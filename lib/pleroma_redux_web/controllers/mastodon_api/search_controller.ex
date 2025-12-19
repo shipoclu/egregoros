@@ -92,4 +92,3 @@ defmodule PleromaReduxWeb.MastodonAPI.SearchController do
 
   defp parse_limit(_), do: 20
 end
-

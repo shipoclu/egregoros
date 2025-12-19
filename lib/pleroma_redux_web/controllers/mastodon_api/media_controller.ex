@@ -61,4 +61,3 @@ defmodule PleromaReduxWeb.MastodonAPI.MediaController do
 
   defp mastodon_media_type(_), do: "unknown"
 end
-

@@ -21,4 +21,3 @@ defmodule PleromaReduxWeb.MastodonAPI.FollowsController do
     send_resp(conn, 422, "Unprocessable Entity")
   end
 end
-

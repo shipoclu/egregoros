@@ -72,4 +72,3 @@ defmodule PleromaReduxWeb.MastodonAPI.FollowsControllerTest do
     assert response["acct"] == "bob@remote.example"
   end
 end
-

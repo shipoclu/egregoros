@@ -26,4 +26,3 @@ defmodule PleromaReduxWeb.MastodonAPI.EmptyListEndpointsTest do
     end)
   end
 end
-

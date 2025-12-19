@@ -9,4 +9,3 @@ defmodule PleromaReduxWeb.MastodonAPI.MarkersController do
     json(conn, %{})
   end
 end
-

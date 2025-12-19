@@ -5,4 +5,3 @@ defmodule PleromaReduxWeb.MastodonAPI.EmptyListController do
     json(conn, [])
   end
 end
-

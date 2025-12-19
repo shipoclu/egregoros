@@ -10,4 +10,3 @@ defmodule PleromaRedux.MediaStorage do
     Application.get_env(:pleroma_redux, __MODULE__, PleromaRedux.MediaStorage.Local)
   end
 end
-

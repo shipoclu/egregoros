@@ -34,4 +34,3 @@ defmodule PleromaReduxWeb.MastodonAPI.MarkersControllerTest do
     assert response == %{}
   end
 end
-

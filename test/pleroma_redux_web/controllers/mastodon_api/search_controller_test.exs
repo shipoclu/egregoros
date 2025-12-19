@@ -78,4 +78,3 @@ defmodule PleromaReduxWeb.MastodonAPI.SearchControllerTest do
            )
   end
 end
-

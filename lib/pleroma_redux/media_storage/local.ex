@@ -65,4 +65,3 @@ defmodule PleromaRedux.MediaStorage.Local do
     end
   end
 end
-
