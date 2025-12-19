@@ -11,6 +11,35 @@ defmodule PleromaRedux.PipelineTest do
     "content" => "Hello from pipeline"
   }
 
+  @like %{
+    "id" => "https://example.com/activities/like/1",
+    "type" => "Like",
+    "actor" => "https://example.com/users/alice",
+    "object" => "https://example.com/objects/1"
+  }
+
+  @announce %{
+    "id" => "https://example.com/activities/announce/1",
+    "type" => "Announce",
+    "actor" => "https://example.com/users/alice",
+    "object" => "https://example.com/objects/1"
+  }
+
+  @follow %{
+    "id" => "https://example.com/activities/follow/1",
+    "type" => "Follow",
+    "actor" => "https://example.com/users/alice",
+    "object" => "https://example.com/users/bob"
+  }
+
+  @emoji_react %{
+    "id" => "https://example.com/activities/react/1",
+    "type" => "EmojiReact",
+    "actor" => "https://example.com/users/alice",
+    "object" => "https://example.com/objects/1",
+    "content" => ":fire:"
+  }
+
   test "ingest stores a Note as an object" do
     assert {:ok, %Object{} = object} = Pipeline.ingest(@note, local: true)
     assert object.ap_id == @note["id"]
@@ -18,6 +47,36 @@ defmodule PleromaRedux.PipelineTest do
     assert object.actor == @note["attributedTo"]
     assert object.data["content"] == "Hello from pipeline"
     assert object.local == true
+  end
+
+  test "ingest stores Like" do
+    assert {:ok, %Object{} = object} = Pipeline.ingest(@like, local: false)
+    assert object.type == "Like"
+    assert object.actor == @like["actor"]
+    assert object.object == @like["object"]
+    assert object.local == false
+  end
+
+  test "ingest stores Announce" do
+    assert {:ok, %Object{} = object} = Pipeline.ingest(@announce, local: false)
+    assert object.type == "Announce"
+    assert object.actor == @announce["actor"]
+    assert object.object == @announce["object"]
+  end
+
+  test "ingest stores Follow" do
+    assert {:ok, %Object{} = object} = Pipeline.ingest(@follow, local: false)
+    assert object.type == "Follow"
+    assert object.actor == @follow["actor"]
+    assert object.object == @follow["object"]
+  end
+
+  test "ingest stores EmojiReact" do
+    assert {:ok, %Object{} = object} = Pipeline.ingest(@emoji_react, local: false)
+    assert object.type == "EmojiReact"
+    assert object.actor == @emoji_react["actor"]
+    assert object.object == @emoji_react["object"]
+    assert object.data["content"] == ":fire:"
   end
 
   test "ingest rejects unknown types" do

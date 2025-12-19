@@ -31,4 +31,10 @@ defmodule PleromaRedux.ObjectsTest do
     assert {:error, changeset} = Objects.create_object(@attrs)
     assert "has already been taken" in errors_on(changeset).ap_id
   end
+
+  test "upsert_object returns existing record" do
+    assert {:ok, %Object{id: id}} = Objects.upsert_object(@attrs)
+    assert {:ok, %Object{id: id_again}} = Objects.upsert_object(@attrs)
+    assert id == id_again
+  end
 end

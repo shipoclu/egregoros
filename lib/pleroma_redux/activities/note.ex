@@ -33,7 +33,7 @@ defmodule PleromaRedux.Activities.Note do
   def ingest(note, opts) do
     note
     |> to_object_attrs(opts)
-    |> Objects.create_object()
+    |> Objects.upsert_object()
   end
 
   def side_effects(_object, _opts), do: :ok
