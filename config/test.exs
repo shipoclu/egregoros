@@ -42,3 +42,4 @@ config :phoenix,
   sort_verified_routes_query_params: true
 
 config :pleroma_redux, PleromaRedux.Auth, PleromaRedux.Auth.Mock
+config :pleroma_redux, PleromaRedux.Discovery, PleromaRedux.Discovery.Mock
