@@ -64,4 +64,3 @@ defmodule PleromaRedux.Media do
     end
   end
 end
-
