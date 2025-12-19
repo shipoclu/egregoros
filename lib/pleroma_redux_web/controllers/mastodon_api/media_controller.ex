@@ -33,22 +33,36 @@ defmodule PleromaReduxWeb.MastodonAPI.MediaController do
   end
 
   defp create_media_object(user, %Plug.Upload{} = upload, url_path) when is_binary(url_path) do
-    ap_id = Endpoint.url() <> "/media/" <> Ecto.UUID.generate()
+    ap_id = Endpoint.url() <> "/objects/" <> Ecto.UUID.generate()
+    href = URL.absolute(url_path) || url_path
 
     Objects.create_object(%{
       ap_id: ap_id,
-      type: "Media",
+      type: activity_type(upload.content_type),
       actor: user.ap_id,
       local: true,
       published: DateTime.utc_now(),
       data: %{
-        "url" => url_path,
-        "preview_url" => url_path,
-        "name" => upload.filename,
-        "mediaType" => upload.content_type
+        "id" => ap_id,
+        "type" => activity_type(upload.content_type),
+        "mediaType" => upload.content_type,
+        "url" => [
+          %{
+            "type" => "Link",
+            "mediaType" => upload.content_type,
+            "href" => href
+          }
+        ],
+        "name" => ""
       }
     })
   end
+
+  defp activity_type(content_type) when is_binary(content_type) do
+    if String.starts_with?(content_type, "image/"), do: "Image", else: "Document"
+  end
+
+  defp activity_type(_), do: "Document"
 
   defp mastodon_media_type(content_type) when is_binary(content_type) do
     cond do
