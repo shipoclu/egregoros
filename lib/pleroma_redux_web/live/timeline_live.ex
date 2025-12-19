@@ -351,6 +351,7 @@ defmodule PleromaReduxWeb.TimelineLive do
                     </span>
                     <button
                       type="submit"
+                      phx-disable-with="Posting..."
                       class="rounded-full bg-slate-900 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-slate-900/20 transition hover:-translate-y-0.5 hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
                     >
                       Post
@@ -416,6 +417,7 @@ defmodule PleromaReduxWeb.TimelineLive do
 
                 <button
                   type="submit"
+                  phx-disable-with="Following..."
                   class="rounded-full border border-slate-200/80 bg-white/70 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:-translate-y-0.5 hover:bg-white dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:hover:bg-slate-950"
                 >
                   Follow
@@ -492,6 +494,7 @@ defmodule PleromaReduxWeb.TimelineLive do
                     data-role="unfollow"
                     phx-click="unfollow"
                     phx-value-id={entry.relationship.id}
+                    phx-disable-with="Unfollowing..."
                     class="shrink-0 rounded-full border border-slate-200/80 bg-white/70 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700 transition hover:-translate-y-0.5 hover:bg-white dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:hover:bg-slate-950"
                   >
                     Unfollow
@@ -614,8 +617,19 @@ defmodule PleromaReduxWeb.TimelineLive do
                   data-role="like"
                   phx-click="toggle_like"
                   phx-value-id={entry.object.id}
-                  class="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/70 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:-translate-y-0.5 hover:bg-white dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:hover:bg-slate-950"
+                  phx-disable-with="..."
+                  class={[
+                    "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition hover:-translate-y-0.5",
+                    entry.liked? &&
+                      "border-rose-200/70 bg-rose-50/80 text-rose-700 hover:bg-rose-50 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200 dark:hover:bg-rose-500/10",
+                    !entry.liked? &&
+                      "border-slate-200/80 bg-white/70 text-slate-700 hover:bg-white dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:hover:bg-slate-950"
+                  ]}
                 >
+                  <.icon
+                    name={if entry.liked?, do: "hero-heart-solid", else: "hero-heart"}
+                    class="size-4"
+                  />
                   {if entry.liked?, do: "Unlike", else: "Like"}
                   <span class="text-xs font-normal text-slate-500 dark:text-slate-400">
                     {entry.likes_count}
@@ -628,8 +642,19 @@ defmodule PleromaReduxWeb.TimelineLive do
                   data-role="repost"
                   phx-click="toggle_repost"
                   phx-value-id={entry.object.id}
-                  class="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/70 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:-translate-y-0.5 hover:bg-white dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:hover:bg-slate-950"
+                  phx-disable-with="..."
+                  class={[
+                    "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition hover:-translate-y-0.5",
+                    entry.reposted? &&
+                      "border-emerald-200/70 bg-emerald-50/80 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200 dark:hover:bg-emerald-500/10",
+                    !entry.reposted? &&
+                      "border-slate-200/80 bg-white/70 text-slate-700 hover:bg-white dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:hover:bg-slate-950"
+                  ]}
                 >
+                  <.icon
+                    name={if entry.reposted?, do: "hero-arrow-path-solid", else: "hero-arrow-path"}
+                    class="size-4"
+                  />
                   {if entry.reposted?, do: "Unrepost", else: "Repost"}
                   <span class="text-xs font-normal text-slate-500 dark:text-slate-400">
                     {entry.reposts_count}
@@ -647,6 +672,7 @@ defmodule PleromaReduxWeb.TimelineLive do
                       phx-click="toggle_reaction"
                       phx-value-id={entry.object.id}
                       phx-value-emoji={emoji}
+                      phx-disable-with="..."
                       class={[
                         "inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-semibold transition hover:-translate-y-0.5",
                         reaction.reacted? &&
@@ -774,8 +800,8 @@ defmodule PleromaReduxWeb.TimelineLive do
   defp user_handle(%User{nickname: nickname}, ap_id)
        when is_binary(nickname) and is_binary(ap_id) do
     case URI.parse(ap_id) do
-      %{host: host} when is_binary(host) and host != "" -> "#{nickname}@#{host}"
-      _ -> nickname
+      %{host: host} when is_binary(host) and host != "" -> "@#{nickname}@#{host}"
+      _ -> "@" <> nickname
     end
   end
 
