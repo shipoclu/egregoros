@@ -3,7 +3,9 @@ defmodule PleromaReduxWeb.TimelineLiveTest do
 
   import Phoenix.LiveViewTest
 
+  alias PleromaRedux.Activities.Follow
   alias PleromaRedux.Objects
+  alias PleromaRedux.Pipeline
   alias PleromaRedux.Timeline
   alias PleromaRedux.Users
 
@@ -90,5 +92,32 @@ defmodule PleromaReduxWeb.TimelineLiveTest do
              "#post-#{note.id} button[data-role='reaction'][data-emoji='🔥']",
              "1"
            )
+  end
+
+  test "unfollowing removes the follow from the UI", %{conn: conn, user: user} do
+    {:ok, remote} =
+      Users.create_user(%{
+        nickname: "bob",
+        ap_id: "https://remote.example/users/bob",
+        inbox: "https://remote.example/users/bob/inbox",
+        outbox: "https://remote.example/users/bob/outbox",
+        public_key: "PUB",
+        private_key: nil,
+        local: false
+      })
+
+    {:ok, follow_object} = Pipeline.ingest(Follow.build(user, remote), local: true)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/")
+
+    assert has_element?(view, "#following-#{follow_object.id}")
+
+    view
+    |> element("#following-#{follow_object.id} button[data-role='unfollow']")
+    |> render_click()
+
+    assert Objects.get(follow_object.id) == nil
+    refute has_element?(view, "#following-#{follow_object.id}")
   end
 end

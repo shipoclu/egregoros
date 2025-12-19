@@ -34,6 +34,7 @@ defmodule PleromaReduxWeb.TimelineLive do
        error: nil,
        follow_error: nil,
        follow_success: nil,
+       following: list_following(current_user),
        form: form,
        follow_form: follow_form,
        current_user: current_user
@@ -78,12 +79,29 @@ defmodule PleromaReduxWeb.TimelineLive do
              assign(socket,
                follow_form: Phoenix.Component.to_form(%{"handle" => ""}, as: :follow),
                follow_error: nil,
-               follow_success: "Following #{remote.ap_id}."
+               follow_success: "Following #{remote.ap_id}.",
+               following: list_following(user)
              )}
 
           {:error, _reason} ->
             {:noreply, assign(socket, follow_error: "Could not follow.", follow_success: nil)}
         end
+    end
+  end
+
+  def handle_event("unfollow", %{"id" => id}, socket) do
+    with %User{} = user <- socket.assigns.current_user,
+         {follow_id, ""} <- Integer.parse(to_string(id)),
+         %{type: "Follow", actor: actor} = follow_object <- Objects.get(follow_id),
+         true <- actor == user.ap_id,
+         {:ok, _undo} <- Pipeline.ingest(Undo.build(user, follow_object), local: true) do
+      {:noreply, assign(socket, following: list_following(user))}
+    else
+      nil ->
+        {:noreply, assign(socket, follow_error: "Register to unfollow.", follow_success: nil)}
+
+      _ ->
+        {:noreply, socket}
     end
   end
 
@@ -216,6 +234,47 @@ defmodule PleromaReduxWeb.TimelineLive do
             {@follow_success}
           </p>
 
+          <div :if={@current_user} class="mt-8 border-t border-slate-200/70 pt-6 dark:border-slate-700/60">
+            <div class="flex items-center justify-between">
+              <h3 class="text-xs uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
+                Following
+              </h3>
+              <span class="text-xs text-slate-400 dark:text-slate-500">{length(@following)}</span>
+            </div>
+
+            <div class="mt-4 space-y-2">
+              <%= for entry <- @following do %>
+                <div
+                  id={"following-#{entry.follow.id}"}
+                  class="flex items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-white/70 px-4 py-3 text-sm shadow-sm shadow-slate-200/20 backdrop-blur dark:border-slate-700/70 dark:bg-slate-950/60 dark:shadow-slate-900/40"
+                >
+                  <div class="min-w-0">
+                    <p class="truncate font-semibold text-slate-900 dark:text-slate-100">
+                      {if entry.target, do: entry.target.nickname, else: entry.follow.object}
+                    </p>
+                    <p class="truncate text-xs text-slate-500 dark:text-slate-400">
+                      {entry.follow.object}
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    data-role="unfollow"
+                    phx-click="unfollow"
+                    phx-value-id={entry.follow.id}
+                    class="shrink-0 rounded-full border border-slate-200/80 bg-white/70 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700 transition hover:-translate-y-0.5 hover:bg-white dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:hover:bg-slate-950"
+                  >
+                    Unfollow
+                  </button>
+                </div>
+              <% end %>
+
+              <p :if={@following == []} class="text-sm text-slate-500 dark:text-slate-400">
+                Follow someone to start building your home graph.
+              </p>
+            </div>
+          </div>
+
           <.form for={@form} id="timeline-form" phx-submit="create_post" class="mt-6 space-y-4">
             <.input
               type="textarea"
@@ -328,6 +387,17 @@ defmodule PleromaReduxWeb.TimelineLive do
 
   defp decorate_posts(posts, current_user) when is_list(posts) do
     Enum.map(posts, &decorate_post(&1, current_user))
+  end
+
+  defp list_following(nil), do: []
+
+  defp list_following(%User{} = user) do
+    user.ap_id
+    |> Objects.list_follows_by_actor()
+    |> Enum.sort_by(& &1.inserted_at, :desc)
+    |> Enum.map(fn follow ->
+      %{follow: follow, target: Users.get_by_ap_id(follow.object)}
+    end)
   end
 
   defp decorate_post(post, current_user) do
