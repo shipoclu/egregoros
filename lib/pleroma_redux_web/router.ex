@@ -66,6 +66,7 @@ defmodule PleromaReduxWeb.Router do
   scope "/api/v1", PleromaReduxWeb.MastodonAPI do
     pipe_through :api
 
+    post "/apps", AppsController, :create
     get "/timelines/public", TimelinesController, :public
     get "/statuses/:id", StatusesController, :show
     get "/accounts/:id", AccountsController, :show
