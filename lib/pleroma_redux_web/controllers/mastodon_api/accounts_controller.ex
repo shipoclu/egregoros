@@ -3,6 +3,7 @@ defmodule PleromaReduxWeb.MastodonAPI.AccountsController do
 
   alias PleromaRedux.Activities.Follow
   alias PleromaRedux.Activities.Undo
+  alias PleromaRedux.AvatarStorage
   alias PleromaRedux.Federation.Actor
   alias PleromaRedux.Federation.WebFinger
   alias PleromaRedux.Objects
@@ -17,6 +18,25 @@ defmodule PleromaReduxWeb.MastodonAPI.AccountsController do
 
   def verify_credentials(conn, _params) do
     json(conn, AccountRenderer.render_account(conn.assigns.current_user))
+  end
+
+  def update_credentials(conn, params) do
+    user = conn.assigns.current_user
+
+    attrs =
+      %{
+        name: Map.get(params, "display_name"),
+        bio: Map.get(params, "note")
+      }
+      |> Enum.reject(fn {_k, v} -> v == nil end)
+      |> Map.new(fn {k, v} -> {k, to_string(v)} end)
+
+    with {:ok, attrs} <- maybe_put_avatar(user, params, attrs),
+         {:ok, user} <- Users.update_profile(user, attrs) do
+      json(conn, AccountRenderer.render_account(user))
+    else
+      {:error, _} -> send_resp(conn, 422, "Unprocessable Entity")
+    end
   end
 
   def show(conn, %{"id" => id}) do
@@ -192,4 +212,13 @@ defmodule PleromaReduxWeb.MastodonAPI.AccountsController do
     |> URI.parse()
     |> Map.get(:host)
   end
+
+  defp maybe_put_avatar(user, %{"avatar" => %Plug.Upload{} = upload}, attrs) when is_map(attrs) do
+    case AvatarStorage.store_avatar(user, upload) do
+      {:ok, url_path} -> {:ok, Map.put(attrs, :avatar_url, url_path)}
+      {:error, _} -> {:error, :invalid_avatar}
+    end
+  end
+
+  defp maybe_put_avatar(_user, _params, attrs), do: {:ok, attrs}
 end

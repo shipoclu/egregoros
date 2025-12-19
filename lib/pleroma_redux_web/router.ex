@@ -55,6 +55,7 @@ defmodule PleromaReduxWeb.Router do
   scope "/api/v1", PleromaReduxWeb.MastodonAPI do
     pipe_through [:api, :api_auth]
 
+    patch "/accounts/update_credentials", AccountsController, :update_credentials
     get "/accounts/verify_credentials", AccountsController, :verify_credentials
     get "/accounts/relationships", AccountsController, :relationships
     get "/timelines/home", TimelinesController, :home

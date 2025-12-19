@@ -76,6 +76,57 @@ defmodule PleromaReduxWeb.MastodonAPI.AccountsControllerTest do
     assert Enum.at(response, 0)["content"] == "First post"
   end
 
+  test "PATCH /api/v1/accounts/update_credentials updates profile fields", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("local")
+
+    PleromaRedux.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, user} end)
+
+    conn =
+      patch(conn, "/api/v1/accounts/update_credentials", %{
+        "display_name" => "New Name",
+        "note" => "New bio"
+      })
+
+    response = json_response(conn, 200)
+    assert response["display_name"] == "New Name"
+    assert response["note"] == "New bio"
+
+    user = Users.get(user.id)
+    assert user.name == "New Name"
+    assert user.bio == "New bio"
+  end
+
+  test "PATCH /api/v1/accounts/update_credentials updates avatar upload", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("local")
+
+    PleromaRedux.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, user} end)
+
+    upload =
+      %Plug.Upload{
+        path: tmp_upload_path(),
+        filename: "avatar.png",
+        content_type: "image/png"
+      }
+
+    PleromaRedux.AvatarStorage.Mock
+    |> expect(:store_avatar, fn ^user, %Plug.Upload{filename: "avatar.png"} ->
+      {:ok, "/uploads/avatars/#{user.id}/avatar.png"}
+    end)
+
+    conn =
+      patch(conn, "/api/v1/accounts/update_credentials", %{
+        "avatar" => upload
+      })
+
+    response = json_response(conn, 200)
+    assert String.ends_with?(response["avatar"], "/uploads/avatars/#{user.id}/avatar.png")
+
+    user = Users.get(user.id)
+    assert user.avatar_url == "/uploads/avatars/#{user.id}/avatar.png"
+  end
+
   test "GET /api/v1/accounts/lookup finds a local account by acct", %{conn: conn} do
     {:ok, user} = Users.create_local_user("alice")
 
@@ -275,5 +326,11 @@ defmodule PleromaReduxWeb.MastodonAPI.AccountsControllerTest do
     response = json_response(conn, 200)
 
     assert Enum.any?(response, &(&1["id"] == Integer.to_string(target.id)))
+  end
+
+  defp tmp_upload_path do
+    path = Path.join(System.tmp_dir!(), "pleroma-redux-test-upload-#{Ecto.UUID.generate()}")
+    File.write!(path, <<0, 1, 2, 3>>)
+    path
   end
 end
