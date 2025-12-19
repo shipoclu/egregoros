@@ -1,15 +1,18 @@
 defmodule PleromaReduxWeb.MastodonAPI.AccountRenderer do
   alias PleromaRedux.User
+  alias PleromaReduxWeb.URL
 
   def render_account(%User{} = user) do
+    avatar_url = URL.absolute(user.avatar_url) || ""
+
     %{
       "id" => Integer.to_string(user.id),
       "username" => user.nickname,
       "acct" => user.nickname,
       "display_name" => user.name || user.nickname,
       "note" => user.bio || "",
-      "avatar" => user.avatar_url || "",
-      "avatar_static" => user.avatar_url || "",
+      "avatar" => avatar_url,
+      "avatar_static" => avatar_url,
       "url" => user.ap_id
     }
   end

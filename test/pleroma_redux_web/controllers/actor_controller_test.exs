@@ -38,4 +38,21 @@ defmodule PleromaReduxWeb.ActorControllerTest do
     assert decoded["summary"] == "Hello federation"
     assert decoded["icon"]["url"] == "https://cdn.example/dana.png"
   end
+
+  test "GET /users/:nickname renders uploaded avatar paths as absolute urls", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("dana")
+
+    {:ok, _} =
+      Users.update_profile(user, %{
+        "avatar_url" => "/uploads/avatars/#{user.id}/avatar.png"
+      })
+
+    conn = get(conn, "/users/dana")
+    assert conn.status == 200
+
+    decoded = Jason.decode!(conn.resp_body)
+
+    assert decoded["icon"]["url"] ==
+             PleromaReduxWeb.Endpoint.url() <> "/uploads/avatars/#{user.id}/avatar.png"
+  end
 end

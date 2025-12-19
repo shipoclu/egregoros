@@ -2,6 +2,7 @@ defmodule PleromaReduxWeb.ActorController do
   use PleromaReduxWeb, :controller
 
   alias PleromaRedux.Users
+  alias PleromaReduxWeb.URL
 
   def show(conn, %{"nickname" => nickname}) do
     case Users.get_by_nickname(nickname) do
@@ -43,7 +44,7 @@ defmodule PleromaReduxWeb.ActorController do
        when is_binary(avatar_url) and avatar_url != "" do
     Map.put(actor, "icon", %{
       "type" => "Image",
-      "url" => avatar_url
+      "url" => URL.absolute(avatar_url)
     })
   end
 
