@@ -36,4 +36,3 @@ defmodule PleromaRedux.Relationships do
     |> Repo.all()
   end
 end
-

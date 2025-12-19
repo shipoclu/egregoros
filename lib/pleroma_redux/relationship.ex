@@ -19,4 +19,3 @@ defmodule PleromaRedux.Relationship do
     |> unique_constraint([:type, :actor, :object], name: :relationships_type_actor_object_index)
   end
 end
-

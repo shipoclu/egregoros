@@ -236,7 +236,10 @@ defmodule PleromaReduxWeb.TimelineLive do
             {@follow_success}
           </p>
 
-          <div :if={@current_user} class="mt-8 border-t border-slate-200/70 pt-6 dark:border-slate-700/60">
+          <div
+            :if={@current_user}
+            class="mt-8 border-t border-slate-200/70 pt-6 dark:border-slate-700/60"
+          >
             <div class="flex items-center justify-between">
               <h3 class="text-xs uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
                 Following

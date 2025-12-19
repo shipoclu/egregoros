@@ -109,7 +109,9 @@ defmodule PleromaReduxWeb.TimelineLiveTest do
 
     assert {:ok, _follow_object} = Pipeline.ingest(Follow.build(user, remote), local: true)
 
-    assert %{} = relationship = Relationships.get_by_type_actor_object("Follow", user.ap_id, remote.ap_id)
+    assert %{} =
+             relationship =
+             Relationships.get_by_type_actor_object("Follow", user.ap_id, remote.ap_id)
 
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     {:ok, view, _html} = live(conn, "/")

@@ -33,4 +33,3 @@ defmodule PleromaRedux.RelationshipsTest do
     assert relationship.activity_ap_id == follow_2["id"]
   end
 end
-
