@@ -74,7 +74,8 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesControllerTest do
     [object] = Objects.list_notes()
 
     conn = post(conn, "/api/v1/statuses/#{object.id}/favourite")
-    assert json_response(conn, 200)
+    response = json_response(conn, 200)
+    assert response["account"]["username"] == "alice"
 
     assert Objects.get_by_type_actor_object("Like", user.ap_id, object.ap_id)
   end

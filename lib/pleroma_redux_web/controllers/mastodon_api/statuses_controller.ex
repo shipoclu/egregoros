@@ -42,7 +42,7 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesController do
     with %{} = object <- Objects.get(id),
          {:ok, _liked} <-
            Pipeline.ingest(Like.build(conn.assigns.current_user, object), local: true) do
-      json(conn, StatusRenderer.render_status(object, conn.assigns.current_user))
+      json(conn, StatusRenderer.render_status(object))
     else
       nil -> send_resp(conn, 404, "Not Found")
       {:error, _} -> send_resp(conn, 422, "Unprocessable Entity")
@@ -53,7 +53,7 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesController do
     with %{} = object <- Objects.get(id),
          %{} = like <- Objects.get_by_type_actor_object("Like", conn.assigns.current_user.ap_id, object.ap_id),
          {:ok, _undo} <- Pipeline.ingest(Undo.build(conn.assigns.current_user, like), local: true) do
-      json(conn, StatusRenderer.render_status(object, conn.assigns.current_user))
+      json(conn, StatusRenderer.render_status(object))
     else
       nil -> send_resp(conn, 404, "Not Found")
       {:error, _} -> send_resp(conn, 422, "Unprocessable Entity")
@@ -63,7 +63,7 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesController do
   def reblog(conn, %{"id" => id}) do
     with %{} = object <- Objects.get(id),
          {:ok, _announce} <- Pipeline.ingest(Announce.build(conn.assigns.current_user, object), local: true) do
-      json(conn, StatusRenderer.render_status(object, conn.assigns.current_user))
+      json(conn, StatusRenderer.render_status(object))
     else
       nil -> send_resp(conn, 404, "Not Found")
       {:error, _} -> send_resp(conn, 422, "Unprocessable Entity")
@@ -74,7 +74,7 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesController do
     with %{} = object <- Objects.get(id),
          %{} = announce <- Objects.get_by_type_actor_object("Announce", conn.assigns.current_user.ap_id, object.ap_id),
          {:ok, _undo} <- Pipeline.ingest(Undo.build(conn.assigns.current_user, announce), local: true) do
-      json(conn, StatusRenderer.render_status(object, conn.assigns.current_user))
+      json(conn, StatusRenderer.render_status(object))
     else
       nil -> send_resp(conn, 404, "Not Found")
       {:error, _} -> send_resp(conn, 422, "Unprocessable Entity")
