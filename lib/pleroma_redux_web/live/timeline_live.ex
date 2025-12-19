@@ -116,7 +116,8 @@ defmodule PleromaReduxWeb.TimelineLive do
           %{} = relationship ->
             Pipeline.ingest(Undo.build(user, relationship.activity_ap_id), local: true)
 
-          _ -> {:error, :not_found}
+          _ ->
+            {:error, :not_found}
         end
       else
         Pipeline.ingest(Like.build(user, post), local: true)
@@ -142,7 +143,8 @@ defmodule PleromaReduxWeb.TimelineLive do
           %{} = relationship ->
             Pipeline.ingest(Undo.build(user, relationship.activity_ap_id), local: true)
 
-          _ -> {:error, :not_found}
+          _ ->
+            {:error, :not_found}
         end
       else
         Pipeline.ingest(Announce.build(user, post), local: true)
@@ -448,7 +450,8 @@ defmodule PleromaReduxWeb.TimelineLive do
 
   defp reacted_by_current_user?(post, %User{} = current_user, relationship_type)
        when is_binary(relationship_type) do
-    Relationships.get_by_type_actor_object(relationship_type, current_user.ap_id, post.ap_id) != nil
+    Relationships.get_by_type_actor_object(relationship_type, current_user.ap_id, post.ap_id) !=
+      nil
   end
 
   defp reaction_emojis do

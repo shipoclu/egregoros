@@ -63,11 +63,11 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesController do
     with %{} = object <- Objects.get(id),
          %{} =
            relationship <-
-             Relationships.get_by_type_actor_object(
-               "Like",
-               conn.assigns.current_user.ap_id,
-               object.ap_id
-             ),
+           Relationships.get_by_type_actor_object(
+             "Like",
+             conn.assigns.current_user.ap_id,
+             object.ap_id
+           ),
          {:ok, _undo} <-
            Pipeline.ingest(Undo.build(conn.assigns.current_user, relationship.activity_ap_id),
              local: true
@@ -103,11 +103,11 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesController do
     with %{} = object <- Objects.get(id),
          %{} =
            relationship <-
-             Relationships.get_by_type_actor_object(
-               "Announce",
-               conn.assigns.current_user.ap_id,
-               object.ap_id
-             ),
+           Relationships.get_by_type_actor_object(
+             "Announce",
+             conn.assigns.current_user.ap_id,
+             object.ap_id
+           ),
          {:ok, _undo} <-
            Pipeline.ingest(Undo.build(conn.assigns.current_user, relationship.activity_ap_id),
              local: true

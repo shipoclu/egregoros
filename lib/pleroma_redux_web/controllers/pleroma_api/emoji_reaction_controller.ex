@@ -38,12 +38,13 @@ defmodule PleromaReduxWeb.PleromaAPI.EmojiReactionController do
          relationship_type = "EmojiReact:" <> to_string(emoji),
          %{} =
            relationship <-
-             Relationships.get_by_type_actor_object(
-               relationship_type,
-               user.ap_id,
-               object.ap_id
-             ),
-         {:ok, _undo} <- Pipeline.ingest(Undo.build(user, relationship.activity_ap_id), local: true) do
+           Relationships.get_by_type_actor_object(
+             relationship_type,
+             user.ap_id,
+             object.ap_id
+           ),
+         {:ok, _undo} <-
+           Pipeline.ingest(Undo.build(user, relationship.activity_ap_id), local: true) do
       send_resp(conn, 200, "")
     else
       nil -> send_resp(conn, 404, "Not Found")

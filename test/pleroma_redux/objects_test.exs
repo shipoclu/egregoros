@@ -65,7 +65,9 @@ defmodule PleromaRedux.ObjectsTest do
     assert {:ok, %Object{} = obj_1} = Objects.create_object(like_1)
     assert {:ok, %Object{} = obj_2} = Objects.create_object(like_2)
 
-    assert %Object{} = latest = Objects.get_by_type_actor_object("Like", obj_1.actor, obj_1.object)
+    assert %Object{} =
+             latest = Objects.get_by_type_actor_object("Like", obj_1.actor, obj_1.object)
+
     assert latest.id == obj_2.id
   end
 
