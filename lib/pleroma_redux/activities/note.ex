@@ -1,5 +1,6 @@
 defmodule PleromaRedux.Activities.Note do
   alias PleromaRedux.Objects
+  alias PleromaRedux.Timeline
 
   def type, do: "Note"
 
@@ -36,7 +37,10 @@ defmodule PleromaRedux.Activities.Note do
     |> Objects.upsert_object()
   end
 
-  def side_effects(_object, _opts), do: :ok
+  def side_effects(object, _opts) do
+    Timeline.broadcast_post(object)
+    :ok
+  end
 
   defp put_actor(%{"actor" => _} = note), do: note
 

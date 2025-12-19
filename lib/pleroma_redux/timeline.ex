@@ -26,10 +26,13 @@ defmodule PleromaRedux.Timeline do
     else
       with {:ok, user} <- Users.get_or_create_local_user("local"),
            {:ok, object} <- Pipeline.ingest(build_note(user, content), local: true) do
-        Phoenix.PubSub.broadcast(PleromaRedux.PubSub, @topic, {:post_created, object})
         {:ok, object}
       end
     end
+  end
+
+  def broadcast_post(object) do
+    Phoenix.PubSub.broadcast(PleromaRedux.PubSub, @topic, {:post_created, object})
   end
 
   def reset do
