@@ -39,6 +39,7 @@ defmodule PleromaReduxWeb.Router do
     pipe_through [:api, :api_auth]
 
     get "/accounts/verify_credentials", AccountsController, :verify_credentials
+    get "/timelines/home", TimelinesController, :home
     post "/accounts/:id/follow", AccountsController, :follow
     post "/accounts/:id/unfollow", AccountsController, :unfollow
     post "/statuses", StatusesController, :create
