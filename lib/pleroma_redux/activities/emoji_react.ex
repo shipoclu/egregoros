@@ -2,6 +2,7 @@ defmodule PleromaRedux.Activities.EmojiReact do
   alias PleromaRedux.Federation.Delivery
   alias PleromaRedux.Object
   alias PleromaRedux.Objects
+  alias PleromaRedux.Relationships
   alias PleromaRedux.User
   alias PleromaRedux.Users
   alias PleromaReduxWeb.Endpoint
@@ -74,6 +75,18 @@ defmodule PleromaRedux.Activities.EmojiReact do
   end
 
   def side_effects(object, opts) do
+    emoji = get_in(object.data, ["content"])
+
+    if is_binary(emoji) and emoji != "" do
+      _ =
+        Relationships.upsert_relationship(%{
+          type: type() <> ":" <> emoji,
+          actor: object.actor,
+          object: object.object,
+          activity_ap_id: object.ap_id
+        })
+    end
+
     if Keyword.get(opts, :local, true) do
       deliver_reaction(object)
     end

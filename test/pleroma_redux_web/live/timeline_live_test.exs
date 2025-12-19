@@ -165,4 +165,51 @@ defmodule PleromaReduxWeb.TimelineLiveTest do
     assert has_element?(view, "#post-#{note.id} button[data-role='like']", "Like")
     assert has_element?(view, "#post-#{note.id} button[data-role='like']", "0")
   end
+
+  test "duplicate reactions are deduped and can be fully unreacted", %{conn: conn, user: user} do
+    {:ok, note} = Pipeline.ingest(Note.build(user, "Hello world"), local: true)
+
+    assert {:ok, _} =
+             Pipeline.ingest(
+               %{
+                 "id" => "https://local.example/activities/react/1",
+                 "type" => "EmojiReact",
+                 "actor" => user.ap_id,
+                 "object" => note.ap_id,
+                 "content" => "🔥"
+               },
+               local: true
+             )
+
+    assert {:ok, _} =
+             Pipeline.ingest(
+               %{
+                 "id" => "https://local.example/activities/react/2",
+                 "type" => "EmojiReact",
+                 "actor" => user.ap_id,
+                 "object" => note.ap_id,
+                 "content" => "🔥"
+               },
+               local: true
+             )
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/")
+
+    assert has_element?(
+             view,
+             "#post-#{note.id} button[data-role='reaction'][data-emoji='🔥']",
+             "1"
+           )
+
+    view
+    |> element("#post-#{note.id} button[data-role='reaction'][data-emoji='🔥']")
+    |> render_click()
+
+    assert has_element?(
+             view,
+             "#post-#{note.id} button[data-role='reaction'][data-emoji='🔥']",
+             "0"
+           )
+  end
 end

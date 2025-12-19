@@ -6,7 +6,6 @@ defmodule PleromaReduxWeb.TimelineLive do
   alias PleromaRedux.Activities.Like
   alias PleromaRedux.Activities.Undo
   alias PleromaRedux.Federation
-  alias PleromaRedux.Objects
   alias PleromaRedux.Pipeline
   alias PleromaRedux.Publish
   alias PleromaRedux.Relationships
@@ -164,10 +163,11 @@ defmodule PleromaReduxWeb.TimelineLive do
          {post_id, ""} <- Integer.parse(to_string(id)),
          %{object: post} <- Enum.find(socket.assigns.posts, &(&1.object.id == post_id)) do
       emoji = to_string(emoji)
+      relationship_type = "EmojiReact:" <> emoji
 
-      case Objects.get_emoji_react(user.ap_id, post.ap_id, emoji) do
-        %{} = reaction_object ->
-          Pipeline.ingest(Undo.build(user, reaction_object), local: true)
+      case Relationships.get_by_type_actor_object(relationship_type, user.ap_id, post.ap_id) do
+        %{} = relationship ->
+          Pipeline.ingest(Undo.build(user, relationship.activity_ap_id), local: true)
 
         nil ->
           Pipeline.ingest(EmojiReact.build(user, post, emoji), local: true)
@@ -434,18 +434,21 @@ defmodule PleromaReduxWeb.TimelineLive do
 
   defp reactions_for_post(post, current_user) do
     for emoji <- reaction_emojis(), into: %{} do
+      relationship_type = "EmojiReact:" <> emoji
+
       {emoji,
        %{
-         count: Objects.count_emoji_reacts(post.ap_id, emoji),
-         reacted?: reacted_by_current_user?(post, current_user, emoji)
+         count: Relationships.count_by_type_object(relationship_type, post.ap_id),
+         reacted?: reacted_by_current_user?(post, current_user, relationship_type)
        }}
     end
   end
 
-  defp reacted_by_current_user?(_post, nil, _emoji), do: false
+  defp reacted_by_current_user?(_post, nil, _relationship_type), do: false
 
-  defp reacted_by_current_user?(post, %User{} = current_user, emoji) when is_binary(emoji) do
-    Objects.get_emoji_react(current_user.ap_id, post.ap_id, emoji) != nil
+  defp reacted_by_current_user?(post, %User{} = current_user, relationship_type)
+       when is_binary(relationship_type) do
+    Relationships.get_by_type_actor_object(relationship_type, current_user.ap_id, post.ap_id) != nil
   end
 
   defp reaction_emojis do

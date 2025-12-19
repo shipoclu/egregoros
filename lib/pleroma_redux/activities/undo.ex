@@ -136,8 +136,25 @@ defmodule PleromaRedux.Activities.Undo do
     Objects.delete_object(target_activity)
   end
 
-  defp undo_target(%Object{type: type} = target_activity)
-       when type in ["EmojiReact"] do
+  defp undo_target(
+         %Object{type: "EmojiReact", actor: actor, object: object, ap_id: target_ap_id} =
+           target_activity
+       ) do
+    emoji = get_in(target_activity.data, ["content"])
+
+    if is_binary(emoji) and emoji != "" do
+      relationship_type = "EmojiReact:" <> emoji
+
+      case Relationships.get_by_type_actor_object(relationship_type, actor, object) do
+        %{activity_ap_id: ^target_ap_id} ->
+          _ = Relationships.delete_by_type_actor_object(relationship_type, actor, object)
+          :ok
+
+        _ ->
+          :ok
+      end
+    end
+
     Objects.delete_object(target_activity)
   end
 
