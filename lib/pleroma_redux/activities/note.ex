@@ -1,8 +1,26 @@
 defmodule PleromaRedux.Activities.Note do
   alias PleromaRedux.Objects
   alias PleromaRedux.Timeline
+  alias PleromaRedux.User
+  alias PleromaReduxWeb.Endpoint
 
   def type, do: "Note"
+
+  def build(%User{ap_id: actor}, content) when is_binary(content) do
+    build(actor, content)
+  end
+
+  def build(actor, content) when is_binary(actor) and is_binary(content) do
+    %{
+      "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
+      "type" => type(),
+      "attributedTo" => actor,
+      "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+      "cc" => [actor <> "/followers"],
+      "content" => content,
+      "published" => DateTime.utc_now() |> DateTime.to_iso8601()
+    }
+  end
 
   def normalize(%{"type" => "Note"} = note) do
     note

@@ -1,9 +1,30 @@
 defmodule PleromaRedux.Activities.Create do
   alias PleromaRedux.Objects
   alias PleromaRedux.Pipeline
+  alias PleromaRedux.User
   alias PleromaRedux.Users
+  alias PleromaReduxWeb.Endpoint
 
   def type, do: "Create"
+
+  def build(%User{ap_id: actor}, object) when is_map(object) do
+    build(actor, object)
+  end
+
+  def build(actor, object) when is_binary(actor) and is_map(object) do
+    to = object["to"] || ["https://www.w3.org/ns/activitystreams#Public"]
+    cc = object["cc"] || [actor <> "/followers"]
+
+    %{
+      "id" => Endpoint.url() <> "/activities/create/" <> Ecto.UUID.generate(),
+      "type" => type(),
+      "actor" => actor,
+      "to" => to,
+      "cc" => cc,
+      "object" => object,
+      "published" => object["published"] || DateTime.utc_now() |> DateTime.to_iso8601()
+    }
+  end
 
   def normalize(%{"type" => "Create"} = activity) do
     activity
