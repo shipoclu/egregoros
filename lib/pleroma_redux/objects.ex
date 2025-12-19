@@ -11,6 +11,12 @@ defmodule PleromaRedux.Objects do
     |> Repo.insert()
   end
 
+  def update_object(%Object{} = object, attrs) do
+    object
+    |> Object.changeset(attrs)
+    |> Repo.update()
+  end
+
   def upsert_object(attrs) do
     case create_object(attrs) do
       {:ok, %Object{} = object} ->
