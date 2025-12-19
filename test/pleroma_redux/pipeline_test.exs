@@ -32,6 +32,13 @@ defmodule PleromaRedux.PipelineTest do
     "object" => "https://example.com/users/bob"
   }
 
+  @undo %{
+    "id" => "https://example.com/activities/undo/1",
+    "type" => "Undo",
+    "actor" => "https://example.com/users/alice",
+    "object" => "https://example.com/activities/follow/1"
+  }
+
   @emoji_react %{
     "id" => "https://example.com/activities/react/1",
     "type" => "EmojiReact",
@@ -69,6 +76,13 @@ defmodule PleromaRedux.PipelineTest do
     assert object.type == "Follow"
     assert object.actor == @follow["actor"]
     assert object.object == @follow["object"]
+  end
+
+  test "ingest stores Undo" do
+    assert {:ok, %Object{} = object} = Pipeline.ingest(@undo, local: false)
+    assert object.type == "Undo"
+    assert object.actor == @undo["actor"]
+    assert object.object == @undo["object"]
   end
 
   test "ingest stores EmojiReact" do

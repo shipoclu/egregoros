@@ -4,13 +4,15 @@ defmodule PleromaRedux.ActivityRegistry do
   alias PleromaRedux.Activities.Follow
   alias PleromaRedux.Activities.Like
   alias PleromaRedux.Activities.Note
+  alias PleromaRedux.Activities.Undo
 
   @registry %{
     "Note" => Note,
     "Like" => Like,
     "Announce" => Announce,
     "Follow" => Follow,
-    "EmojiReact" => EmojiReact
+    "EmojiReact" => EmojiReact,
+    "Undo" => Undo
   }
 
   def fetch(%{"type" => type}), do: fetch(type)
