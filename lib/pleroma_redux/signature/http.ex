@@ -9,14 +9,21 @@ defmodule PleromaRedux.Signature.HTTP do
 
     with {:ok, key_id, signature, headers_param} <- parse_signature(headers),
          {:ok, key} <- public_key_for_key_id(key_id),
-         {:ok, method} <- method_atom(conn.method),
-         path <- request_path_with_query(conn),
-         signature_string <- signature_string(method, path, headers, headers_param),
-         true <- verify_rsa(signature, signature_string, key) do
-      :ok
+         {:ok, method} <- method_atom(conn.method) do
+      headers_param = normalize_header_names(headers_param)
+      headers = augment_headers(headers, conn, headers_param)
+
+      request_targets(conn, method)
+      |> Enum.any?(fn request_target ->
+        signature_string = signature_string(request_target, headers, headers_param)
+        verify_rsa(signature, signature_string, key)
+      end)
+      |> case do
+        true -> :ok
+        false -> {:error, :invalid_signature}
+      end
     else
       {:error, _} = error -> error
-      false -> {:error, :invalid_signature}
       _ -> {:error, :invalid_signature}
     end
   end
@@ -59,6 +66,7 @@ defmodule PleromaRedux.Signature.HTTP do
         params
         |> Map.get("headers", "(request-target) date")
         |> String.split()
+        |> Enum.map(&String.downcase/1)
 
       case Base.decode64(signature_b64) do
         {:ok, decoded} ->
@@ -94,10 +102,11 @@ defmodule PleromaRedux.Signature.HTTP do
 
   defp public_key_for_key_id(_), do: {:error, :invalid_signature}
 
-  defp signature_string(method, path, headers, headers_param) do
+  defp signature_string(request_target, headers, headers_param) do
     headers_param
     |> Enum.map(fn
-      "(request-target)" -> "(request-target): #{method} #{path}"
+      "(request-target)" -> "(request-target): #{request_target}"
+      "@request-target" -> "@request-target: #{request_target}"
       header -> "#{header}: #{Map.get(headers, header, "")}"
     end)
     |> Enum.join("\n")
@@ -107,11 +116,13 @@ defmodule PleromaRedux.Signature.HTTP do
     :public_key.verify(data, :sha256, signature, public_key)
   end
 
-  defp request_path_with_query(conn) do
+  defp request_targets(conn, method) do
+    base = method <> " " <> conn.request_path
+
     case conn.query_string do
-      "" -> conn.request_path
-      nil -> conn.request_path
-      qs -> conn.request_path <> "?" <> qs
+      "" -> [base]
+      nil -> [base]
+      qs -> [base, base <> "?" <> qs]
     end
   end
 
@@ -125,6 +136,65 @@ defmodule PleromaRedux.Signature.HTTP do
       "head" -> {:ok, "head"}
       "options" -> {:ok, "options"}
       _ -> {:error, :invalid_method}
+    end
+  end
+
+  defp normalize_header_names(headers_param) do
+    headers_param
+    |> Enum.map(&String.downcase/1)
+  end
+
+  defp augment_headers(headers, conn, headers_param) do
+    headers_param_set = MapSet.new(headers_param)
+    headers
+    |> maybe_put_host(conn, headers_param_set)
+    |> maybe_put_content_length(conn, headers_param_set)
+    |> maybe_put_digest(conn, headers_param_set)
+  end
+
+  defp maybe_put_host(headers, conn, headers_param_set) do
+    if MapSet.member?(headers_param_set, "host") and not Map.has_key?(headers, "host") do
+      Map.put(headers, "host", host_header(conn))
+    else
+      headers
+    end
+  end
+
+  defp maybe_put_content_length(headers, conn, headers_param_set) do
+    if MapSet.member?(headers_param_set, "content-length") and is_binary(raw_body(conn)) do
+      Map.put(headers, "content-length", Integer.to_string(byte_size(raw_body(conn))))
+    else
+      headers
+    end
+  end
+
+  defp maybe_put_digest(headers, conn, headers_param_set) do
+    if MapSet.member?(headers_param_set, "digest") and is_binary(raw_body(conn)) do
+      Map.put(headers, "digest", digest_for(raw_body(conn)))
+    else
+      headers
+    end
+  end
+
+  defp raw_body(conn) do
+    Map.get(conn.assigns, :raw_body)
+  end
+
+  defp digest_for(body) do
+    "SHA-256=" <> (:crypto.hash(:sha256, body) |> Base.encode64())
+  end
+
+  defp host_header(conn) do
+    default_port =
+      case conn.scheme do
+        :https -> 443
+        _ -> 80
+      end
+
+    if conn.port == default_port or is_nil(conn.port) do
+      conn.host
+    else
+      "#{conn.host}:#{conn.port}"
     end
   end
 end
