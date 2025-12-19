@@ -9,6 +9,11 @@ defmodule PleromaRedux.Timeline do
 
   @topic "timeline"
 
+  defmodule Post do
+    @enforce_keys [:id, :content, :inserted_at]
+    defstruct [:id, :content, :inserted_at]
+  end
+
   def start_link(_opts) do
     Agent.start_link(fn -> [] end, name: __MODULE__)
   end
@@ -41,10 +46,5 @@ defmodule PleromaRedux.Timeline do
 
   def reset do
     Agent.update(__MODULE__, fn _ -> [] end)
-  end
-
-  defmodule Post do
-    @enforce_keys [:id, :content, :inserted_at]
-    defstruct [:id, :content, :inserted_at]
   end
 end
