@@ -105,8 +105,18 @@ defmodule PleromaRedux.Activities.Undo do
 
   defp do_deliver(_actor, _activity, _undo_object), do: :ok
 
-  defp undo_target(%Object{type: "Follow", actor: actor, object: object} = target_activity) do
-    _ = Relationships.delete_by_type_actor_object("Follow", actor, object)
+  defp undo_target(
+         %Object{type: "Follow", actor: actor, object: object, ap_id: target_ap_id} = target_activity
+       ) do
+    case Relationships.get_by_type_actor_object("Follow", actor, object) do
+      %{activity_ap_id: ^target_ap_id} ->
+        _ = Relationships.delete_by_type_actor_object("Follow", actor, object)
+        :ok
+
+      _ ->
+        :ok
+    end
+
     Objects.delete_object(target_activity)
   end
 
