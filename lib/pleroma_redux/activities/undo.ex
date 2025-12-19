@@ -57,19 +57,23 @@ defmodule PleromaRedux.Activities.Undo do
   end
 
   def side_effects(object, opts) do
+    target_activity = Objects.get_by_ap_id(object.object)
+
     if Keyword.get(opts, :local, true) do
-      deliver_undo(object)
+      deliver_undo(object, target_activity)
     end
 
+    _ = undo_target(target_activity)
     :ok
   end
 
-  defp deliver_undo(%Object{} = undo_object) do
-    with %{} = actor <- Users.get_by_ap_id(undo_object.actor),
-         %{} = target_activity <- Objects.get_by_ap_id(undo_object.object) do
+  defp deliver_undo(%Object{} = undo_object, %Object{} = target_activity) do
+    with %{} = actor <- Users.get_by_ap_id(undo_object.actor) do
       do_deliver(actor, target_activity, undo_object)
     end
   end
+
+  defp deliver_undo(_undo_object, _target_activity), do: :ok
 
   defp do_deliver(actor, %Object{type: "Follow"} = follow, undo_object) do
     with %{} = target <- Users.get_by_ap_id(follow.object),
@@ -99,6 +103,12 @@ defmodule PleromaRedux.Activities.Undo do
   end
 
   defp do_deliver(_actor, _activity, _undo_object), do: :ok
+
+  defp undo_target(%Object{type: type} = target_activity) when type in ["Follow", "Like", "EmojiReact", "Announce"] do
+    Objects.delete_object(target_activity)
+  end
+
+  defp undo_target(_), do: :ok
 
   defp maybe_copy_addressing(activity, %{"to" => to} = target_data) when is_list(to) do
     activity

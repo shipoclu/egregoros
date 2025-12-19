@@ -32,6 +32,10 @@ defmodule PleromaRedux.Objects do
   def get_by_ap_id(nil), do: nil
   def get_by_ap_id(ap_id) when is_binary(ap_id), do: Repo.get_by(Object, ap_id: ap_id)
 
+  def delete_object(%Object{} = object) do
+    Repo.delete(object)
+  end
+
   def get(id) when is_integer(id), do: Repo.get(Object, id)
 
   def get(id) when is_binary(id) do
