@@ -2,6 +2,7 @@ defmodule PleromaReduxWeb.TimelineLive do
   use PleromaReduxWeb, :live_view
 
   alias PleromaRedux.Federation
+  alias PleromaRedux.Publish
   alias PleromaRedux.Timeline
   alias PleromaRedux.Users
 
@@ -39,7 +40,7 @@ defmodule PleromaReduxWeb.TimelineLive do
         {:noreply, assign(socket, error: "Register to post.")}
 
       user ->
-        case Timeline.create_post(user, content) do
+        case Publish.post_note(user, content) do
           {:ok, _post} ->
             {:noreply,
              assign(socket, form: Phoenix.Component.to_form(%{"content" => ""}, as: :post), error: nil)}

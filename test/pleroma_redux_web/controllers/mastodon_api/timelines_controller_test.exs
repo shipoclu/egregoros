@@ -1,13 +1,13 @@
 defmodule PleromaReduxWeb.MastodonAPI.TimelinesControllerTest do
   use PleromaReduxWeb.ConnCase, async: true
 
-  alias PleromaRedux.Timeline
+  alias PleromaRedux.Publish
   alias PleromaRedux.Users
 
   test "GET /api/v1/timelines/public returns latest statuses", %{conn: conn} do
     {:ok, user} = Users.create_local_user("local")
-    {:ok, _} = Timeline.create_post(user, "First post")
-    {:ok, _} = Timeline.create_post(user, "Second post")
+    {:ok, _} = Publish.post_note(user, "First post")
+    {:ok, _} = Publish.post_note(user, "Second post")
 
     conn = get(conn, "/api/v1/timelines/public")
 
@@ -23,8 +23,8 @@ defmodule PleromaReduxWeb.MastodonAPI.TimelinesControllerTest do
     PleromaRedux.Auth.Mock
     |> expect(:current_user, fn _conn -> {:ok, user} end)
 
-    {:ok, _} = Timeline.create_post(user, "First home post")
-    {:ok, _} = Timeline.create_post(user, "Second home post")
+    {:ok, _} = Publish.post_note(user, "First home post")
+    {:ok, _} = Publish.post_note(user, "Second home post")
 
     conn = get(conn, "/api/v1/timelines/home")
 

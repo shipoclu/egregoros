@@ -3,6 +3,7 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesController do
 
   alias PleromaRedux.Objects
   alias PleromaRedux.Pipeline
+  alias PleromaRedux.Publish
   alias PleromaReduxWeb.Endpoint
   alias PleromaReduxWeb.MastodonAPI.StatusRenderer
 
@@ -14,11 +15,8 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesController do
     else
       user = conn.assigns.current_user
 
-      note = build_note(user.ap_id, status)
-      create = build_create(user.ap_id, note)
-
-      with {:ok, _create} <- Pipeline.ingest(create, local: true),
-           %{} = object <- Objects.get_by_ap_id(note["id"]) do
+      with {:ok, create_object} <- Publish.post_note(user, status),
+           %{} = object <- Objects.get_by_ap_id(create_object.object) do
         json(conn, StatusRenderer.render_status(object, user))
       end
     end
@@ -79,30 +77,6 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesController do
       nil -> send_resp(conn, 404, "Not Found")
       {:error, _} -> send_resp(conn, 422, "Unprocessable Entity")
     end
-  end
-
-  defp build_note(actor, content) do
-    %{
-      "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
-      "type" => "Note",
-      "attributedTo" => actor,
-      "to" => ["https://www.w3.org/ns/activitystreams#Public"],
-      "cc" => [actor <> "/followers"],
-      "content" => content,
-      "published" => DateTime.utc_now() |> DateTime.to_iso8601()
-    }
-  end
-
-  defp build_create(actor, note) do
-    %{
-      "id" => Endpoint.url() <> "/activities/create/" <> Ecto.UUID.generate(),
-      "type" => "Create",
-      "actor" => actor,
-      "to" => note["to"],
-      "cc" => note["cc"],
-      "object" => note,
-      "published" => note["published"]
-    }
   end
 
   defp build_activity(type, actor, object) do
