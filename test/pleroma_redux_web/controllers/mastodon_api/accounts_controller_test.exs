@@ -203,4 +203,46 @@ defmodule PleromaReduxWeb.MastodonAPI.AccountsControllerTest do
     assert Enum.any?(response, &(&1["id"] == Integer.to_string(target_1.id)))
     assert Enum.any?(response, &(&1["id"] == Integer.to_string(target_2.id)))
   end
+
+  test "GET /api/v1/accounts/:id/followers returns follower accounts", %{conn: conn} do
+    {:ok, follower} = Users.create_local_user("alice")
+    {:ok, target} = Users.create_local_user("bob")
+
+    {:ok, _follow} =
+      Pipeline.ingest(
+        %{
+          "id" => "https://example.com/activities/follow/1",
+          "type" => "Follow",
+          "actor" => follower.ap_id,
+          "object" => target.ap_id
+        },
+        local: true
+      )
+
+    conn = get(conn, "/api/v1/accounts/#{target.id}/followers")
+    response = json_response(conn, 200)
+
+    assert Enum.any?(response, &(&1["id"] == Integer.to_string(follower.id)))
+  end
+
+  test "GET /api/v1/accounts/:id/following returns followed accounts", %{conn: conn} do
+    {:ok, follower} = Users.create_local_user("alice")
+    {:ok, target} = Users.create_local_user("bob")
+
+    {:ok, _follow} =
+      Pipeline.ingest(
+        %{
+          "id" => "https://example.com/activities/follow/1",
+          "type" => "Follow",
+          "actor" => follower.ap_id,
+          "object" => target.ap_id
+        },
+        local: true
+      )
+
+    conn = get(conn, "/api/v1/accounts/#{follower.id}/following")
+    response = json_response(conn, 200)
+
+    assert Enum.any?(response, &(&1["id"] == Integer.to_string(target.id)))
+  end
 end

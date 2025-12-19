@@ -60,6 +60,40 @@ defmodule PleromaReduxWeb.MastodonAPI.AccountsController do
     end
   end
 
+  def followers(conn, %{"id" => id}) do
+    case Users.get(id) do
+      nil ->
+        send_resp(conn, 404, "Not Found")
+
+      user ->
+        followers =
+          user.ap_id
+          |> Relationships.list_follows_to()
+          |> Enum.map(&Users.get_by_ap_id(&1.actor))
+          |> Enum.filter(&is_map/1)
+          |> Enum.map(&AccountRenderer.render_account/1)
+
+        json(conn, followers)
+    end
+  end
+
+  def following(conn, %{"id" => id}) do
+    case Users.get(id) do
+      nil ->
+        send_resp(conn, 404, "Not Found")
+
+      user ->
+        following =
+          user.ap_id
+          |> Relationships.list_follows_by_actor()
+          |> Enum.map(&Users.get_by_ap_id(&1.object))
+          |> Enum.filter(&is_map/1)
+          |> Enum.map(&AccountRenderer.render_account/1)
+
+        json(conn, following)
+    end
+  end
+
   def relationships(conn, params) do
     ids = Map.get(params, "id", [])
 

@@ -82,6 +82,8 @@ defmodule PleromaReduxWeb.Router do
     get "/accounts/lookup", AccountsController, :lookup
     get "/accounts/:id", AccountsController, :show
     get "/accounts/:id/statuses", AccountsController, :statuses
+    get "/accounts/:id/followers", AccountsController, :followers
+    get "/accounts/:id/following", AccountsController, :following
   end
 
   scope "/api/v2", PleromaReduxWeb.MastodonAPI do
