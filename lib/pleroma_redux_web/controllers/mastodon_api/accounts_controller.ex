@@ -36,7 +36,11 @@ defmodule PleromaReduxWeb.MastodonAPI.AccountsController do
     with %{} = target <- Users.get(id),
          %{} =
            follow <-
-             Objects.get_by_type_actor_object("Follow", conn.assigns.current_user.ap_id, target.ap_id),
+           Objects.get_by_type_actor_object(
+             "Follow",
+             conn.assigns.current_user.ap_id,
+             target.ap_id
+           ),
          {:ok, _undo} <-
            Pipeline.ingest(Undo.build(conn.assigns.current_user, follow),
              local: true

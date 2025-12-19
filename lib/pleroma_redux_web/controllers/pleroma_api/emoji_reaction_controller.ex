@@ -21,8 +21,10 @@ defmodule PleromaReduxWeb.PleromaAPI.EmojiReactionController do
 
   def delete(conn, %{"id" => id, "emoji" => emoji}) do
     with %{} = object <- Objects.get(id),
-         %{} = reaction <- Objects.get_emoji_react(conn.assigns.current_user.ap_id, object.ap_id, emoji),
-         {:ok, _undo} <- Pipeline.ingest(Undo.build(conn.assigns.current_user, reaction), local: true) do
+         %{} = reaction <-
+           Objects.get_emoji_react(conn.assigns.current_user.ap_id, object.ap_id, emoji),
+         {:ok, _undo} <-
+           Pipeline.ingest(Undo.build(conn.assigns.current_user, reaction), local: true) do
       send_resp(conn, 200, "")
     else
       nil -> send_resp(conn, 404, "Not Found")

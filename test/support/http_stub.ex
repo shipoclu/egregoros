@@ -11,4 +11,3 @@ defmodule PleromaRedux.HTTP.Stub do
     {:ok, %{status: 202, body: "", headers: []}}
   end
 end
-

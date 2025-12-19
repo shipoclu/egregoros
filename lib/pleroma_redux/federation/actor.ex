@@ -33,7 +33,8 @@ defmodule PleromaRedux.Federation.Actor do
 
   defp decode_json(_), do: {:error, :invalid_json}
 
-  defp to_user_attrs(%{"id" => id, "inbox" => inbox} = actor) when is_binary(id) and is_binary(inbox) do
+  defp to_user_attrs(%{"id" => id, "inbox" => inbox} = actor)
+       when is_binary(id) and is_binary(inbox) do
     public_key = get_in(actor, ["publicKey", "publicKeyPem"])
 
     if not is_binary(public_key) or public_key == "" do

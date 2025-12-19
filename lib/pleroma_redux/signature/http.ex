@@ -245,6 +245,7 @@ defmodule PleromaRedux.Signature.HTTP do
 
   defp augment_headers(headers, conn, headers_param) do
     headers_param_set = MapSet.new(headers_param)
+
     headers
     |> maybe_put_host(conn, headers_param_set)
     |> maybe_put_content_length(conn, headers_param_set)

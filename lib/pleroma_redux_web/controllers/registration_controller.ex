@@ -51,4 +51,3 @@ defmodule PleromaReduxWeb.RegistrationController do
     |> redirect(to: ~p"/")
   end
 end
-

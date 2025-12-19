@@ -5,7 +5,7 @@
       Pick a nickname to create a local actor on this instance.
     </p>
 
-    <p :if={@error} class="mt-4 text-sm text-rose-500"><%= @error %></p>
+    <p :if={@error} class="mt-4 text-sm text-rose-500">{@error}</p>
 
     <.form for={@form} id="registration-form" action={~p"/register"} class="mt-6 space-y-4">
       <.input
@@ -32,4 +32,3 @@
     </a>
   </section>
 </Layouts.app>
-

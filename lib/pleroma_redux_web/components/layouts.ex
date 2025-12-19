@@ -40,8 +40,10 @@ defmodule PleromaReduxWeb.Layouts do
   def app(assigns) do
     ~H"""
     <div class="relative min-h-screen overflow-hidden bg-gradient-to-br from-amber-50 via-white to-slate-100 text-slate-900 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 dark:text-slate-100">
-      <div class="pointer-events-none absolute -top-40 right-10 h-72 w-72 rounded-full bg-amber-200/60 blur-3xl dark:bg-sky-500/20"></div>
-      <div class="pointer-events-none absolute -bottom-48 left-6 h-80 w-80 rounded-full bg-rose-200/60 blur-3xl dark:bg-fuchsia-500/20"></div>
+      <div class="pointer-events-none absolute -top-40 right-10 h-72 w-72 rounded-full bg-amber-200/60 blur-3xl dark:bg-sky-500/20">
+      </div>
+      <div class="pointer-events-none absolute -bottom-48 left-6 h-80 w-80 rounded-full bg-rose-200/60 blur-3xl dark:bg-fuchsia-500/20">
+      </div>
 
       <div class="relative mx-auto max-w-4xl px-6 py-10">
         <header class="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
@@ -66,7 +68,7 @@ defmodule PleromaReduxWeb.Layouts do
                 href={~p"/logout"}
                 class="hidden text-xs uppercase tracking-[0.25em] text-slate-500 transition hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 sm:block"
               >
-                <%= @current_user.nickname %> · Logout
+                {@current_user.nickname} · Logout
               </a>
             <% else %>
               <a
@@ -141,7 +143,8 @@ defmodule PleromaReduxWeb.Layouts do
   def theme_toggle(assigns) do
     ~H"""
     <div class="relative flex items-center rounded-full border border-slate-200/70 bg-white/70 p-1 shadow-sm shadow-slate-200/30 backdrop-blur transition dark:border-slate-700/70 dark:bg-slate-900/70 dark:shadow-slate-900/40">
-      <div class="absolute inset-y-1 w-10 rounded-full bg-slate-900 text-slate-100 transition-all duration-300 [[data-theme=system]_&]:translate-x-0 [[data-theme=light]_&]:translate-x-10 [[data-theme=dark]_&]:translate-x-20 dark:bg-slate-100 dark:text-slate-900"></div>
+      <div class="absolute inset-y-1 w-10 rounded-full bg-slate-900 text-slate-100 transition-all duration-300 [[data-theme=system]_&]:translate-x-0 [[data-theme=light]_&]:translate-x-10 [[data-theme=dark]_&]:translate-x-20 dark:bg-slate-100 dark:text-slate-900">
+      </div>
 
       <button
         class="relative z-10 flex h-8 w-10 items-center justify-center text-slate-500 transition hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"

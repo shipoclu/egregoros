@@ -33,11 +33,16 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusRenderer do
         AccountRenderer.render_account(user)
 
       _ ->
-        %{"id" => actor, "username" => fallback_username(actor), "acct" => fallback_username(actor)}
+        %{
+          "id" => actor,
+          "username" => fallback_username(actor),
+          "acct" => fallback_username(actor)
+        }
     end
   end
 
-  defp account_from_actor(_), do: %{"id" => "unknown", "username" => "unknown", "acct" => "unknown"}
+  defp account_from_actor(_),
+    do: %{"id" => "unknown", "username" => "unknown", "acct" => "unknown"}
 
   defp fallback_username(actor) do
     case URI.parse(actor) do

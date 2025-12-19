@@ -74,7 +74,7 @@ defmodule PleromaRedux.Activities.Announce do
           Delivery.deliver(actor, follower.inbox, announce_object.data)
         end
       end)
-      end
+    end
   end
 
   defp recipients(actor, %Object{actor: object_actor}) when is_binary(object_actor) do

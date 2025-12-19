@@ -84,6 +84,11 @@ defmodule PleromaReduxWeb.TimelineLiveTest do
     |> render_click()
 
     assert Objects.get_emoji_react(user.ap_id, note.ap_id, "🔥")
-    assert has_element?(view, "#post-#{note.id} button[data-role='reaction'][data-emoji='🔥']", "1")
+
+    assert has_element?(
+             view,
+             "#post-#{note.id} button[data-role='reaction'][data-emoji='🔥']",
+             "1"
+           )
   end
 end

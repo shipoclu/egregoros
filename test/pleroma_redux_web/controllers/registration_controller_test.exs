@@ -17,4 +17,3 @@ defmodule PleromaReduxWeb.RegistrationControllerTest do
     assert Users.get_by_nickname("alice")
   end
 end
-

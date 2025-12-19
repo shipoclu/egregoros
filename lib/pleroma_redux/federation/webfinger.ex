@@ -3,7 +3,9 @@ defmodule PleromaRedux.Federation.WebFinger do
 
   def lookup(handle) when is_binary(handle) do
     with {:ok, username, domain} <- parse_handle(handle),
-         url <- "https://" <> domain <> "/.well-known/webfinger?resource=acct:" <> username <> "@" <> domain,
+         url <-
+           "https://" <>
+             domain <> "/.well-known/webfinger?resource=acct:" <> username <> "@" <> domain,
          {:ok, %{status: status, body: body}} when status in 200..299 <- HTTP.get(url, headers()),
          {:ok, jrd} <- decode_json(body),
          {:ok, actor_url} <- find_actor_url(jrd) do
@@ -60,4 +62,3 @@ defmodule PleromaRedux.Federation.WebFinger do
     end
   end
 end
-

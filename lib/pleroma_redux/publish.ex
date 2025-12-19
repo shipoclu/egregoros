@@ -17,4 +17,3 @@ defmodule PleromaRedux.Publish do
     end
   end
 end
-

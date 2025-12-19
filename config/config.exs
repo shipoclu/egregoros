@@ -16,7 +16,6 @@ config :pleroma_redux, PleromaRedux.Auth, PleromaRedux.Auth.Default
 config :pleroma_redux, PleromaRedux.Discovery, PleromaRedux.Discovery.DNS
 config :pleroma_redux, PleromaRedux.HTTP, PleromaRedux.HTTP.Req
 
-
 # Configure the endpoint
 config :pleroma_redux, PleromaReduxWeb.Endpoint,
   url: [host: "localhost"],

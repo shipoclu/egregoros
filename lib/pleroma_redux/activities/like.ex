@@ -14,7 +14,8 @@ defmodule PleromaRedux.Activities.Like do
     build(actor, object)
   end
 
-  def build(actor, %Object{ap_id: object_id} = object) when is_binary(actor) and is_binary(object_id) do
+  def build(actor, %Object{ap_id: object_id} = object)
+      when is_binary(actor) and is_binary(object_id) do
     build(actor, object_id, object)
   end
 

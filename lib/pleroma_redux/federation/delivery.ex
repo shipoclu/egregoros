@@ -3,7 +3,8 @@ defmodule PleromaRedux.Federation.Delivery do
   alias PleromaRedux.Signature.HTTP, as: HTTPSignature
   alias PleromaRedux.User
 
-  def deliver(%User{} = user, inbox_url, activity) when is_binary(inbox_url) and is_map(activity) do
+  def deliver(%User{} = user, inbox_url, activity)
+      when is_binary(inbox_url) and is_map(activity) do
     body = Jason.encode!(activity)
 
     with {:ok, signed} <- HTTPSignature.sign_request(user, "post", inbox_url, body),
@@ -29,4 +30,3 @@ defmodule PleromaRedux.Federation.Delivery do
     ]
   end
 end
-

@@ -50,7 +50,10 @@ defmodule PleromaReduxWeb.TimelineLive do
         case Publish.post_note(user, content) do
           {:ok, _post} ->
             {:noreply,
-             assign(socket, form: Phoenix.Component.to_form(%{"content" => ""}, as: :post), error: nil)}
+             assign(socket,
+               form: Phoenix.Component.to_form(%{"content" => ""}, as: :post),
+               error: nil
+             )}
 
           {:error, :empty} ->
             {:noreply,
@@ -65,7 +68,8 @@ defmodule PleromaReduxWeb.TimelineLive do
   def handle_event("follow_remote", %{"follow" => %{"handle" => handle}}, socket) do
     case socket.assigns.current_user do
       nil ->
-        {:noreply, assign(socket, follow_error: "Register to follow people.", follow_success: nil)}
+        {:noreply,
+         assign(socket, follow_error: "Register to follow people.", follow_success: nil)}
 
       user ->
         case Federation.follow_remote(user, handle) do
@@ -86,7 +90,8 @@ defmodule PleromaReduxWeb.TimelineLive do
   def handle_event("toggle_like", %{"id" => id}, socket) do
     with %User{} = user <- socket.assigns.current_user,
          {post_id, ""} <- Integer.parse(to_string(id)),
-         %{object: post, liked?: liked?} <- Enum.find(socket.assigns.posts, &(&1.object.id == post_id)) do
+         %{object: post, liked?: liked?} <-
+           Enum.find(socket.assigns.posts, &(&1.object.id == post_id)) do
       if liked? do
         case Objects.get_by_type_actor_object("Like", user.ap_id, post.ap_id) do
           %{} = like_object -> Pipeline.ingest(Undo.build(user, like_object), local: true)
@@ -109,7 +114,8 @@ defmodule PleromaReduxWeb.TimelineLive do
   def handle_event("toggle_repost", %{"id" => id}, socket) do
     with %User{} = user <- socket.assigns.current_user,
          {post_id, ""} <- Integer.parse(to_string(id)),
-         %{object: post, reposted?: reposted?} <- Enum.find(socket.assigns.posts, &(&1.object.id == post_id)) do
+         %{object: post, reposted?: reposted?} <-
+           Enum.find(socket.assigns.posts, &(&1.object.id == post_id)) do
       if reposted? do
         case Objects.get_by_type_actor_object("Announce", user.ap_id, post.ap_id) do
           %{} = announce_object -> Pipeline.ingest(Undo.build(user, announce_object), local: true)
@@ -156,7 +162,9 @@ defmodule PleromaReduxWeb.TimelineLive do
   @impl true
   def handle_info({:post_created, post}, socket) do
     {:noreply,
-     update(socket, :posts, fn posts -> [decorate_post(post, socket.assigns.current_user) | posts] end)}
+     update(socket, :posts, fn posts ->
+       [decorate_post(post, socket.assigns.current_user) | posts]
+     end)}
   end
 
   @impl true
@@ -167,7 +175,9 @@ defmodule PleromaReduxWeb.TimelineLive do
         <div class="rounded-3xl border border-white/80 bg-white/80 p-6 shadow-xl shadow-slate-200/40 backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/70 dark:shadow-slate-900/40 animate-rise">
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-xs uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">Compose</p>
+              <p class="text-xs uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
+                Compose
+              </p>
               <h2 class="mt-2 font-display text-xl text-slate-900 dark:text-slate-100">
                 Broadcast a short note
               </h2>
@@ -201,9 +211,9 @@ defmodule PleromaReduxWeb.TimelineLive do
             </button>
           </.form>
 
-          <p :if={@follow_error} class="mt-3 text-sm text-rose-500"><%= @follow_error %></p>
+          <p :if={@follow_error} class="mt-3 text-sm text-rose-500">{@follow_error}</p>
           <p :if={@follow_success} class="mt-3 text-sm text-emerald-600 dark:text-emerald-400">
-            <%= @follow_success %>
+            {@follow_success}
           </p>
 
           <.form for={@form} id="timeline-form" phx-submit="create_post" class="mt-6 space-y-4">
@@ -217,10 +227,10 @@ defmodule PleromaReduxWeb.TimelineLive do
             />
 
             <div class="flex flex-wrap items-center justify-between gap-3">
-              <p :if={@error} class="text-sm text-rose-500"><%= @error %></p>
+              <p :if={@error} class="text-sm text-rose-500">{@error}</p>
               <div class="ml-auto flex items-center gap-3">
                 <span class="text-xs uppercase tracking-[0.25em] text-slate-400 dark:text-slate-500">
-                  <%= if @current_user, do: @current_user.nickname, else: "guest" %>
+                  {if @current_user, do: @current_user.nickname, else: "guest"}
                 </span>
                 <button
                   type="submit"
@@ -246,11 +256,11 @@ defmodule PleromaReduxWeb.TimelineLive do
                     local
                   </p>
                   <p class="mt-3 text-base leading-relaxed text-slate-900 dark:text-slate-100">
-                    <%= entry.object.data["content"] %>
+                    {entry.object.data["content"]}
                   </p>
                 </div>
                 <span class="text-xs text-slate-400 dark:text-slate-500">
-                  <%= format_time(entry.object.inserted_at) %>
+                  {format_time(entry.object.inserted_at)}
                 </span>
               </div>
 
@@ -263,9 +273,9 @@ defmodule PleromaReduxWeb.TimelineLive do
                   phx-value-id={entry.object.id}
                   class="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/70 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:-translate-y-0.5 hover:bg-white dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:hover:bg-slate-950"
                 >
-                  <%= if entry.liked?, do: "Unlike", else: "Like" %>
+                  {if entry.liked?, do: "Unlike", else: "Like"}
                   <span class="text-xs font-normal text-slate-500 dark:text-slate-400">
-                    <%= entry.likes_count %>
+                    {entry.likes_count}
                   </span>
                 </button>
 
@@ -277,9 +287,9 @@ defmodule PleromaReduxWeb.TimelineLive do
                   phx-value-id={entry.object.id}
                   class="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/70 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:-translate-y-0.5 hover:bg-white dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:hover:bg-slate-950"
                 >
-                  <%= if entry.reposted?, do: "Unrepost", else: "Repost" %>
+                  {if entry.reposted?, do: "Unrepost", else: "Repost"}
                   <span class="text-xs font-normal text-slate-500 dark:text-slate-400">
-                    <%= entry.reposts_count %>
+                    {entry.reposts_count}
                   </span>
                 </button>
 
@@ -302,8 +312,8 @@ defmodule PleromaReduxWeb.TimelineLive do
                           "border-slate-200/80 bg-white/70 text-slate-700 hover:bg-white dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:hover:bg-slate-950"
                       ]}
                     >
-                      <span class="text-base leading-none"><%= emoji %></span>
-                      <span class="text-xs font-normal"><%= reaction.count %></span>
+                      <span class="text-base leading-none">{emoji}</span>
+                      <span class="text-xs font-normal">{reaction.count}</span>
                     </button>
                   <% end %>
                 </div>

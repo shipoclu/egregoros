@@ -55,15 +55,16 @@ defmodule PleromaRedux.UsersTest do
   end
 
   test "ap_id is unique" do
-    {:ok, _} = Users.create_user(%{
-      nickname: "carol",
-      ap_id: "https://example.com/users/carol",
-      inbox: "https://example.com/users/carol/inbox",
-      outbox: "https://example.com/users/carol/outbox",
-      public_key: "PUB",
-      private_key: "PRIV",
-      local: true
-    })
+    {:ok, _} =
+      Users.create_user(%{
+        nickname: "carol",
+        ap_id: "https://example.com/users/carol",
+        inbox: "https://example.com/users/carol/inbox",
+        outbox: "https://example.com/users/carol/outbox",
+        public_key: "PUB",
+        private_key: "PRIV",
+        local: true
+      })
 
     assert {:error, changeset} =
              Users.create_user(%{

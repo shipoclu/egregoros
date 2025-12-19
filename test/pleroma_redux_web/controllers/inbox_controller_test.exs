@@ -7,6 +7,7 @@ defmodule PleromaReduxWeb.InboxControllerTest do
   test "POST /users/:nickname/inbox ingests activity", %{conn: conn} do
     {:ok, _user} = Users.create_local_user("frank")
     {public_key, private_key} = PleromaRedux.Keys.generate_rsa_keypair()
+
     {:ok, _} =
       Users.create_user(%{
         nickname: "alice",
@@ -34,7 +35,12 @@ defmodule PleromaReduxWeb.InboxControllerTest do
 
     conn =
       conn
-      |> sign_request("post", "/users/frank/inbox", private_key, "https://remote.example/users/alice#main-key")
+      |> sign_request(
+        "post",
+        "/users/frank/inbox",
+        private_key,
+        "https://remote.example/users/alice#main-key"
+      )
       |> post("/users/frank/inbox", create)
 
     assert response(conn, 202)
@@ -123,7 +129,12 @@ defmodule PleromaReduxWeb.InboxControllerTest do
 
     conn =
       conn
-      |> sign_request("post", "/users/frank/inbox", private_key, "https://remote.example/users/alice#main-key")
+      |> sign_request(
+        "post",
+        "/users/frank/inbox",
+        private_key,
+        "https://remote.example/users/alice#main-key"
+      )
       |> move_authorization_to_signature_header()
       |> post("/users/frank/inbox", create)
 
@@ -131,9 +142,10 @@ defmodule PleromaReduxWeb.InboxControllerTest do
     assert Objects.get_by_ap_id(note["id"])
   end
 
-  test "POST /users/:nickname/inbox accepts signature behind https proxy (x-forwarded headers)", %{
-    conn: conn
-  } do
+  test "POST /users/:nickname/inbox accepts signature behind https proxy (x-forwarded headers)",
+       %{
+         conn: conn
+       } do
     {:ok, _user} = Users.create_local_user("frank")
     {public_key, private_key} = PleromaRedux.Keys.generate_rsa_keypair()
 
@@ -304,7 +316,12 @@ defmodule PleromaReduxWeb.InboxControllerTest do
     conn =
       conn
       |> put_req_header("date", old_date)
-      |> sign_request("post", "/users/frank/inbox", private_key, "https://remote.example/users/alice#main-key")
+      |> sign_request(
+        "post",
+        "/users/frank/inbox",
+        private_key,
+        "https://remote.example/users/alice#main-key"
+      )
       |> post("/users/frank/inbox", create)
 
     assert response(conn, 401)
@@ -357,12 +374,13 @@ defmodule PleromaReduxWeb.InboxControllerTest do
       |> maybe_put_header(headers, "content-length", content_length)
       |> maybe_put_header(headers, "digest", digest)
 
-    signature_string = signature_string(headers, method, path, %{
-      "date" => date,
-      "host" => host,
-      "content-length" => content_length,
-      "digest" => digest
-    })
+    signature_string =
+      signature_string(headers, method, path, %{
+        "date" => date,
+        "host" => host,
+        "content-length" => content_length,
+        "digest" => digest
+      })
 
     [entry] = :public_key.pem_decode(private_key_pem)
     private_key = :public_key.pem_entry_decode(entry)
@@ -410,7 +428,7 @@ defmodule PleromaReduxWeb.InboxControllerTest do
         %{conn | host: value}
 
       true ->
-      Plug.Conn.put_req_header(conn, header, value)
+        Plug.Conn.put_req_header(conn, header, value)
     end
   end
 
@@ -482,5 +500,4 @@ defmodule PleromaReduxWeb.InboxControllerTest do
     ])
     |> IO.iodata_to_binary()
   end
-
 end

@@ -15,4 +15,3 @@ defmodule PleromaReduxWeb.Plugs.FetchCurrentUser do
     assign(conn, :current_user, user)
   end
 end
-

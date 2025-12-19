@@ -46,11 +46,11 @@ defmodule PleromaRedux.PublishTest do
       assert decoded["actor"] == local.ap_id
 
       assert "https://www.w3.org/ns/activitystreams#Public" in decoded["to"]
-      assert local.ap_id <> "/followers" in decoded["cc"]
+      assert (local.ap_id <> "/followers") in decoded["cc"]
 
       assert is_map(decoded["object"])
       assert "https://www.w3.org/ns/activitystreams#Public" in decoded["object"]["to"]
-      assert local.ap_id <> "/followers" in decoded["object"]["cc"]
+      assert (local.ap_id <> "/followers") in decoded["object"]["cc"]
 
       {:ok, %{status: 202, body: "", headers: []}}
     end)
@@ -58,4 +58,3 @@ defmodule PleromaRedux.PublishTest do
     assert {:ok, _} = Publish.post_note(local, "Hello followers")
   end
 end
-

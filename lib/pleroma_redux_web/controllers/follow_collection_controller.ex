@@ -48,4 +48,3 @@ defmodule PleromaReduxWeb.FollowCollectionController do
     |> send_resp(200, Jason.encode!(payload))
   end
 end
-

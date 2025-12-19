@@ -18,8 +18,10 @@ defmodule PleromaRedux.Keys do
     {public_pem, private_pem}
   end
 
-  defp public_key_from_private({:RSAPrivateKey, _, modulus, public_exponent, _private_exponent,
-        _prime1, _prime2, _exponent1, _exponent2, _coefficient, _other_prime_infos}) do
+  defp public_key_from_private(
+         {:RSAPrivateKey, _, modulus, public_exponent, _private_exponent, _prime1, _prime2,
+          _exponent1, _exponent2, _coefficient, _other_prime_infos}
+       ) do
     {:RSAPublicKey, modulus, public_exponent}
   end
 end

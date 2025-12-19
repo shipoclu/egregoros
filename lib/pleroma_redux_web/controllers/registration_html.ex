@@ -3,4 +3,3 @@ defmodule PleromaReduxWeb.RegistrationHTML do
 
   embed_templates "registration_html/*"
 end
-

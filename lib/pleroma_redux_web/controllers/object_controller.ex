@@ -20,4 +20,3 @@ defmodule PleromaReduxWeb.ObjectController do
     end
   end
 end
-

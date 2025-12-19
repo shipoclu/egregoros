@@ -66,4 +66,3 @@ defmodule PleromaReduxWeb.FollowCollectionControllerTest do
     assert remote.ap_id in decoded["orderedItems"]
   end
 end
-

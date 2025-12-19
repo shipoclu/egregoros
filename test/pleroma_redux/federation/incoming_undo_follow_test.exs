@@ -42,4 +42,3 @@ defmodule PleromaRedux.Federation.IncomingUndoFollowTest do
     assert Objects.get_by_ap_id(undo["id"])
   end
 end
-

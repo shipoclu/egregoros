@@ -37,4 +37,3 @@ defmodule PleromaReduxWeb.ObjectControllerTest do
     assert response(conn, 404)
   end
 end
-

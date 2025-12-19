@@ -33,7 +33,7 @@ defmodule PleromaRedux.Activities.BuildersTest do
     assert like["type"] == "Like"
     assert like["actor"] == actor.ap_id
     assert like["object"] == note_object.ap_id
-    assert actor.ap_id <> "/followers" in like["to"]
+    assert (actor.ap_id <> "/followers") in like["to"]
     assert note_object.actor in like["to"]
   end
 
@@ -61,7 +61,7 @@ defmodule PleromaRedux.Activities.BuildersTest do
     assert react["actor"] == actor.ap_id
     assert react["object"] == note_object.ap_id
     assert react["content"] == ":fire:"
-    assert actor.ap_id <> "/followers" in react["to"]
+    assert (actor.ap_id <> "/followers") in react["to"]
     assert note_object.actor in react["to"]
   end
 
@@ -89,7 +89,7 @@ defmodule PleromaRedux.Activities.BuildersTest do
     assert announce["actor"] == actor.ap_id
     assert announce["object"] == note_object.ap_id
     assert @public in announce["to"]
-    assert actor.ap_id <> "/followers" in announce["to"]
+    assert (actor.ap_id <> "/followers") in announce["to"]
     assert note_object.actor in announce["to"]
   end
 
@@ -121,4 +121,3 @@ defmodule PleromaRedux.Activities.BuildersTest do
     assert undo["cc"] == [actor.ap_id <> "/followers"]
   end
 end
-

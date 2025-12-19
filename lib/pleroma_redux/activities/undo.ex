@@ -104,7 +104,8 @@ defmodule PleromaRedux.Activities.Undo do
 
   defp do_deliver(_actor, _activity, _undo_object), do: :ok
 
-  defp undo_target(%Object{type: type} = target_activity) when type in ["Follow", "Like", "EmojiReact", "Announce"] do
+  defp undo_target(%Object{type: type} = target_activity)
+       when type in ["Follow", "Like", "EmojiReact", "Announce"] do
     Objects.delete_object(target_activity)
   end
 

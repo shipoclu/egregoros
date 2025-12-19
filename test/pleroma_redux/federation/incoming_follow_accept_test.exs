@@ -47,4 +47,3 @@ defmodule PleromaRedux.Federation.IncomingFollowAcceptTest do
     assert Objects.get_by_type_actor_object("Accept", local.ap_id, follow["id"])
   end
 end
-

@@ -72,4 +72,3 @@ defmodule PleromaRedux.Federation.FollowFlowTest do
     assert Objects.get_by_type_actor_object("Follow", local.ap_id, actor_url)
   end
 end
-

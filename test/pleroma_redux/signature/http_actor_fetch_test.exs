@@ -62,4 +62,3 @@ defmodule PleromaRedux.Signature.HTTPActorFetchTest do
     assert Users.get_by_ap_id(actor_url)
   end
 end
-

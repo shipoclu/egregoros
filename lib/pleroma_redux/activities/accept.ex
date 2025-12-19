@@ -102,4 +102,3 @@ defmodule PleromaRedux.Activities.Accept do
 
   defp parse_datetime(%DateTime{} = dt), do: dt
 end
-
