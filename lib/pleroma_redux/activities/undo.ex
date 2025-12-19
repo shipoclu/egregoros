@@ -2,6 +2,7 @@ defmodule PleromaRedux.Activities.Undo do
   alias PleromaRedux.Federation.Delivery
   alias PleromaRedux.Object
   alias PleromaRedux.Objects
+  alias PleromaRedux.Relationships
   alias PleromaRedux.User
   alias PleromaRedux.Users
   alias PleromaReduxWeb.Endpoint
@@ -93,10 +94,10 @@ defmodule PleromaRedux.Activities.Undo do
 
   defp do_deliver(actor, %Object{type: "Announce"}, undo_object) do
     actor.ap_id
-    |> Objects.list_follows_to()
-    |> Enum.filter(&(&1.local == false))
+    |> Relationships.list_follows_to()
     |> Enum.each(fn follow ->
-      with %{} = follower <- Users.get_by_ap_id(follow.actor) do
+      with %{} = follower <- Users.get_by_ap_id(follow.actor),
+           false <- follower.local do
         Delivery.deliver(actor, follower.inbox, undo_object.data)
       end
     end)
@@ -104,8 +105,13 @@ defmodule PleromaRedux.Activities.Undo do
 
   defp do_deliver(_actor, _activity, _undo_object), do: :ok
 
+  defp undo_target(%Object{type: "Follow", actor: actor, object: object} = target_activity) do
+    _ = Relationships.delete_by_type_actor_object("Follow", actor, object)
+    Objects.delete_object(target_activity)
+  end
+
   defp undo_target(%Object{type: type} = target_activity)
-       when type in ["Follow", "Like", "EmojiReact", "Announce"] do
+       when type in ["Like", "EmojiReact", "Announce"] do
     Objects.delete_object(target_activity)
   end
 

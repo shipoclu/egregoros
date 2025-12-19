@@ -2,6 +2,7 @@ defmodule PleromaRedux.Activities.Follow do
   alias PleromaRedux.Activities.Accept
   alias PleromaRedux.Objects
   alias PleromaRedux.Pipeline
+  alias PleromaRedux.Relationships
   alias PleromaRedux.User
   alias PleromaRedux.Users
   alias PleromaReduxWeb.Endpoint
@@ -40,6 +41,14 @@ defmodule PleromaRedux.Activities.Follow do
   end
 
   def side_effects(object, opts) do
+    _ =
+      Relationships.upsert_relationship(%{
+        type: object.type,
+        actor: object.actor,
+        object: object.object,
+        activity_ap_id: object.ap_id
+      })
+
     if Keyword.get(opts, :local, true) do
       deliver_follow(object)
     else
