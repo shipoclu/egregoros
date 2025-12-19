@@ -12,6 +12,6 @@ defmodule PleromaReduxWeb.MastodonAPI.TimelinesController do
   def home(conn, _params) do
     user = conn.assigns.current_user
     objects = Objects.list_home_notes(user.ap_id)
-    json(conn, StatusRenderer.render_statuses(objects))
+    json(conn, StatusRenderer.render_statuses(objects, user))
   end
 end

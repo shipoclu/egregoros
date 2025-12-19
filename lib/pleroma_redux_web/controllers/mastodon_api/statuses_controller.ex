@@ -44,11 +44,11 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesController do
          %{} = user <- conn.assigns.current_user do
       case Relationships.get_by_type_actor_object("Like", user.ap_id, object.ap_id) do
         %{} ->
-          json(conn, StatusRenderer.render_status(object))
+          json(conn, StatusRenderer.render_status(object, user))
 
         nil ->
           with {:ok, _liked} <- Pipeline.ingest(Like.build(user, object), local: true) do
-            json(conn, StatusRenderer.render_status(object))
+            json(conn, StatusRenderer.render_status(object, user))
           else
             {:error, _} -> send_resp(conn, 422, "Unprocessable Entity")
           end
@@ -72,7 +72,7 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesController do
            Pipeline.ingest(Undo.build(conn.assigns.current_user, relationship.activity_ap_id),
              local: true
            ) do
-      json(conn, StatusRenderer.render_status(object))
+      json(conn, StatusRenderer.render_status(object, conn.assigns.current_user))
     else
       nil -> send_resp(conn, 404, "Not Found")
       {:error, _} -> send_resp(conn, 422, "Unprocessable Entity")
@@ -84,11 +84,11 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesController do
          %{} = user <- conn.assigns.current_user do
       case Relationships.get_by_type_actor_object("Announce", user.ap_id, object.ap_id) do
         %{} ->
-          json(conn, StatusRenderer.render_status(object))
+          json(conn, StatusRenderer.render_status(object, user))
 
         nil ->
           with {:ok, _announce} <- Pipeline.ingest(Announce.build(user, object), local: true) do
-            json(conn, StatusRenderer.render_status(object))
+            json(conn, StatusRenderer.render_status(object, user))
           else
             {:error, _} -> send_resp(conn, 422, "Unprocessable Entity")
           end
@@ -112,7 +112,7 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesController do
            Pipeline.ingest(Undo.build(conn.assigns.current_user, relationship.activity_ap_id),
              local: true
            ) do
-      json(conn, StatusRenderer.render_status(object))
+      json(conn, StatusRenderer.render_status(object, conn.assigns.current_user))
     else
       nil -> send_resp(conn, 404, "Not Found")
       {:error, _} -> send_resp(conn, 422, "Unprocessable Entity")
