@@ -131,6 +131,84 @@ defmodule PleromaReduxWeb.InboxControllerTest do
     assert Objects.get_by_ap_id(note["id"])
   end
 
+  test "POST /users/:nickname/inbox accepts signature behind https proxy (x-forwarded headers)", %{
+    conn: conn
+  } do
+    {:ok, _user} = Users.create_local_user("frank")
+    {public_key, private_key} = PleromaRedux.Keys.generate_rsa_keypair()
+
+    {:ok, _} =
+      Users.create_user(%{
+        nickname: "alice",
+        ap_id: "https://remote.example/users/alice",
+        inbox: "https://remote.example/users/alice/inbox",
+        outbox: "https://remote.example/users/alice/outbox",
+        public_key: public_key,
+        private_key: private_key,
+        local: false
+      })
+
+    note = %{
+      "id" => "https://remote.example/objects/1-proxy",
+      "type" => "Note",
+      "attributedTo" => "https://remote.example/users/alice",
+      "content" => "Hello through proxy"
+    }
+
+    create = %{
+      "id" => "https://remote.example/activities/create/1-proxy",
+      "type" => "Create",
+      "actor" => "https://remote.example/users/alice",
+      "object" => note
+    }
+
+    body = Jason.encode!(create)
+    headers = ["(request-target)", "host", "date", "digest", "content-length"]
+    headers = Enum.map(headers, &String.downcase/1)
+
+    date = date_header()
+    host = "predux.ngrok.dev"
+    digest = digest_header(body)
+    content_length = Integer.to_string(byte_size(body))
+
+    signature_string =
+      signature_string(headers, "post", "/users/frank/inbox", %{
+        "date" => date,
+        "host" => host,
+        "content-length" => content_length,
+        "digest" => digest
+      })
+
+    [entry] = :public_key.pem_decode(private_key)
+    private_key = :public_key.pem_entry_decode(entry)
+    signature = :public_key.sign(signature_string, :sha256, private_key)
+    signature_b64 = Base.encode64(signature)
+
+    header =
+      "keyId=\"https://remote.example/users/alice#main-key\"," <>
+        "algorithm=\"rsa-sha256\"," <>
+        "headers=\"#{Enum.join(headers, " ")}\"," <>
+        "signature=\"#{signature_b64}\""
+
+    conn =
+      conn
+      |> Map.put(:scheme, :http)
+      |> Map.put(:host, host)
+      |> Map.put(:port, 4000)
+      |> put_req_header("x-forwarded-proto", "https")
+      |> put_req_header("x-forwarded-port", "443")
+      |> put_req_header("content-type", "application/activity+json")
+      |> put_req_header("accept", "application/activity+json")
+      |> put_req_header("date", date)
+      |> put_req_header("digest", digest)
+      |> put_req_header("content-length", content_length)
+      |> put_req_header("signature", header)
+      |> post("/users/frank/inbox", body)
+
+    assert response(conn, 202)
+    assert Objects.get_by_ap_id(note["id"])
+  end
+
   test "POST /users/:nickname/inbox rejects mismatched digest", %{conn: conn} do
     {:ok, _user} = Users.create_local_user("frank")
     {public_key, private_key} = PleromaRedux.Keys.generate_rsa_keypair()

@@ -284,17 +284,76 @@ defmodule PleromaRedux.Signature.HTTP do
   end
 
   defp host_header_for_conn(conn) do
-    default_port =
-      case conn.scheme do
-        :https -> 443
-        _ -> 80
+    forwarded_host = conn |> Plug.Conn.get_req_header("x-forwarded-host") |> List.first()
+    forwarded_port = conn |> Plug.Conn.get_req_header("x-forwarded-port") |> List.first()
+    forwarded_proto = conn |> Plug.Conn.get_req_header("x-forwarded-proto") |> List.first()
+
+    host =
+      forwarded_host
+      |> first_forwarded_value()
+      |> case do
+        nil -> conn.host
+        value -> value
       end
 
-    if conn.port == default_port or is_nil(conn.port) do
-      conn.host
+    scheme =
+      case forwarded_proto do
+        "https" -> :https
+        "http" -> :http
+        _ -> conn.scheme
+      end
+
+    port =
+      case parse_forwarded_port(forwarded_port) do
+        {:ok, port} ->
+          port
+
+        :error ->
+          if is_binary(forwarded_proto) do
+            default_port_for_scheme(scheme)
+          else
+            conn.port
+          end
+      end
+
+    if host_has_port?(host) or is_nil(port) or port == default_port_for_scheme(scheme) do
+      host
     else
-      "#{conn.host}:#{conn.port}"
+      "#{host}:#{port}"
     end
+  end
+
+  defp first_forwarded_value(nil), do: nil
+
+  defp first_forwarded_value(value) when is_binary(value) do
+    value
+    |> String.split(",", parts: 2)
+    |> List.first()
+    |> String.trim()
+    |> case do
+      "" -> nil
+      trimmed -> trimmed
+    end
+  end
+
+  defp parse_forwarded_port(nil), do: :error
+
+  defp parse_forwarded_port(value) when is_binary(value) do
+    case Integer.parse(String.trim(value)) do
+      {port, ""} when port > 0 -> {:ok, port}
+      _ -> :error
+    end
+  end
+
+  defp default_port_for_scheme(:https), do: 443
+  defp default_port_for_scheme(_), do: 80
+
+  defp host_has_port?("[" <> rest) do
+    String.contains?(rest, "]:")
+  end
+
+  defp host_has_port?(host) when is_binary(host) do
+    String.contains?(host, ":")
   end
 
   defp host_header_for_uri(%URI{} = uri) do
