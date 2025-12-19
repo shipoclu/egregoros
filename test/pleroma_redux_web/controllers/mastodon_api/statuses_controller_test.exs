@@ -168,4 +168,56 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesControllerTest do
 
     assert Objects.get_by_type_actor_object("Undo", user.ap_id, announce_object.ap_id)
   end
+
+  test "POST /api/v1/statuses/:id/favourite is idempotent", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("local")
+
+    PleromaRedux.Auth.Mock
+    |> expect(:current_user, 2, fn _conn -> {:ok, user} end)
+
+    {:ok, note} =
+      Pipeline.ingest(
+        %{
+          "id" => "https://example.com/objects/like-idempotent",
+          "type" => "Note",
+          "actor" => "https://example.com/users/alice",
+          "content" => "Hello like"
+        },
+        local: false
+      )
+
+    conn = post(conn, "/api/v1/statuses/#{note.id}/favourite")
+    assert json_response(conn, 200)
+
+    conn = post(conn, "/api/v1/statuses/#{note.id}/favourite")
+    assert json_response(conn, 200)
+
+    assert Objects.count_by_type_object("Like", note.ap_id) == 1
+  end
+
+  test "POST /api/v1/statuses/:id/reblog is idempotent", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("local")
+
+    PleromaRedux.Auth.Mock
+    |> expect(:current_user, 2, fn _conn -> {:ok, user} end)
+
+    {:ok, note} =
+      Pipeline.ingest(
+        %{
+          "id" => "https://example.com/objects/reblog-idempotent",
+          "type" => "Note",
+          "actor" => "https://example.com/users/alice",
+          "content" => "Hello reblog"
+        },
+        local: false
+      )
+
+    conn = post(conn, "/api/v1/statuses/#{note.id}/reblog")
+    assert json_response(conn, 200)
+
+    conn = post(conn, "/api/v1/statuses/#{note.id}/reblog")
+    assert json_response(conn, 200)
+
+    assert Objects.count_by_type_object("Announce", note.ap_id) == 1
+  end
 end
