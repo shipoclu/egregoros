@@ -1,6 +1,7 @@
 defmodule PleromaReduxWeb.MastodonAPI.TimelinesControllerTest do
   use PleromaReduxWeb.ConnCase, async: true
 
+  alias PleromaRedux.Pipeline
   alias PleromaRedux.Publish
   alias PleromaRedux.Users
 
@@ -15,6 +16,37 @@ defmodule PleromaReduxWeb.MastodonAPI.TimelinesControllerTest do
     assert length(response) == 2
     assert Enum.at(response, 0)["content"] == "Second post"
     assert Enum.at(response, 1)["content"] == "First post"
+  end
+
+  test "GET /api/v1/timelines/public includes reblog statuses", %{conn: conn} do
+    {:ok, alice} = Users.create_local_user("alice")
+    {:ok, bob} = Users.create_local_user("bob")
+
+    {:ok, create} = Publish.post_note(alice, "Hello")
+
+    {:ok, _announce} =
+      Pipeline.ingest(
+        %{
+          "id" => "https://example.com/activities/announce/1",
+          "type" => "Announce",
+          "actor" => bob.ap_id,
+          "object" => create.object
+        },
+        local: true
+      )
+
+    conn = get(conn, "/api/v1/timelines/public")
+
+    response = json_response(conn, 200)
+    assert length(response) == 2
+
+    assert Enum.at(response, 0)["account"]["username"] == "bob"
+    assert Enum.at(response, 0)["content"] == ""
+    assert Enum.at(response, 0)["reblog"]["content"] == "Hello"
+
+    assert Enum.at(response, 1)["account"]["username"] == "alice"
+    assert Enum.at(response, 1)["content"] == "Hello"
+    assert Enum.at(response, 1)["reblog"] == nil
   end
 
   test "GET /api/v1/timelines/public paginates with max_id and Link header", %{conn: conn} do
@@ -62,6 +94,36 @@ defmodule PleromaReduxWeb.MastodonAPI.TimelinesControllerTest do
     assert length(response) == 2
     assert Enum.at(response, 0)["content"] == "Second home post"
     assert Enum.at(response, 1)["content"] == "First home post"
+  end
+
+  test "GET /api/v1/timelines/home includes reblog statuses by the current user", %{conn: conn} do
+    {:ok, alice} = Users.create_local_user("alice")
+    {:ok, bob} = Users.create_local_user("bob")
+
+    PleromaRedux.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, bob} end)
+
+    {:ok, create} = Publish.post_note(alice, "Hello")
+
+    {:ok, _announce} =
+      Pipeline.ingest(
+        %{
+          "id" => "https://example.com/activities/announce/2",
+          "type" => "Announce",
+          "actor" => bob.ap_id,
+          "object" => create.object
+        },
+        local: true
+      )
+
+    conn = get(conn, "/api/v1/timelines/home")
+    response = json_response(conn, 200)
+
+    assert length(response) == 1
+    assert Enum.at(response, 0)["account"]["username"] == "bob"
+    assert Enum.at(response, 0)["content"] == ""
+    assert Enum.at(response, 0)["reblog"]["account"]["username"] == "alice"
+    assert Enum.at(response, 0)["reblog"]["content"] == "Hello"
   end
 
   test "GET /api/v1/timelines/home paginates with max_id and Link header", %{conn: conn} do

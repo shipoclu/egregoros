@@ -114,6 +114,23 @@ defmodule PleromaRedux.Objects do
     |> Repo.all()
   end
 
+  @status_types ~w(Note Announce)
+
+  def list_public_statuses(opts \\ []) when is_list(opts) do
+    limit = opts |> Keyword.get(:limit, 20) |> normalize_limit()
+    max_id = Keyword.get(opts, :max_id)
+    since_id = Keyword.get(opts, :since_id)
+
+    from(o in Object,
+      where: o.type in ^@status_types,
+      order_by: [desc: o.id],
+      limit: ^limit
+    )
+    |> maybe_where_max_id(max_id)
+    |> maybe_where_since_id(since_id)
+    |> Repo.all()
+  end
+
   def list_home_notes(actor_ap_id) when is_binary(actor_ap_id) do
     list_home_notes(actor_ap_id, limit: 20)
   end
@@ -137,6 +154,33 @@ defmodule PleromaRedux.Objects do
 
     from(o in Object,
       where: o.type == "Note" and o.actor in ^actor_ids,
+      order_by: [desc: o.id],
+      limit: ^limit
+    )
+    |> maybe_where_max_id(max_id)
+    |> maybe_where_since_id(since_id)
+    |> Repo.all()
+  end
+
+  def list_home_statuses(actor_ap_id) when is_binary(actor_ap_id) do
+    list_home_statuses(actor_ap_id, limit: 20)
+  end
+
+  def list_home_statuses(actor_ap_id, opts) when is_binary(actor_ap_id) and is_list(opts) do
+    limit = opts |> Keyword.get(:limit, 20) |> normalize_limit()
+    max_id = Keyword.get(opts, :max_id)
+    since_id = Keyword.get(opts, :since_id)
+
+    followed_actor_ids =
+      actor_ap_id
+      |> Relationships.list_follows_by_actor()
+      |> Enum.map(& &1.object)
+      |> Enum.filter(&is_binary/1)
+
+    actor_ids = Enum.uniq([actor_ap_id | followed_actor_ids])
+
+    from(o in Object,
+      where: o.type in ^@status_types and o.actor in ^actor_ids,
       order_by: [desc: o.id],
       limit: ^limit
     )

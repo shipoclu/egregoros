@@ -9,7 +9,7 @@ defmodule PleromaReduxWeb.MastodonAPI.TimelinesController do
     pagination = Pagination.parse(params)
 
     objects =
-      Objects.list_notes(
+      Objects.list_public_statuses(
         limit: pagination.limit + 1,
         max_id: pagination.max_id,
         since_id: pagination.since_id
@@ -28,7 +28,7 @@ defmodule PleromaReduxWeb.MastodonAPI.TimelinesController do
     user = conn.assigns.current_user
 
     objects =
-      Objects.list_home_notes(user.ap_id,
+      Objects.list_home_statuses(user.ap_id,
         limit: pagination.limit + 1,
         max_id: pagination.max_id,
         since_id: pagination.since_id
