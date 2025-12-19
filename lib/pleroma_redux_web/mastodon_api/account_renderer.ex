@@ -6,7 +6,10 @@ defmodule PleromaReduxWeb.MastodonAPI.AccountRenderer do
       "id" => Integer.to_string(user.id),
       "username" => user.nickname,
       "acct" => user.nickname,
-      "display_name" => user.nickname,
+      "display_name" => user.name || user.nickname,
+      "note" => user.bio || "",
+      "avatar" => user.avatar_url || "",
+      "avatar_static" => user.avatar_url || "",
       "url" => user.ap_id
     }
   end

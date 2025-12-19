@@ -64,7 +64,10 @@ defmodule PleromaRedux.Federation.Actor do
          outbox: outbox,
          public_key: public_key,
          private_key: nil,
-         local: false
+         local: false,
+         name: Map.get(actor, "name"),
+         bio: Map.get(actor, "summary"),
+         avatar_url: icon_url(actor)
        }}
     end
   end
@@ -82,4 +85,8 @@ defmodule PleromaRedux.Federation.Actor do
       value -> value
     end
   end
+
+  defp icon_url(%{"icon" => %{"url" => url}}) when is_binary(url), do: url
+  defp icon_url(%{"icon" => url}) when is_binary(url), do: url
+  defp icon_url(_), do: nil
 end

@@ -24,6 +24,8 @@ defmodule PleromaReduxWeb.ActorController do
       "id" => user.ap_id,
       "type" => "Person",
       "preferredUsername" => user.nickname,
+      "name" => user.name || user.nickname,
+      "summary" => user.bio,
       "inbox" => user.inbox,
       "outbox" => user.outbox,
       "followers" => user.ap_id <> "/followers",
@@ -34,5 +36,16 @@ defmodule PleromaReduxWeb.ActorController do
         "publicKeyPem" => user.public_key
       }
     }
+    |> maybe_put_icon(user)
   end
+
+  defp maybe_put_icon(actor, %{avatar_url: avatar_url})
+       when is_binary(avatar_url) and avatar_url != "" do
+    Map.put(actor, "icon", %{
+      "type" => "Image",
+      "url" => avatar_url
+    })
+  end
+
+  defp maybe_put_icon(actor, _user), do: actor
 end
