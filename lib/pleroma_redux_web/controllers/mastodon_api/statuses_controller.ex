@@ -2,6 +2,7 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesController do
   use PleromaReduxWeb, :controller
 
   alias PleromaRedux.Activities.Announce
+  alias PleromaRedux.Activities.Delete
   alias PleromaRedux.Activities.Like
   alias PleromaRedux.Activities.Undo
   alias PleromaRedux.Media
@@ -116,6 +117,19 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesController do
         Relationships.list_by_type_object("Announce", object.ap_id)
         |> Enum.map(&render_actor_account(&1.actor))
         |> then(&json(conn, &1))
+    end
+  end
+
+  def delete(conn, %{"id" => id}) do
+    with %{} = object <- Objects.get(id),
+         %{} = user <- conn.assigns.current_user,
+         true <- object.type == "Note" and object.actor == user.ap_id,
+         {:ok, _delete} <- Pipeline.ingest(Delete.build(user, object), local: true) do
+      json(conn, StatusRenderer.render_status(object, user))
+    else
+      nil -> send_resp(conn, 404, "Not Found")
+      false -> send_resp(conn, 403, "Forbidden")
+      {:error, _} -> send_resp(conn, 422, "Unprocessable Entity")
     end
   end
 

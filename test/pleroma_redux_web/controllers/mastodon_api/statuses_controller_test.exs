@@ -580,4 +580,20 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesControllerTest do
     assert length(response) == 1
     assert Enum.at(response, 0)["username"] == "bob"
   end
+
+  test "DELETE /api/v1/statuses/:id deletes a local status", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("local")
+
+    PleromaRedux.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, user} end)
+
+    {:ok, create} = Publish.post_note(user, "Hello delete")
+    note = Objects.get_by_ap_id(create.object)
+
+    conn = delete(conn, "/api/v1/statuses/#{note.id}")
+    response = json_response(conn, 200)
+
+    assert response["id"] == Integer.to_string(note.id)
+    assert Objects.get(note.id) == nil
+  end
 end

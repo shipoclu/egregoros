@@ -78,6 +78,7 @@ defmodule PleromaReduxWeb.Router do
     post "/statuses", StatusesController, :create
     get "/statuses/:id/favourited_by", StatusesController, :favourited_by
     get "/statuses/:id/reblogged_by", StatusesController, :reblogged_by
+    delete "/statuses/:id", StatusesController, :delete
     post "/statuses/:id/favourite", StatusesController, :favourite
     post "/statuses/:id/unfavourite", StatusesController, :unfavourite
     post "/statuses/:id/reblog", StatusesController, :reblog

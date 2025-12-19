@@ -26,6 +26,11 @@ defmodule PleromaRedux.Relationships do
     |> Repo.delete_all()
   end
 
+  def delete_all_for_object(object_ap_id) when is_binary(object_ap_id) do
+    from(r in Relationship, where: r.object == ^object_ap_id)
+    |> Repo.delete_all()
+  end
+
   def list_follows_to(object_ap_id) when is_binary(object_ap_id) do
     from(r in Relationship, where: r.type == "Follow" and r.object == ^object_ap_id)
     |> Repo.all()
