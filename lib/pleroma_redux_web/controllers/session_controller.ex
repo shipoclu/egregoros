@@ -33,4 +33,3 @@ defmodule PleromaReduxWeb.SessionController do
     |> text("Unprocessable Entity")
   end
 end
-

@@ -41,4 +41,3 @@ defmodule PleromaRedux.Password do
     Application.get_env(:pleroma_redux, :password_iterations, 200_000)
   end
 end
-

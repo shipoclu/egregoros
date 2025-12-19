@@ -3,4 +3,3 @@ defmodule PleromaReduxWeb.SessionHTML do
 
   embed_templates "session_html/*"
 end
-

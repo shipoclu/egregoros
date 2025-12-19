@@ -3,7 +3,7 @@
     <div class="rounded-3xl border border-white/80 bg-white/80 p-8 shadow-xl shadow-slate-200/40 backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/70 dark:shadow-slate-900/40">
       <h2 class="font-display text-2xl text-slate-900 dark:text-slate-100">Settings</h2>
       <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">
-        Signed in as <span class="font-semibold"><%= @current_user.email %></span>
+        Signed in as <span class="font-semibold">{@current_user.email}</span>
       </p>
 
       <p :if={@error} class="mt-4 text-sm text-rose-500">{@error}</p>
@@ -13,7 +13,12 @@
       <section class="rounded-3xl border border-white/80 bg-white/80 p-8 shadow-lg shadow-slate-200/30 backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/70 dark:shadow-slate-900/50">
         <h3 class="font-display text-xl text-slate-900 dark:text-slate-100">Profile</h3>
 
-        <.form for={@profile_form} id="profile-form" action={~p"/settings/profile"} class="mt-6 space-y-4">
+        <.form
+          for={@profile_form}
+          id="profile-form"
+          action={~p"/settings/profile"}
+          class="mt-6 space-y-4"
+        >
           <.input
             type="text"
             field={@profile_form[:name]}

@@ -56,7 +56,9 @@ defmodule PleromaReduxWeb.SettingsControllerTest do
     assert updated.avatar_url == "https://cdn.example/alice.png"
   end
 
-  test "POST /settings/account updates email and allows logging in with the new email", %{conn: conn} do
+  test "POST /settings/account updates email and allows logging in with the new email", %{
+    conn: conn
+  } do
     {:ok, user} =
       apply(Users, :register_local_user, [
         %{

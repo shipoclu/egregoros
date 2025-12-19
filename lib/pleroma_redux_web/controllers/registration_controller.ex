@@ -20,7 +20,9 @@ defmodule PleromaReduxWeb.RegistrationController do
     password = params |> Map.get("password", "") |> to_string()
 
     form =
-      Phoenix.Component.to_form(%{"nickname" => nickname, "email" => email, "password" => ""}, as: :registration)
+      Phoenix.Component.to_form(%{"nickname" => nickname, "email" => email, "password" => ""},
+        as: :registration
+      )
 
     cond do
       nickname == "" ->

@@ -56,4 +56,3 @@ defmodule PleromaReduxWeb.SessionControllerTest do
     assert get_session(conn, :user_id) == nil
   end
 end
-

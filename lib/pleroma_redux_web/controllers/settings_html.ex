@@ -3,4 +3,3 @@ defmodule PleromaReduxWeb.SettingsHTML do
 
   embed_templates "settings_html/*"
 end
-
