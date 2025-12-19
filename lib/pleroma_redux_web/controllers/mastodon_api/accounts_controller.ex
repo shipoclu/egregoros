@@ -3,10 +3,13 @@ defmodule PleromaReduxWeb.MastodonAPI.AccountsController do
 
   alias PleromaRedux.Activities.Follow
   alias PleromaRedux.Activities.Undo
+  alias PleromaRedux.Federation.Actor
+  alias PleromaRedux.Federation.WebFinger
   alias PleromaRedux.Objects
   alias PleromaRedux.Pipeline
   alias PleromaRedux.Relationships
   alias PleromaRedux.Users
+  alias PleromaReduxWeb.Endpoint
   alias PleromaReduxWeb.MastodonAPI.AccountRenderer
   alias PleromaReduxWeb.MastodonAPI.RelationshipRenderer
   alias PleromaReduxWeb.MastodonAPI.StatusRenderer
@@ -20,6 +23,30 @@ defmodule PleromaReduxWeb.MastodonAPI.AccountsController do
       nil -> send_resp(conn, 404, "Not Found")
       user -> json(conn, AccountRenderer.render_account(user))
     end
+  end
+
+  def lookup(conn, %{"acct" => acct}) do
+    acct =
+      acct
+      |> to_string()
+      |> String.trim()
+      |> String.trim_leading("@")
+
+    if acct == "" do
+      send_resp(conn, 422, "Unprocessable Entity")
+    else
+      case parse_acct(acct) do
+        {:local, nickname} ->
+          lookup_local(conn, nickname)
+
+        {:remote, handle} ->
+          lookup_remote(conn, handle)
+      end
+    end
+  end
+
+  def lookup(conn, _params) do
+    send_resp(conn, 422, "Unprocessable Entity")
   end
 
   def statuses(conn, %{"id" => id}) do
@@ -77,5 +104,44 @@ defmodule PleromaReduxWeb.MastodonAPI.AccountsController do
       nil -> send_resp(conn, 404, "Not Found")
       {:error, _} -> send_resp(conn, 422, "Unprocessable Entity")
     end
+  end
+
+  defp parse_acct(acct) when is_binary(acct) do
+    case String.split(acct, "@", parts: 2) do
+      [nickname] when nickname != "" ->
+        {:local, nickname}
+
+      [nickname, domain] when nickname != "" and domain != "" ->
+        if domain == local_domain() do
+          {:local, nickname}
+        else
+          {:remote, nickname <> "@" <> domain}
+        end
+
+      _ ->
+        {:local, acct}
+    end
+  end
+
+  defp lookup_local(conn, nickname) do
+    case Users.get_by_nickname(nickname) do
+      nil -> send_resp(conn, 404, "Not Found")
+      user -> json(conn, AccountRenderer.render_account(user))
+    end
+  end
+
+  defp lookup_remote(conn, handle) do
+    with {:ok, actor_url} <- WebFinger.lookup(handle),
+         {:ok, user} <- Actor.fetch_and_store(actor_url) do
+      json(conn, AccountRenderer.render_account(user))
+    else
+      _ -> send_resp(conn, 404, "Not Found")
+    end
+  end
+
+  defp local_domain do
+    Endpoint.url()
+    |> URI.parse()
+    |> Map.get(:host)
   end
 end

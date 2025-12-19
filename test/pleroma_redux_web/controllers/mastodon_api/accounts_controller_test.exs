@@ -1,6 +1,8 @@
 defmodule PleromaReduxWeb.MastodonAPI.AccountsControllerTest do
   use PleromaReduxWeb.ConnCase, async: true
 
+  import Mox
+
   alias PleromaRedux.Publish
   alias PleromaRedux.Pipeline
   alias PleromaRedux.Relationships
@@ -41,6 +43,68 @@ defmodule PleromaReduxWeb.MastodonAPI.AccountsControllerTest do
     assert length(response) == 2
     assert Enum.at(response, 0)["content"] == "Second post"
     assert Enum.at(response, 1)["content"] == "First post"
+  end
+
+  test "GET /api/v1/accounts/lookup finds a local account by acct", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("alice")
+
+    conn = get(conn, "/api/v1/accounts/lookup", %{"acct" => "alice"})
+    response = json_response(conn, 200)
+
+    assert response["id"] == Integer.to_string(user.id)
+    assert response["username"] == "alice"
+  end
+
+  test "GET /api/v1/accounts/lookup resolves a remote acct via WebFinger", %{conn: conn} do
+    actor_url = "https://remote.example/users/bob"
+
+    PleromaRedux.HTTP.Mock
+    |> expect(:get, fn url, _headers ->
+      assert url ==
+               "https://remote.example/.well-known/webfinger?resource=acct:bob@remote.example"
+
+      {:ok,
+       %{
+         status: 200,
+         body: %{
+           "links" => [
+             %{
+               "rel" => "self",
+               "type" => "application/activity+json",
+               "href" => actor_url
+             }
+           ]
+         },
+         headers: []
+       }}
+    end)
+    |> expect(:get, fn url, _headers ->
+      assert url == actor_url
+
+      {:ok,
+       %{
+         status: 200,
+         body: %{
+           "id" => actor_url,
+           "type" => "Person",
+           "preferredUsername" => "bob",
+           "inbox" => "https://remote.example/users/bob/inbox",
+           "outbox" => "https://remote.example/users/bob/outbox",
+           "publicKey" => %{
+             "id" => actor_url <> "#main-key",
+             "owner" => actor_url,
+             "publicKeyPem" => "-----BEGIN PUBLIC KEY-----\nMIIB...\n-----END PUBLIC KEY-----\n"
+           }
+         },
+         headers: []
+       }}
+    end)
+
+    conn = get(conn, "/api/v1/accounts/lookup", %{"acct" => "bob@remote.example"})
+    response = json_response(conn, 200)
+
+    assert response["username"] == "bob"
+    assert response["acct"] == "bob@remote.example"
   end
 
   test "POST /api/v1/accounts/:id/follow creates follow activity", %{conn: conn} do
