@@ -59,4 +59,3 @@ defmodule PleromaRedux.OAuthTest do
     assert OAuth.get_user_by_token(token.token).id == user.id
   end
 end
-

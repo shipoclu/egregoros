@@ -23,4 +23,3 @@ defmodule PleromaReduxWeb.MastodonAPI.AppsController do
     end
   end
 end
-

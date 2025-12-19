@@ -15,7 +15,8 @@ defmodule PleromaRedux.OAuth do
     application_attrs = %{
       name: Map.get(attrs, "client_name") || Map.get(attrs, :client_name) || "App",
       website: Map.get(attrs, "website") || Map.get(attrs, :website),
-      redirect_uris: parse_redirect_uris(Map.get(attrs, "redirect_uris") || Map.get(attrs, :redirect_uris)),
+      redirect_uris:
+        parse_redirect_uris(Map.get(attrs, "redirect_uris") || Map.get(attrs, :redirect_uris)),
       scopes: Map.get(attrs, "scopes") || Map.get(attrs, :scopes) || "",
       client_id: generate_token(32),
       client_secret: generate_token(48),

@@ -22,4 +22,3 @@ defmodule PleromaReduxWeb.MastodonAPI.AppsControllerTest do
     assert %{} = OAuth.get_application_by_client_id(response["client_id"])
   end
 end
-
