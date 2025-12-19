@@ -85,7 +85,9 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesController do
     %{
       "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
       "type" => "Note",
-      "actor" => actor,
+      "attributedTo" => actor,
+      "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+      "cc" => [actor <> "/followers"],
       "content" => content,
       "published" => DateTime.utc_now() |> DateTime.to_iso8601()
     }
@@ -96,6 +98,8 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesController do
       "id" => Endpoint.url() <> "/activities/create/" <> Ecto.UUID.generate(),
       "type" => "Create",
       "actor" => actor,
+      "to" => note["to"],
+      "cc" => note["cc"],
       "object" => note,
       "published" => note["published"]
     }
