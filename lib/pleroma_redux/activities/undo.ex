@@ -2,9 +2,43 @@ defmodule PleromaRedux.Activities.Undo do
   alias PleromaRedux.Federation.Delivery
   alias PleromaRedux.Object
   alias PleromaRedux.Objects
+  alias PleromaRedux.User
   alias PleromaRedux.Users
+  alias PleromaReduxWeb.Endpoint
 
   def type, do: "Undo"
+
+  def build(%User{ap_id: actor}, %Object{} = target_activity) do
+    build(actor, target_activity)
+  end
+
+  def build(actor, %Object{} = target_activity) when is_binary(actor) do
+    base =
+      %{
+        "id" => Endpoint.url() <> "/activities/undo/" <> Ecto.UUID.generate(),
+        "type" => type(),
+        "actor" => actor,
+        "object" => target_activity.ap_id,
+        "published" => DateTime.utc_now() |> DateTime.to_iso8601()
+      }
+
+    base
+    |> maybe_copy_addressing(target_activity.data)
+  end
+
+  def build(%User{ap_id: actor}, object_id) when is_binary(object_id) do
+    build(actor, object_id)
+  end
+
+  def build(actor, object_id) when is_binary(actor) and is_binary(object_id) do
+    %{
+      "id" => Endpoint.url() <> "/activities/undo/" <> Ecto.UUID.generate(),
+      "type" => type(),
+      "actor" => actor,
+      "object" => object_id,
+      "published" => DateTime.utc_now() |> DateTime.to_iso8601()
+    }
+  end
 
   def normalize(%{"type" => "Undo"} = activity), do: activity
   def normalize(_), do: nil
@@ -54,6 +88,17 @@ defmodule PleromaRedux.Activities.Undo do
   end
 
   defp do_deliver(_actor, _activity, _undo_object), do: :ok
+
+  defp maybe_copy_addressing(activity, %{"to" => to} = target_data) when is_list(to) do
+    activity
+    |> Map.put("to", to)
+    |> maybe_copy_cc(target_data)
+  end
+
+  defp maybe_copy_addressing(activity, target_data), do: maybe_copy_cc(activity, target_data)
+
+  defp maybe_copy_cc(activity, %{"cc" => cc}) when is_list(cc), do: Map.put(activity, "cc", cc)
+  defp maybe_copy_cc(activity, _), do: activity
 
   defp to_object_attrs(activity, opts) do
     %{

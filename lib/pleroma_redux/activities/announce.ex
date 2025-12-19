@@ -1,9 +1,42 @@
 defmodule PleromaRedux.Activities.Announce do
   alias PleromaRedux.Federation.Delivery
+  alias PleromaRedux.Object
   alias PleromaRedux.Objects
+  alias PleromaRedux.User
   alias PleromaRedux.Users
+  alias PleromaReduxWeb.Endpoint
+
+  @public "https://www.w3.org/ns/activitystreams#Public"
 
   def type, do: "Announce"
+
+  def build(%User{ap_id: actor}, %Object{} = object) do
+    build(actor, object)
+  end
+
+  def build(actor, %Object{ap_id: object_id} = object)
+      when is_binary(actor) and is_binary(object_id) do
+    build(actor, object_id, object)
+  end
+
+  def build(%User{ap_id: actor}, object_id) when is_binary(object_id) do
+    build(actor, object_id)
+  end
+
+  def build(actor, object_id) when is_binary(actor) and is_binary(object_id) do
+    %{
+      "id" => Endpoint.url() <> "/activities/announce/" <> Ecto.UUID.generate(),
+      "type" => type(),
+      "actor" => actor,
+      "object" => object_id,
+      "published" => DateTime.utc_now() |> DateTime.to_iso8601()
+    }
+  end
+
+  defp build(actor, object_id, %Object{} = object) do
+    base = build(actor, object_id)
+    Map.merge(base, recipients(actor, object))
+  end
 
   def normalize(%{"type" => "Announce"} = activity), do: activity
   def normalize(_), do: nil
@@ -41,7 +74,15 @@ defmodule PleromaRedux.Activities.Announce do
           Delivery.deliver(actor, follower.inbox, announce_object.data)
         end
       end)
-    end
+      end
+  end
+
+  defp recipients(actor, %Object{actor: object_actor}) when is_binary(object_actor) do
+    %{"to" => Enum.uniq([@public, actor <> "/followers", object_actor])}
+  end
+
+  defp recipients(actor, _object) do
+    %{"to" => Enum.uniq([@public, actor <> "/followers"])}
   end
 
   defp to_object_attrs(activity, opts) do

@@ -1,9 +1,49 @@
 defmodule PleromaRedux.Activities.EmojiReact do
   alias PleromaRedux.Federation.Delivery
+  alias PleromaRedux.Object
   alias PleromaRedux.Objects
+  alias PleromaRedux.User
   alias PleromaRedux.Users
+  alias PleromaReduxWeb.Endpoint
+
+  @public "https://www.w3.org/ns/activitystreams#Public"
 
   def type, do: "EmojiReact"
+
+  def build(%User{ap_id: actor}, %Object{} = object, content) when is_binary(content) do
+    build(actor, object, content)
+  end
+
+  def build(actor, %Object{ap_id: object_id} = object, content)
+      when is_binary(actor) and is_binary(object_id) and is_binary(content) do
+    build(actor, object_id, content, object)
+  end
+
+  def build(%User{ap_id: actor}, object_id, content)
+      when is_binary(object_id) and is_binary(content) do
+    build(actor, object_id, content)
+  end
+
+  def build(actor, object_id, content)
+      when is_binary(actor) and is_binary(object_id) and is_binary(content) do
+    %{
+      "id" => Endpoint.url() <> "/activities/react/" <> Ecto.UUID.generate(),
+      "type" => type(),
+      "actor" => actor,
+      "object" => object_id,
+      "content" => String.trim(content),
+      "published" => DateTime.utc_now() |> DateTime.to_iso8601()
+    }
+  end
+
+  defp build(actor, object_id, content, %Object{} = object) do
+    base = build(actor, object_id, content)
+
+    case recipients(actor, object) do
+      %{} = recipients when map_size(recipients) > 0 -> Map.merge(base, recipients)
+      _ -> base
+    end
+  end
 
   def normalize(%{"type" => "EmojiReact"} = activity) do
     trim_content(activity)
@@ -59,6 +99,22 @@ defmodule PleromaRedux.Activities.EmojiReact do
         _ -> nil
       end
   end
+
+  defp recipients(actor, %Object{actor: object_actor} = object) when is_binary(object_actor) do
+    to =
+      if public_object?(object) do
+        [actor <> "/followers", object_actor]
+      else
+        [object_actor]
+      end
+
+    %{"to" => Enum.uniq(to)}
+  end
+
+  defp recipients(_actor, _object), do: %{}
+
+  defp public_object?(%Object{data: %{"to" => to}}) when is_list(to), do: @public in to
+  defp public_object?(_), do: false
 
   defp to_object_attrs(activity, opts) do
     %{

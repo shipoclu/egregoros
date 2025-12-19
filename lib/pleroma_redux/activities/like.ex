@@ -1,9 +1,48 @@
 defmodule PleromaRedux.Activities.Like do
   alias PleromaRedux.Federation.Delivery
+  alias PleromaRedux.Object
   alias PleromaRedux.Objects
+  alias PleromaRedux.User
   alias PleromaRedux.Users
+  alias PleromaReduxWeb.Endpoint
+
+  @public "https://www.w3.org/ns/activitystreams#Public"
 
   def type, do: "Like"
+
+  def build(%User{ap_id: actor}, %Object{} = object) do
+    build(actor, object)
+  end
+
+  def build(actor, %Object{ap_id: object_id} = object) when is_binary(actor) and is_binary(object_id) do
+    build(actor, object_id, object)
+  end
+
+  def build(%User{ap_id: actor}, object_id) when is_binary(object_id) do
+    build(actor, object_id)
+  end
+
+  def build(actor, object_id) when is_binary(actor) and is_binary(object_id) do
+    base =
+      %{
+        "id" => Endpoint.url() <> "/activities/like/" <> Ecto.UUID.generate(),
+        "type" => type(),
+        "actor" => actor,
+        "object" => object_id,
+        "published" => DateTime.utc_now() |> DateTime.to_iso8601()
+      }
+
+    base
+  end
+
+  defp build(actor, object_id, %Object{} = object) do
+    base = build(actor, object_id)
+
+    case recipients(actor, object) do
+      %{} = recipients when map_size(recipients) > 0 -> Map.merge(base, recipients)
+      _ -> base
+    end
+  end
 
   def normalize(%{"type" => "Like"} = activity), do: activity
   def normalize(_), do: nil
@@ -47,6 +86,22 @@ defmodule PleromaRedux.Activities.Like do
         _ -> nil
       end
   end
+
+  defp recipients(actor, %Object{actor: object_actor} = object) when is_binary(object_actor) do
+    to =
+      if public_object?(object) do
+        [actor <> "/followers", object_actor]
+      else
+        [object_actor]
+      end
+
+    %{"to" => Enum.uniq(to)}
+  end
+
+  defp recipients(_actor, _object), do: %{}
+
+  defp public_object?(%Object{data: %{"to" => to}}) when is_list(to), do: @public in to
+  defp public_object?(_), do: false
 
   defp to_object_attrs(activity, opts) do
     %{
