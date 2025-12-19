@@ -92,6 +92,45 @@ defmodule PleromaReduxWeb.InboxControllerTest do
     assert Objects.get_by_ap_id(note["id"])
   end
 
+  test "POST /users/:nickname/inbox accepts signature header without scheme prefix", %{conn: conn} do
+    {:ok, _user} = Users.create_local_user("frank")
+    {public_key, private_key} = PleromaRedux.Keys.generate_rsa_keypair()
+
+    {:ok, _} =
+      Users.create_user(%{
+        nickname: "alice",
+        ap_id: "https://remote.example/users/alice",
+        inbox: "https://remote.example/users/alice/inbox",
+        outbox: "https://remote.example/users/alice/outbox",
+        public_key: public_key,
+        private_key: private_key,
+        local: false
+      })
+
+    note = %{
+      "id" => "https://remote.example/objects/1-signature-header",
+      "type" => "Note",
+      "attributedTo" => "https://remote.example/users/alice",
+      "content" => "Hello via signature header"
+    }
+
+    create = %{
+      "id" => "https://remote.example/activities/create/1-signature-header",
+      "type" => "Create",
+      "actor" => "https://remote.example/users/alice",
+      "object" => note
+    }
+
+    conn =
+      conn
+      |> sign_request("post", "/users/frank/inbox", private_key, "https://remote.example/users/alice#main-key")
+      |> move_authorization_to_signature_header()
+      |> post("/users/frank/inbox", create)
+
+    assert response(conn, 202)
+    assert Objects.get_by_ap_id(note["id"])
+  end
+
   test "POST /users/:nickname/inbox rejects mismatched digest", %{conn: conn} do
     {:ok, _user} = Users.create_local_user("frank")
     {public_key, private_key} = PleromaRedux.Keys.generate_rsa_keypair()
@@ -260,6 +299,18 @@ defmodule PleromaReduxWeb.InboxControllerTest do
         "signature=\"#{signature_b64}\""
 
     Plug.Conn.put_req_header(conn, "authorization", header)
+  end
+
+  defp move_authorization_to_signature_header(conn) do
+    case Plug.Conn.get_req_header(conn, "authorization") do
+      ["Signature " <> rest] ->
+        conn
+        |> Plug.Conn.delete_req_header("authorization")
+        |> Plug.Conn.put_req_header("signature", rest)
+
+      _ ->
+        conn
+    end
   end
 
   defp signature_string(headers, method, path, values) do

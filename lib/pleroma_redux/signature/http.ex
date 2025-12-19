@@ -79,20 +79,28 @@ defmodule PleromaRedux.Signature.HTTP do
     Enum.into(headers, %{}, fn {key, value} -> {String.downcase(key), value} end)
   end
 
-  defp parse_signature(%{"authorization" => authorization}) do
-    case parse_authorization(authorization) do
-      {:ok, params} -> {:ok, params.key_id, params.signature, params.headers}
-      {:error, _} = error -> error
+  defp parse_signature(headers) do
+    cond do
+      is_binary(Map.get(headers, "signature")) ->
+        headers
+        |> Map.get("signature")
+        |> parse_signature_value()
+
+      is_binary(Map.get(headers, "authorization")) ->
+        headers
+        |> Map.get("authorization")
+        |> parse_signature_value()
+
+      true ->
+        {:error, :missing_signature}
     end
   end
 
-  defp parse_signature(%{"signature" => signature}) do
-    parse_signature(Map.put(%{}, "authorization", signature))
-  end
+  defp parse_signature_value("Signature " <> rest), do: parse_signature_params(rest)
+  defp parse_signature_value(rest) when is_binary(rest), do: parse_signature_params(rest)
+  defp parse_signature_value(_), do: {:error, :invalid_signature}
 
-  defp parse_signature(_), do: {:error, :missing_signature}
-
-  defp parse_authorization("Signature " <> rest) do
+  defp parse_signature_params(rest) when is_binary(rest) do
     params =
       rest
       |> String.split(",")
@@ -117,12 +125,7 @@ defmodule PleromaRedux.Signature.HTTP do
 
       case Base.decode64(signature_b64) do
         {:ok, decoded} ->
-          {:ok,
-           %{
-             key_id: key_id,
-             signature: decoded,
-             headers: headers_param
-           }}
+          {:ok, key_id, decoded, headers_param}
 
         :error ->
           {:error, :invalid_signature}
@@ -131,8 +134,6 @@ defmodule PleromaRedux.Signature.HTTP do
       _ -> {:error, :invalid_signature}
     end
   end
-
-  defp parse_authorization(_), do: {:error, :invalid_signature}
 
   defp public_key_for_key_id(key_id) when is_binary(key_id) do
     ap_id = key_id |> String.split("#") |> List.first()
