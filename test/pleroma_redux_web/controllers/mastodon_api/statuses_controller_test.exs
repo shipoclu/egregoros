@@ -369,6 +369,57 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesControllerTest do
     assert response["descendants"] == []
   end
 
+  test "GET /api/v1/statuses/:id/context returns thread ancestors and descendants", %{conn: conn} do
+    {:ok, _user} = Users.create_local_user("local")
+
+    {:ok, root} =
+      Pipeline.ingest(
+        %{
+          "id" => "https://example.com/objects/root",
+          "type" => "Note",
+          "actor" => "https://example.com/users/alice",
+          "content" => "Root"
+        },
+        local: false
+      )
+
+    {:ok, reply_1} =
+      Pipeline.ingest(
+        %{
+          "id" => "https://example.com/objects/reply-1",
+          "type" => "Note",
+          "actor" => "https://example.com/users/bob",
+          "content" => "Reply 1",
+          "inReplyTo" => root.ap_id
+        },
+        local: false
+      )
+
+    {:ok, reply_2} =
+      Pipeline.ingest(
+        %{
+          "id" => "https://example.com/objects/reply-2",
+          "type" => "Note",
+          "actor" => "https://example.com/users/charlie",
+          "content" => "Reply 2",
+          "inReplyTo" => reply_1.ap_id
+        },
+        local: false
+      )
+
+    conn = get(conn, "/api/v1/statuses/#{reply_2.id}/context")
+    response = json_response(conn, 200)
+
+    assert Enum.map(response["ancestors"], & &1["content"]) == ["Root", "Reply 1"]
+    assert response["descendants"] == []
+
+    conn = get(conn, "/api/v1/statuses/#{root.id}/context")
+    response = json_response(conn, 200)
+
+    assert response["ancestors"] == []
+    assert Enum.map(response["descendants"], & &1["content"]) == ["Reply 1", "Reply 2"]
+  end
+
   defp tmp_upload_path do
     path = Path.join(System.tmp_dir!(), "pleroma-redux-test-upload-#{Ecto.UUID.generate()}")
     File.write!(path, <<0, 1, 2, 3>>)

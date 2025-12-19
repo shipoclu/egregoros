@@ -49,8 +49,14 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesController do
       nil ->
         send_resp(conn, 404, "Not Found")
 
-      _object ->
-        json(conn, %{"ancestors" => [], "descendants" => []})
+      object ->
+        ancestors = Objects.thread_ancestors(object)
+        descendants = Objects.thread_descendants(object)
+
+        json(conn, %{
+          "ancestors" => StatusRenderer.render_statuses(ancestors),
+          "descendants" => StatusRenderer.render_statuses(descendants)
+        })
     end
   end
 
