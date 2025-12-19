@@ -25,4 +25,41 @@ defmodule PleromaReduxWeb.MastodonAPI.AccountsControllerTest do
     assert response["id"] == Integer.to_string(user.id)
     assert response["username"] == "alice"
   end
+
+  test "POST /api/v1/accounts/:id/follow creates follow activity", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("local")
+    {:ok, target} = Users.create_local_user("bob")
+
+    PleromaRedux.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, user} end)
+
+    conn = post(conn, "/api/v1/accounts/#{target.id}/follow")
+    assert json_response(conn, 200)
+
+    assert PleromaRedux.Objects.get_by_type_actor_object("Follow", user.ap_id, target.ap_id)
+  end
+
+  test "POST /api/v1/accounts/:id/unfollow creates undo activity", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("local")
+    {:ok, target} = Users.create_local_user("charlie")
+
+    PleromaRedux.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, user} end)
+
+    {:ok, follow} =
+      PleromaRedux.Pipeline.ingest(
+        %{
+          "id" => "https://example.com/activities/follow/1",
+          "type" => "Follow",
+          "actor" => user.ap_id,
+          "object" => target.ap_id
+        },
+        local: true
+      )
+
+    conn = post(conn, "/api/v1/accounts/#{target.id}/unfollow")
+    assert json_response(conn, 200)
+
+    assert PleromaRedux.Objects.get_by_type_actor_object("Undo", user.ap_id, follow.ap_id)
+  end
 end
