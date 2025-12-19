@@ -17,7 +17,7 @@ defmodule PleromaReduxWeb.Router do
   scope "/", PleromaReduxWeb do
     pipe_through :browser
 
-    get "/", PageController, :home
+    live "/", TimelineLive
   end
 
   # Other scopes may use custom stacks.
