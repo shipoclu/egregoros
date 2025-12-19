@@ -11,7 +11,7 @@ defmodule PleromaReduxWeb.ActorController do
       user ->
         conn
         |> put_resp_content_type("application/activity+json")
-        |> json(actor_json(user))
+        |> send_resp(200, Jason.encode!(actor_json(user)))
     end
   end
 
@@ -26,6 +26,8 @@ defmodule PleromaReduxWeb.ActorController do
       "preferredUsername" => user.nickname,
       "inbox" => user.inbox,
       "outbox" => user.outbox,
+      "followers" => user.ap_id <> "/followers",
+      "following" => user.ap_id <> "/following",
       "publicKey" => %{
         "id" => user.ap_id <> "#main-key",
         "owner" => user.ap_id,

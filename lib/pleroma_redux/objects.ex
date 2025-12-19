@@ -63,6 +63,11 @@ defmodule PleromaRedux.Objects do
     |> Repo.all()
   end
 
+  def list_follows_by_actor(actor_ap_id) when is_binary(actor_ap_id) do
+    from(o in Object, where: o.type == "Follow" and o.actor == ^actor_ap_id)
+    |> Repo.all()
+  end
+
   def list_notes(limit \\ 20) do
     from(o in Object, where: o.type == "Note", order_by: [desc: o.inserted_at], limit: ^limit)
     |> Repo.all()

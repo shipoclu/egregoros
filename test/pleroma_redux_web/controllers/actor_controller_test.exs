@@ -7,8 +7,16 @@ defmodule PleromaReduxWeb.ActorControllerTest do
     {:ok, user} = Users.create_local_user("dana")
 
     conn = get(conn, "/users/dana")
-    assert json_response(conn, 200)["id"] == user.ap_id
-    assert json_response(conn, 200)["preferredUsername"] == "dana"
-    assert json_response(conn, 200)["publicKey"]["publicKeyPem"] == user.public_key
+    assert conn.status == 200
+
+    [content_type] = get_resp_header(conn, "content-type")
+    assert String.contains?(content_type, "application/activity+json")
+
+    decoded = Jason.decode!(conn.resp_body)
+    assert decoded["id"] == user.ap_id
+    assert decoded["preferredUsername"] == "dana"
+    assert decoded["followers"] == user.ap_id <> "/followers"
+    assert decoded["following"] == user.ap_id <> "/following"
+    assert decoded["publicKey"]["publicKeyPem"] == user.public_key
   end
 end
