@@ -27,6 +27,10 @@ defmodule PleromaReduxWeb.Layouts do
   """
   attr :flash, :map, required: true, doc: "the map of flash messages"
 
+  attr :current_user, :any,
+    default: nil,
+    doc: "the currently signed-in user (optional)"
+
   attr :current_scope, :map,
     default: nil,
     doc: "the current [scope](https://hexdocs.pm/phoenix/scopes.html)"
@@ -57,6 +61,21 @@ defmodule PleromaReduxWeb.Layouts do
             >
               Mastodon API
             </a>
+            <%= if @current_user do %>
+              <a
+                href={~p"/logout"}
+                class="hidden text-xs uppercase tracking-[0.25em] text-slate-500 transition hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 sm:block"
+              >
+                <%= @current_user.nickname %> · Logout
+              </a>
+            <% else %>
+              <a
+                href={~p"/register"}
+                class="hidden text-xs uppercase tracking-[0.25em] text-slate-500 transition hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 sm:block"
+              >
+                Register
+              </a>
+            <% end %>
             <.theme_toggle />
           </div>
         </header>

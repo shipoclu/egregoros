@@ -5,6 +5,7 @@ defmodule PleromaReduxWeb.Router do
     plug :accepts, ["html"]
     plug :fetch_session
     plug :fetch_live_flash
+    plug PleromaReduxWeb.Plugs.FetchCurrentUser
     plug :put_root_layout, html: {PleromaReduxWeb.Layouts, :root}
     plug :protect_from_forgery
     plug :put_secure_browser_headers
@@ -20,6 +21,10 @@ defmodule PleromaReduxWeb.Router do
 
   scope "/", PleromaReduxWeb do
     pipe_through :browser
+
+    get "/register", RegistrationController, :new
+    post "/register", RegistrationController, :create
+    get "/logout", RegistrationController, :logout
 
     live "/", TimelineLive
   end
