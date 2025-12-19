@@ -12,6 +12,7 @@ config :pleroma_redux,
   generators: [timestamp_type: :utc_datetime]
 
 config :pleroma_redux, PleromaRedux.Signature, PleromaRedux.Signature.HTTP
+config :pleroma_redux, PleromaRedux.Auth, PleromaRedux.Auth.Default
 
 
 # Configure the endpoint

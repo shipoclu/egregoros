@@ -28,10 +28,13 @@ defmodule PleromaReduxWeb.ConnCase do
       import Plug.Conn
       import Phoenix.ConnTest
       import PleromaReduxWeb.ConnCase
+      import Mox
     end
   end
 
   setup tags do
+    Mox.set_mox_from_context(tags)
+    Mox.verify_on_exit!(tags)
     PleromaRedux.DataCase.setup_sandbox(tags)
     {:ok, conn: Phoenix.ConnTest.build_conn()}
   end
