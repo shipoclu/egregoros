@@ -47,6 +47,21 @@ defmodule PleromaRedux.Relationships do
     |> Repo.aggregate(:count, :id)
   end
 
+  def list_by_type_object(type, object_ap_id, limit \\ 40)
+      when is_binary(type) and is_binary(object_ap_id) and is_integer(limit) do
+    limit =
+      limit
+      |> max(1)
+      |> min(80)
+
+    from(r in Relationship,
+      where: r.type == ^type and r.object == ^object_ap_id,
+      order_by: [desc: r.id],
+      limit: ^limit
+    )
+    |> Repo.all()
+  end
+
   def emoji_reaction_counts(object_ap_id) when is_binary(object_ap_id) do
     from(r in Relationship,
       where: r.object == ^object_ap_id and like(r.type, "EmojiReact:%"),

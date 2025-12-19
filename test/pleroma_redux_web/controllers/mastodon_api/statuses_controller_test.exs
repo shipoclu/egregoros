@@ -3,6 +3,7 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesControllerTest do
 
   alias PleromaRedux.Objects
   alias PleromaRedux.Pipeline
+  alias PleromaRedux.Publish
   alias PleromaRedux.Users
   alias PleromaReduxWeb.Endpoint
 
@@ -487,5 +488,65 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesControllerTest do
     path = Path.join(System.tmp_dir!(), "pleroma-redux-test-upload-#{Ecto.UUID.generate()}")
     File.write!(path, <<0, 1, 2, 3>>)
     path
+  end
+
+  test "GET /api/v1/statuses/:id/favourited_by returns accounts who liked a status", %{conn: conn} do
+    {:ok, alice} = Users.create_local_user("alice")
+    {:ok, bob} = Users.create_local_user("bob")
+
+    {:ok, create} = Publish.post_note(alice, "Hello")
+    note = Objects.get_by_ap_id(create.object)
+
+    {:ok, _like} =
+      Pipeline.ingest(
+        %{
+          "id" => "https://example.com/activities/like/1",
+          "type" => "Like",
+          "actor" => bob.ap_id,
+          "object" => note.ap_id
+        },
+        local: true
+      )
+
+    PleromaRedux.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, alice} end)
+
+    conn = get(conn, "/api/v1/statuses/#{note.id}/favourited_by")
+    response = json_response(conn, 200)
+
+    assert is_list(response)
+    assert length(response) == 1
+    assert Enum.at(response, 0)["username"] == "bob"
+  end
+
+  test "GET /api/v1/statuses/:id/reblogged_by returns accounts who reblogged a status", %{
+    conn: conn
+  } do
+    {:ok, alice} = Users.create_local_user("alice")
+    {:ok, bob} = Users.create_local_user("bob")
+
+    {:ok, create} = Publish.post_note(alice, "Hello")
+    note = Objects.get_by_ap_id(create.object)
+
+    {:ok, _announce} =
+      Pipeline.ingest(
+        %{
+          "id" => "https://example.com/activities/announce/1",
+          "type" => "Announce",
+          "actor" => bob.ap_id,
+          "object" => note.ap_id
+        },
+        local: true
+      )
+
+    PleromaRedux.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, alice} end)
+
+    conn = get(conn, "/api/v1/statuses/#{note.id}/reblogged_by")
+    response = json_response(conn, 200)
+
+    assert is_list(response)
+    assert length(response) == 1
+    assert Enum.at(response, 0)["username"] == "bob"
   end
 end

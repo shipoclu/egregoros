@@ -9,6 +9,8 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesController do
   alias PleromaRedux.Pipeline
   alias PleromaRedux.Publish
   alias PleromaRedux.Relationships
+  alias PleromaRedux.Users
+  alias PleromaReduxWeb.MastodonAPI.AccountRenderer
   alias PleromaReduxWeb.MastodonAPI.StatusRenderer
 
   def create(conn, %{"status" => status} = params) do
@@ -93,6 +95,30 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesController do
     end
   end
 
+  def favourited_by(conn, %{"id" => id}) do
+    case Objects.get(id) do
+      nil ->
+        send_resp(conn, 404, "Not Found")
+
+      object ->
+        Relationships.list_by_type_object("Like", object.ap_id)
+        |> Enum.map(&render_actor_account(&1.actor))
+        |> then(&json(conn, &1))
+    end
+  end
+
+  def reblogged_by(conn, %{"id" => id}) do
+    case Objects.get(id) do
+      nil ->
+        send_resp(conn, 404, "Not Found")
+
+      object ->
+        Relationships.list_by_type_object("Announce", object.ap_id)
+        |> Enum.map(&render_actor_account(&1.actor))
+        |> then(&json(conn, &1))
+    end
+  end
+
   def favourite(conn, %{"id" => id}) do
     with %{} = object <- Objects.get(id),
          %{} = user <- conn.assigns.current_user do
@@ -170,6 +196,37 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesController do
     else
       nil -> send_resp(conn, 404, "Not Found")
       {:error, _} -> send_resp(conn, 422, "Unprocessable Entity")
+    end
+  end
+
+  defp render_actor_account(actor_ap_id) when is_binary(actor_ap_id) do
+    actor_ap_id
+    |> account_for_actor()
+    |> AccountRenderer.render_account()
+  end
+
+  defp render_actor_account(_), do: AccountRenderer.render_account(nil)
+
+  defp account_for_actor(actor_ap_id) when is_binary(actor_ap_id) do
+    Users.get_by_ap_id(actor_ap_id) ||
+      %{ap_id: actor_ap_id, nickname: fallback_username(actor_ap_id)}
+  end
+
+  defp account_for_actor(_), do: nil
+
+  defp fallback_username(actor_ap_id) do
+    case URI.parse(actor_ap_id) do
+      %URI{path: path} when is_binary(path) and path != "" ->
+        path
+        |> String.split("/", trim: true)
+        |> List.last()
+        |> case do
+          nil -> "unknown"
+          value -> value
+        end
+
+      _ ->
+        "unknown"
     end
   end
 end
