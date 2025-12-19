@@ -42,13 +42,15 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusRenderer do
         Relationships.get_by_type_actor_object("Announce", current_user.ap_id, object.ap_id) !=
           nil
 
+    {in_reply_to_id, in_reply_to_account_id} = in_reply_to(object)
+
     %{
       "id" => Integer.to_string(object.id),
       "uri" => object.ap_id,
       "url" => object.ap_id,
-      "visibility" => "public",
-      "sensitive" => false,
-      "spoiler_text" => "",
+      "visibility" => visibility(object),
+      "sensitive" => sensitive(object),
+      "spoiler_text" => spoiler_text(object),
       "content" => Map.get(object.data, "content", ""),
       "account" => account,
       "created_at" => format_datetime(object),
@@ -64,12 +66,12 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusRenderer do
       "muted" => false,
       "bookmarked" => false,
       "pinned" => false,
-      "in_reply_to_id" => nil,
-      "in_reply_to_account_id" => nil,
+      "in_reply_to_id" => in_reply_to_id,
+      "in_reply_to_account_id" => in_reply_to_account_id,
       "reblog" => nil,
       "poll" => nil,
       "card" => nil,
-      "language" => nil,
+      "language" => language(object),
       "pleroma" => %{
         "emoji_reactions" => emoji_reactions(object, current_user)
       }
@@ -120,6 +122,92 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusRenderer do
   end
 
   defp format_datetime(%Object{}), do: DateTime.utc_now() |> DateTime.to_iso8601()
+
+  defp in_reply_to(%Object{} = object) do
+    object.data
+    |> Map.get("inReplyTo")
+    |> in_reply_to_ap_id()
+    |> case do
+      ap_id when is_binary(ap_id) ->
+        case Objects.get_by_ap_id(ap_id) do
+          %Object{} = parent ->
+            account_id =
+              case Users.get_by_ap_id(parent.actor) do
+                %User{} = user -> Integer.to_string(user.id)
+                _ -> nil
+              end
+
+            {Integer.to_string(parent.id), account_id}
+
+          _ ->
+            {nil, nil}
+        end
+
+      _ ->
+        {nil, nil}
+    end
+  end
+
+  defp in_reply_to(_), do: {nil, nil}
+
+  defp in_reply_to_ap_id(value) when is_binary(value), do: value
+  defp in_reply_to_ap_id(%{"id" => id}) when is_binary(id), do: id
+  defp in_reply_to_ap_id(_), do: nil
+
+  defp visibility(%Object{} = object) do
+    to = object.data |> Map.get("to", []) |> List.wrap()
+    cc = object.data |> Map.get("cc", []) |> List.wrap()
+
+    public = "https://www.w3.org/ns/activitystreams#Public"
+    followers = object.actor <> "/followers"
+
+    cond do
+      public in to ->
+        "public"
+
+      public in cc and followers in to ->
+        "unlisted"
+
+      followers in to ->
+        "private"
+
+      true ->
+        "direct"
+    end
+  end
+
+  defp visibility(_), do: "public"
+
+  defp spoiler_text(%Object{} = object) do
+    object.data
+    |> Map.get("summary", "")
+    |> to_string()
+  end
+
+  defp spoiler_text(_), do: ""
+
+  defp sensitive(%Object{} = object) do
+    object.data
+    |> Map.get("sensitive", false)
+    |> case do
+      true -> true
+      "true" -> true
+      _ -> false
+    end
+  end
+
+  defp sensitive(_), do: false
+
+  defp language(%Object{} = object) do
+    object.data
+    |> Map.get("language")
+    |> case do
+      value when is_binary(value) and value != "" -> value
+      _ -> nil
+    end
+  end
+
+  defp language(_), do: nil
 
   defp media_attachments(%Object{} = object) do
     object.data

@@ -14,6 +14,11 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesController do
   def create(conn, %{"status" => status} = params) do
     status = String.trim(status || "")
     media_ids = Map.get(params, "media_ids", [])
+    in_reply_to_id = Map.get(params, "in_reply_to_id")
+    visibility = Map.get(params, "visibility", "public")
+    spoiler_text = Map.get(params, "spoiler_text")
+    sensitive = Map.get(params, "sensitive")
+    language = Map.get(params, "language")
 
     if status == "" do
       send_resp(conn, 422, "Unprocessable Entity")
@@ -21,7 +26,16 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesController do
       user = conn.assigns.current_user
 
       with {:ok, attachments} <- Media.attachments_from_ids(user, media_ids),
-           {:ok, create_object} <- Publish.post_note(user, status, attachments: attachments),
+           {:ok, in_reply_to} <- resolve_in_reply_to(in_reply_to_id),
+           {:ok, create_object} <-
+             Publish.post_note(user, status,
+               attachments: attachments,
+               in_reply_to: in_reply_to,
+               visibility: visibility,
+               spoiler_text: spoiler_text,
+               sensitive: sensitive,
+               language: language
+             ),
            %{} = object <- Objects.get_by_ap_id(create_object.object) do
         json(conn, StatusRenderer.render_status(object, user))
       else
@@ -33,6 +47,25 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesController do
   def create(conn, _params) do
     send_resp(conn, 422, "Unprocessable Entity")
   end
+
+  defp resolve_in_reply_to(nil), do: {:ok, nil}
+  defp resolve_in_reply_to(""), do: {:ok, nil}
+
+  defp resolve_in_reply_to(in_reply_to_id) when is_binary(in_reply_to_id) do
+    case Objects.get(in_reply_to_id) do
+      %{} = object -> {:ok, object.ap_id}
+      _ -> {:error, :not_found}
+    end
+  end
+
+  defp resolve_in_reply_to(in_reply_to_id) when is_integer(in_reply_to_id) do
+    case Objects.get(in_reply_to_id) do
+      %{} = object -> {:ok, object.ap_id}
+      _ -> {:error, :not_found}
+    end
+  end
+
+  defp resolve_in_reply_to(_), do: {:error, :not_found}
 
   def show(conn, %{"id" => id}) do
     case Objects.get(id) do

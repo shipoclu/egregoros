@@ -22,6 +22,69 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesControllerTest do
     assert object.data["content"] == "Hello API"
   end
 
+  test "POST /api/v1/statuses supports replies via in_reply_to_id", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("local")
+
+    PleromaRedux.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, user} end)
+
+    {:ok, parent} =
+      Pipeline.ingest(
+        %{
+          "id" => "https://example.com/objects/parent",
+          "type" => "Note",
+          "actor" => "https://example.com/users/alice",
+          "content" => "Parent post"
+        },
+        local: false
+      )
+
+    conn =
+      post(conn, "/api/v1/statuses", %{
+        "status" => "Reply post",
+        "in_reply_to_id" => Integer.to_string(parent.id)
+      })
+
+    response = json_response(conn, 200)
+    assert response["content"] == "Reply post"
+    assert response["in_reply_to_id"] == Integer.to_string(parent.id)
+
+    [reply, _parent] = Objects.list_notes()
+    assert reply.data["content"] == "Reply post"
+    assert reply.data["inReplyTo"] == parent.ap_id
+  end
+
+  test "POST /api/v1/statuses supports visibility, spoiler_text, sensitive, and language",
+       %{conn: conn} do
+    {:ok, user} = Users.create_local_user("local")
+
+    PleromaRedux.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, user} end)
+
+    conn =
+      post(conn, "/api/v1/statuses", %{
+        "status" => "Hello with options",
+        "visibility" => "unlisted",
+        "spoiler_text" => "cw",
+        "sensitive" => "true",
+        "language" => "en"
+      })
+
+    response = json_response(conn, 200)
+
+    assert response["visibility"] == "unlisted"
+    assert response["spoiler_text"] == "cw"
+    assert response["sensitive"] == true
+    assert response["language"] == "en"
+
+    [object] = Objects.list_notes()
+    assert object.data["summary"] == "cw"
+    assert object.data["sensitive"] == true
+    assert object.data["language"] == "en"
+    assert object.data["to"] == [user.ap_id <> "/followers"]
+    assert object.data["cc"] == ["https://www.w3.org/ns/activitystreams#Public"]
+  end
+
   test "POST /api/v1/statuses rejects empty status", %{conn: conn} do
     {:ok, user} = Users.create_local_user("local")
 
