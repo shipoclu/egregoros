@@ -72,6 +72,7 @@ defmodule PleromaReduxWeb.Router do
     post "/follows", FollowsController, :create
     post "/accounts/:id/follow", AccountsController, :follow
     post "/accounts/:id/unfollow", AccountsController, :unfollow
+    post "/media", MediaController, :create
     post "/statuses", StatusesController, :create
     post "/statuses/:id/favourite", StatusesController, :favourite
     post "/statuses/:id/unfavourite", StatusesController, :unfavourite

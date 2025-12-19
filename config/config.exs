@@ -16,6 +16,7 @@ config :pleroma_redux, PleromaRedux.Auth, PleromaRedux.Auth.BearerToken
 config :pleroma_redux, PleromaRedux.Discovery, PleromaRedux.Discovery.DNS
 config :pleroma_redux, PleromaRedux.HTTP, PleromaRedux.HTTP.Req
 config :pleroma_redux, PleromaRedux.AvatarStorage, PleromaRedux.AvatarStorage.Local
+config :pleroma_redux, PleromaRedux.MediaStorage, PleromaRedux.MediaStorage.Local
 
 config :pleroma_redux, :password_iterations, 200_000
 
