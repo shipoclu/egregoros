@@ -1,5 +1,6 @@
 defmodule PleromaRedux.ActivityRegistry do
   alias PleromaRedux.Activities.Announce
+  alias PleromaRedux.Activities.Create
   alias PleromaRedux.Activities.EmojiReact
   alias PleromaRedux.Activities.Follow
   alias PleromaRedux.Activities.Like
@@ -8,6 +9,7 @@ defmodule PleromaRedux.ActivityRegistry do
 
   @registry %{
     "Note" => Note,
+    "Create" => Create,
     "Like" => Like,
     "Announce" => Announce,
     "Follow" => Follow,

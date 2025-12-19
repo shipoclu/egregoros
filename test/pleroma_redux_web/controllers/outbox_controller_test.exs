@@ -14,12 +14,19 @@ defmodule PleromaReduxWeb.OutboxControllerTest do
       "content" => "Outbox hello"
     }
 
-    assert {:ok, _object} = Pipeline.ingest(note, local: true)
+    create = %{
+      "id" => "https://example.com/activities/create/outbox-1",
+      "type" => "Create",
+      "actor" => user.ap_id,
+      "object" => note
+    }
+
+    assert {:ok, _object} = Pipeline.ingest(create, local: true)
 
     conn = get(conn, "/users/ella/outbox")
     body = json_response(conn, 200)
 
     assert body["type"] == "OrderedCollection"
-    assert Enum.any?(body["orderedItems"], &(&1["id"] == note["id"]))
+    assert Enum.any?(body["orderedItems"], &(&1["id"] == create["id"]))
   end
 end

@@ -25,10 +25,17 @@ defmodule PleromaReduxWeb.InboxControllerTest do
       "content" => "Hello from remote"
     }
 
+    create = %{
+      "id" => "https://remote.example/activities/create/1",
+      "type" => "Create",
+      "actor" => "https://remote.example/users/alice",
+      "object" => note
+    }
+
     conn =
       conn
       |> sign_request("post", "/users/frank/inbox", private_key, "https://remote.example/users/alice#main-key")
-      |> post("/users/frank/inbox", note)
+      |> post("/users/frank/inbox", create)
 
     assert response(conn, 202)
 
@@ -57,7 +64,14 @@ defmodule PleromaReduxWeb.InboxControllerTest do
       "content" => "Hello with digest"
     }
 
-    body = Jason.encode!(note)
+    create = %{
+      "id" => "https://remote.example/activities/create/1-digest",
+      "type" => "Create",
+      "actor" => "https://remote.example/users/alice",
+      "object" => note
+    }
+
+    body = Jason.encode!(create)
     headers = ["(request-target)", "host", "date", "digest", "content-length"]
 
     conn =
@@ -100,9 +114,24 @@ defmodule PleromaReduxWeb.InboxControllerTest do
       "content" => "Original content"
     }
 
-    tampered = Map.put(note, "content", "Tampered content")
-    signed_body = Jason.encode!(note)
-    sent_body = Jason.encode!(tampered)
+    tampered_note = Map.put(note, "content", "Tampered content")
+
+    signed_create = %{
+      "id" => "https://remote.example/activities/create/1-digest-mismatch",
+      "type" => "Create",
+      "actor" => "https://remote.example/users/alice",
+      "object" => note
+    }
+
+    tampered_create = %{
+      "id" => "https://remote.example/activities/create/1-digest-mismatch",
+      "type" => "Create",
+      "actor" => "https://remote.example/users/alice",
+      "object" => tampered_note
+    }
+
+    signed_body = Jason.encode!(signed_create)
+    sent_body = Jason.encode!(tampered_create)
 
     headers = ["(request-target)", "host", "date", "digest", "content-length"]
 
@@ -146,13 +175,20 @@ defmodule PleromaReduxWeb.InboxControllerTest do
       "content" => "Old date note"
     }
 
+    create = %{
+      "id" => "https://remote.example/activities/create/1-old-date",
+      "type" => "Create",
+      "actor" => "https://remote.example/users/alice",
+      "object" => note
+    }
+
     old_date = DateTime.utc_now() |> DateTime.add(-400, :second) |> date_header()
 
     conn =
       conn
       |> put_req_header("date", old_date)
       |> sign_request("post", "/users/frank/inbox", private_key, "https://remote.example/users/alice#main-key")
-      |> post("/users/frank/inbox", note)
+      |> post("/users/frank/inbox", create)
 
     assert response(conn, 401)
     refute Objects.get_by_ap_id(note["id"])
@@ -168,7 +204,14 @@ defmodule PleromaReduxWeb.InboxControllerTest do
       "content" => "Hello from remote"
     }
 
-    conn = post(conn, "/users/frank/inbox", note)
+    create = %{
+      "id" => "https://remote.example/activities/create/2",
+      "type" => "Create",
+      "actor" => "https://remote.example/users/alice",
+      "object" => note
+    }
+
+    conn = post(conn, "/users/frank/inbox", create)
     assert response(conn, 401)
 
     refute Objects.get_by_ap_id(note["id"])

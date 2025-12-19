@@ -11,6 +11,13 @@ defmodule PleromaRedux.PipelineTest do
     "content" => "Hello from pipeline"
   }
 
+  @create %{
+    "id" => "https://example.com/activities/create/1",
+    "type" => "Create",
+    "actor" => "https://example.com/users/alice",
+    "object" => @note
+  }
+
   @like %{
     "id" => "https://example.com/activities/like/1",
     "type" => "Like",
@@ -91,6 +98,15 @@ defmodule PleromaRedux.PipelineTest do
     assert object.actor == @emoji_react["actor"]
     assert object.object == @emoji_react["object"]
     assert object.data["content"] == ":fire:"
+  end
+
+  test "ingest stores Create and its embedded object" do
+    assert {:ok, %Object{} = object} = Pipeline.ingest(@create, local: false)
+    assert object.type == "Create"
+    assert object.actor == @create["actor"]
+    assert object.object == @note["id"]
+
+    assert PleromaRedux.Objects.get_by_ap_id(@note["id"])
   end
 
   test "ingest rejects unknown types" do
