@@ -1,6 +1,8 @@
 defmodule PleromaReduxWeb.InboxController do
   use PleromaReduxWeb, :controller
 
+  plug PleromaReduxWeb.Plugs.VerifySignature
+
   alias PleromaRedux.Pipeline
   alias PleromaRedux.Users
 

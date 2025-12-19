@@ -11,6 +11,9 @@ config :pleroma_redux,
   ecto_repos: [PleromaRedux.Repo],
   generators: [timestamp_type: :utc_datetime]
 
+config :pleroma_redux, PleromaRedux.Signature, PleromaRedux.Signature.HTTP
+
+
 # Configure the endpoint
 config :pleroma_redux, PleromaReduxWeb.Endpoint,
   url: [host: "localhost"],
