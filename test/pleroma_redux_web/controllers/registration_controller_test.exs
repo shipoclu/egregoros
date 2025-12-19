@@ -9,11 +9,20 @@ defmodule PleromaReduxWeb.RegistrationControllerTest do
   end
 
   test "POST /register creates user and sets session", %{conn: conn} do
-    conn = post(conn, "/register", %{"registration" => %{"nickname" => "alice"}})
+    conn =
+      post(conn, "/register", %{
+        "registration" => %{
+          "nickname" => "alice",
+          "email" => "alice@example.com",
+          "password" => "very secure password"
+        }
+      })
 
     assert redirected_to(conn) == "/"
     assert is_integer(get_session(conn, :user_id))
 
-    assert Users.get_by_nickname("alice")
+    assert user = Users.get_by_nickname("alice")
+    assert user.email == "alice@example.com"
+    assert is_binary(user.password_hash)
   end
 end
