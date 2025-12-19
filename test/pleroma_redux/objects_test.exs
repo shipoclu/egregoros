@@ -3,6 +3,7 @@ defmodule PleromaRedux.ObjectsTest do
 
   alias PleromaRedux.Object
   alias PleromaRedux.Objects
+  alias PleromaRedux.Users
 
   @note_attrs %{
     ap_id: "https://example.com/objects/1",
@@ -60,5 +61,77 @@ defmodule PleromaRedux.ObjectsTest do
     assert {:ok, %Object{}} = Objects.create_object(@note_attrs)
     Objects.delete_all_notes()
     assert [] == Objects.list_notes()
+  end
+
+  test "list_home_notes returns own notes and notes from followed actors" do
+    {:ok, alice} = Users.create_local_user("alice")
+
+    bob_ap_id = "https://remote.example/users/bob"
+    carol_ap_id = "https://remote.example/users/carol"
+
+    assert {:ok, %Object{}} =
+             Objects.create_object(%{
+               ap_id: "https://local.example/activities/follow/1",
+               type: "Follow",
+               actor: alice.ap_id,
+               object: bob_ap_id,
+               data: %{
+                 "id" => "https://local.example/activities/follow/1",
+                 "type" => "Follow",
+                 "actor" => alice.ap_id,
+                 "object" => bob_ap_id
+               },
+               local: true
+             })
+
+    assert {:ok, %Object{}} =
+             Objects.create_object(%{
+               ap_id: "https://remote.example/objects/bob-1",
+               type: "Note",
+               actor: bob_ap_id,
+               object: nil,
+               data: %{
+                 "id" => "https://remote.example/objects/bob-1",
+                 "type" => "Note",
+                 "actor" => bob_ap_id,
+                 "content" => "hello"
+               },
+               local: false
+             })
+
+    assert {:ok, %Object{}} =
+             Objects.create_object(%{
+               ap_id: "https://remote.example/objects/carol-1",
+               type: "Note",
+               actor: carol_ap_id,
+               object: nil,
+               data: %{
+                 "id" => "https://remote.example/objects/carol-1",
+                 "type" => "Note",
+                 "actor" => carol_ap_id,
+                 "content" => "hello"
+               },
+               local: false
+             })
+
+    assert {:ok, %Object{}} =
+             Objects.create_object(%{
+               ap_id: "https://local.example/objects/alice-1",
+               type: "Note",
+               actor: alice.ap_id,
+               object: nil,
+               data: %{
+                 "id" => "https://local.example/objects/alice-1",
+                 "type" => "Note",
+                 "actor" => alice.ap_id,
+                 "content" => "hello"
+               },
+               local: true
+             })
+
+    notes = Objects.list_home_notes(alice.ap_id)
+    assert Enum.any?(notes, &(&1.actor == alice.ap_id))
+    assert Enum.any?(notes, &(&1.actor == bob_ap_id))
+    refute Enum.any?(notes, &(&1.actor == carol_ap_id))
   end
 end

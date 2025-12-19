@@ -77,6 +77,23 @@ defmodule PleromaRedux.Objects do
     |> Repo.all()
   end
 
+  def list_home_notes(actor_ap_id, limit \\ 20) when is_binary(actor_ap_id) do
+    followed_actor_ids =
+      actor_ap_id
+      |> list_follows_by_actor()
+      |> Enum.map(& &1.object)
+      |> Enum.filter(&is_binary/1)
+
+    actor_ids = Enum.uniq([actor_ap_id | followed_actor_ids])
+
+    from(o in Object,
+      where: o.type == "Note" and o.actor in ^actor_ids,
+      order_by: [desc: o.inserted_at],
+      limit: ^limit
+    )
+    |> Repo.all()
+  end
+
   def list_notes_by_actor(actor, limit \\ 20) when is_binary(actor) do
     from(o in Object,
       where: o.type == "Note" and o.actor == ^actor,
