@@ -39,12 +39,17 @@ defmodule PleromaReduxWeb.Router do
     pipe_through :api
 
     get "/timelines/public", TimelinesController, :public
+    get "/statuses/:id", StatusesController, :show
   end
 
   scope "/api/v1", PleromaReduxWeb.MastodonAPI do
     pipe_through [:api, :api_auth]
 
     post "/statuses", StatusesController, :create
+    post "/statuses/:id/favourite", StatusesController, :favourite
+    post "/statuses/:id/unfavourite", StatusesController, :unfavourite
+    post "/statuses/:id/reblog", StatusesController, :reblog
+    post "/statuses/:id/unreblog", StatusesController, :unreblog
   end
 
   # Other scopes may use custom stacks.

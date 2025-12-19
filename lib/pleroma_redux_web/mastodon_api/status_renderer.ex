@@ -18,9 +18,11 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusRenderer do
 
   defp render_status_with_account(object, account) do
     %{
-      "id" => object.ap_id,
+      "id" => Integer.to_string(object.id),
+      "uri" => object.ap_id,
       "content" => Map.get(object.data, "content", ""),
-      "account" => account
+      "account" => account,
+      "created_at" => format_datetime(object)
     }
   end
 
@@ -56,4 +58,16 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusRenderer do
         "unknown"
     end
   end
+
+  defp format_datetime(%Object{published: %DateTime{} = dt}) do
+    DateTime.to_iso8601(dt)
+  end
+
+  defp format_datetime(%Object{inserted_at: %NaiveDateTime{} = dt}) do
+    dt
+    |> DateTime.from_naive!("Etc/UTC")
+    |> DateTime.to_iso8601()
+  end
+
+  defp format_datetime(%Object{}), do: DateTime.utc_now() |> DateTime.to_iso8601()
 end

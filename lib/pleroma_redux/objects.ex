@@ -32,6 +32,20 @@ defmodule PleromaRedux.Objects do
   def get_by_ap_id(nil), do: nil
   def get_by_ap_id(ap_id) when is_binary(ap_id), do: Repo.get_by(Object, ap_id: ap_id)
 
+  def get(id) when is_integer(id), do: Repo.get(Object, id)
+
+  def get(id) when is_binary(id) do
+    case Integer.parse(id) do
+      {int, ""} -> Repo.get(Object, int)
+      _ -> nil
+    end
+  end
+
+  def get_by_type_actor_object(type, actor, object)
+      when is_binary(type) and is_binary(actor) and is_binary(object) do
+    Repo.get_by(Object, type: type, actor: actor, object: object)
+  end
+
   def list_notes(limit \\ 20) do
     from(o in Object, where: o.type == "Note", order_by: [desc: o.inserted_at], limit: ^limit)
     |> Repo.all()
