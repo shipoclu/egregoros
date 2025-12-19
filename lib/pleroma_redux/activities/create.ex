@@ -1,6 +1,7 @@
 defmodule PleromaRedux.Activities.Create do
   alias PleromaRedux.Objects
   alias PleromaRedux.Pipeline
+  alias PleromaRedux.Users
 
   def type, do: "Create"
 
@@ -30,7 +31,26 @@ defmodule PleromaRedux.Activities.Create do
     end
   end
 
-  def side_effects(_object, _opts), do: :ok
+  def side_effects(object, opts) do
+    if Keyword.get(opts, :local, true) do
+      deliver_to_followers(object)
+    end
+
+    :ok
+  end
+
+  defp deliver_to_followers(create_object) do
+    with %{} = actor <- Users.get_by_ap_id(create_object.actor) do
+      actor.ap_id
+      |> Objects.list_follows_to()
+      |> Enum.filter(&(&1.local == false))
+      |> Enum.each(fn follow ->
+        with %{} = follower <- Users.get_by_ap_id(follow.actor) do
+          PleromaRedux.Federation.Delivery.deliver(actor, follower.inbox, create_object.data)
+        end
+      end)
+    end
+  end
 
   defp to_object_attrs(activity, embedded_object, opts) do
     %{

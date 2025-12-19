@@ -1,5 +1,6 @@
 defmodule PleromaRedux.Activities.Follow do
   alias PleromaRedux.Objects
+  alias PleromaRedux.Users
 
   def type, do: "Follow"
 
@@ -19,7 +20,21 @@ defmodule PleromaRedux.Activities.Follow do
     |> Objects.upsert_object()
   end
 
-  def side_effects(_object, _opts), do: :ok
+  def side_effects(object, opts) do
+    if Keyword.get(opts, :local, true) do
+      deliver_follow(object)
+    end
+
+    :ok
+  end
+
+  defp deliver_follow(object) do
+    with %{} = actor <- Users.get_by_ap_id(object.actor),
+         %{} = target <- Users.get_by_ap_id(object.object),
+         false <- target.local do
+      PleromaRedux.Federation.Delivery.deliver(actor, target.inbox, object.data)
+    end
+  end
 
   defp to_object_attrs(activity, opts) do
     %{
