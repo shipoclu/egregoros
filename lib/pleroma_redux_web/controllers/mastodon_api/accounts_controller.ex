@@ -3,8 +3,8 @@ defmodule PleromaReduxWeb.MastodonAPI.AccountsController do
 
   alias PleromaRedux.Activities.Follow
   alias PleromaRedux.Activities.Undo
-  alias PleromaRedux.Objects
   alias PleromaRedux.Pipeline
+  alias PleromaRedux.Relationships
   alias PleromaRedux.Users
   alias PleromaReduxWeb.MastodonAPI.AccountRenderer
 
@@ -35,14 +35,14 @@ defmodule PleromaReduxWeb.MastodonAPI.AccountsController do
   def unfollow(conn, %{"id" => id}) do
     with %{} = target <- Users.get(id),
          %{} =
-           follow <-
-           Objects.get_by_type_actor_object(
-             "Follow",
-             conn.assigns.current_user.ap_id,
-             target.ap_id
-           ),
+           relationship <-
+             Relationships.get_by_type_actor_object(
+               "Follow",
+               conn.assigns.current_user.ap_id,
+               target.ap_id
+             ),
          {:ok, _undo} <-
-           Pipeline.ingest(Undo.build(conn.assigns.current_user, follow),
+           Pipeline.ingest(Undo.build(conn.assigns.current_user, relationship.activity_ap_id),
              local: true
            ) do
       json(conn, AccountRenderer.render_account(target))
