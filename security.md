@@ -8,7 +8,7 @@ This file tracks known security gaps and their remediation status.
 - [x] **Authorize `Undo`**: only apply `Undo` side-effects when `Undo.actor` matches the target activity’s `actor` (prevents undoing other people’s follows/likes/etc).
 
 ## High priority (SSRF / DoS)
-- [ ] **Harden remote actor fetches** (used in signature verification and discovery):
+- [x] **Harden remote actor fetches** (used in signature verification and discovery):
   - [x] Reject non-HTTP(S) schemes and missing hosts.
   - [x] Block loopback / private IP literals.
   - [x] Block private IPs via DNS resolution (basic DNS rebinding mitigation).
