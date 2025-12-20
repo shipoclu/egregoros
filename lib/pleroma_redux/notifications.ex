@@ -6,6 +6,15 @@ defmodule PleromaRedux.Notifications do
   alias PleromaRedux.User
 
   @interactive_types ~w(Follow Like Announce)
+  @topic_prefix "notifications"
+
+  def subscribe(user_ap_id) when is_binary(user_ap_id) do
+    Phoenix.PubSub.subscribe(PleromaRedux.PubSub, topic(user_ap_id))
+  end
+
+  def broadcast(user_ap_id, %Object{} = activity) when is_binary(user_ap_id) do
+    Phoenix.PubSub.broadcast(PleromaRedux.PubSub, topic(user_ap_id), {:notification_created, activity})
+  end
 
   def list_for_user(user, opts \\ [])
 
@@ -35,6 +44,10 @@ defmodule PleromaRedux.Notifications do
   def list_for_user(_user, _opts), do: []
 
   def interactive_types, do: @interactive_types
+
+  defp topic(user_ap_id) when is_binary(user_ap_id) do
+    @topic_prefix <> ":" <> user_ap_id
+  end
 
   defp maybe_where_max_id(query, max_id) when is_integer(max_id) and max_id > 0 do
     from(a in query, where: a.id < ^max_id)
