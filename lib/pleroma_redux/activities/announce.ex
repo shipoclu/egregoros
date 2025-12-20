@@ -12,6 +12,7 @@ defmodule PleromaRedux.Activities.Announce do
   alias PleromaRedux.Objects
   alias PleromaRedux.Pipeline
   alias PleromaRedux.Relationships
+  alias PleromaRedux.Timeline
   alias PleromaRedux.User
   alias PleromaRedux.Users
   alias PleromaReduxWeb.Endpoint
@@ -99,6 +100,7 @@ defmodule PleromaRedux.Activities.Announce do
       })
 
     maybe_broadcast_notification(object)
+    Timeline.broadcast_post(object)
 
     if Keyword.get(opts, :local, true) do
       deliver_to_followers(object)
