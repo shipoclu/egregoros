@@ -399,13 +399,26 @@ defmodule PleromaReduxWeb.StatusCard do
     """
   end
 
-  defp attachment_kind(%{media_type: media_type})
+  defp attachment_kind(%{media_type: media_type} = attachment)
        when is_binary(media_type) and media_type != "" do
+    media_kind =
+      cond do
+        String.starts_with?(media_type, "video/") -> :video
+        String.starts_with?(media_type, "audio/") -> :audio
+        String.starts_with?(media_type, "image/") -> :image
+        true -> :link
+      end
+
+    ext_kind =
+      case Map.get(attachment, :href) do
+        href when is_binary(href) and href != "" -> attachment_kind(%{href: href})
+        _ -> :link
+      end
+
     cond do
-      String.starts_with?(media_type, "image/") -> :image
-      String.starts_with?(media_type, "video/") -> :video
-      String.starts_with?(media_type, "audio/") -> :audio
-      true -> :link
+      media_kind == :link and ext_kind != :link -> ext_kind
+      media_kind == :image and ext_kind in [:video, :audio] -> ext_kind
+      true -> media_kind
     end
   end
 
