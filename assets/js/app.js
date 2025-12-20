@@ -58,6 +58,39 @@ window.addEventListener("predux:scroll-top", () => {
   window.scrollTo({top: 0, behavior: "smooth"})
 })
 
+async function copyToClipboard(text) {
+  if (!text) return false
+
+  if (navigator.clipboard && window.isSecureContext) {
+    await navigator.clipboard.writeText(text)
+    return true
+  }
+
+  const textarea = document.createElement("textarea")
+  textarea.value = text
+  textarea.setAttribute("readonly", "")
+  textarea.style.position = "fixed"
+  textarea.style.top = "0"
+  textarea.style.left = "-9999px"
+  document.body.appendChild(textarea)
+  textarea.select()
+
+  const ok = document.execCommand("copy")
+  document.body.removeChild(textarea)
+  return ok
+}
+
+window.addEventListener("predux:copy", async e => {
+  const text = e.target?.dataset?.copyText
+  if (!text) return
+
+  try {
+    await copyToClipboard(text)
+  } catch (_error) {
+    // ignore clipboard errors; LiveView shows feedback separately
+  }
+})
+
 // Show progress bar on live navigation and form submits
 topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})
 window.addEventListener("phx:page-loading-start", _info => topbar.show(300))
