@@ -13,4 +13,17 @@ defmodule PleromaReduxWeb.URL do
       base <> path
     end
   end
+
+  def local_object_uuid(ap_id) when is_binary(ap_id) do
+    base = Endpoint.url() <> "/objects/"
+
+    if String.starts_with?(ap_id, base) do
+      uuid = String.replace_prefix(ap_id, base, "")
+      if uuid == "", do: nil, else: uuid
+    else
+      nil
+    end
+  end
+
+  def local_object_uuid(_ap_id), do: nil
 end

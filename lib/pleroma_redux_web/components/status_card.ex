@@ -2,6 +2,7 @@ defmodule PleromaReduxWeb.StatusCard do
   use PleromaReduxWeb, :html
 
   alias PleromaRedux.HTML
+  alias PleromaReduxWeb.URL
   alias PleromaReduxWeb.ViewModels.Status, as: StatusVM
 
   attr :id, :string, required: true
@@ -76,7 +77,18 @@ defmodule PleromaReduxWeb.StatusCard do
           <% end %>
         </div>
 
-        <.time_ago at={@entry.object.inserted_at} />
+        <%= if is_binary(permalink_path = status_permalink_path(@entry)) do %>
+          <.link
+            navigate={permalink_path}
+            data-role="post-permalink"
+            class="inline-flex focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+            aria-label="Open post"
+          >
+            <.time_ago at={@entry.object.inserted_at} />
+          </.link>
+        <% else %>
+          <.time_ago at={@entry.object.inserted_at} />
+        <% end %>
       </div>
 
       <div class="mt-3 text-base leading-relaxed text-slate-900 dark:text-slate-100">
@@ -208,6 +220,16 @@ defmodule PleromaReduxWeb.StatusCard do
   end
 
   defp actor_profile_path(_actor), do: nil
+
+  defp status_permalink_path(%{object: %{local: true} = object, actor: %{nickname: nickname}})
+       when is_binary(nickname) and nickname != "" do
+    case URL.local_object_uuid(Map.get(object, :ap_id)) do
+      uuid when is_binary(uuid) and uuid != "" -> "/@#{nickname}/#{uuid}"
+      _ -> nil
+    end
+  end
+
+  defp status_permalink_path(_entry), do: nil
 
   attr :actor, :map, required: true
 
