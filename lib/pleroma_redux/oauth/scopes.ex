@@ -23,4 +23,3 @@ defmodule PleromaRedux.OAuth.Scopes do
     MapSet.subset?(requested_scopes, allowed_scopes)
   end
 end
-

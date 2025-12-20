@@ -6,4 +6,3 @@ defmodule PleromaRedux.AuthZ.Stub do
     :ok
   end
 end
-

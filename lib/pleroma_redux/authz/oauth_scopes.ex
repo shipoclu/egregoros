@@ -27,4 +27,3 @@ defmodule PleromaRedux.AuthZ.OAuthScopes do
     end
   end
 end
-

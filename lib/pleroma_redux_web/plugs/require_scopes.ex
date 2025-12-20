@@ -31,4 +31,3 @@ defmodule PleromaReduxWeb.Plugs.RequireScopes do
     |> halt()
   end
 end
-

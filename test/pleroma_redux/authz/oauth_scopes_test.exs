@@ -44,4 +44,3 @@ defmodule PleromaRedux.AuthZ.OAuthScopesTest do
     assert {:error, :insufficient_scope} = OAuthScopes.authorize(conn, ["write", "admin"])
   end
 end
-

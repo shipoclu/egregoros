@@ -17,7 +17,7 @@ This file tracks known security gaps and their remediation status.
   - [x] Apply response size limits.
 
 ## Medium priority (authz)
-- [ ] **Enforce OAuth scopes** for Mastodon API endpoints (read vs write, per-endpoint scopes).
+- [x] **Enforce OAuth scopes** for Mastodon API endpoints (coarse `read`/`write`/`follow`).
 - [ ] **Token lifecycle**: token expiry / refresh tokens / revocation endpoint (and tests).
 
 ## Medium priority (inbox abuse controls)

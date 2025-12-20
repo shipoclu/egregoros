@@ -39,4 +39,3 @@ defmodule PleromaReduxWeb.Plugs.RequireScopesTest do
     assert is_nil(conn.status)
   end
 end
-

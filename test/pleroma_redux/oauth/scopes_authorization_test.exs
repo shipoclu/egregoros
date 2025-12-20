@@ -32,4 +32,3 @@ defmodule PleromaRedux.OAuth.ScopesAuthorizationTest do
              OAuth.create_authorization_code(app, user, "urn:ietf:wg:oauth:2.0:oob", "read write")
   end
 end
-

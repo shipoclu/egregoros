@@ -9,4 +9,3 @@ defmodule PleromaRedux.AuthZ do
     Application.get_env(:pleroma_redux, __MODULE__, PleromaRedux.AuthZ.OAuthScopes)
   end
 end
-
