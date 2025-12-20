@@ -56,7 +56,7 @@ defmodule PleromaReduxWeb.MastodonAPI.NotificationsControllerTest do
 
     assert Enum.at(response, 0)["type"] == "favourite"
     assert Enum.at(response, 0)["account"]["username"] == "bob"
-    assert Enum.at(response, 0)["status"]["content"] == "Hello"
+    assert Enum.at(response, 0)["status"]["content"] == "<p>Hello</p>"
 
     assert Enum.at(response, 1)["type"] == "follow"
     assert Enum.at(response, 1)["account"]["username"] == "bob"

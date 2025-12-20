@@ -14,8 +14,8 @@ defmodule PleromaReduxWeb.MastodonAPI.TimelinesControllerTest do
 
     response = json_response(conn, 200)
     assert length(response) == 2
-    assert Enum.at(response, 0)["content"] == "Second post"
-    assert Enum.at(response, 1)["content"] == "First post"
+    assert Enum.at(response, 0)["content"] == "<p>Second post</p>"
+    assert Enum.at(response, 1)["content"] == "<p>First post</p>"
   end
 
   test "GET /api/v1/timelines/public includes reblog statuses", %{conn: conn} do
@@ -42,10 +42,10 @@ defmodule PleromaReduxWeb.MastodonAPI.TimelinesControllerTest do
 
     assert Enum.at(response, 0)["account"]["username"] == "bob"
     assert Enum.at(response, 0)["content"] == ""
-    assert Enum.at(response, 0)["reblog"]["content"] == "Hello"
+    assert Enum.at(response, 0)["reblog"]["content"] == "<p>Hello</p>"
 
     assert Enum.at(response, 1)["account"]["username"] == "alice"
-    assert Enum.at(response, 1)["content"] == "Hello"
+    assert Enum.at(response, 1)["content"] == "<p>Hello</p>"
     assert Enum.at(response, 1)["reblog"] == nil
   end
 
@@ -59,8 +59,8 @@ defmodule PleromaReduxWeb.MastodonAPI.TimelinesControllerTest do
 
     response = json_response(conn, 200)
     assert length(response) == 2
-    assert Enum.at(response, 0)["content"] == "Third post"
-    assert Enum.at(response, 1)["content"] == "Second post"
+    assert Enum.at(response, 0)["content"] == "<p>Third post</p>"
+    assert Enum.at(response, 1)["content"] == "<p>Second post</p>"
 
     [link] = get_resp_header(conn, "link")
     assert String.contains?(link, "rel=\"next\"")
@@ -76,7 +76,7 @@ defmodule PleromaReduxWeb.MastodonAPI.TimelinesControllerTest do
 
     response = json_response(conn, 200)
     assert length(response) == 1
-    assert Enum.at(response, 0)["content"] == "First post"
+    assert Enum.at(response, 0)["content"] == "<p>First post</p>"
   end
 
   test "GET /api/v1/timelines/home returns latest statuses", %{conn: conn} do
@@ -92,8 +92,8 @@ defmodule PleromaReduxWeb.MastodonAPI.TimelinesControllerTest do
 
     response = json_response(conn, 200)
     assert length(response) == 2
-    assert Enum.at(response, 0)["content"] == "Second home post"
-    assert Enum.at(response, 1)["content"] == "First home post"
+    assert Enum.at(response, 0)["content"] == "<p>Second home post</p>"
+    assert Enum.at(response, 1)["content"] == "<p>First home post</p>"
   end
 
   test "GET /api/v1/timelines/home includes reblog statuses by the current user", %{conn: conn} do
@@ -123,7 +123,7 @@ defmodule PleromaReduxWeb.MastodonAPI.TimelinesControllerTest do
     assert Enum.at(response, 0)["account"]["username"] == "bob"
     assert Enum.at(response, 0)["content"] == ""
     assert Enum.at(response, 0)["reblog"]["account"]["username"] == "alice"
-    assert Enum.at(response, 0)["reblog"]["content"] == "Hello"
+    assert Enum.at(response, 0)["reblog"]["content"] == "<p>Hello</p>"
   end
 
   test "GET /api/v1/timelines/home paginates with max_id and Link header", %{conn: conn} do
@@ -140,8 +140,8 @@ defmodule PleromaReduxWeb.MastodonAPI.TimelinesControllerTest do
     response = json_response(conn, 200)
 
     assert length(response) == 2
-    assert Enum.at(response, 0)["content"] == "Third home post"
-    assert Enum.at(response, 1)["content"] == "Second home post"
+    assert Enum.at(response, 0)["content"] == "<p>Third home post</p>"
+    assert Enum.at(response, 1)["content"] == "<p>Second home post</p>"
 
     [link] = get_resp_header(conn, "link")
     assert String.contains?(link, "rel=\"next\"")
@@ -157,6 +157,6 @@ defmodule PleromaReduxWeb.MastodonAPI.TimelinesControllerTest do
 
     response = json_response(conn, 200)
     assert length(response) == 1
-    assert Enum.at(response, 0)["content"] == "First home post"
+    assert Enum.at(response, 0)["content"] == "<p>First home post</p>"
   end
 end

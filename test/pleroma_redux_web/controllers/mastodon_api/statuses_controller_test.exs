@@ -16,7 +16,7 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesControllerTest do
     conn = post(conn, "/api/v1/statuses", %{"status" => "Hello API"})
 
     response = json_response(conn, 200)
-    assert response["content"] == "Hello API"
+    assert response["content"] == "<p>Hello API</p>"
     assert response["account"]["username"] == "local"
 
     [object] = Objects.list_notes()
@@ -47,7 +47,7 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesControllerTest do
       })
 
     response = json_response(conn, 200)
-    assert response["content"] == "Reply post"
+    assert response["content"] == "<p>Reply post</p>"
     assert response["in_reply_to_id"] == Integer.to_string(parent.id)
 
     [reply, _parent] = Objects.list_notes()
@@ -116,7 +116,7 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesControllerTest do
 
     response = json_response(conn, 200)
     assert response["id"] == Integer.to_string(object.id)
-    assert response["content"] == "Hello show"
+    assert response["content"] == "<p>Hello show</p>"
   end
 
   test "POST /api/v1/statuses/:id/favourite creates a like", %{conn: conn} do
@@ -227,7 +227,7 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesControllerTest do
     assert is_map(response["reblog"])
     assert response["reblog"]["id"] == Integer.to_string(note.id)
     assert response["reblog"]["account"]["username"] == "alice"
-    assert response["reblog"]["content"] == "Hello reblog"
+    assert response["reblog"]["content"] == "<p>Hello reblog</p>"
 
     assert response["id"] != response["reblog"]["id"]
   end
@@ -355,7 +355,7 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesControllerTest do
 
     response = json_response(conn, 200)
 
-    assert response["content"] == "Hello with media"
+    assert response["content"] == "<p>Hello with media</p>"
     assert length(response["media_attachments"]) == 1
 
     attachment = Enum.at(response["media_attachments"], 0)
@@ -438,7 +438,7 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesControllerTest do
 
     response = json_response(conn, 200)
 
-    assert response["content"] == "Hello with uploaded media"
+    assert response["content"] == "<p>Hello with uploaded media</p>"
     assert length(response["media_attachments"]) == 1
     assert Enum.at(response["media_attachments"], 0)["id"] == media["id"]
   end
@@ -505,14 +505,14 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesControllerTest do
     conn = get(conn, "/api/v1/statuses/#{reply_2.id}/context")
     response = json_response(conn, 200)
 
-    assert Enum.map(response["ancestors"], & &1["content"]) == ["Root", "Reply 1"]
+    assert Enum.map(response["ancestors"], & &1["content"]) == ["<p>Root</p>", "<p>Reply 1</p>"]
     assert response["descendants"] == []
 
     conn = get(conn, "/api/v1/statuses/#{root.id}/context")
     response = json_response(conn, 200)
 
     assert response["ancestors"] == []
-    assert Enum.map(response["descendants"], & &1["content"]) == ["Reply 1", "Reply 2"]
+    assert Enum.map(response["descendants"], & &1["content"]) == ["<p>Reply 1</p>", "<p>Reply 2</p>"]
   end
 
   defp tmp_upload_path do

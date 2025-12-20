@@ -41,8 +41,8 @@ defmodule PleromaReduxWeb.MastodonAPI.AccountsControllerTest do
     response = json_response(conn, 200)
 
     assert length(response) == 2
-    assert Enum.at(response, 0)["content"] == "Second post"
-    assert Enum.at(response, 1)["content"] == "First post"
+    assert Enum.at(response, 0)["content"] == "<p>Second post</p>"
+    assert Enum.at(response, 1)["content"] == "<p>First post</p>"
   end
 
   test "GET /api/v1/accounts/:id/statuses includes reblogs", %{conn: conn} do
@@ -68,7 +68,7 @@ defmodule PleromaReduxWeb.MastodonAPI.AccountsControllerTest do
     assert length(response) == 1
     assert Enum.at(response, 0)["account"]["username"] == "bob"
     assert Enum.at(response, 0)["content"] == ""
-    assert Enum.at(response, 0)["reblog"]["content"] == "Hello"
+    assert Enum.at(response, 0)["reblog"]["content"] == "<p>Hello</p>"
   end
 
   test "GET /api/v1/accounts/:id/statuses paginates with max_id and Link header", %{conn: conn} do
@@ -82,8 +82,8 @@ defmodule PleromaReduxWeb.MastodonAPI.AccountsControllerTest do
     response = json_response(conn, 200)
 
     assert length(response) == 2
-    assert Enum.at(response, 0)["content"] == "Third post"
-    assert Enum.at(response, 1)["content"] == "Second post"
+    assert Enum.at(response, 0)["content"] == "<p>Third post</p>"
+    assert Enum.at(response, 1)["content"] == "<p>Second post</p>"
 
     [link] = get_resp_header(conn, "link")
     assert String.contains?(link, "rel=\"next\"")
@@ -99,7 +99,7 @@ defmodule PleromaReduxWeb.MastodonAPI.AccountsControllerTest do
 
     response = json_response(conn, 200)
     assert length(response) == 1
-    assert Enum.at(response, 0)["content"] == "First post"
+    assert Enum.at(response, 0)["content"] == "<p>First post</p>"
   end
 
   test "PATCH /api/v1/accounts/update_credentials updates profile fields", %{conn: conn} do
@@ -116,7 +116,7 @@ defmodule PleromaReduxWeb.MastodonAPI.AccountsControllerTest do
 
     response = json_response(conn, 200)
     assert response["display_name"] == "New Name"
-    assert response["note"] == "New bio"
+    assert response["note"] == "<p>New bio</p>"
 
     user = Users.get(user.id)
     assert user.name == "New Name"
