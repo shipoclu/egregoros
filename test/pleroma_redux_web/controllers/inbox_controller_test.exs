@@ -1,8 +1,10 @@
 defmodule PleromaReduxWeb.InboxControllerTest do
   use PleromaReduxWeb.ConnCase, async: true
+  use Oban.Testing, repo: PleromaRedux.Repo
 
   alias PleromaRedux.Objects
   alias PleromaRedux.Users
+  alias PleromaRedux.Workers.IngestActivity
 
   test "POST /users/:nickname/inbox ingests activity", %{conn: conn} do
     {:ok, _user} = Users.create_local_user("frank")
@@ -44,6 +46,14 @@ defmodule PleromaReduxWeb.InboxControllerTest do
       |> post("/users/frank/inbox", create)
 
     assert response(conn, 202)
+
+    assert_enqueued(
+      worker: IngestActivity,
+      queue: "federation_incoming",
+      args: %{"activity" => create}
+    )
+
+    assert :ok = perform_job(IngestActivity, %{"activity" => create})
 
     assert Objects.get_by_ap_id(note["id"])
   end
@@ -98,6 +108,9 @@ defmodule PleromaReduxWeb.InboxControllerTest do
       |> post("/users/frank/inbox", create)
 
     assert response(conn, 202)
+
+    assert_enqueued(worker: IngestActivity, args: %{"activity" => create})
+    assert :ok = perform_job(IngestActivity, %{"activity" => create})
 
     object = Objects.get_by_ap_id(note["id"])
     assert object
@@ -155,6 +168,9 @@ defmodule PleromaReduxWeb.InboxControllerTest do
       |> post("/users/frank/inbox", body)
 
     assert response(conn, 202)
+    assert_enqueued(worker: IngestActivity, args: %{"activity" => create})
+    assert :ok = perform_job(IngestActivity, %{"activity" => create})
+
     assert Objects.get_by_ap_id(note["id"])
   end
 
@@ -199,6 +215,9 @@ defmodule PleromaReduxWeb.InboxControllerTest do
       |> post("/users/frank/inbox", create)
 
     assert response(conn, 202)
+    assert_enqueued(worker: IngestActivity, args: %{"activity" => create})
+    assert :ok = perform_job(IngestActivity, %{"activity" => create})
+
     assert Objects.get_by_ap_id(note["id"])
   end
 
@@ -278,6 +297,9 @@ defmodule PleromaReduxWeb.InboxControllerTest do
       |> post("/users/frank/inbox", body)
 
     assert response(conn, 202)
+    assert_enqueued(worker: IngestActivity, args: %{"activity" => create})
+    assert :ok = perform_job(IngestActivity, %{"activity" => create})
+
     assert Objects.get_by_ap_id(note["id"])
   end
 
