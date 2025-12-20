@@ -55,9 +55,9 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusRenderer do
       "account" => account,
       "created_at" => format_datetime(object),
       "media_attachments" => media_attachments(object),
-      "mentions" => [],
-      "tags" => [],
-      "emojis" => [],
+      "mentions" => mentions(object),
+      "tags" => tags(object),
+      "emojis" => emojis(object),
       "reblogs_count" => reblogs_count,
       "favourites_count" => favourites_count,
       "replies_count" => 0,
@@ -374,4 +374,179 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusRenderer do
       }
     end)
   end
+
+  defp mentions(%Object{} = object) do
+    object
+    |> activity_tags()
+    |> Enum.filter(&(Map.get(&1, "type") == "Mention"))
+    |> Enum.map(&render_mention/1)
+    |> Enum.filter(&is_map/1)
+  end
+
+  defp mentions(_), do: []
+
+  defp render_mention(%{} = tag) do
+    href =
+      case tag do
+        %{"href" => href} when is_binary(href) -> href
+        %{"id" => href} when is_binary(href) -> href
+        _ -> nil
+      end
+
+    name =
+      case tag do
+        %{"name" => name} when is_binary(name) -> name
+        _ -> nil
+      end
+
+    with href when is_binary(href) <- href do
+      case Users.get_by_ap_id(href) do
+        %User{} = user ->
+          %{
+            "id" => Integer.to_string(user.id),
+            "username" => user.nickname,
+            "url" => href,
+            "acct" => acct_for_user(user)
+          }
+
+        _ ->
+          {username, acct} = mention_username_and_acct(name, href)
+
+          %{
+            "id" => href,
+            "username" => username,
+            "url" => href,
+            "acct" => acct
+          }
+      end
+    else
+      _ -> nil
+    end
+  end
+
+  defp render_mention(_), do: nil
+
+  defp mention_username_and_acct(name, href) do
+    name =
+      case name do
+        name when is_binary(name) -> String.trim(name)
+        _ -> ""
+      end
+
+    name =
+      if String.starts_with?(name, "@") do
+        String.trim_leading(name, "@")
+      else
+        name
+      end
+
+    case String.split(name, "@", parts: 2, trim: true) do
+      [username, host] ->
+        {username, "#{username}@#{host}"}
+
+      [username] ->
+        {username, acct_for_remote(username, href)}
+
+      _ ->
+        username = fallback_username(href)
+        {username, acct_for_remote(username, href)}
+    end
+  end
+
+  defp acct_for_remote(username, ap_id) when is_binary(username) and is_binary(ap_id) do
+    case URI.parse(ap_id) do
+      %URI{host: host} when is_binary(host) and host != "" -> "#{username}@#{host}"
+      _ -> username
+    end
+  end
+
+  defp acct_for_remote(username, _ap_id) when is_binary(username), do: username
+  defp acct_for_remote(_username, _ap_id), do: "unknown"
+
+  defp acct_for_user(%User{local: true, nickname: nickname}) when is_binary(nickname), do: nickname
+
+  defp acct_for_user(%User{nickname: nickname, ap_id: ap_id})
+       when is_binary(nickname) and is_binary(ap_id) do
+    case URI.parse(ap_id) do
+      %URI{host: host} when is_binary(host) and host != "" -> "#{nickname}@#{host}"
+      _ -> nickname
+    end
+  end
+
+  defp acct_for_user(_), do: "unknown"
+
+  defp tags(%Object{} = object) do
+    object
+    |> activity_tags()
+    |> Enum.filter(&(Map.get(&1, "type") == "Hashtag"))
+    |> Enum.map(&render_hashtag/1)
+    |> Enum.filter(&is_map/1)
+  end
+
+  defp tags(_), do: []
+
+  defp render_hashtag(%{"name" => name} = tag) when is_binary(name) do
+    name =
+      name
+      |> String.trim()
+      |> String.trim_leading("#")
+      |> String.downcase()
+
+    href =
+      case tag do
+        %{"href" => href} when is_binary(href) -> href
+        _ -> URL.absolute("/tags/" <> name)
+      end
+
+    %{"name" => name, "url" => href}
+  end
+
+  defp render_hashtag(_), do: nil
+
+  defp emojis(%Object{} = object) do
+    object
+    |> activity_tags()
+    |> Enum.filter(&(Map.get(&1, "type") == "Emoji"))
+    |> Enum.map(&render_custom_emoji/1)
+    |> Enum.filter(&is_map/1)
+  end
+
+  defp emojis(_), do: []
+
+  defp render_custom_emoji(%{"name" => name, "icon" => icon}) when is_binary(name) do
+    shortcode =
+      name
+      |> String.trim()
+      |> String.trim(":")
+
+    url = icon_url(icon)
+
+    if is_binary(url) and shortcode != "" do
+      %{
+        "shortcode" => shortcode,
+        "url" => url,
+        "static_url" => url,
+        "visible_in_picker" => true
+      }
+    end
+  end
+
+  defp render_custom_emoji(_), do: nil
+
+  defp icon_url(%{"url" => url}) when is_binary(url), do: url
+
+  defp icon_url(%{"url" => [%{"href" => href} | _]}) when is_binary(href), do: href
+
+  defp icon_url(%{"url" => [%{"url" => url} | _]}) when is_binary(url), do: url
+
+  defp icon_url(_), do: nil
+
+  defp activity_tags(%Object{} = object) do
+    object.data
+    |> Map.get("tag", [])
+    |> List.wrap()
+    |> Enum.filter(&is_map/1)
+  end
+
+  defp activity_tags(_), do: []
 end
