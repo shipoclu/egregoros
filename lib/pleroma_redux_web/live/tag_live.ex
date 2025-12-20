@@ -1,6 +1,7 @@
 defmodule PleromaReduxWeb.TagLive do
   use PleromaReduxWeb, :live_view
 
+  alias PleromaRedux.Interactions
   alias PleromaRedux.Notifications
   alias PleromaRedux.Objects
   alias PleromaRedux.User
@@ -48,6 +49,49 @@ defmodule PleromaReduxWeb.TagLive do
 
   def handle_event("close_media", _params, socket) do
     {:noreply, MediaViewer.close(socket)}
+  end
+
+  def handle_event("toggle_like", %{"id" => id}, socket) do
+    with %User{} = user <- socket.assigns.current_user,
+         {post_id, ""} <- Integer.parse(to_string(id)),
+         {:ok, _activity} <- Interactions.toggle_like(user, post_id) do
+      {:noreply, reload_posts(socket)}
+    else
+      nil ->
+        {:noreply, put_flash(socket, :error, "Register to like posts.")}
+
+      _ ->
+        {:noreply, socket}
+    end
+  end
+
+  def handle_event("toggle_repost", %{"id" => id}, socket) do
+    with %User{} = user <- socket.assigns.current_user,
+         {post_id, ""} <- Integer.parse(to_string(id)),
+         {:ok, _activity} <- Interactions.toggle_repost(user, post_id) do
+      {:noreply, reload_posts(socket)}
+    else
+      nil ->
+        {:noreply, put_flash(socket, :error, "Register to repost.")}
+
+      _ ->
+        {:noreply, socket}
+    end
+  end
+
+  def handle_event("toggle_reaction", %{"id" => id, "emoji" => emoji}, socket) do
+    with %User{} = user <- socket.assigns.current_user,
+         {post_id, ""} <- Integer.parse(to_string(id)),
+         emoji when is_binary(emoji) <- to_string(emoji),
+         {:ok, _activity} <- Interactions.toggle_reaction(user, post_id, emoji) do
+      {:noreply, reload_posts(socket)}
+    else
+      nil ->
+        {:noreply, put_flash(socket, :error, "Register to react.")}
+
+      _ ->
+        {:noreply, socket}
+    end
   end
 
   @impl true
@@ -114,6 +158,11 @@ defmodule PleromaReduxWeb.TagLive do
     user
     |> Notifications.list_for_user(limit: @page_size)
     |> length()
+  end
+
+  defp reload_posts(socket) do
+    posts = Objects.list_notes_by_hashtag(socket.assigns.tag, limit: @page_size)
+    assign(socket, posts: StatusVM.decorate_many(posts, socket.assigns.current_user))
   end
 
   defp timeline_href(%{id: _}), do: ~p"/?timeline=home"
