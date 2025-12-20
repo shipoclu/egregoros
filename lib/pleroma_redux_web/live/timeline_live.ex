@@ -62,7 +62,24 @@ defmodule PleromaReduxWeb.TimelineLive do
       )
       |> stream(:posts, StatusVM.decorate_many(posts, current_user), dom_id: &post_dom_id/1)
       |> allow_upload(:media,
-        accept: ~w(.png .jpg .jpeg .webp .gif .heic .heif),
+        accept: ~w(
+          .png
+          .jpg
+          .jpeg
+          .webp
+          .gif
+          .heic
+          .heif
+          .mp4
+          .webm
+          .mov
+          .m4a
+          .mp3
+          .ogg
+          .opus
+          .wav
+          .aac
+        ),
         max_entries: 4,
         max_file_size: 10_000_000,
         auto_upload: true
@@ -512,15 +529,15 @@ defmodule PleromaReduxWeb.TimelineLive do
                         Attachments
                       </p>
                       <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                        PNG, JPG, GIF, WEBP, HEIC — up to 10MB
+                        Images, video, audio — up to 10MB
                       </p>
                     </div>
 
                     <label
-                      data-role="compose-add-photo"
+                      data-role="compose-add-media"
                       class="relative inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-full border border-slate-200/80 bg-white/70 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700 transition hover:-translate-y-0.5 hover:bg-white dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:hover:bg-slate-950"
                     >
-                      <.icon name="hero-photo" class="size-4" /> Add photo
+                      <.icon name="hero-photo" class="size-4" /> Add media
                       <.live_file_input
                         upload={@uploads.media}
                         id="media-input"
@@ -538,7 +555,7 @@ defmodule PleromaReduxWeb.TimelineLive do
                       :if={@uploads.media.entries == []}
                       class="rounded-2xl border border-dashed border-slate-200/80 bg-white/50 p-4 text-sm text-slate-600 dark:border-slate-700/70 dark:bg-slate-950/40 dark:text-slate-300"
                     >
-                      Drop photos here or use “Add photo”.
+                      Drop media here or use “Add media”.
                     </p>
 
                     <div
@@ -549,7 +566,13 @@ defmodule PleromaReduxWeb.TimelineLive do
                     >
                       <div class="flex gap-3">
                         <div class="relative h-16 w-16 overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm shadow-slate-200/20 dark:border-slate-700/70 dark:bg-slate-950/60 dark:shadow-slate-900/40">
-                          <.live_img_preview entry={entry} class="h-full w-full object-cover" />
+                          <%= if image_upload?(entry) do %>
+                            <.live_img_preview entry={entry} class="h-full w-full object-cover" />
+                          <% else %>
+                            <div class="flex h-full w-full items-center justify-center bg-slate-900/5 text-slate-500 dark:bg-white/5 dark:text-slate-300">
+                              <.icon name={media_upload_icon(entry)} class="size-7" />
+                            </div>
+                          <% end %>
                         </div>
 
                         <div class="min-w-0 flex-1 space-y-3">
@@ -938,6 +961,22 @@ defmodule PleromaReduxWeb.TimelineLive do
   defp upload_error_text(:not_accepted), do: "Unsupported file type."
   defp upload_error_text(:too_many_files), do: "Too many files selected."
   defp upload_error_text(_), do: "Upload failed."
+
+  defp image_upload?(%{client_type: type}) when is_binary(type) do
+    String.starts_with?(type, "image/")
+  end
+
+  defp image_upload?(_entry), do: false
+
+  defp media_upload_icon(%{client_type: type}) when is_binary(type) do
+    cond do
+      String.starts_with?(type, "video/") -> "hero-film"
+      String.starts_with?(type, "audio/") -> "hero-musical-note"
+      true -> "hero-paper-clip"
+    end
+  end
+
+  defp media_upload_icon(_entry), do: "hero-paper-clip"
 
   defp notifications_count(nil), do: 0
 

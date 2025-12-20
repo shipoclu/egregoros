@@ -250,20 +250,53 @@ defmodule PleromaReduxWeb.TimelineLiveTest do
     assert has_element?(view, "#post-#{note.id} img[data-role='attachment']")
   end
 
-  test "compose Add photo button is wired to the hidden file input", %{conn: conn, user: user} do
+  test "compose Add media button is wired to the hidden file input", %{conn: conn, user: user} do
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     {:ok, view, _html} = live(conn, "/")
 
-    assert has_element?(view, "[data-role='compose-add-photo']", "Add photo")
-    assert has_element?(view, "[data-role='compose-add-photo'] input[type='file']")
+    assert has_element?(view, "[data-role='compose-add-media']", "Add media")
+    assert has_element?(view, "[data-role='compose-add-media'] input[type='file']")
 
     html =
       view
-      |> element("[data-role='compose-add-photo']")
+      |> element("[data-role='compose-add-media']")
       |> render()
 
     assert html =~ "type=\"file\""
     assert html =~ "Phoenix.LiveFileUpload"
+  end
+
+  test "posting with a video attachment renders it in the timeline", %{conn: conn, user: user} do
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/")
+
+    upload =
+      file_input(view, "#timeline-form", :media, [
+        %{
+          last_modified: 1_694_171_879_000,
+          name: "clip.mp4",
+          content: "video",
+          size: 5,
+          type: "video/mp4"
+        }
+      ])
+
+    expect(PleromaRedux.MediaStorage.Mock, :store_media, fn passed_user, passed_upload ->
+      assert passed_user.id == user.id
+      assert passed_upload.filename == "clip.mp4"
+      assert passed_upload.content_type == "video/mp4"
+      {:ok, "/uploads/media/#{passed_user.id}/clip.mp4"}
+    end)
+
+    assert render_upload(upload, "clip.mp4") =~ "100%"
+
+    view
+    |> form("#timeline-form", post: %{content: "Hello with video"})
+    |> render_submit()
+
+    [note] = Objects.list_notes()
+
+    assert has_element?(view, "#post-#{note.id} video[data-role='attachment'][data-kind='video']")
   end
 
   test "posting with only an attachment is allowed", %{conn: conn, user: user} do
