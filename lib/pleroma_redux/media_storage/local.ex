@@ -7,7 +7,18 @@ defmodule PleromaRedux.MediaStorage.Local do
     "image/png" => ".png",
     "image/jpeg" => ".jpg",
     "image/webp" => ".webp",
-    "image/gif" => ".gif"
+    "image/gif" => ".gif",
+    "image/heic" => ".heic",
+    "image/heif" => ".heif",
+    "video/mp4" => ".mp4",
+    "video/webm" => ".webm",
+    "video/quicktime" => ".mov",
+    "audio/mpeg" => ".mp3",
+    "audio/ogg" => ".ogg",
+    "audio/opus" => ".opus",
+    "audio/wav" => ".wav",
+    "audio/aac" => ".aac",
+    "audio/mp4" => ".m4a"
   }
 
   @impl true
