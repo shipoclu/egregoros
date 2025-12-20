@@ -1,11 +1,13 @@
 defmodule PleromaRedux.Federation.IncomingFollowAcceptTest do
   use PleromaRedux.DataCase, async: true
+  use Oban.Testing, repo: PleromaRedux.Repo
 
   import Mox
 
   alias PleromaRedux.Objects
   alias PleromaRedux.Pipeline
   alias PleromaRedux.Users
+  alias PleromaRedux.Workers.DeliverActivity
 
   test "ingesting remote Follow to local user stores and sends Accept" do
     {:ok, local} = Users.create_local_user("alice")
@@ -45,5 +47,16 @@ defmodule PleromaRedux.Federation.IncomingFollowAcceptTest do
     assert follow_object.type == "Follow"
 
     assert Objects.get_by_type_actor_object("Accept", local.ap_id, follow["id"])
+
+    args =
+      all_enqueued(worker: DeliverActivity)
+      |> Enum.map(& &1.args)
+      |> Enum.find(fn
+        %{"activity" => %{"type" => "Accept"}} -> true
+        _ -> false
+      end)
+
+    assert is_map(args)
+    assert :ok = perform_job(DeliverActivity, args)
   end
 end

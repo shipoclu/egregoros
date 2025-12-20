@@ -1,9 +1,11 @@
 defmodule PleromaReduxWeb.MastodonAPI.FollowsControllerTest do
   use PleromaReduxWeb.ConnCase, async: true
+  use Oban.Testing, repo: PleromaRedux.Repo
 
   import Mox
 
   alias PleromaRedux.Users
+  alias PleromaRedux.Workers.DeliverActivity
 
   test "POST /api/v1/follows follows a remote account by handle", %{conn: conn} do
     {:ok, user} = Users.create_local_user("alice")
@@ -70,5 +72,16 @@ defmodule PleromaReduxWeb.MastodonAPI.FollowsControllerTest do
 
     assert response["username"] == "bob"
     assert response["acct"] == "bob@remote.example"
+
+    args =
+      all_enqueued(worker: DeliverActivity)
+      |> Enum.map(& &1.args)
+      |> Enum.find(fn
+        %{"activity" => %{"type" => "Follow"}} -> true
+        _ -> false
+      end)
+
+    assert is_map(args)
+    assert :ok = perform_job(DeliverActivity, args)
   end
 end

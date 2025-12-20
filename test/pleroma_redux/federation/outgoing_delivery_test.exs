@@ -1,10 +1,12 @@
 defmodule PleromaRedux.Federation.OutgoingDeliveryTest do
   use PleromaRedux.DataCase, async: true
+  use Oban.Testing, repo: PleromaRedux.Repo
 
   import Mox
 
   alias PleromaRedux.Pipeline
   alias PleromaRedux.Users
+  alias PleromaRedux.Workers.DeliverActivity
 
   test "local Follow delivers to remote inbox" do
     {:ok, local} = Users.create_local_user("alice")
@@ -51,6 +53,17 @@ defmodule PleromaRedux.Federation.OutgoingDeliveryTest do
     end)
 
     assert {:ok, _} = Pipeline.ingest(follow, local: true)
+
+    args =
+      all_enqueued(worker: DeliverActivity)
+      |> Enum.map(& &1.args)
+      |> Enum.find(fn
+        %{"activity" => %{"type" => "Follow"}} -> true
+        _ -> false
+      end)
+
+    assert is_map(args)
+    assert :ok = perform_job(DeliverActivity, args)
   end
 
   test "local Create delivers to remote followers" do
@@ -106,6 +119,17 @@ defmodule PleromaRedux.Federation.OutgoingDeliveryTest do
     end)
 
     assert {:ok, _} = Pipeline.ingest(create, local: true)
+
+    args =
+      all_enqueued(worker: DeliverActivity)
+      |> Enum.map(& &1.args)
+      |> Enum.find(fn
+        %{"activity" => %{"type" => "Create"}} -> true
+        _ -> false
+      end)
+
+    assert is_map(args)
+    assert :ok = perform_job(DeliverActivity, args)
   end
 
   test "local Like delivers to remote object's actor inbox" do
@@ -151,6 +175,17 @@ defmodule PleromaRedux.Federation.OutgoingDeliveryTest do
     end)
 
     assert {:ok, _} = Pipeline.ingest(like, local: true)
+
+    args =
+      all_enqueued(worker: DeliverActivity)
+      |> Enum.map(& &1.args)
+      |> Enum.find(fn
+        %{"activity" => %{"type" => "Like"}} -> true
+        _ -> false
+      end)
+
+    assert is_map(args)
+    assert :ok = perform_job(DeliverActivity, args)
   end
 
   test "local EmojiReact delivers to remote object's actor inbox" do
@@ -198,6 +233,17 @@ defmodule PleromaRedux.Federation.OutgoingDeliveryTest do
     end)
 
     assert {:ok, _} = Pipeline.ingest(react, local: true)
+
+    args =
+      all_enqueued(worker: DeliverActivity)
+      |> Enum.map(& &1.args)
+      |> Enum.find(fn
+        %{"activity" => %{"type" => "EmojiReact"}} -> true
+        _ -> false
+      end)
+
+    assert is_map(args)
+    assert :ok = perform_job(DeliverActivity, args)
   end
 
   test "local Announce delivers to remote followers" do
@@ -245,6 +291,17 @@ defmodule PleromaRedux.Federation.OutgoingDeliveryTest do
     end)
 
     assert {:ok, _} = Pipeline.ingest(announce, local: true)
+
+    args =
+      all_enqueued(worker: DeliverActivity)
+      |> Enum.map(& &1.args)
+      |> Enum.find(fn
+        %{"activity" => %{"type" => "Announce"}} -> true
+        _ -> false
+      end)
+
+    assert is_map(args)
+    assert :ok = perform_job(DeliverActivity, args)
   end
 
   test "local Undo of Follow delivers to remote inbox" do
@@ -298,6 +355,17 @@ defmodule PleromaRedux.Federation.OutgoingDeliveryTest do
     end)
 
     assert {:ok, _} = Pipeline.ingest(undo, local: true)
+
+    args =
+      all_enqueued(worker: DeliverActivity)
+      |> Enum.map(& &1.args)
+      |> Enum.find(fn
+        %{"activity" => %{"type" => "Undo"}} -> true
+        _ -> false
+      end)
+
+    assert is_map(args)
+    assert :ok = perform_job(DeliverActivity, args)
   end
 
   test "local Undo of Like delivers to remote object's actor inbox" do
@@ -352,6 +420,17 @@ defmodule PleromaRedux.Federation.OutgoingDeliveryTest do
     end)
 
     assert {:ok, _} = Pipeline.ingest(undo, local: true)
+
+    args =
+      all_enqueued(worker: DeliverActivity)
+      |> Enum.map(& &1.args)
+      |> Enum.find(fn
+        %{"activity" => %{"type" => "Undo"}} -> true
+        _ -> false
+      end)
+
+    assert is_map(args)
+    assert :ok = perform_job(DeliverActivity, args)
   end
 
   test "local Undo of Announce delivers to remote followers" do
@@ -414,5 +493,16 @@ defmodule PleromaRedux.Federation.OutgoingDeliveryTest do
     end)
 
     assert {:ok, _} = Pipeline.ingest(undo, local: true)
+
+    args =
+      all_enqueued(worker: DeliverActivity)
+      |> Enum.map(& &1.args)
+      |> Enum.find(fn
+        %{"activity" => %{"type" => "Undo"}} -> true
+        _ -> false
+      end)
+
+    assert is_map(args)
+    assert :ok = perform_job(DeliverActivity, args)
   end
 end

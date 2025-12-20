@@ -2,8 +2,20 @@ defmodule PleromaRedux.Federation.Delivery do
   alias PleromaRedux.HTTP
   alias PleromaRedux.Signature.HTTP, as: HTTPSignature
   alias PleromaRedux.User
+  alias PleromaRedux.Workers.DeliverActivity
 
   def deliver(%User{} = user, inbox_url, activity)
+      when is_binary(inbox_url) and is_map(activity) do
+    Oban.insert(
+      DeliverActivity.new(%{
+        "user_id" => user.id,
+        "inbox_url" => inbox_url,
+        "activity" => activity
+      })
+    )
+  end
+
+  def deliver_now(%User{} = user, inbox_url, activity)
       when is_binary(inbox_url) and is_map(activity) do
     body = Jason.encode!(activity)
 

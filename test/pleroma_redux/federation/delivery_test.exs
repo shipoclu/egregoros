@@ -1,10 +1,12 @@
 defmodule PleromaRedux.Federation.DeliveryTest do
   use PleromaRedux.DataCase, async: true
+  use Oban.Testing, repo: PleromaRedux.Repo
 
   import Mox
 
   alias PleromaRedux.Federation.Delivery
   alias PleromaRedux.Users
+  alias PleromaRedux.Workers.DeliverActivity
 
   test "deliver posts a signed activity to the inbox" do
     {:ok, user} = Users.create_local_user("alice")
@@ -41,6 +43,19 @@ defmodule PleromaRedux.Federation.DeliveryTest do
       {:ok, %{status: 202, body: "", headers: []}}
     end)
 
-    assert {:ok, %{status: 202}} = Delivery.deliver(user, inbox, activity)
+    assert {:ok, _job} = Delivery.deliver(user, inbox, activity)
+
+    assert_enqueued(
+      worker: DeliverActivity,
+      queue: "federation_outgoing",
+      args: %{"user_id" => user.id, "inbox_url" => inbox, "activity" => activity}
+    )
+
+    assert :ok =
+             perform_job(DeliverActivity, %{
+               "user_id" => user.id,
+               "inbox_url" => inbox,
+               "activity" => activity
+             })
   end
 end

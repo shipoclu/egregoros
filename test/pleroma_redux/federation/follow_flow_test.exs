@@ -1,10 +1,12 @@
 defmodule PleromaRedux.Federation.FollowFlowTest do
   use PleromaRedux.DataCase, async: true
+  use Oban.Testing, repo: PleromaRedux.Repo
 
   import Mox
 
   alias PleromaRedux.Objects
   alias PleromaRedux.Users
+  alias PleromaRedux.Workers.DeliverActivity
 
   test "follow_remote/2 discovers actor via WebFinger, stores user, and delivers Follow" do
     {:ok, local} = Users.create_local_user("alice")
@@ -64,6 +66,17 @@ defmodule PleromaRedux.Federation.FollowFlowTest do
     end)
 
     assert {:ok, remote} = PleromaRedux.Federation.follow_remote(local, "bob@remote.example")
+
+    args =
+      all_enqueued(worker: DeliverActivity)
+      |> Enum.map(& &1.args)
+      |> Enum.find(fn
+        %{"activity" => %{"type" => "Follow"}} -> true
+        _ -> false
+      end)
+
+    assert is_map(args)
+    assert :ok = perform_job(DeliverActivity, args)
 
     assert remote.local == false
     assert remote.ap_id == actor_url

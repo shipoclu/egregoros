@@ -1,11 +1,13 @@
 defmodule PleromaRedux.PublishTest do
   use PleromaRedux.DataCase, async: true
+  use Oban.Testing, repo: PleromaRedux.Repo
 
   import Mox
 
   alias PleromaRedux.Pipeline
   alias PleromaRedux.Publish
   alias PleromaRedux.Users
+  alias PleromaRedux.Workers.DeliverActivity
 
   test "post_note/2 delivers Create with addressing to remote followers" do
     {:ok, local} = Users.create_local_user("alice")
@@ -48,5 +50,16 @@ defmodule PleromaRedux.PublishTest do
     end)
 
     assert {:ok, _} = Publish.post_note(local, "Hello followers")
+
+    args =
+      all_enqueued(worker: DeliverActivity)
+      |> Enum.map(& &1.args)
+      |> Enum.find(fn
+        %{"activity" => %{"type" => "Create"}} -> true
+        _ -> false
+      end)
+
+    assert is_map(args)
+    assert :ok = perform_job(DeliverActivity, args)
   end
 end
