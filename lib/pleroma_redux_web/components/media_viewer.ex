@@ -76,7 +76,8 @@ defmodule PleromaReduxWeb.MediaViewer do
       phx-window-keydown="media_keydown"
       class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur"
     >
-      <div
+      <.focus_wrap
+        id="media-viewer-dialog"
         phx-click-away="close_media"
         class="relative w-full max-w-4xl overflow-hidden rounded-3xl bg-black shadow-2xl"
       >
@@ -119,7 +120,7 @@ defmodule PleromaReduxWeb.MediaViewer do
           class="max-h-[85vh] w-full object-contain"
           loading="lazy"
         />
-      </div>
+      </.focus_wrap>
     </div>
     """
   end

@@ -89,7 +89,7 @@ This is a **web UI** checklist for Pleroma‑Redux. Items are ordered roughly by
 | Report post/user action menu | TODO | Common “…” menu. |
 | Media attachments render | PARTIAL | Images/video/audio render; documents fall back to download links; still needs lightbox/carousel. |
 | Sensitive media hiding/reveal | PARTIAL | Attachments are hidden behind a “Sensitive media” reveal affordance when `sensitive` is set. |
-| Attachment lightbox / media viewer | PARTIAL | Modal viewer supports image carousel + arrow keys + ESC + click-away + focus restore; still needs video/audio in viewer and a true focus trap. |
+| Attachment lightbox / media viewer | PARTIAL | Modal viewer supports image carousel + arrow keys + ESC + click-away + focus trap + focus restore; still needs video/audio in viewer. |
 | Cards for link previews (OpenGraph) | TODO | “Twitter cards” / link previews (optional). |
 | Content collapse (long posts) | TODO | Readability + performance. |
 

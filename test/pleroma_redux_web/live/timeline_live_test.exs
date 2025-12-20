@@ -556,6 +556,7 @@ defmodule PleromaReduxWeb.TimelineLiveTest do
 
     assert has_element?(view, "[data-role='media-viewer']")
     assert has_element?(view, "#media-viewer")
+    assert has_element?(view, "#media-viewer-dialog[phx-hook='Phoenix.FocusWrap']")
     assert has_element?(view, "[data-role='media-viewer'] img[src='https://cdn.example/image.png']")
 
     view
