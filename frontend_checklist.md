@@ -123,7 +123,7 @@ This is a **web UI** checklist for Pleroma‑Redux. Items are ordered roughly by
 |---|---:|---|
 | Search box (global) | TODO | Accounts + statuses + hashtags. |
 | Account lookup by `@user@host` | TODO | Separate from “follow by handle” workflow. |
-| Hashtag pages | PARTIAL | Tag timeline exists (`/tags/:tag`) using content search; needs pagination + tag extraction from `tag` fields. |
+| Hashtag pages | PARTIAL | Tag timeline exists (`/tags/:tag`) using content search; supports like/repost/reaction when signed in; still needs pagination + tag extraction from `tag` fields. |
 | Explore / trending | TODO | |
 | User directory | TODO | |
 
