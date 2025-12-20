@@ -6,6 +6,7 @@ defmodule PleromaReduxWeb.TimelineLive do
   alias PleromaRedux.Activities.Like
   alias PleromaRedux.Activities.Undo
   alias PleromaRedux.Federation
+  alias PleromaRedux.HTML
   alias PleromaRedux.Objects
   alias PleromaRedux.Pipeline
   alias PleromaRedux.Publish
@@ -604,9 +605,9 @@ defmodule PleromaReduxWeb.TimelineLive do
                     </span>
                   </div>
 
-                  <p class="mt-3 text-base leading-relaxed text-slate-900 dark:text-slate-100">
-                    {entry.object.data["content"]}
-                  </p>
+                  <div class="mt-3 text-base leading-relaxed text-slate-900 dark:text-slate-100">
+                    <%= post_content_html(entry.object) %>
+                  </div>
                 </div>
               </div>
 
@@ -698,6 +699,22 @@ defmodule PleromaReduxWeb.TimelineLive do
   defp decorate_posts(posts, current_user) when is_list(posts) do
     Enum.map(posts, &decorate_post(&1, current_user))
   end
+
+  defp post_content_html(%{data: %{} = data} = object) do
+    raw = Map.get(data, "content", "")
+
+    format =
+      case Map.get(object, :local) do
+        false -> :html
+        _ -> :text
+      end
+
+    raw
+    |> HTML.to_safe_html(format: format)
+    |> Phoenix.HTML.raw()
+  end
+
+  defp post_content_html(_object), do: ""
 
   defp list_following(nil), do: []
 

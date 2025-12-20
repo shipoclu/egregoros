@@ -31,6 +31,20 @@ defmodule PleromaReduxWeb.TimelineLiveTest do
     assert has_element?(view, "article", "Hello world")
   end
 
+  test "timeline escapes unsafe html when posting locally", %{conn: conn, user: user} do
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/")
+
+    view
+    |> form("#timeline-form", post: %{content: "<script>alert(1)</script>"})
+    |> render_submit()
+
+    html = render(view)
+
+    refute html =~ "<script"
+    assert html =~ "&lt;script&gt;alert(1)&lt;/script&gt;"
+  end
+
   test "timeline renders sidebar and feed panels", %{conn: conn, user: user} do
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     {:ok, view, _html} = live(conn, "/")
@@ -74,6 +88,26 @@ defmodule PleromaReduxWeb.TimelineLiveTest do
     {:ok, view, _html} = live(conn, "/?timeline=public")
 
     assert has_element?(view, "[data-role='timeline-current']", "public")
+  end
+
+  test "public timeline sanitizes remote html content", %{conn: conn} do
+    assert {:ok, _object} =
+             Pipeline.ingest(
+               %{
+                 "id" => "https://remote.example/objects/unsafe-1",
+                 "type" => "Note",
+                 "attributedTo" => "https://remote.example/users/bob",
+                 "content" => "<p>ok</p><script>alert(1)</script>"
+               },
+               local: false
+             )
+
+    {:ok, view, _html} = live(conn, "/?timeline=public")
+
+    html = render(view)
+
+    assert html =~ "ok"
+    refute html =~ "<script"
   end
 
   test "liking a post creates a Like activity", %{conn: conn, user: user} do

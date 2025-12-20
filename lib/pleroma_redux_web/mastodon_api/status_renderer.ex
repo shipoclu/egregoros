@@ -1,4 +1,5 @@
 defmodule PleromaReduxWeb.MastodonAPI.StatusRenderer do
+  alias PleromaRedux.HTML
   alias PleromaRedux.Object
   alias PleromaRedux.Objects
   alias PleromaRedux.Relationships
@@ -50,7 +51,7 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusRenderer do
       "visibility" => visibility(object),
       "sensitive" => sensitive(object),
       "spoiler_text" => spoiler_text(object),
-      "content" => Map.get(object.data, "content", ""),
+      "content" => content(object),
       "account" => account,
       "created_at" => format_datetime(object),
       "media_attachments" => media_attachments(object),
@@ -247,6 +248,20 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusRenderer do
   end
 
   defp sensitive(_), do: false
+
+  defp content(%Object{} = object) do
+    raw = Map.get(object.data, "content", "")
+
+    format =
+      case object.local do
+        false -> :html
+        _ -> :text
+      end
+
+    HTML.to_safe_html(raw, format: format)
+  end
+
+  defp content(_), do: ""
 
   defp language(%Object{} = object) do
     object.data
