@@ -62,7 +62,7 @@ defmodule PleromaReduxWeb.TimelineLive do
       )
       |> stream(:posts, StatusVM.decorate_many(posts, current_user), dom_id: &post_dom_id/1)
       |> allow_upload(:media,
-        accept: ~w(.png .jpg .jpeg .webp .gif),
+        accept: ~w(.png .jpg .jpeg .webp .gif .heic .heif),
         max_entries: 4,
         max_file_size: 10_000_000,
         auto_upload: true
@@ -506,8 +506,8 @@ defmodule PleromaReduxWeb.TimelineLive do
                   class="rounded-2xl border border-slate-200/80 bg-white/70 p-4 dark:border-slate-700/70 dark:bg-slate-950/50"
                   aria-label="Attachments"
                 >
-                  <div class="flex items-center justify-between gap-4">
-                    <div>
+                  <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="min-w-0">
                       <p class="text-xs uppercase tracking-[0.25em] text-slate-500 dark:text-slate-400">
                         Attachments
                       </p>
@@ -516,11 +516,14 @@ defmodule PleromaReduxWeb.TimelineLive do
                       </p>
                     </div>
 
-                    <div class="shrink-0">
+                    <div class="flex w-full items-center sm:w-auto sm:shrink-0">
                       <label
                         for="media-input"
-                        class="inline-flex cursor-pointer items-center justify-center rounded-full border border-slate-200/80 bg-white/70 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700 transition hover:-translate-y-0.5 hover:bg-white dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:hover:bg-slate-950"
+                        data-role="compose-add-photo"
+                        phx-click={JS.dispatch("click", to: "#media-input")}
+                        class="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-full border border-slate-200/80 bg-white/70 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700 transition hover:-translate-y-0.5 hover:bg-white dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:hover:bg-slate-950 sm:w-auto"
                       >
+                        <.icon name="hero-photo" class="size-4" />
                         Add photo
                       </label>
                       <.live_file_input upload={@uploads.media} id="media-input" class="sr-only" />

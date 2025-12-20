@@ -250,6 +250,21 @@ defmodule PleromaReduxWeb.TimelineLiveTest do
     assert has_element?(view, "#post-#{note.id} img[data-role='attachment']")
   end
 
+  test "compose Add photo button is wired to the hidden file input", %{conn: conn, user: user} do
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/")
+
+    assert has_element?(view, "[data-role='compose-add-photo']", "Add photo")
+
+    html =
+      view
+      |> element("[data-role='compose-add-photo']")
+      |> render()
+
+    assert html =~ "phx-click="
+    assert html =~ "#media-input"
+  end
+
   test "posting with only an attachment is allowed", %{conn: conn, user: user} do
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     {:ok, view, _html} = live(conn, "/")
