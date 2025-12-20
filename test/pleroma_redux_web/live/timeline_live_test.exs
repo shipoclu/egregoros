@@ -555,6 +555,7 @@ defmodule PleromaReduxWeb.TimelineLiveTest do
     |> render_click()
 
     assert has_element?(view, "[data-role='media-viewer']")
+    assert has_element?(view, "#media-viewer")
     assert has_element?(view, "[data-role='media-viewer'] img[src='https://cdn.example/image.png']")
 
     view

@@ -64,9 +64,15 @@ defmodule PleromaReduxWeb.MediaViewer do
 
     ~H"""
     <div
+      id="media-viewer"
       data-role="media-viewer"
       role="dialog"
       aria-modal="true"
+      phx-mounted={
+        JS.push_focus()
+        |> JS.focus(to: "#media-viewer [data-role='media-viewer-close']")
+      }
+      phx-remove={JS.pop_focus()}
       phx-window-keydown="media_keydown"
       class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur"
     >
