@@ -40,12 +40,6 @@ defmodule PleromaRedux.Activities.Note do
     }
   end
 
-  def normalize(%{"type" => "Note"} = note) do
-    note
-  end
-
-  def normalize(_), do: nil
-
   def cast_and_validate(note) when is_map(note) do
     note =
       note
@@ -64,19 +58,9 @@ defmodule PleromaRedux.Activities.Note do
         {:ok, apply_note(note, validated_note)}
 
       {:error, %Ecto.Changeset{} = changeset} ->
-        {:error, changeset}
+      {:error, changeset}
     end
   end
-
-  def validate(note) when is_map(note) do
-    case cast_and_validate(note) do
-      {:ok, validated} -> {:ok, validated}
-      {:error, %Ecto.Changeset{}} -> {:error, :invalid}
-      {:error, _} = error -> error
-    end
-  end
-
-  def validate(_), do: {:error, :invalid}
 
   def to_object_attrs(note, opts) do
     %{

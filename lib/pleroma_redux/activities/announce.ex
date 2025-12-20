@@ -59,12 +59,6 @@ defmodule PleromaRedux.Activities.Announce do
     Map.merge(base, recipients(actor, object))
   end
 
-  def normalize(%{"type" => "Announce"} = activity) do
-    activity
-  end
-
-  def normalize(_), do: nil
-
   def cast_and_validate(activity) when is_map(activity) do
     cast_activity = maybe_embed_object(activity)
 
@@ -79,16 +73,6 @@ defmodule PleromaRedux.Activities.Announce do
       {:error, %Ecto.Changeset{} = changeset} -> {:error, changeset}
     end
   end
-
-  def validate(activity) when is_map(activity) do
-    case cast_and_validate(activity) do
-      {:ok, validated} -> {:ok, validated}
-      {:error, %Ecto.Changeset{}} -> {:error, :invalid}
-      {:error, _} = error -> error
-    end
-  end
-
-  def validate(_), do: {:error, :invalid}
 
   def ingest(%{"object" => %{} = embedded_object} = activity, opts) do
     with {:ok, _} <- Pipeline.ingest(embedded_object, opts) do

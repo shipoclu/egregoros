@@ -59,12 +59,6 @@ defmodule PleromaRedux.Activities.Undo do
     }
   end
 
-  def normalize(%{"type" => "Undo"} = activity) do
-    activity
-  end
-
-  def normalize(_), do: nil
-
   def cast_and_validate(activity) when is_map(activity) do
     changeset =
       %__MODULE__{}
@@ -77,16 +71,6 @@ defmodule PleromaRedux.Activities.Undo do
       {:error, %Ecto.Changeset{} = changeset} -> {:error, changeset}
     end
   end
-
-  def validate(activity) when is_map(activity) do
-    case cast_and_validate(activity) do
-      {:ok, validated} -> {:ok, validated}
-      {:error, %Ecto.Changeset{}} -> {:error, :invalid}
-      {:error, _} = error -> error
-    end
-  end
-
-  def validate(_), do: {:error, :invalid}
 
   def ingest(activity, opts) do
     activity

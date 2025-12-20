@@ -29,13 +29,7 @@ defmodule PleromaRedux.Pipeline do
         _ -> {:error, :invalid}
       end
     else
-      normalized = module.normalize(activity)
-
-      if is_map(normalized) do
-        module.validate(normalized)
-      else
-        {:error, :invalid}
-      end
+      {:error, :invalid}
     end
   end
 end
