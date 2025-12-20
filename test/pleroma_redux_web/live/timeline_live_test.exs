@@ -255,14 +255,15 @@ defmodule PleromaReduxWeb.TimelineLiveTest do
     {:ok, view, _html} = live(conn, "/")
 
     assert has_element?(view, "[data-role='compose-add-photo']", "Add photo")
+    assert has_element?(view, "[data-role='compose-add-photo'] input[type='file']")
 
     html =
       view
       |> element("[data-role='compose-add-photo']")
       |> render()
 
-    assert html =~ "phx-click="
-    assert html =~ "#media-input"
+    assert html =~ "type=\"file\""
+    assert html =~ "Phoenix.LiveFileUpload"
   end
 
   test "posting with only an attachment is allowed", %{conn: conn, user: user} do
