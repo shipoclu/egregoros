@@ -19,4 +19,3 @@ defmodule PleromaRedux.ActivityPub.ObjectValidators.Types.DateTime do
   def dump(data), do: {:ok, data}
   def load(data), do: {:ok, data}
 end
-

@@ -606,7 +606,7 @@ defmodule PleromaReduxWeb.TimelineLive do
                   </div>
 
                   <div class="mt-3 text-base leading-relaxed text-slate-900 dark:text-slate-100">
-                    <%= post_content_html(entry.object) %>
+                    {post_content_html(entry.object)}
                   </div>
                 </div>
               </div>

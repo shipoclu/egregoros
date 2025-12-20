@@ -12,4 +12,3 @@ defmodule PleromaRedux.Activities.UndoCastAndValidateTest do
     assert validated["object"] == activity["object"]["id"]
   end
 end
-

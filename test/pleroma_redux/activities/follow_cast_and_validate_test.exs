@@ -12,4 +12,3 @@ defmodule PleromaRedux.Activities.FollowCastAndValidateTest do
     assert validated["object"] == activity["object"]
   end
 end
-

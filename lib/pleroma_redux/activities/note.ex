@@ -65,7 +65,7 @@ defmodule PleromaRedux.Activities.Note do
         {:ok, apply_note(note, validated_note)}
 
       {:error, %Ecto.Changeset{} = changeset} ->
-      {:error, changeset}
+        {:error, changeset}
     end
   end
 

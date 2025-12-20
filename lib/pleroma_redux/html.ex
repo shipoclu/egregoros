@@ -61,4 +61,3 @@ defmodule PleromaRedux.HTML do
     "<p>" <> escaped <> "</p>"
   end
 end
-

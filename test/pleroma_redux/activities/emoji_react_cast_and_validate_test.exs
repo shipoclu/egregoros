@@ -30,4 +30,3 @@ defmodule PleromaRedux.Activities.EmojiReactCastAndValidateTest do
     assert {:error, %Ecto.Changeset{}} = EmojiReact.cast_and_validate(activity)
   end
 end
-

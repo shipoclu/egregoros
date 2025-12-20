@@ -22,4 +22,3 @@ defmodule PleromaRedux.Activities.AnnounceCastAndValidateTest do
     assert validated["object"]["id"] == activity["object"]["id"]
   end
 end
-

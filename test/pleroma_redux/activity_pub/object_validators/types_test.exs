@@ -71,4 +71,3 @@ defmodule PleromaRedux.ActivityPub.ObjectValidators.TypesTest do
     end
   end
 end
-

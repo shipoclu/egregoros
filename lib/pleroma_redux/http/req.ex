@@ -40,7 +40,8 @@ defmodule PleromaRedux.HTTP.Req do
   @impl true
   def get(url, headers) do
     opts =
-      [headers: headers, into: limited_into_fun(max_response_bytes())] ++ req_options() ++
+      [headers: headers, into: limited_into_fun(max_response_bytes())] ++
+        req_options() ++
         @default_opts
 
     case Req.get(url, opts) do

@@ -16,4 +16,3 @@ defmodule PleromaRedux.Activities.DeleteCastAndValidateTest do
     assert validated["object"] == "https://example.com/objects/1"
   end
 end
-

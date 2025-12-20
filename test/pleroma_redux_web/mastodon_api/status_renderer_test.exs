@@ -56,7 +56,9 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusRendererTest do
 
     rendered = StatusRenderer.render_status(note)
 
-    assert [%{"url" => "http://localtesting.pleroma.lol/users/lain"} = mention] = rendered["mentions"]
+    assert [%{"url" => "http://localtesting.pleroma.lol/users/lain"} = mention] =
+             rendered["mentions"]
+
     assert mention["username"] == "lain"
     assert mention["acct"] == "lain@localtesting.pleroma.lol"
 

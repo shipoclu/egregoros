@@ -103,7 +103,9 @@ defmodule PleromaReduxWeb.InboxControllerTest do
     assert object
     assert object.data["content"] == ""
     assert is_list(object.data["attachment"])
-    assert Enum.at(object.data["attachment"], 0)["url"] == "https://cdn.remote.example/media/1.webp"
+
+    assert Enum.at(object.data["attachment"], 0)["url"] ==
+             "https://cdn.remote.example/media/1.webp"
   end
 
   test "POST /users/:nickname/inbox accepts signature with digest and host", %{conn: conn} do

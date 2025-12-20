@@ -33,4 +33,3 @@ defmodule PleromaReduxWeb.MastodonAPI.AccountRendererTest do
     refute rendered["note"] =~ "<script"
   end
 end
-

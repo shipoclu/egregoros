@@ -21,4 +21,3 @@ defmodule PleromaRedux.TestSupport.PipelineCastAndValidateProbe do
 
   def side_effects(_object, _opts), do: :ok
 end
-

@@ -6,4 +6,3 @@ defmodule PleromaRedux.DNS.Stub do
     {:ok, [{1, 1, 1, 1}]}
   end
 end
-

@@ -11,4 +11,3 @@ defmodule PleromaRedux.PipelineCastAndValidateTest do
              Pipeline.ingest_with(PipelineCastAndValidateProbe, activity, [])
   end
 end
-

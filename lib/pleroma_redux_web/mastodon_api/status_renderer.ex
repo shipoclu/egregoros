@@ -463,7 +463,8 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusRenderer do
   defp acct_for_remote(username, _ap_id) when is_binary(username), do: username
   defp acct_for_remote(_username, _ap_id), do: "unknown"
 
-  defp acct_for_user(%User{local: true, nickname: nickname}) when is_binary(nickname), do: nickname
+  defp acct_for_user(%User{local: true, nickname: nickname}) when is_binary(nickname),
+    do: nickname
 
   defp acct_for_user(%User{nickname: nickname, ap_id: ap_id})
        when is_binary(nickname) and is_binary(ap_id) do

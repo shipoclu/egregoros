@@ -11,4 +11,3 @@ defmodule PleromaRedux.DNS do
     Application.get_env(:pleroma_redux, __MODULE__, PleromaRedux.DNS.Inet)
   end
 end
-

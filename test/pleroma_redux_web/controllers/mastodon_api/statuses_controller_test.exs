@@ -512,7 +512,11 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesControllerTest do
     response = json_response(conn, 200)
 
     assert response["ancestors"] == []
-    assert Enum.map(response["descendants"], & &1["content"]) == ["<p>Reply 1</p>", "<p>Reply 2</p>"]
+
+    assert Enum.map(response["descendants"], & &1["content"]) == [
+             "<p>Reply 1</p>",
+             "<p>Reply 2</p>"
+           ]
   end
 
   defp tmp_upload_path do

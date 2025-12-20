@@ -44,6 +44,7 @@ defmodule PleromaRedux.SafeURLTest do
       {:ok, [{127, 0, 0, 1}]}
     end)
 
-    assert {:error, :unsafe_url} == SafeURL.validate_http_url("https://private.example/users/alice")
+    assert {:error, :unsafe_url} ==
+             SafeURL.validate_http_url("https://private.example/users/alice")
   end
 end

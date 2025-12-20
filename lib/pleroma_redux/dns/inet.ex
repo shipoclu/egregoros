@@ -20,4 +20,3 @@ defmodule PleromaRedux.DNS.Inet do
     end
   end
 end
-

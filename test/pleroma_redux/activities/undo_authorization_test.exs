@@ -34,4 +34,3 @@ defmodule PleromaRedux.Activities.UndoAuthorizationTest do
     assert Objects.get_by_ap_id(follow_object.ap_id)
   end
 end
-

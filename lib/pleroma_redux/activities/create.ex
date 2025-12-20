@@ -60,7 +60,7 @@ defmodule PleromaRedux.Activities.Create do
         {:ok, apply_create(activity, create)}
 
       {:error, %Ecto.Changeset{} = changeset} ->
-      {:error, changeset}
+        {:error, changeset}
     end
   end
 

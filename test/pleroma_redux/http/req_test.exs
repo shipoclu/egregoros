@@ -18,8 +18,9 @@ defmodule PleromaRedux.HTTP.ReqTest do
       Req.Test.text(conn, String.duplicate("a", max))
     end)
 
-    assert {:ok, %{status: 200, body: body}} = PleromaRedux.HTTP.Req.get("https://example.com", [])
+    assert {:ok, %{status: 200, body: body}} =
+             PleromaRedux.HTTP.Req.get("https://example.com", [])
+
     assert byte_size(body) == max
   end
 end
-
