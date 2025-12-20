@@ -123,6 +123,16 @@ defmodule PleromaRedux.HTMLTest do
       refute safe =~ "there&amp;apos;"
     end
 
+    test "unescapes double-escaped entities in html input" do
+      safe = HTML.to_safe_html("<p>there&amp;#39;s</p>", format: :html)
+      assert safe =~ ~r/there(&#39;|&apos;|')s/
+      refute safe =~ "there&amp;#39;s"
+
+      safe = HTML.to_safe_html("<p>there&amp;apos;s</p>", format: :html)
+      assert safe =~ ~r/there(&#39;|&apos;|')s/
+      refute safe =~ "there&amp;apos;"
+    end
+
     test "preserves text like <3 when entities are present" do
       safe = HTML.to_safe_html("I&#39;m <3", format: :html)
       assert safe =~ "I&#39;m"

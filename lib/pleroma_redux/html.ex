@@ -13,7 +13,7 @@ defmodule PleromaRedux.HTML do
 
   def sanitize(html) when is_binary(html) do
     {:ok, content} = FastSanitize.Sanitizer.scrub(html, @default_scrubber)
-    content
+    String.replace(content, "&amp;", "&")
   end
 
   def sanitize(_), do: ""
