@@ -15,24 +15,44 @@ defmodule PleromaReduxWeb.StatusCard do
       data-role="status-card"
       class="rounded-3xl border border-white/80 bg-white/80 p-6 shadow-lg shadow-slate-200/30 backdrop-blur transition hover:-translate-y-0.5 hover:shadow-xl dark:border-slate-700/60 dark:bg-slate-900/70 dark:shadow-slate-900/50 animate-rise"
     >
-      <div class="flex items-start gap-4">
-        <div class="shrink-0">
-          <%= if is_binary(@entry.actor.avatar_url) and @entry.actor.avatar_url != "" do %>
-            <img
-              src={@entry.actor.avatar_url}
-              alt={@entry.actor.display_name}
-              class="h-12 w-12 rounded-2xl border border-slate-200/80 bg-white object-cover shadow-sm shadow-slate-200/40 dark:border-slate-700/60 dark:bg-slate-950/60 dark:shadow-slate-900/40"
-              loading="lazy"
-            />
-          <% else %>
-            <div class="flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-200/80 bg-white/70 text-sm font-semibold text-slate-700 shadow-sm shadow-slate-200/30 dark:border-slate-700/60 dark:bg-slate-950/60 dark:text-slate-200 dark:shadow-slate-900/40">
-              {avatar_initial(@entry.actor.display_name)}
-            </div>
-          <% end %>
-        </div>
+      <div class="flex items-start justify-between gap-3">
+        <div class="flex min-w-0 items-start gap-4">
+          <%= if is_binary(profile_path = actor_profile_path(@entry.actor)) do %>
+            <.link
+              navigate={profile_path}
+              data-role="actor-link"
+              class="group flex min-w-0 items-start gap-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+            >
+              <div class="shrink-0">
+                <.actor_avatar actor={@entry.actor} />
+              </div>
 
-        <div class="min-w-0 flex-1">
-          <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <p
+                  data-role="post-actor-name"
+                  class="truncate text-sm font-semibold text-slate-900 transition group-hover:underline dark:text-slate-100"
+                >
+                  {@entry.actor.display_name}
+                </p>
+                <div class="mt-1 flex flex-wrap items-center gap-2">
+                  <span
+                    data-role="post-actor-handle"
+                    class="truncate text-xs text-slate-500 dark:text-slate-400"
+                  >
+                    {@entry.actor.handle}
+                  </span>
+
+                  <span class="text-[10px] uppercase tracking-[0.25em] text-slate-400 dark:text-slate-500">
+                    {if @entry.object.local, do: "local", else: "remote"}
+                  </span>
+                </div>
+              </div>
+            </.link>
+          <% else %>
+            <div class="shrink-0">
+              <.actor_avatar actor={@entry.actor} />
+            </div>
+
             <div class="min-w-0">
               <p
                 data-role="post-actor-name"
@@ -53,28 +73,28 @@ defmodule PleromaReduxWeb.StatusCard do
                 </span>
               </div>
             </div>
+          <% end %>
+        </div>
 
-            <span class="text-xs text-slate-400 dark:text-slate-500">
-              {format_time(@entry.object.inserted_at)}
-            </span>
-          </div>
+        <span class="text-xs text-slate-400 dark:text-slate-500">
+          {format_time(@entry.object.inserted_at)}
+        </span>
+      </div>
 
-          <div class="mt-3 text-base leading-relaxed text-slate-900 dark:text-slate-100">
-            {post_content_html(@entry.object)}
-          </div>
+      <div class="mt-3 text-base leading-relaxed text-slate-900 dark:text-slate-100">
+        {post_content_html(@entry.object)}
+      </div>
 
-          <div
-            :if={@entry.attachments != []}
-            data-role="attachments"
-            class="mt-4 grid gap-3 sm:grid-cols-2"
-          >
-            <div
-              :for={attachment <- @entry.attachments}
-              class="group overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm shadow-slate-200/20 dark:border-slate-700/70 dark:bg-slate-950/60 dark:shadow-slate-900/40"
-            >
-              <.attachment_media attachment={attachment} />
-            </div>
-          </div>
+      <div
+        :if={@entry.attachments != []}
+        data-role="attachments"
+        class="mt-4 grid gap-3 sm:grid-cols-2"
+      >
+        <div
+          :for={attachment <- @entry.attachments}
+          class="group overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm shadow-slate-200/20 dark:border-slate-700/70 dark:bg-slate-950/60 dark:shadow-slate-900/40"
+        >
+          <.attachment_media attachment={attachment} />
         </div>
       </div>
 
@@ -198,6 +218,32 @@ defmodule PleromaReduxWeb.StatusCard do
   end
 
   defp avatar_initial(_), do: "?"
+
+  defp actor_profile_path(%{nickname: nickname})
+       when is_binary(nickname) and nickname != "" do
+    ~p"/@#{nickname}"
+  end
+
+  defp actor_profile_path(_actor), do: nil
+
+  attr :actor, :map, required: true
+
+  defp actor_avatar(assigns) do
+    ~H"""
+    <%= if is_binary(@actor.avatar_url) and @actor.avatar_url != "" do %>
+      <img
+        src={@actor.avatar_url}
+        alt={@actor.display_name}
+        class="h-12 w-12 rounded-2xl border border-slate-200/80 bg-white object-cover shadow-sm shadow-slate-200/40 dark:border-slate-700/60 dark:bg-slate-950/60 dark:shadow-slate-900/40"
+        loading="lazy"
+      />
+    <% else %>
+      <div class="flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-200/80 bg-white/70 text-sm font-semibold text-slate-700 shadow-sm shadow-slate-200/30 dark:border-slate-700/60 dark:bg-slate-950/60 dark:text-slate-200 dark:shadow-slate-900/40">
+        {avatar_initial(@actor.display_name)}
+      </div>
+    <% end %>
+    """
+  end
 
   attr :attachment, :map, required: true
 

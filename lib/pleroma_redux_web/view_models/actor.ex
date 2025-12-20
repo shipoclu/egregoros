@@ -9,6 +9,7 @@ defmodule PleromaReduxWeb.ViewModels.Actor do
     %{
       ap_id: nil,
       display_name: "Unknown",
+      nickname: nil,
       handle: "@unknown",
       avatar_url: nil,
       local?: false
@@ -21,6 +22,7 @@ defmodule PleromaReduxWeb.ViewModels.Actor do
         %{
           ap_id: user.ap_id,
           display_name: user.name || user.nickname || ap_id,
+          nickname: user.nickname,
           handle: handle(user, ap_id),
           avatar_url: URL.absolute(user.avatar_url),
           local?: user.local
@@ -30,6 +32,7 @@ defmodule PleromaReduxWeb.ViewModels.Actor do
         %{
           ap_id: ap_id,
           display_name: ap_id,
+          nickname: nil,
           handle: ap_id,
           avatar_url: nil,
           local?: false

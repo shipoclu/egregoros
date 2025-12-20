@@ -110,6 +110,66 @@ defmodule PleromaReduxWeb.StatusCardTest do
     assert html =~ ~s(href="/uploads/media/1/file.pdf")
   end
 
+  test "links actor to the profile page when nickname is present" do
+    html =
+      render_component(&StatusCard.status_card/1, %{
+        id: "post-1",
+        current_user: nil,
+        entry: %{
+          object: %{
+            id: 1,
+            inserted_at: ~U[2025-01-01 00:00:00Z],
+            local: true,
+            data: %{"content" => "Hello world"}
+          },
+          actor: %{
+            display_name: "Alice",
+            nickname: "alice",
+            handle: "@alice",
+            avatar_url: nil
+          },
+          attachments: [],
+          liked?: false,
+          likes_count: 0,
+          reposted?: false,
+          reposts_count: 0,
+          reactions: %{}
+        }
+      })
+
+    assert html =~ ~s(href="/@alice")
+    assert html =~ ~s(data-role="actor-link")
+  end
+
+  test "does not link actor when nickname is missing" do
+    html =
+      render_component(&StatusCard.status_card/1, %{
+        id: "post-1",
+        current_user: nil,
+        entry: %{
+          object: %{
+            id: 1,
+            inserted_at: ~U[2025-01-01 00:00:00Z],
+            local: true,
+            data: %{"content" => "Hello world"}
+          },
+          actor: %{
+            display_name: "Alice",
+            handle: "@alice",
+            avatar_url: nil
+          },
+          attachments: [],
+          liked?: false,
+          likes_count: 0,
+          reposted?: false,
+          reposts_count: 0,
+          reactions: %{}
+        }
+      })
+
+    refute html =~ ~s(data-role="actor-link")
+  end
+
   test "hides actions for signed-out visitors" do
     html =
       render_component(&StatusCard.status_card/1, %{
