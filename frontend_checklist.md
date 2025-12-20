@@ -101,8 +101,8 @@ This is a **web UI** checklist for Pleroma‑Redux. Items are ordered roughly by
 | Profile page | DONE | `/@:nickname` |
 | Follow / unfollow from profile | DONE | |
 | Remote follow by handle | DONE | Present as a “follow remote” workflow. |
-| Followers list page | TODO | Dedicated list view with pagination. |
-| Following list page | PARTIAL | A “following” panel exists; needs dedicated pages + better UX. |
+| Followers list page | PARTIAL | Dedicated page exists (`/@:nickname/followers`); still needs pagination + follow state UX. |
+| Following list page | PARTIAL | Dedicated page exists (`/@:nickname/following`); still needs pagination + follow state UX. |
 | Follow requests (locked accounts) | TODO | Accept/deny UI. |
 | Blocks / mutes | TODO | UI + clear state indicators. |
 | Relationship badges (follows you, mutuals) | TODO | Optional but useful. |
