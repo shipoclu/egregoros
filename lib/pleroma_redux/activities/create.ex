@@ -125,17 +125,52 @@ defmodule PleromaRedux.Activities.Create do
   defp normalize_actor(activity), do: activity
 
   defp validate_object(changeset) do
+    create_actor = get_field(changeset, :actor)
+
     validate_change(changeset, :object, fn :object, object_value ->
       object_id = get_in(object_value, ["id"]) || get_in(object_value, [:id])
       object_type = get_in(object_value, ["type"]) || get_in(object_value, [:type])
 
-      if is_binary(object_id) and object_id != "" and is_binary(object_type) and object_type != "" do
-        []
+      errors =
+        if is_binary(object_id) and object_id != "" and is_binary(object_type) and
+             object_type != "" do
+          []
+        else
+          [object: "must be an object with id and type"]
+        end
+
+      object_actor_ids = extract_object_actor_ids(object_value)
+
+      if is_binary(create_actor) and create_actor != "" and object_actor_ids != [] and
+           create_actor not in object_actor_ids do
+        errors ++ [object: "actor does not match Create actor"]
       else
-        [object: "must be an object with id and type"]
+        errors
       end
     end)
   end
+
+  defp extract_object_actor_ids(object) when is_map(object) do
+    object
+    |> object_author_field()
+    |> List.wrap()
+    |> Enum.map(&extract_actor_id/1)
+    |> Enum.filter(&(is_binary(&1) and &1 != ""))
+    |> Enum.uniq()
+  end
+
+  defp extract_object_actor_ids(_), do: []
+
+  defp object_author_field(%{"attributedTo" => value}), do: value
+  defp object_author_field(%{attributedTo: value}), do: value
+  defp object_author_field(%{"actor" => value}), do: value
+  defp object_author_field(%{actor: value}), do: value
+  defp object_author_field(_), do: nil
+
+  defp extract_actor_id(%{"id" => id}) when is_binary(id), do: id
+  defp extract_actor_id(%{id: id}) when is_binary(id), do: id
+  defp extract_actor_id(id) when is_binary(id), do: id
+  defp extract_actor_id(_), do: nil
 
   defp maybe_put(activity, _key, nil), do: activity
   defp maybe_put(activity, key, value), do: Map.put(activity, key, value)

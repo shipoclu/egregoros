@@ -12,5 +12,20 @@ defmodule PleromaRedux.Activities.CreateCastAndValidateTest do
     assert is_map(validated["object"])
     assert is_binary(validated["object"]["id"])
   end
-end
 
+  test "rejects Create when embedded object actor does not match Create actor" do
+    activity = %{
+      "id" => "https://example.com/activities/create/1",
+      "type" => "Create",
+      "actor" => "https://example.com/users/alice",
+      "object" => %{
+        "id" => "https://example.com/objects/1",
+        "type" => "Note",
+        "attributedTo" => "https://example.com/users/bob",
+        "content" => "Hello"
+      }
+    }
+
+    assert {:error, %Ecto.Changeset{}} = Create.cast_and_validate(activity)
+  end
+end
