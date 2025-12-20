@@ -169,8 +169,8 @@ defmodule PleromaReduxWeb.NotificationsLive do
               </p>
             </div>
 
-            <span class="shrink-0 text-xs text-slate-400 dark:text-slate-500">
-              {format_time(@entry.notification.inserted_at)}
+            <span class="shrink-0">
+              <.time_ago at={@entry.notification.inserted_at} />
             </span>
           </div>
 
@@ -269,19 +269,4 @@ defmodule PleromaReduxWeb.NotificationsLive do
     do: "notification-#{id}"
 
   defp notification_dom_id(_notification), do: Ecto.UUID.generate()
-
-  defp format_time(%DateTime{} = dt) do
-    dt
-    |> DateTime.to_naive()
-    |> NaiveDateTime.truncate(:second)
-    |> NaiveDateTime.to_string()
-  end
-
-  defp format_time(%NaiveDateTime{} = dt) do
-    dt
-    |> NaiveDateTime.truncate(:second)
-    |> NaiveDateTime.to_string()
-  end
-
-  defp format_time(_), do: ""
 end

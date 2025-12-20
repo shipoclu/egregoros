@@ -76,9 +76,7 @@ defmodule PleromaReduxWeb.StatusCard do
           <% end %>
         </div>
 
-        <span class="text-xs text-slate-400 dark:text-slate-500">
-          {format_time(@entry.object.inserted_at)}
-        </span>
+        <.time_ago at={@entry.object.inserted_at} />
       </div>
 
       <div class="mt-3 text-base leading-relaxed text-slate-900 dark:text-slate-100">
@@ -192,21 +190,6 @@ defmodule PleromaReduxWeb.StatusCard do
   end
 
   defp post_content_html(_object), do: ""
-
-  defp format_time(%DateTime{} = dt) do
-    dt
-    |> DateTime.to_naive()
-    |> NaiveDateTime.truncate(:second)
-    |> NaiveDateTime.to_string()
-  end
-
-  defp format_time(%NaiveDateTime{} = dt) do
-    dt
-    |> NaiveDateTime.truncate(:second)
-    |> NaiveDateTime.to_string()
-  end
-
-  defp format_time(_), do: ""
 
   defp avatar_initial(name) when is_binary(name) do
     name = String.trim(name)

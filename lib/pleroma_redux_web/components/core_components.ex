@@ -231,6 +231,32 @@ defmodule PleromaReduxWeb.CoreComponents do
   end
 
   @doc """
+  Renders a human-friendly relative timestamp.
+  """
+  attr :at, :any, required: true
+  attr :class, :any, default: nil
+  attr :data_role, :string, default: "timestamp"
+
+  def time_ago(assigns) do
+    assigns =
+      assigns
+      |> assign(:iso, PleromaReduxWeb.Time.iso8601(assigns.at))
+      |> assign(:label, PleromaReduxWeb.Time.relative(assigns.at))
+
+    ~H"""
+    <time
+      :if={is_binary(@iso) and @iso != "" and is_binary(@label) and @label != ""}
+      data-role={@data_role}
+      datetime={@iso}
+      title={@iso}
+      class={["text-xs text-slate-400 dark:text-slate-500", @class]}
+    >
+      {@label}
+    </time>
+    """
+  end
+
+  @doc """
   Renders an input with label and error messages.
 
   A `Phoenix.HTML.FormField` may be passed as argument,
