@@ -52,7 +52,7 @@ This is a **web UI** checklist for Pleroma‑Redux. Items are ordered roughly by
 | Status permalink page (single post view) | PARTIAL | LiveView route `/@:nickname/:uuid` exists; needs polish (error states, canonical redirects). |
 | Thread/context view (replies chain) | PARTIAL | Renders basic ancestors + descendants on the status page; needs better nesting + reply entrypoint. |
 | Clickable actor profile from timeline | DONE | Status cards link actor → profile. |
-| Link handling (open external safely, copy link) | TODO | UI affordances for sharing/copying/opening. |
+| Link handling (open external safely, copy link) | PARTIAL | Status menu supports “Copy link” + “Open link”; needs richer share affordances. |
 
 ### Compose / posting
 | Feature | Status | Notes |
