@@ -1,11 +1,9 @@
 defmodule PleromaReduxWeb.ProfileLive do
   use PleromaReduxWeb, :live_view
 
-  alias PleromaRedux.Activities.Announce
-  alias PleromaRedux.Activities.EmojiReact
   alias PleromaRedux.Activities.Follow
-  alias PleromaRedux.Activities.Like
   alias PleromaRedux.Activities.Undo
+  alias PleromaRedux.Interactions
   alias PleromaRedux.Notifications
   alias PleromaRedux.Objects
   alias PleromaRedux.Pipeline
@@ -160,20 +158,8 @@ defmodule PleromaReduxWeb.ProfileLive do
 
   def handle_event("toggle_like", %{"id" => id}, socket) do
     with %User{} = user <- socket.assigns.current_user,
-         {post_id, ""} <- Integer.parse(to_string(id)),
-         %{} = post <- Objects.get(post_id),
-         true <- post.type == "Note" do
-      if Relationships.get_by_type_actor_object("Like", user.ap_id, post.ap_id) do
-        case Relationships.get_by_type_actor_object("Like", user.ap_id, post.ap_id) do
-          %{} = relationship ->
-            Pipeline.ingest(Undo.build(user, relationship.activity_ap_id), local: true)
-
-          _ ->
-            {:error, :not_found}
-        end
-      else
-        Pipeline.ingest(Like.build(user, post), local: true)
-      end
+         {post_id, ""} <- Integer.parse(to_string(id)) do
+      _ = Interactions.toggle_like(user, post_id)
 
       {:noreply, refresh_post(socket, post_id)}
     else
@@ -187,20 +173,8 @@ defmodule PleromaReduxWeb.ProfileLive do
 
   def handle_event("toggle_repost", %{"id" => id}, socket) do
     with %User{} = user <- socket.assigns.current_user,
-         {post_id, ""} <- Integer.parse(to_string(id)),
-         %{} = post <- Objects.get(post_id),
-         true <- post.type == "Note" do
-      if Relationships.get_by_type_actor_object("Announce", user.ap_id, post.ap_id) do
-        case Relationships.get_by_type_actor_object("Announce", user.ap_id, post.ap_id) do
-          %{} = relationship ->
-            Pipeline.ingest(Undo.build(user, relationship.activity_ap_id), local: true)
-
-          _ ->
-            {:error, :not_found}
-        end
-      else
-        Pipeline.ingest(Announce.build(user, post), local: true)
-      end
+         {post_id, ""} <- Integer.parse(to_string(id)) do
+      _ = Interactions.toggle_repost(user, post_id)
 
       {:noreply, refresh_post(socket, post_id)}
     else
@@ -214,19 +188,9 @@ defmodule PleromaReduxWeb.ProfileLive do
 
   def handle_event("toggle_reaction", %{"id" => id, "emoji" => emoji}, socket) do
     with %User{} = user <- socket.assigns.current_user,
-         {post_id, ""} <- Integer.parse(to_string(id)),
-         %{} = post <- Objects.get(post_id),
-         true <- post.type == "Note" do
+         {post_id, ""} <- Integer.parse(to_string(id)) do
       emoji = to_string(emoji)
-      relationship_type = "EmojiReact:" <> emoji
-
-      case Relationships.get_by_type_actor_object(relationship_type, user.ap_id, post.ap_id) do
-        %{} = relationship ->
-          Pipeline.ingest(Undo.build(user, relationship.activity_ap_id), local: true)
-
-        nil ->
-          Pipeline.ingest(EmojiReact.build(user, post, emoji), local: true)
-      end
+      _ = Interactions.toggle_reaction(user, post_id, emoji)
 
       {:noreply, refresh_post(socket, post_id)}
     else
