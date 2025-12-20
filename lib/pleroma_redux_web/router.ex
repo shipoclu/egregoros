@@ -113,6 +113,7 @@ defmodule PleromaReduxWeb.Router do
     pipe_through :api
 
     post "/apps", AppsController, :create
+    get "/streaming", StreamingController, :index
     get "/instance", InstanceController, :show
     get "/custom_emojis", CustomEmojisController, :index
     get "/timelines/public", TimelinesController, :public
