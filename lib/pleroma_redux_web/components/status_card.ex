@@ -77,18 +77,22 @@ defmodule PleromaReduxWeb.StatusCard do
           <% end %>
         </div>
 
-        <%= if is_binary(permalink_path = status_permalink_path(@entry)) do %>
-          <.link
-            navigate={permalink_path}
-            data-role="post-permalink"
-            class="inline-flex focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
-            aria-label="Open post"
-          >
+        <div class="flex items-center gap-2">
+          <%= if is_binary(permalink_path = status_permalink_path(@entry)) do %>
+            <.link
+              navigate={permalink_path}
+              data-role="post-permalink"
+              class="inline-flex focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+              aria-label="Open post"
+            >
+              <.time_ago at={@entry.object.inserted_at} />
+            </.link>
+          <% else %>
             <.time_ago at={@entry.object.inserted_at} />
-          </.link>
-        <% else %>
-          <.time_ago at={@entry.object.inserted_at} />
-        <% end %>
+          <% end %>
+
+          <.status_menu entry={@entry} />
+        </div>
       </div>
 
       <div class="mt-3 text-base leading-relaxed text-slate-900 dark:text-slate-100">
@@ -230,6 +234,64 @@ defmodule PleromaReduxWeb.StatusCard do
   end
 
   defp status_permalink_path(_entry), do: nil
+
+  defp status_share_url(entry) when is_map(entry) do
+    object = Map.get(entry, :object) || %{}
+    ap_id = Map.get(object, :ap_id) || Map.get(object, "ap_id")
+
+    cond do
+      is_binary(path = status_permalink_path(entry)) and path != "" ->
+        URL.absolute(path)
+
+      is_binary(ap_id) and ap_id != "" ->
+        ap_id
+
+      true ->
+        nil
+    end
+  end
+
+  attr :entry, :map, required: true
+
+  defp status_menu(assigns) do
+    assigns = assign(assigns, :share_url, status_share_url(assigns.entry))
+
+    ~H"""
+    <details data-role="status-menu" class="relative">
+      <summary class="list-none [&::-webkit-details-marker]:hidden">
+        <span class="inline-flex h-9 w-9 items-center justify-center rounded-2xl text-slate-500 transition hover:bg-slate-900/5 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white">
+          <.icon name="hero-ellipsis-horizontal" class="size-5" />
+        </span>
+      </summary>
+
+      <div class="absolute right-0 top-10 z-40 w-48 overflow-hidden rounded-2xl border border-slate-200/80 bg-white/95 shadow-xl shadow-slate-900/10 backdrop-blur dark:border-slate-700/70 dark:bg-slate-950/80 dark:shadow-slate-900/40">
+        <button
+          :if={is_binary(@share_url) and @share_url != ""}
+          type="button"
+          data-role="copy-link"
+          data-copy-text={@share_url}
+          phx-click={JS.dispatch("predux:copy") |> JS.push("copied_link")}
+          class="flex w-full items-center gap-3 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-900/5 dark:text-slate-200 dark:hover:bg-white/10"
+        >
+          <.icon name="hero-clipboard-document" class="size-5 text-slate-500 dark:text-slate-400" />
+          Copy link
+        </button>
+
+        <a
+          :if={is_binary(@share_url) and @share_url != ""}
+          data-role="open-link"
+          href={@share_url}
+          target="_blank"
+          rel="noreferrer noopener"
+          class="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-900/5 dark:text-slate-200 dark:hover:bg-white/10"
+        >
+          <.icon name="hero-arrow-top-right-on-square" class="size-5 text-slate-500 dark:text-slate-400" />
+          Open link
+        </a>
+      </div>
+    </details>
+    """
+  end
 
   attr :actor, :map, required: true
 

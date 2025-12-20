@@ -235,4 +235,41 @@ defmodule PleromaReduxWeb.StatusCardTest do
     assert html =~ ~s(data-role="post-permalink")
     assert html =~ ~s(href="/@alice/#{uuid}")
   end
+
+  test "renders a status action menu with a copy-link target" do
+    uuid = "8a31b5d5-5453-4f65-88b9-e0b8d535a4b4"
+    permalink = PleromaReduxWeb.Endpoint.url() <> "/@alice/#{uuid}"
+    ap_id = PleromaReduxWeb.Endpoint.url() <> "/objects/" <> uuid
+
+    html =
+      render_component(&StatusCard.status_card/1, %{
+        id: "post-1",
+        current_user: %{id: 1},
+        entry: %{
+          object: %{
+            id: 1,
+            ap_id: ap_id,
+            inserted_at: ~U[2025-01-01 00:00:00Z],
+            local: true,
+            data: %{"content" => "Hello world"}
+          },
+          actor: %{
+            display_name: "Alice",
+            nickname: "alice",
+            handle: "@alice",
+            avatar_url: nil
+          },
+          attachments: [],
+          liked?: false,
+          likes_count: 0,
+          reposted?: false,
+          reposts_count: 0,
+          reactions: %{}
+        }
+      })
+
+    assert html =~ ~s(data-role="status-menu")
+    assert html =~ ~s(data-role="copy-link")
+    assert html =~ ~s(data-copy-text="#{permalink}")
+  end
 end
