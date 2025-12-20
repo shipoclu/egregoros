@@ -48,10 +48,10 @@ This is a **web UI** checklist for Pleroma‑Redux. Items are ordered roughly by
 | Infinite scroll | TODO | Replace/augment “Load more”. |
 | Streaming new posts into timeline | DONE | Live updates exist for timeline. |
 | “New posts” indicator when scrolled | TODO | Prevents disrupting reading when live updates arrive. |
-| Human‑friendly timestamps (“5m”, “2h”) | TODO | Current formatting is raw datetime strings. |
+| Human‑friendly timestamps (“5m”, “2h”) | DONE | Rendered as relative time with a full timestamp on hover. |
 | Status permalink page (single post view) | TODO | Needed for sharing, thread navigation, and deep links. |
 | Thread/context view (replies chain) | TODO | Mastodon “context” equivalent in UI. |
-| Clickable actor profile from timeline | TODO | Status cards don’t link actor → profile yet. |
+| Clickable actor profile from timeline | DONE | Status cards link actor → profile. |
 | Link handling (open external safely, copy link) | TODO | UI affordances for sharing/copying/opening. |
 
 ### Compose / posting
@@ -59,13 +59,13 @@ This is a **web UI** checklist for Pleroma‑Redux. Items are ordered roughly by
 |---|---:|---|
 | Post text | DONE | Basic compose exists. |
 | Post validation feedback (empty/too long/etc) | PARTIAL | Empty handled; expand to full validations + inline errors. |
-| Attachments upload (images) | TODO | Should use LiveView uploads + `MediaStorage`. |
-| Attachments upload (video/audio) | TODO | Support UX + transcoding/probing later. |
-| Attachment preview grid in composer | TODO | Must show selected media before posting. |
-| Attachment alt text / description editing | TODO | Critical for accessibility; align with Mastodon API behavior. |
-| Content warning / spoiler text | TODO | UX for CW and summary field. |
-| Mark media as sensitive | TODO | UI for sensitive flag and blur previews. |
-| Visibility selector (public/unlisted/followers/direct) | TODO | Backend supports visibility; UI needs it. |
+| Attachments upload (images) | DONE | LiveView uploads + `MediaStorage` wired up. |
+| Attachments upload (video/audio) | PARTIAL | Upload + posting works; composer preview is currently icon-based for non-images. |
+| Attachment preview grid in composer | PARTIAL | Image previews + basic file indicators; no playback/lightbox yet. |
+| Attachment alt text / description editing | DONE | Per-attachment “Alt text” input is supported. |
+| Content warning / spoiler text | DONE | Composer “Content warning” field exists. |
+| Mark media as sensitive | DONE | Composer “Mark media as sensitive” toggle exists. |
+| Visibility selector (public/unlisted/followers/direct) | DONE | Composer visibility select exists. |
 | Reply composer (in‑reply‑to) | TODO | Compose from status card. |
 | Quote post | TODO | Optional; not in vanilla Mastodon but common. |
 | Drafts | TODO | Often requested; can be lightweight (local storage). |
@@ -86,7 +86,7 @@ This is a **web UI** checklist for Pleroma‑Redux. Items are ordered roughly by
 | Delete own post | TODO | |
 | Edit own post | TODO | (Optional; Mastodon doesn’t support editing by default.) |
 | Report post/user action menu | TODO | Common “…” menu. |
-| Media attachments render | PARTIAL | Attachments render, but currently image‑only and no lightbox/video/audio handling. |
+| Media attachments render | PARTIAL | Images/video/audio render; documents fall back to download links; still needs lightbox/carousel. |
 | Attachment lightbox / media viewer | TODO | Click to view full media, navigate carousel. |
 | Cards for link previews (OpenGraph) | TODO | “Twitter cards” / link previews (optional). |
 | Content collapse (long posts) | TODO | Readability + performance. |
@@ -114,7 +114,7 @@ This is a **web UI** checklist for Pleroma‑Redux. Items are ordered roughly by
 |---|---:|---|
 | Notifications list | DONE | `/notifications` |
 | Notification types coverage | PARTIAL | Follow/like/repost covered; expand (mentions, emoji reactions, etc.). |
-| Live updates for notifications | TODO | Subscribe + stream updates. |
+| Live updates for notifications | DONE | Notifications stream into the list while connected. |
 | Mark as read / unread | TODO | |
 | Notification filtering (mentions only, follows only, etc.) | TODO | |
 
@@ -170,4 +170,3 @@ This is a **web UI** checklist for Pleroma‑Redux. Items are ordered roughly by
 | Filters (mute words, hide boosts, etc.) | TODO | |
 | Analytics / insights | TODO | |
 | Admin/mod UI in web | TODO | |
-
