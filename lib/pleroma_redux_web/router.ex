@@ -49,6 +49,8 @@ defmodule PleromaReduxWeb.Router do
     live "/", TimelineLive
     live "/notifications", NotificationsLive
     live "/@:nickname", ProfileLive
+    live "/@:nickname/followers", RelationshipsLive, :followers
+    live "/@:nickname/following", RelationshipsLive, :following
     live "/@:nickname/:uuid", StatusLive
   end
 
