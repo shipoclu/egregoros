@@ -61,4 +61,28 @@ defmodule PleromaRedux.Signature.HTTPActorFetchTest do
     assert {:ok, ^actor_url} = PleromaRedux.Signature.verify_request(conn)
     assert Users.get_by_ap_id(actor_url)
   end
+
+  test "verify_request rejects unsafe actor urls" do
+    actor_url = "http://127.0.0.1/users/alice"
+
+    stub(PleromaRedux.HTTP.Mock, :get, fn _url, _headers ->
+      flunk("unexpected HTTP fetch for unsafe actor url")
+    end)
+
+    date = :httpd_util.rfc1123_date() |> List.to_string()
+
+    header =
+      "Signature " <>
+        "keyId=\"#{actor_url}#main-key\"," <>
+        "algorithm=\"rsa-sha256\"," <>
+        "headers=\"(request-target) date\"," <>
+        "signature=\"AA==\""
+
+    conn =
+      Plug.Test.conn(:post, "/users/frank/inbox", "")
+      |> Plug.Conn.put_req_header("date", date)
+      |> Plug.Conn.put_req_header("authorization", header)
+
+    assert {:error, :unsafe_url} = PleromaRedux.Signature.verify_request(conn)
+  end
 end

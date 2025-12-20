@@ -1,9 +1,11 @@
 defmodule PleromaRedux.Federation.Actor do
   alias PleromaRedux.HTTP
+  alias PleromaRedux.SafeURL
   alias PleromaRedux.Users
 
   def fetch_and_store(actor_url) when is_binary(actor_url) do
-    with {:ok, %{status: status, body: body}} when status in 200..299 <-
+    with :ok <- SafeURL.validate_http_url(actor_url),
+         {:ok, %{status: status, body: body}} when status in 200..299 <-
            HTTP.get(actor_url, headers()),
          {:ok, actor} <- decode_json(body),
          {:ok, attrs} <- to_user_attrs(actor),

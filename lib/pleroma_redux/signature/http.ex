@@ -168,6 +168,7 @@ defmodule PleromaRedux.Signature.HTTP do
          [entry] <- :public_key.pem_decode(user.public_key) do
       {:ok, :public_key.pem_entry_decode(entry)}
     else
+      {:error, _} = error -> error
       _ -> {:error, :unknown_key}
     end
   end

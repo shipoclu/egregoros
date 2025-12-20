@@ -9,10 +9,11 @@ This file tracks known security gaps and their remediation status.
 
 ## High priority (SSRF / DoS)
 - [ ] **Harden remote actor fetches** (used in signature verification and discovery):
-  - Reject non-HTTP(S) schemes and missing hosts.
-  - Block loopback / private IP literals (and eventually DNS rebinding).
-  - Disable redirects or re-validate redirect targets.
-  - Apply response size/time limits.
+  - [x] Reject non-HTTP(S) schemes and missing hosts.
+  - [x] Block loopback / private IP literals (DNS rebinding still TODO).
+  - [x] Disable redirects (temporary; re-validate redirect targets if re-enabled).
+  - [x] Apply request receive timeout.
+  - [ ] Apply response size limits.
 
 ## Medium priority (authz)
 - [ ] **Enforce OAuth scopes** for Mastodon API endpoints (read vs write, per-endpoint scopes).
