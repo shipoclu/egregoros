@@ -7,6 +7,7 @@ defmodule PleromaRedux.Activities.Announce do
   alias PleromaRedux.ActivityPub.ObjectValidators.Types.Recipients
   alias PleromaRedux.ActivityPub.ObjectValidators.Types.DateTime, as: APDateTime
   alias PleromaRedux.Federation.Delivery
+  alias PleromaRedux.Notifications
   alias PleromaRedux.Object
   alias PleromaRedux.Objects
   alias PleromaRedux.Pipeline
@@ -97,11 +98,24 @@ defmodule PleromaRedux.Activities.Announce do
         activity_ap_id: object.ap_id
       })
 
+    maybe_broadcast_notification(object)
+
     if Keyword.get(opts, :local, true) do
       deliver_to_followers(object)
     end
 
     :ok
+  end
+
+  defp maybe_broadcast_notification(object) do
+    with %{} = announced_object <- Objects.get_by_ap_id(object.object),
+         %{} = target <- Users.get_by_ap_id(announced_object.actor),
+         true <- target.local,
+         true <- target.ap_id != object.actor do
+      Notifications.broadcast(target.ap_id, object)
+    else
+      _ -> :ok
+    end
   end
 
   defp deliver_to_followers(announce_object) do

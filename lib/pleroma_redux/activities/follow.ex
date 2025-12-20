@@ -7,6 +7,7 @@ defmodule PleromaRedux.Activities.Follow do
   alias PleromaRedux.ActivityPub.ObjectValidators.Types.Recipients
   alias PleromaRedux.ActivityPub.ObjectValidators.Types.DateTime, as: APDateTime
   alias PleromaRedux.Activities.Accept
+  alias PleromaRedux.Notifications
   alias PleromaRedux.Objects
   alias PleromaRedux.Pipeline
   alias PleromaRedux.Relationships
@@ -73,6 +74,8 @@ defmodule PleromaRedux.Activities.Follow do
         activity_ap_id: object.ap_id
       })
 
+    maybe_broadcast_notification(object)
+
     if Keyword.get(opts, :local, true) do
       deliver_follow(object)
     else
@@ -80,6 +83,16 @@ defmodule PleromaRedux.Activities.Follow do
     end
 
     :ok
+  end
+
+  defp maybe_broadcast_notification(object) do
+    with %{} = target <- Users.get_by_ap_id(object.object),
+         true <- target.local,
+         true <- target.ap_id != object.actor do
+      Notifications.broadcast(target.ap_id, object)
+    else
+      _ -> :ok
+    end
   end
 
   defp deliver_follow(object) do
