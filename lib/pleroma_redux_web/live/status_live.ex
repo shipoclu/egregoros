@@ -46,6 +46,11 @@ defmodule PleromaReduxWeb.StatusLive do
   end
 
   @impl true
+  def handle_event("copied_link", _params, socket) do
+    {:noreply, put_flash(socket, :info, "Copied link to clipboard.")}
+  end
+
+  @impl true
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_user={@current_user}>
@@ -147,4 +152,3 @@ defmodule PleromaReduxWeb.StatusLive do
   defp timeline_href(%{id: _}), do: ~p"/?timeline=home"
   defp timeline_href(_user), do: ~p"/?timeline=public"
 end
-

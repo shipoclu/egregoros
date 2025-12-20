@@ -57,6 +57,10 @@ defmodule PleromaReduxWeb.ProfileLive do
   end
 
   @impl true
+  def handle_event("copied_link", _params, socket) do
+    {:noreply, put_flash(socket, :info, "Copied link to clipboard.")}
+  end
+
   def handle_event("follow", _params, socket) do
     with %User{} = viewer <- socket.assigns.current_user,
          %User{} = profile_user <- socket.assigns.profile_user,

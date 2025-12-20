@@ -148,6 +148,10 @@ defmodule PleromaReduxWeb.TimelineLive do
     {:noreply, socket}
   end
 
+  def handle_event("copied_link", _params, socket) do
+    {:noreply, put_flash(socket, :info, "Copied link to clipboard.")}
+  end
+
   def handle_event("cancel_media", %{"ref" => ref}, socket) do
     {:noreply,
      socket
