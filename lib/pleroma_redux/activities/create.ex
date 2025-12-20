@@ -1,4 +1,11 @@
 defmodule PleromaRedux.Activities.Create do
+  use Ecto.Schema
+
+  import Ecto.Changeset
+
+  alias PleromaRedux.ActivityPub.ObjectValidators.Types.ObjectID
+  alias PleromaRedux.ActivityPub.ObjectValidators.Types.Recipients
+  alias PleromaRedux.ActivityPub.ObjectValidators.Types.DateTime, as: APDateTime
   alias PleromaRedux.Objects
   alias PleromaRedux.Pipeline
   alias PleromaRedux.Relationships
@@ -7,6 +14,17 @@ defmodule PleromaRedux.Activities.Create do
   alias PleromaReduxWeb.Endpoint
 
   def type, do: "Create"
+
+  @primary_key false
+  embedded_schema do
+    field :id, ObjectID
+    field :type, :string
+    field :actor, ObjectID
+    field :object, :map
+    field :to, Recipients
+    field :cc, Recipients
+    field :published, APDateTime
+  end
 
   def build(%User{ap_id: actor}, object) when is_map(object) do
     build(actor, object)
@@ -29,17 +47,34 @@ defmodule PleromaRedux.Activities.Create do
 
   def normalize(%{"type" => "Create"} = activity) do
     activity
-    |> put_actor()
   end
 
   def normalize(_), do: nil
 
-  def validate(%{"id" => id, "type" => "Create", "actor" => actor, "object" => object} = activity)
-      when is_binary(id) and is_binary(actor) and is_map(object) do
-    if is_binary(object["id"]) and is_binary(object["type"]) do
-      {:ok, activity}
-    else
-      {:error, :invalid}
+  def cast_and_validate(activity) when is_map(activity) do
+    activity = normalize_actor(activity)
+
+    changeset =
+      %__MODULE__{}
+      |> cast(activity, __schema__(:fields))
+      |> validate_required([:id, :type, :actor, :object])
+      |> validate_inclusion(:type, [type()])
+      |> validate_object()
+
+    case apply_action(changeset, :insert) do
+      {:ok, %__MODULE__{} = create} ->
+        {:ok, apply_create(activity, create)}
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        {:error, changeset}
+    end
+  end
+
+  def validate(activity) when is_map(activity) do
+    case cast_and_validate(activity) do
+      {:ok, validated} -> {:ok, validated}
+      {:error, %Ecto.Changeset{}} -> {:error, :invalid}
+      {:error, _} = error -> error
     end
   end
 
@@ -86,21 +121,40 @@ defmodule PleromaRedux.Activities.Create do
     }
   end
 
-  defp put_actor(%{"actor" => actor} = activity) when is_binary(actor), do: activity
+  defp apply_create(activity, %__MODULE__{} = create) do
+    activity
+    |> Map.put("id", create.id)
+    |> Map.put("type", create.type)
+    |> Map.put("actor", create.actor)
+    |> Map.put("object", create.object)
+    |> maybe_put("to", create.to)
+    |> maybe_put("cc", create.cc)
+    |> maybe_put("published", create.published)
+  end
 
-  defp put_actor(%{"actor" => %{"id" => actor}} = activity) when is_binary(actor) do
+  defp normalize_actor(%{"actor" => _} = activity), do: activity
+
+  defp normalize_actor(%{"attributedTo" => actor} = activity) do
     Map.put(activity, "actor", actor)
   end
 
-  defp put_actor(%{"attributedTo" => actor} = activity) when is_binary(actor) do
-    Map.put(activity, "actor", actor)
+  defp normalize_actor(activity), do: activity
+
+  defp validate_object(changeset) do
+    validate_change(changeset, :object, fn :object, object_value ->
+      object_id = get_in(object_value, ["id"]) || get_in(object_value, [:id])
+      object_type = get_in(object_value, ["type"]) || get_in(object_value, [:type])
+
+      if is_binary(object_id) and object_id != "" and is_binary(object_type) and object_type != "" do
+        []
+      else
+        [object: "must be an object with id and type"]
+      end
+    end)
   end
 
-  defp put_actor(%{"attributedTo" => %{"id" => actor}} = activity) when is_binary(actor) do
-    Map.put(activity, "actor", actor)
-  end
-
-  defp put_actor(activity), do: activity
+  defp maybe_put(activity, _key, nil), do: activity
+  defp maybe_put(activity, key, value), do: Map.put(activity, key, value)
 
   defp parse_datetime(nil), do: nil
 
