@@ -3,6 +3,7 @@ defmodule PleromaRedux.OAuth do
 
   alias PleromaRedux.OAuth.Application, as: OAuthApplication
   alias PleromaRedux.OAuth.AuthorizationCode
+  alias PleromaRedux.OAuth.Scopes
   alias PleromaRedux.OAuth.Token
   alias PleromaRedux.Repo
   alias PleromaRedux.User
@@ -50,25 +51,29 @@ defmodule PleromaRedux.OAuth do
       )
       when is_binary(redirect_uri) and is_binary(scopes) do
     if redirect_uri_allowed?(application, redirect_uri) do
-      ttl_seconds =
-        Elixir.Application.get_env(
-          :pleroma_redux,
-          :oauth_code_ttl_seconds,
-          @default_code_ttl_seconds
-        )
+      if Scopes.subset?(scopes, application.scopes) do
+        ttl_seconds =
+          Elixir.Application.get_env(
+            :pleroma_redux,
+            :oauth_code_ttl_seconds,
+            @default_code_ttl_seconds
+          )
 
-      expires_at = DateTime.add(DateTime.utc_now(), ttl_seconds, :second)
+        expires_at = DateTime.add(DateTime.utc_now(), ttl_seconds, :second)
 
-      %AuthorizationCode{}
-      |> AuthorizationCode.changeset(%{
-        code: generate_token(32),
-        redirect_uri: redirect_uri,
-        scopes: scopes,
-        expires_at: expires_at,
-        user_id: user.id,
-        application_id: application.id
-      })
-      |> Repo.insert()
+        %AuthorizationCode{}
+        |> AuthorizationCode.changeset(%{
+          code: generate_token(32),
+          redirect_uri: redirect_uri,
+          scopes: scopes,
+          expires_at: expires_at,
+          user_id: user.id,
+          application_id: application.id
+        })
+        |> Repo.insert()
+      else
+        {:error, :invalid_scope}
+      end
     else
       {:error, :invalid_redirect_uri}
     end
