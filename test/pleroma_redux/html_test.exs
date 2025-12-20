@@ -128,5 +128,27 @@ defmodule PleromaRedux.HTMLTest do
       assert safe =~ "I&#39;m"
       assert safe =~ "&lt;3"
     end
+
+    test "linkifies local @mentions in plain text" do
+      safe = HTML.to_safe_html("hi @alice", format: :text)
+      assert safe =~ ~s(href="#{PleromaReduxWeb.Endpoint.url()}/@alice")
+      assert safe =~ ">@alice</a>"
+    end
+
+    test "linkifies remote @mentions in plain text" do
+      safe = HTML.to_safe_html("hi @bob@example.com", format: :text)
+      assert safe =~ ~s(href="https://example.com/@bob")
+      assert safe =~ ">@bob@example.com</a>"
+    end
+
+    test "does not linkify email addresses" do
+      safe = HTML.to_safe_html("contact alice@example.com", format: :text)
+      refute safe =~ "<a "
+    end
+
+    test "keeps trailing punctuation outside mention links" do
+      safe = HTML.to_safe_html("hi @alice,", format: :text)
+      assert safe =~ ">@alice</a>,"
+    end
   end
 end
