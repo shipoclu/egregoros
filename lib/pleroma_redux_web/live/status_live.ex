@@ -3,13 +3,14 @@ defmodule PleromaReduxWeb.StatusLive do
 
   alias PleromaRedux.Notifications
   alias PleromaRedux.Objects
+  alias PleromaRedux.Publish
   alias PleromaRedux.User
   alias PleromaRedux.Users
   alias PleromaReduxWeb.Endpoint
   alias PleromaReduxWeb.ViewModels.Status, as: StatusVM
 
   @impl true
-  def mount(%{"nickname" => nickname, "uuid" => uuid}, session, socket) do
+  def mount(%{"nickname" => nickname, "uuid" => uuid} = params, session, socket) do
     current_user =
       case Map.get(session, "user_id") do
         nil -> nil
@@ -17,6 +18,9 @@ defmodule PleromaReduxWeb.StatusLive do
       end
 
     object = object_for_uuid(uuid)
+
+    reply_open? = truthy?(Map.get(params, "reply"))
+    reply_form = Phoenix.Component.to_form(%{"content" => ""}, as: :reply)
 
     {status_entry, ancestor_entries, descendant_entries} =
       case object do
@@ -39,7 +43,9 @@ defmodule PleromaReduxWeb.StatusLive do
         uuid: uuid,
         status: status_entry,
         ancestors: ancestor_entries,
-        descendants: descendant_entries
+        descendants: descendant_entries,
+        reply_open?: reply_open?,
+        reply_form: reply_form
       )
 
     {:ok, socket}
@@ -48,6 +54,58 @@ defmodule PleromaReduxWeb.StatusLive do
   @impl true
   def handle_event("copied_link", _params, socket) do
     {:noreply, put_flash(socket, :info, "Copied link to clipboard.")}
+  end
+
+  def handle_event("open_reply", _params, socket) do
+    {:noreply, assign(socket, reply_open?: true)}
+  end
+
+  def handle_event("close_reply", _params, socket) do
+    {:noreply, assign(socket, reply_open?: false)}
+  end
+
+  def handle_event("reply_change", %{"reply" => %{} = reply_params}, socket) do
+    content = reply_params |> Map.get("content", "") |> to_string()
+    {:noreply, assign(socket, reply_form: Phoenix.Component.to_form(%{"content" => content}, as: :reply))}
+  end
+
+  def handle_event("create_reply", %{"reply" => %{} = reply_params}, socket) do
+    content = reply_params |> Map.get("content", "") |> to_string()
+
+    with %User{} = user <- socket.assigns.current_user,
+         %{object: %{ap_id: in_reply_to}} <- socket.assigns.status,
+         true <- is_binary(in_reply_to) and in_reply_to != "" do
+      case Publish.post_note(user, content, in_reply_to: in_reply_to) do
+        {:ok, _create} ->
+          note = socket.assigns.status.object
+
+          descendants =
+            note
+            |> Objects.thread_descendants()
+            |> StatusVM.decorate_many(user)
+
+          {:noreply,
+           socket
+           |> put_flash(:info, "Reply posted.")
+           |> assign(
+             descendants: descendants,
+             reply_form: Phoenix.Component.to_form(%{"content" => ""}, as: :reply),
+             reply_open?: false
+           )}
+
+        {:error, :empty} ->
+          {:noreply, put_flash(socket, :error, "Reply can't be empty.")}
+
+        _ ->
+          {:noreply, put_flash(socket, :error, "Could not post reply.")}
+      end
+    else
+      nil ->
+        {:noreply, put_flash(socket, :error, "Register to reply.")}
+
+      _ ->
+        {:noreply, put_flash(socket, :error, "Could not post reply.")}
+    end
   end
 
   @impl true
@@ -105,6 +163,60 @@ defmodule PleromaReduxWeb.StatusLive do
                 current_user={@current_user}
               />
             </div>
+
+            <section :if={@current_user} class="rounded-3xl border border-white/80 bg-white/80 p-6 shadow-lg shadow-slate-200/20 backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/70 dark:shadow-slate-900/40">
+              <%= if @reply_open? do %>
+                <.form
+                  for={@reply_form}
+                  id="reply-form"
+                  phx-change="reply_change"
+                  phx-submit="create_reply"
+                  class="space-y-4"
+                >
+                  <div class="flex items-center justify-between gap-3">
+                    <p class="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
+                      Reply
+                    </p>
+                    <button
+                      type="button"
+                      phx-click="close_reply"
+                      class="inline-flex h-9 w-9 items-center justify-center rounded-2xl text-slate-500 transition hover:bg-slate-900/5 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
+                      aria-label="Close reply composer"
+                    >
+                      <.icon name="hero-x-mark" class="size-4" />
+                    </button>
+                  </div>
+
+                  <.input
+                    field={@reply_form[:content]}
+                    type="textarea"
+                    label="Your reply"
+                    placeholder="Write a reply…"
+                    class="min-h-28"
+                  />
+
+                  <div class="flex items-center justify-end gap-3">
+                    <button
+                      type="submit"
+                      phx-disable-with="Posting…"
+                      class="inline-flex items-center gap-2 rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/20 transition hover:-translate-y-0.5 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+                    >
+                      <.icon name="hero-paper-airplane" class="size-5" /> Post reply
+                    </button>
+                  </div>
+                </.form>
+              <% else %>
+                <button
+                  type="button"
+                  data-role="reply-open"
+                  phx-click="open_reply"
+                  class="inline-flex w-full items-center justify-center gap-2 rounded-full border border-slate-200/80 bg-white/70 px-6 py-3 text-sm font-semibold text-slate-700 shadow-sm shadow-slate-200/20 transition hover:-translate-y-0.5 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:shadow-slate-900/40 dark:hover:bg-slate-950"
+                >
+                  <.icon name="hero-chat-bubble-left-right" class="size-5" />
+                  Write a reply
+                </button>
+              <% end %>
+            </section>
           </section>
         <% else %>
           <section class="rounded-3xl border border-slate-200/80 bg-white/70 p-8 text-center shadow-sm shadow-slate-200/20 dark:border-slate-700/70 dark:bg-slate-950/50 dark:shadow-slate-900/30">
@@ -147,6 +259,16 @@ defmodule PleromaReduxWeb.StatusLive do
     user
     |> Notifications.list_for_user(limit: 20)
     |> length()
+  end
+
+  defp truthy?(value) do
+    case value do
+      true -> true
+      1 -> true
+      "1" -> true
+      "true" -> true
+      _ -> false
+    end
   end
 
   defp timeline_href(%{id: _}), do: ~p"/?timeline=home"

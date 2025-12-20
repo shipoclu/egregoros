@@ -113,6 +113,17 @@ defmodule PleromaReduxWeb.StatusCard do
       </div>
 
       <div :if={@current_user} class="mt-5 flex flex-wrap items-center gap-3">
+        <%= if is_binary(reply_path = status_reply_path(@entry)) do %>
+          <.link
+            navigate={reply_path}
+            data-role="reply"
+            class="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/70 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm shadow-slate-200/20 transition hover:-translate-y-0.5 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:shadow-slate-900/40 dark:hover:bg-slate-950"
+          >
+            <.icon name="hero-chat-bubble-left-right" class="size-4" />
+            Reply
+          </.link>
+        <% end %>
+
         <button
           type="button"
           data-role="like"
@@ -234,6 +245,13 @@ defmodule PleromaReduxWeb.StatusCard do
   end
 
   defp status_permalink_path(_entry), do: nil
+
+  defp status_reply_path(entry) do
+    case status_permalink_path(entry) do
+      path when is_binary(path) and path != "" -> path <> "?reply=true#reply-form"
+      _ -> nil
+    end
+  end
 
   defp status_share_url(entry) when is_map(entry) do
     object = Map.get(entry, :object) || %{}

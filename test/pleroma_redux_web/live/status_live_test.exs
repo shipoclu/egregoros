@@ -4,6 +4,7 @@ defmodule PleromaReduxWeb.StatusLiveTest do
   import Phoenix.LiveViewTest
 
   alias PleromaRedux.Activities.Note
+  alias PleromaRedux.Objects
   alias PleromaRedux.Pipeline
   alias PleromaRedux.Users
 
@@ -52,6 +53,23 @@ defmodule PleromaReduxWeb.StatusLiveTest do
 
     assert root_index < reply_index
     assert reply_index < child_index
+  end
+
+  test "signed-in users can reply from the status page", %{conn: conn, user: user} do
+    assert {:ok, parent} = Pipeline.ingest(Note.build(user, "Parent post"), local: true)
+    uuid = uuid_from_ap_id(parent.ap_id)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}?reply=true")
+
+    view
+    |> form("#reply-form", reply: %{content: "A reply"})
+    |> render_submit()
+
+    assert has_element?(view, "article", "A reply")
+
+    [reply] = Objects.list_replies_to(parent.ap_id, limit: 1)
+    assert reply.data["inReplyTo"] == parent.ap_id
   end
 
   defp uuid_from_ap_id(ap_id) when is_binary(ap_id) do
