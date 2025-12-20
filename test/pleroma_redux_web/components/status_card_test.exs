@@ -404,4 +404,37 @@ defmodule PleromaReduxWeb.StatusCardTest do
     assert html =~ "Spoilers"
     assert html =~ "Hello world"
   end
+
+  test "hides sensitive media behind a reveal button" do
+    html =
+      render_component(&StatusCard.status_card/1, %{
+        id: "post-1",
+        current_user: nil,
+        entry: %{
+          object: %{
+            id: 1,
+            inserted_at: ~U[2025-01-01 00:00:00Z],
+            local: true,
+            data: %{"content" => "Hello world", "sensitive" => true}
+          },
+          actor: %{
+            display_name: "Alice",
+            handle: "@alice",
+            avatar_url: nil
+          },
+          attachments: [
+            %{href: "/uploads/media/1/photo.png", description: "Alt", media_type: "image/png"}
+          ],
+          liked?: false,
+          likes_count: 0,
+          reposted?: false,
+          reposts_count: 0,
+          reactions: %{}
+        }
+      })
+
+    assert html =~ ~s(data-role="sensitive-media-reveal")
+    assert html =~ ~s(id="attachments-1")
+    assert html =~ ~r/id="attachments-1"[^>]*class="[^"]*hidden/
+  end
 end
