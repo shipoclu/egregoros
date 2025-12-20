@@ -77,6 +77,7 @@ This is a **web UI** checklist for Pleroma‑Redux. Items are ordered roughly by
 |---|---:|---|
 | Safe HTML rendering (sanitized) | DONE | Rendering uses safe HTML pipeline. |
 | Local text rendering | DONE | Local posts render as text. |
+| Content warning / spoiler rendering | DONE | Status cards render CW as a toggle and hide body + media behind it. |
 | Linkify mentions/hashtags for local content | PARTIAL | `@user`, `@user@host`, and `#tags` linkified in local text; remote tags still depend on incoming HTML. |
 | Emoji reactions UI | DONE | Limited emoji set; improve UX (picker/custom emoji). |
 | Like / unlike | DONE | |

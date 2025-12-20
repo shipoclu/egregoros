@@ -95,22 +95,42 @@ defmodule PleromaReduxWeb.StatusCard do
         </div>
       </div>
 
-      <div class="mt-3 text-base leading-relaxed text-slate-900 dark:text-slate-100">
-        {post_content_html(@entry.object)}
-      </div>
+      <% content_warning = content_warning_text(@entry.object) %>
 
-      <div
-        :if={@entry.attachments != []}
-        data-role="attachments"
-        class="mt-4 grid gap-3 sm:grid-cols-2"
-      >
-        <div
-          :for={{attachment, index} <- Enum.with_index(@entry.attachments)}
-          class="group overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm shadow-slate-200/20 dark:border-slate-700/70 dark:bg-slate-950/60 dark:shadow-slate-900/40"
-        >
-          <.attachment_media attachment={attachment} post_id={@entry.object.id} index={index} />
-        </div>
-      </div>
+      <%= if is_binary(content_warning) do %>
+        <details data-role="content-warning" class="group mt-3">
+          <summary class="flex cursor-pointer items-center justify-between gap-4 rounded-2xl border border-amber-200/80 bg-amber-50/50 px-4 py-3 text-left text-slate-900 transition hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-slate-100 dark:hover:bg-amber-400/15 list-none [&::-webkit-details-marker]:hidden">
+            <div class="flex min-w-0 items-start gap-3">
+              <span class="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-400/15 dark:text-amber-200">
+                <.icon name="hero-exclamation-triangle" class="size-4" />
+              </span>
+
+              <div class="min-w-0">
+                <p class="text-[10px] font-semibold uppercase tracking-[0.25em] text-amber-700 dark:text-amber-200">
+                  Content warning
+                </p>
+                <p
+                  data-role="content-warning-text"
+                  class="mt-1 truncate text-sm font-semibold text-slate-900 dark:text-slate-100"
+                  title={content_warning}
+                >
+                  {content_warning}
+                </p>
+              </div>
+            </div>
+
+            <span class="inline-flex shrink-0 items-center gap-2 rounded-xl bg-white/80 px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm shadow-slate-200/20 transition group-open:bg-white dark:bg-slate-950/60 dark:text-slate-200 dark:shadow-slate-900/30 dark:group-open:bg-slate-950">
+              <span class="group-open:hidden">Show</span>
+              <span class="hidden group-open:inline">Hide</span>
+              <.icon name="hero-chevron-down" class="size-4 transition group-open:rotate-180" />
+            </span>
+          </summary>
+
+          <.status_body entry={@entry} />
+        </details>
+      <% else %>
+        <.status_body entry={@entry} />
+      <% end %>
 
       <div :if={@current_user} class="mt-5 flex flex-wrap items-center gap-3">
         <%= if is_binary(reply_path = status_reply_path(@entry)) do %>
@@ -201,6 +221,45 @@ defmodule PleromaReduxWeb.StatusCard do
     </article>
     """
   end
+
+  attr :entry, :map, required: true
+
+  defp status_body(assigns) do
+    ~H"""
+    <div
+      data-role="post-content"
+      class="mt-3 text-base leading-relaxed text-slate-900 dark:text-slate-100"
+    >
+      {post_content_html(@entry.object)}
+    </div>
+
+    <div
+      :if={@entry.attachments != []}
+      data-role="attachments"
+      class="mt-4 grid gap-3 sm:grid-cols-2"
+    >
+      <div
+        :for={{attachment, index} <- Enum.with_index(@entry.attachments)}
+        class="group overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm shadow-slate-200/20 dark:border-slate-700/70 dark:bg-slate-950/60 dark:shadow-slate-900/40"
+      >
+        <.attachment_media attachment={attachment} post_id={@entry.object.id} index={index} />
+      </div>
+    </div>
+    """
+  end
+
+  defp content_warning_text(%{data: %{} = data}) do
+    case Map.get(data, "summary") do
+      summary when is_binary(summary) ->
+        summary = String.trim(summary)
+        if summary == "", do: nil, else: summary
+
+      _ ->
+        nil
+    end
+  end
+
+  defp content_warning_text(_object), do: nil
 
   defp post_content_html(%{data: %{} = data} = object) do
     raw = Map.get(data, "content", "")
