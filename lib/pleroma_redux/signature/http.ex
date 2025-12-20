@@ -11,6 +11,7 @@ defmodule PleromaRedux.Signature.HTTP do
     headers = normalize_headers(conn.req_headers)
 
     with {:ok, key_id, signature, headers_param} <- parse_signature(headers),
+         signer_ap_id when is_binary(signer_ap_id) <- signer_ap_id_from_key_id(key_id),
          {:ok, key} <- public_key_for_key_id(key_id),
          :ok <- validate_date(headers, headers_param),
          {:ok, method} <- method_atom(conn.method) do
@@ -23,7 +24,7 @@ defmodule PleromaRedux.Signature.HTTP do
         verify_rsa(signature, signature_string, key)
       end)
       |> case do
-        true -> :ok
+        true -> {:ok, signer_ap_id}
         false -> {:error, :invalid_signature}
       end
     else
@@ -149,6 +150,18 @@ defmodule PleromaRedux.Signature.HTTP do
   end
 
   defp public_key_for_key_id(_), do: {:error, :invalid_signature}
+
+  defp signer_ap_id_from_key_id(key_id) when is_binary(key_id) do
+    key_id
+    |> String.split("#", parts: 2)
+    |> List.first()
+    |> case do
+      ap_id when is_binary(ap_id) and ap_id != "" -> ap_id
+      _ -> nil
+    end
+  end
+
+  defp signer_ap_id_from_key_id(_), do: nil
 
   defp fetch_public_key_for_actor(ap_id) when is_binary(ap_id) do
     with {:ok, user} <- PleromaRedux.Federation.Actor.fetch_and_store(ap_id),

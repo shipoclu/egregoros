@@ -1,5 +1,5 @@
 defmodule PleromaRedux.Signature do
-  @callback verify_request(Plug.Conn.t()) :: :ok | {:error, term()}
+  @callback verify_request(Plug.Conn.t()) :: {:ok, binary()} | {:error, term()}
 
   def verify_request(conn) do
     impl().verify_request(conn)

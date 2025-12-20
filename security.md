@@ -3,7 +3,7 @@
 This file tracks known security gaps and their remediation status.
 
 ## High priority (impersonation / integrity)
-- [ ] **Bind HTTP signature `keyId` to ActivityPub `actor`**: reject inbox requests where the verified signing actor does not match the activity `"actor"` (or inline `"actor": {"id": ...}`).
+- [x] **Bind HTTP signature `keyId` to ActivityPub `actor`**: reject inbox requests where the verified signing actor does not match the activity `"actor"` (or inline `"actor": {"id": ...}`).
 - [ ] **Bind `Create.actor` to embedded object author**: reject `Create` activities where the embedded object’s author (`attributedTo`/`actor`) does not match the `Create.actor`.
 - [ ] **Authorize `Undo`**: only apply `Undo` side-effects when `Undo.actor` matches the target activity’s `actor` (prevents undoing other people’s follows/likes/etc).
 
@@ -21,4 +21,3 @@ This file tracks known security gaps and their remediation status.
 ## Medium priority (inbox abuse controls)
 - [ ] **Inbox addressing checks**: optionally require incoming activities to be addressed to this instance/user (e.g. `to`/`cc` includes followers/shared inbox), to reduce DB pollution.
 - [ ] **Rate limiting / throttling**: per-IP/per-actor throttles on inbox and expensive federation fetches.
-

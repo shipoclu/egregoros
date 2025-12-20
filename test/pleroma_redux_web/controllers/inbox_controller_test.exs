@@ -340,6 +340,49 @@ defmodule PleromaReduxWeb.InboxControllerTest do
     refute Objects.get_by_ap_id(note["id"])
   end
 
+  test "POST /users/:nickname/inbox rejects signature actor mismatch", %{conn: conn} do
+    {:ok, _user} = Users.create_local_user("frank")
+    {public_key, private_key} = PleromaRedux.Keys.generate_rsa_keypair()
+
+    {:ok, _} =
+      Users.create_user(%{
+        nickname: "alice",
+        ap_id: "https://remote.example/users/alice",
+        inbox: "https://remote.example/users/alice/inbox",
+        outbox: "https://remote.example/users/alice/outbox",
+        public_key: public_key,
+        private_key: private_key,
+        local: false
+      })
+
+    note = %{
+      "id" => "https://remote.example/objects/1-actor-mismatch",
+      "type" => "Note",
+      "attributedTo" => "https://remote.example/users/bob",
+      "content" => "Hello from bob"
+    }
+
+    create = %{
+      "id" => "https://remote.example/activities/create/1-actor-mismatch",
+      "type" => "Create",
+      "actor" => "https://remote.example/users/bob",
+      "object" => note
+    }
+
+    conn =
+      conn
+      |> sign_request(
+        "post",
+        "/users/frank/inbox",
+        private_key,
+        "https://remote.example/users/alice#main-key"
+      )
+      |> post("/users/frank/inbox", create)
+
+    assert response(conn, 401)
+    refute Objects.get_by_ap_id(note["id"])
+  end
+
   test "POST /users/:nickname/inbox rejects old date signature", %{conn: conn} do
     {:ok, _user} = Users.create_local_user("frank")
     {public_key, private_key} = PleromaRedux.Keys.generate_rsa_keypair()

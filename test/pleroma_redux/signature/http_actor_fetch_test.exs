@@ -58,7 +58,7 @@ defmodule PleromaRedux.Signature.HTTPActorFetchTest do
       |> Plug.Conn.put_req_header("date", date)
       |> Plug.Conn.put_req_header("authorization", header)
 
-    assert :ok = PleromaRedux.Signature.verify_request(conn)
+    assert {:ok, ^actor_url} = PleromaRedux.Signature.verify_request(conn)
     assert Users.get_by_ap_id(actor_url)
   end
 end

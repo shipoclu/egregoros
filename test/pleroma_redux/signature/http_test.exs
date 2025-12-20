@@ -33,6 +33,7 @@ defmodule PleromaRedux.Signature.HTTPTest do
 
     conn = %{conn | host: "local.example", scheme: :https, port: 443}
 
-    assert :ok == HTTP.verify_request(conn)
+    assert {:ok, signer_ap_id} = HTTP.verify_request(conn)
+    assert signer_ap_id == user.ap_id
   end
 end
