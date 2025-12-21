@@ -311,7 +311,9 @@ defmodule PleromaReduxWeb.TimelineLiveTest do
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     {:ok, view, _html} = live(conn, "/")
 
-    assert has_element?(view, "[data-role='compose-add-media']", "Add media")
+    assert has_element?(view, "[data-role='compose-editor']")
+    assert has_element?(view, "[data-role='compose-toolbar']")
+    assert has_element?(view, "[data-role='compose-add-media'][aria-label='Add media']")
     assert has_element?(view, "[data-role='compose-add-media'] input[type='file']")
 
     html =
