@@ -12,6 +12,8 @@ defmodule PleromaReduxWeb.AppShell do
   attr :current_user, :any, default: nil
   attr :notifications_count, :integer, default: 0
 
+  slot :nav_top
+  slot :nav_bottom
   slot :aside
   slot :inner_block, required: true
 
@@ -22,96 +24,117 @@ defmodule PleromaReduxWeb.AppShell do
       class="grid gap-6 pb-24 lg:grid-cols-12 lg:items-start lg:pb-0"
       data-role="app-shell"
     >
-      <nav id={@nav_id} class="hidden lg:col-span-3 lg:block lg:sticky lg:top-10">
-        <.card class="p-4">
-          <%= if @current_user do %>
-            <div class="flex items-center gap-3">
-              <.avatar
-                size="sm"
-                name={display_name(@current_user)}
-                src={avatar_src(@current_user)}
-              />
-              <div class="min-w-0">
-                <p class="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
-                  {display_name(@current_user)}
-                </p>
-                <p class="truncate text-xs text-slate-500 dark:text-slate-400">
-                  @{to_string(nickname(@current_user))}
-                </p>
-              </div>
-            </div>
-          <% else %>
-            <p class="text-xs uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
-              Guest mode
-            </p>
-            <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">
-              Public feed is available. Sign in for home, posting, and notifications.
-            </p>
-          <% end %>
+      <div
+        id={@nav_id}
+        data-role="app-shell-sidebar"
+        class={[
+          "contents lg:block lg:space-y-6",
+          @aside == [] && "lg:col-span-4",
+          @aside != [] && "lg:col-span-3",
+          "lg:sticky lg:top-10 lg:max-h-[calc(100vh-5rem)] lg:overflow-y-auto"
+        ]}
+      >
+        {render_slot(@nav_top)}
 
-          <div class="mt-4 space-y-2">
-            <.nav_link
-              role="nav-timeline"
-              active={@active == :timeline}
-              icon="hero-home"
-              label="Timeline"
-              navigate={timeline_href(@current_user)}
-            />
-
+        <nav class="hidden lg:block" aria-label="Primary navigation">
+          <.card class="p-4">
             <%= if @current_user do %>
-              <.nav_link
-                role="nav-notifications"
-                active={@active == :notifications}
-                icon="hero-bell"
-                label="Notifications"
-                navigate={~p"/notifications"}
-              >
-                <span
-                  :if={@notifications_count > 0}
-                  data-role="nav-notifications-count"
-                  class="ml-auto inline-flex items-center rounded-full bg-rose-600 px-2 py-0.5 text-xs font-semibold text-white"
-                >
-                  {@notifications_count}
-                </span>
-              </.nav_link>
-
-              <.nav_link
-                role="nav-profile"
-                active={@active == :profile}
-                icon="hero-user-circle"
-                label="Profile"
-                navigate={profile_href(@current_user)}
-              />
-
-              <.nav_link
-                role="nav-settings"
-                active={@active == :settings}
-                icon="hero-cog-6-tooth"
-                label="Settings"
-                navigate={~p"/settings"}
-              />
+              <div class="flex items-center gap-3">
+                <.avatar
+                  size="sm"
+                  name={display_name(@current_user)}
+                  src={avatar_src(@current_user)}
+                />
+                <div class="min-w-0">
+                  <p class="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
+                    {display_name(@current_user)}
+                  </p>
+                  <p class="truncate text-xs text-slate-500 dark:text-slate-400">
+                    @{to_string(nickname(@current_user))}
+                  </p>
+                </div>
+              </div>
             <% else %>
-              <.nav_link
-                role="nav-login"
-                active={false}
-                icon="hero-arrow-right-on-rectangle"
-                label="Login"
-                navigate={~p"/login"}
-              />
-
-              <.nav_link
-                role="nav-register"
-                active={false}
-                icon="hero-user-plus"
-                label="Register"
-                navigate={~p"/register"}
-              />
+              <p class="text-xs uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
+                Guest mode
+              </p>
+              <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                Public feed is available. Sign in for home, posting, and notifications.
+              </p>
             <% end %>
-          </div>
-        </.card>
-      </nav>
 
-      <main id={@main_id} class="lg:col-span-6">
+            <div class="mt-4 space-y-2">
+              <.nav_link
+                role="nav-timeline"
+                active={@active == :timeline}
+                icon="hero-home"
+                label="Timeline"
+                navigate={timeline_href(@current_user)}
+              />
+
+              <%= if @current_user do %>
+                <.nav_link
+                  role="nav-notifications"
+                  active={@active == :notifications}
+                  icon="hero-bell"
+                  label="Notifications"
+                  navigate={~p"/notifications"}
+                >
+                  <span
+                    :if={@notifications_count > 0}
+                    data-role="nav-notifications-count"
+                    class="ml-auto inline-flex items-center rounded-full bg-rose-600 px-2 py-0.5 text-xs font-semibold text-white"
+                  >
+                    {@notifications_count}
+                  </span>
+                </.nav_link>
+
+                <.nav_link
+                  role="nav-profile"
+                  active={@active == :profile}
+                  icon="hero-user-circle"
+                  label="Profile"
+                  navigate={profile_href(@current_user)}
+                />
+
+                <.nav_link
+                  role="nav-settings"
+                  active={@active == :settings}
+                  icon="hero-cog-6-tooth"
+                  label="Settings"
+                  navigate={~p"/settings"}
+                />
+              <% else %>
+                <.nav_link
+                  role="nav-login"
+                  active={false}
+                  icon="hero-arrow-right-on-rectangle"
+                  label="Login"
+                  navigate={~p"/login"}
+                />
+
+                <.nav_link
+                  role="nav-register"
+                  active={false}
+                  icon="hero-user-plus"
+                  label="Register"
+                  navigate={~p"/register"}
+                />
+              <% end %>
+            </div>
+          </.card>
+        </nav>
+
+        {render_slot(@nav_bottom)}
+      </div>
+
+      <main
+        id={@main_id}
+        class={[
+          @aside == [] && "lg:col-span-8",
+          @aside != [] && "lg:col-span-6"
+        ]}
+      >
         {render_slot(@inner_block)}
       </main>
 

@@ -45,7 +45,7 @@ defmodule PleromaReduxWeb.Layouts do
       <div class="pointer-events-none absolute -bottom-48 left-6 h-80 w-80 rounded-full bg-rose-200/60 blur-3xl dark:bg-fuchsia-500/20">
       </div>
 
-      <div class="relative mx-auto max-w-6xl px-6 py-10">
+      <div class="relative mx-auto max-w-[90rem] px-4 py-10 sm:px-6 lg:px-8">
         <header class="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p class="text-xs uppercase tracking-[0.35em] text-slate-500 dark:text-slate-400">

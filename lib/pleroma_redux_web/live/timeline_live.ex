@@ -492,12 +492,11 @@ defmodule PleromaReduxWeb.TimelineLive do
         id="timeline-shell"
         nav_id="timeline-sidebar"
         main_id="timeline-feed"
-        aside_id="timeline-aside"
         active={:timeline}
         current_user={@current_user}
         notifications_count={@notifications_count}
       >
-        <:aside>
+        <:nav_top>
           <section
             id="compose-panel"
             data-role="compose-panel"
@@ -843,7 +842,9 @@ defmodule PleromaReduxWeb.TimelineLive do
               </div>
             <% end %>
           </section>
+        </:nav_top>
 
+        <:nav_bottom>
           <section
             id="follow-panel"
             class="hidden rounded-3xl border border-white/80 bg-white/80 p-6 shadow-lg shadow-slate-200/30 backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/70 dark:shadow-slate-900/50 lg:block"
@@ -966,7 +967,7 @@ defmodule PleromaReduxWeb.TimelineLive do
               </p>
             </div>
           </section>
-        </:aside>
+        </:nav_bottom>
 
         <section class="space-y-4">
           <div

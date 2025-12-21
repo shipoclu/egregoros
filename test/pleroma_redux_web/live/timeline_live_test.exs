@@ -53,6 +53,8 @@ defmodule PleromaReduxWeb.TimelineLiveTest do
     assert has_element?(view, "#timeline-shell")
     assert has_element?(view, "#timeline-sidebar")
     assert has_element?(view, "#timeline-feed")
+    assert has_element?(view, "#timeline-sidebar #compose-panel")
+    refute has_element?(view, "#timeline-aside")
   end
 
   test "following list is not part of the compose panel", %{conn: conn, user: user} do
