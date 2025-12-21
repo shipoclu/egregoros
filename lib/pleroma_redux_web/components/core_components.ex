@@ -109,7 +109,7 @@ defmodule PleromaReduxWeb.CoreComponents do
     link? = rest[:href] || rest[:navigate] || rest[:patch]
 
     base_classes = [
-      "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full font-semibold transition",
+      "inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-full font-semibold transition",
       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white",
       "disabled:pointer-events-none disabled:opacity-50 dark:focus-visible:ring-offset-slate-950"
     ]

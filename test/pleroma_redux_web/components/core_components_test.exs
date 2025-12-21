@@ -52,6 +52,20 @@ defmodule PleromaReduxWeb.CoreComponentsTest do
     assert html =~ "tracking-[0.2em]"
   end
 
+  test "button advertises clickability with a pointer cursor" do
+    html =
+      render_component(&CoreComponents.button/1, %{
+        rest: %{},
+        variant: "primary",
+        size: "md",
+        type: nil,
+        class: nil,
+        inner_block: slot_text("Post")
+      })
+
+    assert html =~ "cursor-pointer"
+  end
+
   test "card wraps content and exposes a stable data role" do
     html =
       render_component(
