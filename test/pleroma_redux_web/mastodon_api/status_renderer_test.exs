@@ -373,4 +373,145 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusRendererTest do
     assert [%{"name" => "elixir", "url" => url}] = rendered["tags"]
     assert url == Endpoint.url() <> "/tags/elixir"
   end
+
+  test "uses inserted_at when published is missing" do
+    {:ok, alice} = Users.create_local_user("alice")
+
+    {:ok, note} =
+      Objects.create_object(%{
+        ap_id: "https://remote.example/objects/created-at",
+        type: "Note",
+        actor: alice.ap_id,
+        local: false,
+        data: %{
+          "id" => "https://remote.example/objects/created-at",
+          "type" => "Note",
+          "actor" => alice.ap_id,
+          "content" => "hello"
+        }
+      })
+
+    rendered = StatusRenderer.render_status(note)
+
+    assert rendered["created_at"] == DateTime.to_iso8601(note.inserted_at)
+  end
+
+  test "renders announces with missing objects as reblogs with nil status" do
+    {:ok, alice} = Users.create_local_user("alice")
+    {:ok, bob} = Users.create_local_user("bob")
+
+    {:ok, announce} =
+      Objects.create_object(%{
+        ap_id: "https://remote.example/activities/announce/1",
+        type: "Announce",
+        actor: bob.ap_id,
+        object: "https://remote.example/objects/missing",
+        local: false,
+        data: %{
+          "id" => "https://remote.example/activities/announce/1",
+          "type" => "Announce",
+          "actor" => bob.ap_id,
+          "object" => "https://remote.example/objects/missing"
+        }
+      })
+
+    rendered = StatusRenderer.render_status(announce, alice)
+
+    assert rendered["reblog"] == nil
+    assert rendered["visibility"] == "public"
+  end
+
+  test "falls back to an unknown account when announce actors are missing" do
+    {:ok, alice} = Users.create_local_user("alice")
+
+    {:ok, note} =
+      Objects.create_object(%{
+        ap_id: "https://remote.example/objects/1",
+        type: "Note",
+        actor: alice.ap_id,
+        local: false,
+        data: %{
+          "id" => "https://remote.example/objects/1",
+          "type" => "Note",
+          "actor" => alice.ap_id,
+          "content" => "hello"
+        }
+      })
+
+    {:ok, announce} =
+      Objects.create_object(%{
+        ap_id: "https://remote.example/activities/announce/with-missing-actor",
+        type: "Announce",
+        actor: nil,
+        object: note.ap_id,
+        local: false,
+        data: %{
+          "id" => "https://remote.example/activities/announce/with-missing-actor",
+          "type" => "Announce",
+          "actor" => nil,
+          "object" => note.ap_id
+        }
+      })
+
+    rendered = StatusRenderer.render_status(announce, alice)
+
+    assert rendered["account"]["id"] == "unknown"
+    assert rendered["reblog"]["uri"] == note.ap_id
+  end
+
+  test "renders inReplyTo objects when they are provided as an id map" do
+    {:ok, alice} = Users.create_local_user("alice")
+    {:ok, bob} = Users.create_local_user("bob")
+
+    {:ok, parent} =
+      Objects.create_object(%{
+        ap_id: "https://remote.example/objects/parent-map",
+        type: "Note",
+        actor: alice.ap_id,
+        local: false,
+        data: %{"id" => "https://remote.example/objects/parent-map", "type" => "Note"}
+      })
+
+    {:ok, child} =
+      Objects.create_object(%{
+        ap_id: "https://remote.example/objects/child-map",
+        type: "Note",
+        actor: bob.ap_id,
+        local: false,
+        data: %{
+          "id" => "https://remote.example/objects/child-map",
+          "type" => "Note",
+          "actor" => bob.ap_id,
+          "inReplyTo" => %{"id" => parent.ap_id}
+        }
+      })
+
+    rendered = StatusRenderer.render_status(child)
+
+    assert rendered["in_reply_to_id"] == Integer.to_string(parent.id)
+    assert rendered["in_reply_to_account_id"] == Integer.to_string(alice.id)
+  end
+
+  test "renders nil in_reply_to fields when the parent cannot be found" do
+    {:ok, alice} = Users.create_local_user("alice")
+
+    {:ok, note} =
+      Objects.create_object(%{
+        ap_id: "https://remote.example/objects/orphan",
+        type: "Note",
+        actor: alice.ap_id,
+        local: false,
+        data: %{
+          "id" => "https://remote.example/objects/orphan",
+          "type" => "Note",
+          "actor" => alice.ap_id,
+          "inReplyTo" => "https://remote.example/objects/missing"
+        }
+      })
+
+    rendered = StatusRenderer.render_status(note)
+
+    assert rendered["in_reply_to_id"] == nil
+    assert rendered["in_reply_to_account_id"] == nil
+  end
 end

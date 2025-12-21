@@ -166,11 +166,7 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusRenderer do
     DateTime.to_iso8601(dt)
   end
 
-  defp format_datetime(%Object{inserted_at: %NaiveDateTime{} = dt}) do
-    dt
-    |> DateTime.from_naive!("Etc/UTC")
-    |> DateTime.to_iso8601()
-  end
+  defp format_datetime(%Object{inserted_at: %DateTime{} = dt}), do: DateTime.to_iso8601(dt)
 
   defp format_datetime(%Object{}), do: DateTime.utc_now() |> DateTime.to_iso8601()
 
