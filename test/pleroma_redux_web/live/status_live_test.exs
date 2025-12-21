@@ -6,6 +6,7 @@ defmodule PleromaReduxWeb.StatusLiveTest do
   alias PleromaRedux.Activities.Note
   alias PleromaRedux.Objects
   alias PleromaRedux.Pipeline
+  alias PleromaRedux.TestSupport.Fixtures
   alias PleromaRedux.Users
 
   setup do
@@ -102,7 +103,7 @@ defmodule PleromaReduxWeb.StatusLiveTest do
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}?reply=true")
 
-    fixture_path = Path.expand("pleroma-old/test/fixtures/DSCN0010.png", File.cwd!())
+    fixture_path = Fixtures.path!("DSCN0010.png")
     content = File.read!(fixture_path)
 
     upload =

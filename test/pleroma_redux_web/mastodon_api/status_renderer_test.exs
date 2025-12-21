@@ -3,7 +3,7 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusRendererTest do
 
   alias PleromaRedux.Objects
   alias PleromaRedux.Pipeline
-  alias PleromaRedux.TestSupport.PleromaOldFixtures
+  alias PleromaRedux.TestSupport.Fixtures
   alias PleromaReduxWeb.MastodonAPI.StatusRenderer
 
   test "sanitizes remote html content" do
@@ -49,7 +49,7 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusRendererTest do
   end
 
   test "renders mentions and hashtags from ActivityPub tag data" do
-    activity = PleromaOldFixtures.json!("mastodon-post-activity-hashtag.json")
+    activity = Fixtures.json!("mastodon-post-activity-hashtag.json")
 
     assert {:ok, create} = Pipeline.ingest(activity, local: false)
     note = Objects.get_by_ap_id(create.object)
@@ -67,7 +67,7 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusRendererTest do
   end
 
   test "renders custom emojis from ActivityPub tag data" do
-    activity = PleromaOldFixtures.json!("kroeg-array-less-emoji.json")
+    activity = Fixtures.json!("kroeg-array-less-emoji.json")
 
     assert {:ok, create} = Pipeline.ingest(activity, local: false)
     note = Objects.get_by_ap_id(create.object)

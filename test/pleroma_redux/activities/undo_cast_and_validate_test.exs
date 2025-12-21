@@ -2,10 +2,10 @@ defmodule PleromaRedux.Activities.UndoCastAndValidateTest do
   use ExUnit.Case, async: true
 
   alias PleromaRedux.Activities.Undo
-  alias PleromaRedux.TestSupport.PleromaOldFixtures
+  alias PleromaRedux.TestSupport.Fixtures
 
   test "normalizes an embedded Like object into its id (mastodon fixture)" do
-    activity = PleromaOldFixtures.json!("mastodon-undo-like.json")
+    activity = Fixtures.json!("mastodon-undo-like.json")
 
     assert {:ok, validated} = Undo.cast_and_validate(activity)
     assert is_binary(validated["object"])

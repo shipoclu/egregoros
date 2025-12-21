@@ -8,6 +8,7 @@ defmodule PleromaReduxWeb.TimelineLiveTest do
   alias PleromaRedux.Objects
   alias PleromaRedux.Pipeline
   alias PleromaRedux.Relationships
+  alias PleromaRedux.TestSupport.Fixtures
   alias PleromaRedux.Timeline
   alias PleromaRedux.Users
 
@@ -218,7 +219,7 @@ defmodule PleromaReduxWeb.TimelineLiveTest do
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     {:ok, view, _html} = live(conn, "/")
 
-    fixture_path = Path.expand("pleroma-old/test/fixtures/DSCN0010.png", File.cwd!())
+    fixture_path = Fixtures.path!("DSCN0010.png")
     content = File.read!(fixture_path)
 
     upload =
@@ -303,7 +304,7 @@ defmodule PleromaReduxWeb.TimelineLiveTest do
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     {:ok, view, _html} = live(conn, "/")
 
-    fixture_path = Path.expand("pleroma-old/test/fixtures/DSCN0010.png", File.cwd!())
+    fixture_path = Fixtures.path!("DSCN0010.png")
     content = File.read!(fixture_path)
 
     upload =

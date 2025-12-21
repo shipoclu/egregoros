@@ -2,10 +2,10 @@ defmodule PleromaRedux.Activities.AcceptCastAndValidateTest do
   use ExUnit.Case, async: true
 
   alias PleromaRedux.Activities.Accept
-  alias PleromaRedux.TestSupport.PleromaOldFixtures
+  alias PleromaRedux.TestSupport.Fixtures
 
   test "accepts an embedded Follow object (mastodon fixture)" do
-    activity = PleromaOldFixtures.json!("mastodon-accept-activity.json")
+    activity = Fixtures.json!("mastodon-accept-activity.json")
 
     assert {:ok, validated} = Accept.cast_and_validate(activity)
     assert validated["actor"] == activity["actor"]

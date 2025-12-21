@@ -2,10 +2,10 @@ defmodule PleromaRedux.Activities.AnnounceCastAndValidateTest do
   use ExUnit.Case, async: true
 
   alias PleromaRedux.Activities.Announce
-  alias PleromaRedux.TestSupport.PleromaOldFixtures
+  alias PleromaRedux.TestSupport.Fixtures
 
   test "accepts an embedded Note object (mastodon fixture)" do
-    activity = PleromaOldFixtures.json!("bogus-mastodon-announce.json")
+    activity = Fixtures.json!("bogus-mastodon-announce.json")
 
     assert {:ok, validated} = Announce.cast_and_validate(activity)
     assert validated["actor"] == activity["actor"]
@@ -14,7 +14,7 @@ defmodule PleromaRedux.Activities.AnnounceCastAndValidateTest do
   end
 
   test "normalizes an inline actor object id (kroeg fixture)" do
-    activity = PleromaOldFixtures.json!("kroeg-announce-with-inline-actor.json")
+    activity = Fixtures.json!("kroeg-announce-with-inline-actor.json")
 
     assert {:ok, validated} = Announce.cast_and_validate(activity)
     assert validated["actor"] == activity["actor"]["id"]

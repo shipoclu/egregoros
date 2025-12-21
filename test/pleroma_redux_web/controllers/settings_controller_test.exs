@@ -2,6 +2,7 @@ defmodule PleromaReduxWeb.SettingsControllerTest do
   use PleromaReduxWeb.ConnCase, async: true
 
   alias PleromaRedux.Users
+  alias PleromaRedux.TestSupport.Fixtures
 
   test "GET /settings redirects when not logged in", %{conn: conn} do
     conn = get(conn, "/settings")
@@ -37,7 +38,7 @@ defmodule PleromaReduxWeb.SettingsControllerTest do
         }
       ])
 
-    fixture_path = Path.expand("pleroma-old/test/fixtures/DSCN0010.png", File.cwd!())
+    fixture_path = Fixtures.path!("DSCN0010.png")
 
     upload = %Plug.Upload{
       path: fixture_path,

@@ -4,10 +4,10 @@ defmodule PleromaRedux.PleromaOldFixturesTest do
   alias PleromaRedux.Objects
   alias PleromaRedux.Pipeline
   alias PleromaRedux.Relationships
-  alias PleromaRedux.TestSupport.PleromaOldFixtures
+  alias PleromaRedux.TestSupport.Fixtures
 
   test "ingests a Follow activity with an inline actor object (hubzilla)" do
-    activity = PleromaOldFixtures.json!("hubzilla-follow-activity.json")
+    activity = Fixtures.json!("hubzilla-follow-activity.json")
 
     assert {:ok, follow} = Pipeline.ingest(activity, local: false)
     assert follow.type == "Follow"
@@ -18,7 +18,7 @@ defmodule PleromaRedux.PleromaOldFixturesTest do
   end
 
   test "ingests a Create activity with an inline actor object (kroeg)" do
-    activity = PleromaOldFixtures.json!("kroeg-post-activity.json")
+    activity = Fixtures.json!("kroeg-post-activity.json")
 
     assert {:ok, create} = Pipeline.ingest(activity, local: false)
     assert create.type == "Create"
@@ -31,7 +31,7 @@ defmodule PleromaRedux.PleromaOldFixturesTest do
   end
 
   test "ingests an Accept activity with an embedded Follow object (mastodon)" do
-    activity = PleromaOldFixtures.json!("mastodon-accept-activity.json")
+    activity = Fixtures.json!("mastodon-accept-activity.json")
 
     assert {:ok, accept} = Pipeline.ingest(activity, local: false)
     assert accept.type == "Accept"
@@ -40,7 +40,7 @@ defmodule PleromaRedux.PleromaOldFixturesTest do
   end
 
   test "ingests an Announce activity with an embedded Note object (mastodon)" do
-    activity = PleromaOldFixtures.json!("bogus-mastodon-announce.json")
+    activity = Fixtures.json!("bogus-mastodon-announce.json")
 
     assert {:ok, announce} = Pipeline.ingest(activity, local: false)
     assert announce.type == "Announce"
@@ -53,7 +53,7 @@ defmodule PleromaRedux.PleromaOldFixturesTest do
   end
 
   test "ingests an Announce activity with inline actor and embedded Note attributedTo object (kroeg)" do
-    activity = PleromaOldFixtures.json!("kroeg-announce-with-inline-actor.json")
+    activity = Fixtures.json!("kroeg-announce-with-inline-actor.json")
 
     assert {:ok, announce} = Pipeline.ingest(activity, local: false)
     assert announce.type == "Announce"
@@ -67,8 +67,8 @@ defmodule PleromaRedux.PleromaOldFixturesTest do
   end
 
   test "ingests an Undo activity with embedded Like object and removes relationship state (mastodon)" do
-    like = PleromaOldFixtures.json!("mastodon-like.json")
-    undo = PleromaOldFixtures.json!("mastodon-undo-like.json")
+    like = Fixtures.json!("mastodon-like.json")
+    undo = Fixtures.json!("mastodon-undo-like.json")
 
     assert {:ok, like_object} = Pipeline.ingest(like, local: false)
     assert like_object.type == "Like"
@@ -82,7 +82,7 @@ defmodule PleromaRedux.PleromaOldFixturesTest do
   end
 
   test "ingests an EmojiReact activity and creates an emoji relationship state (mastodon)" do
-    activity = PleromaOldFixtures.json!("emoji-reaction.json")
+    activity = Fixtures.json!("emoji-reaction.json")
 
     assert {:ok, react} = Pipeline.ingest(activity, local: false)
     assert react.type == "EmojiReact"
