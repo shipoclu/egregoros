@@ -6,6 +6,9 @@ This file tracks known security gaps and their remediation status.
 - [x] **Bind HTTP signature `keyId` to ActivityPub `actor`**: reject inbox requests where the verified signing actor does not match the activity `"actor"` (or inline `"actor": {"id": ...}`).
 - [x] **Bind `Create.actor` to embedded object author**: reject `Create` activities where the embedded object’s author (`attributedTo`/`actor`) does not match the `Create.actor`.
 - [x] **Authorize `Undo`**: only apply `Undo` side-effects when `Undo.actor` matches the target activity’s `actor` (prevents undoing other people’s follows/likes/etc).
+- [x] **Prevent local-namespace hijack**: reject remote activities whose `"id"` is on this instance’s host (prevents remote content being stored under local URLs).
+- [x] **Only serve local objects at `/objects/:uuid`**: return 404 when a stored object is not `local: true` (defense-in-depth against poisoned `ap_id`s).
+- [x] **Actor fetch integrity**: require fetched actor JSON `"id"` to match the requested actor URL (prevents actor poisoning).
 
 ## High priority (SSRF / DoS)
 - [x] **Harden remote actor fetches** (used in signature verification and discovery):
@@ -15,6 +18,10 @@ This file tracks known security gaps and their remediation status.
   - [x] Disable redirects (temporary; re-validate redirect targets if re-enabled).
   - [x] Apply request receive timeout.
   - [x] Apply response size limits.
+- [x] **Validate WebFinger / delivery URLs via `SafeURL`**:
+  - [x] Reject unsafe WebFinger targets before fetching (`lookup/1`).
+  - [x] Reject unsafe actor `inbox`/`outbox` before storing.
+  - [x] Reject unsafe inbox URLs before enqueueing/sending deliveries.
 
 ## Medium priority (authz)
 - [x] **Enforce OAuth scopes** for Mastodon API endpoints (coarse `read`/`write`/`follow`).
