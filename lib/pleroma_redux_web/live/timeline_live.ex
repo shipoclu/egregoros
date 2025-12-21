@@ -580,13 +580,7 @@ defmodule PleromaReduxWeb.TimelineLive do
                     >
                       <div class="flex gap-3">
                         <div class="relative h-16 w-16 overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm shadow-slate-200/20 dark:border-slate-700/70 dark:bg-slate-950/60 dark:shadow-slate-900/40">
-                          <%= if image_upload?(entry) do %>
-                            <.live_img_preview entry={entry} class="h-full w-full object-cover" />
-                          <% else %>
-                            <div class="flex h-full w-full items-center justify-center bg-slate-900/5 text-slate-500 dark:bg-white/5 dark:text-slate-300">
-                              <.icon name={media_upload_icon(entry)} class="size-7" />
-                            </div>
-                          <% end %>
+                          <.upload_entry_preview entry={entry} />
                         </div>
 
                         <div class="min-w-0 flex-1 space-y-3">
@@ -614,13 +608,25 @@ defmodule PleromaReduxWeb.TimelineLive do
                           </div>
                           <span class="sr-only" data-role="media-progress">{entry.progress}%</span>
 
+                          <details
+                            :if={upload_entry_kind(entry) in [:video, :audio]}
+                            class="rounded-2xl border border-slate-200/80 bg-white/70 px-4 py-3 dark:border-slate-700/70 dark:bg-slate-950/50"
+                          >
+                            <summary class="cursor-pointer select-none text-xs font-semibold uppercase tracking-[0.2em] text-slate-600 dark:text-slate-300 list-none [&::-webkit-details-marker]:hidden">
+                              Preview
+                            </summary>
+                            <div class="mt-3">
+                              <.upload_entry_player entry={entry} />
+                            </div>
+                          </details>
+
                           <.input
                             type="text"
                             id={"media-alt-#{entry.ref}"}
                             name={"post[media_alt][#{entry.ref}]"}
                             label="Alt text"
                             value={Map.get(@media_alt, entry.ref, "")}
-                            placeholder="Describe the image for screen readers"
+                            placeholder={upload_entry_description_placeholder(entry)}
                             phx-debounce="blur"
                           />
 
@@ -998,22 +1004,6 @@ defmodule PleromaReduxWeb.TimelineLive do
   defp upload_error_text(:not_accepted), do: "Unsupported file type."
   defp upload_error_text(:too_many_files), do: "Too many files selected."
   defp upload_error_text(_), do: "Upload failed."
-
-  defp image_upload?(%{client_type: type}) when is_binary(type) do
-    String.starts_with?(type, "image/")
-  end
-
-  defp image_upload?(_entry), do: false
-
-  defp media_upload_icon(%{client_type: type}) when is_binary(type) do
-    cond do
-      String.starts_with?(type, "video/") -> "hero-film"
-      String.starts_with?(type, "audio/") -> "hero-musical-note"
-      true -> "hero-paper-clip"
-    end
-  end
-
-  defp media_upload_icon(_entry), do: "hero-paper-clip"
 
   defp notifications_count(nil), do: 0
 

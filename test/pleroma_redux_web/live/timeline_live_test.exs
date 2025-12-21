@@ -300,6 +300,47 @@ defmodule PleromaReduxWeb.TimelineLiveTest do
     assert has_element?(view, "#post-#{note.id} video[data-role='attachment'][data-kind='video']")
   end
 
+  test "video uploads render previews in the composer", %{conn: conn, user: user} do
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/")
+
+    upload =
+      file_input(view, "#timeline-form", :media, [
+        %{
+          last_modified: 1_694_171_879_000,
+          name: "clip.mp4",
+          content: "video",
+          size: 5,
+          type: "video/mp4"
+        }
+      ])
+
+    assert render_upload(upload, "clip.mp4") =~ "100%"
+
+    assert has_element?(view, "video[data-role='upload-preview'][data-kind='video']")
+    assert has_element?(view, "video[data-role='upload-player'][data-kind='video']")
+  end
+
+  test "audio uploads render previews in the composer", %{conn: conn, user: user} do
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/")
+
+    upload =
+      file_input(view, "#timeline-form", :media, [
+        %{
+          last_modified: 1_694_171_879_000,
+          name: "clip.ogg",
+          content: "audio",
+          size: 5,
+          type: "audio/ogg"
+        }
+      ])
+
+    assert render_upload(upload, "clip.ogg") =~ "100%"
+
+    assert has_element?(view, "audio[data-role='upload-player'][data-kind='audio']")
+  end
+
   test "posting with only an attachment is allowed", %{conn: conn, user: user} do
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     {:ok, view, _html} = live(conn, "/")

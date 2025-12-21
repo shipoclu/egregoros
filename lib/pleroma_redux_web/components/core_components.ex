@@ -230,6 +230,145 @@ defmodule PleromaReduxWeb.CoreComponents do
     """
   end
 
+  @doc false
+  def upload_entry_kind(%{client_type: type}) when is_binary(type) do
+    cond do
+      String.starts_with?(type, "image/") -> :image
+      String.starts_with?(type, "video/") -> :video
+      String.starts_with?(type, "audio/") -> :audio
+      true -> :other
+    end
+  end
+
+  def upload_entry_kind(_entry), do: :other
+
+  @doc false
+  def upload_entry_icon(entry) do
+    case upload_entry_kind(entry) do
+      :video -> "hero-film"
+      :audio -> "hero-musical-note"
+      _ -> "hero-paper-clip"
+    end
+  end
+
+  @doc false
+  def upload_entry_description_placeholder(entry) do
+    case upload_entry_kind(entry) do
+      :image -> "Describe the image for screen readers"
+      :video -> "Describe the video for screen readers"
+      :audio -> "Describe the audio for screen readers"
+      _ -> "Describe the attachment for screen readers"
+    end
+  end
+
+  @doc """
+  Renders a compact preview for an uploaded media entry.
+
+  Designed for small thumbnail containers. Supports:
+  - image previews (via built-in LiveView preview hook)
+  - video thumbnails (first frame)
+  - icons for audio/other files
+  """
+  attr :entry, :any, required: true
+  attr :class, :any, default: nil
+  attr :data_role, :string, default: "upload-preview"
+
+  def upload_entry_preview(assigns) do
+    assigns = assign(assigns, :kind, upload_entry_kind(assigns.entry))
+
+    ~H"""
+    <%= case @kind do %>
+      <% :image -> %>
+        <.live_img_preview
+          entry={@entry}
+          data-role={@data_role}
+          data-kind="image"
+          class={["h-full w-full object-cover", @class]}
+        />
+      <% :video -> %>
+        <video
+          id={"phx-preview-thumb-#{@entry.ref}"}
+          data-phx-upload-ref={@entry.upload_ref}
+          data-phx-entry-ref={@entry.ref}
+          data-phx-hook="Phoenix.LiveImgPreview"
+          data-phx-update="ignore"
+          phx-no-format
+          data-role={@data_role}
+          data-kind="video"
+          class={["h-full w-full bg-black object-cover", @class]}
+          muted
+          playsinline
+          preload="metadata"
+        >
+        </video>
+
+        <div class="pointer-events-none absolute inset-0 flex items-center justify-center">
+          <span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-white shadow-sm shadow-slate-900/20 backdrop-blur">
+            <.icon name="hero-play" class="size-4" />
+          </span>
+        </div>
+      <% _ -> %>
+        <div
+          data-role={@data_role}
+          data-kind={to_string(@kind)}
+          class="flex h-full w-full items-center justify-center bg-slate-900/5 text-slate-500 dark:bg-white/5 dark:text-slate-300"
+        >
+          <.icon name={upload_entry_icon(@entry)} class="size-7" />
+        </div>
+    <% end %>
+    """
+  end
+
+  @doc """
+  Renders a full-width inline player for uploaded audio/video entries.
+
+  Uses LiveView's built-in preview hook to set `src` on the element.
+  """
+  attr :entry, :any, required: true
+  attr :class, :any, default: nil
+  attr :data_role, :string, default: "upload-player"
+
+  def upload_entry_player(assigns) do
+    assigns = assign(assigns, :kind, upload_entry_kind(assigns.entry))
+
+    ~H"""
+    <%= case @kind do %>
+      <% :video -> %>
+        <video
+          id={"phx-preview-player-#{@entry.ref}"}
+          data-phx-upload-ref={@entry.upload_ref}
+          data-phx-entry-ref={@entry.ref}
+          data-phx-hook="Phoenix.LiveImgPreview"
+          data-phx-update="ignore"
+          phx-no-format
+          data-role={@data_role}
+          data-kind="video"
+          class={["w-full rounded-2xl bg-black shadow-sm shadow-slate-900/10", @class]}
+          controls
+          preload="metadata"
+          playsinline
+        >
+        </video>
+      <% :audio -> %>
+        <audio
+          id={"phx-preview-player-#{@entry.ref}"}
+          data-phx-upload-ref={@entry.upload_ref}
+          data-phx-entry-ref={@entry.ref}
+          data-phx-hook="Phoenix.LiveImgPreview"
+          data-phx-update="ignore"
+          phx-no-format
+          data-role={@data_role}
+          data-kind="audio"
+          class={["w-full", @class]}
+          controls
+          preload="metadata"
+        >
+        </audio>
+      <% _ -> %>
+    <% end %>
+    """
+  end
+
   @doc """
   Renders a human-friendly relative timestamp.
   """

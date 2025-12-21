@@ -60,8 +60,8 @@ This is a **web UI** checklist for Pleroma‑Redux. Items are ordered roughly by
 | Post text | DONE | Basic compose exists. |
 | Post validation feedback (empty/too long/etc) | PARTIAL | Empty handled; expand to full validations + inline errors. |
 | Attachments upload (images) | DONE | LiveView uploads + `MediaStorage` wired up. |
-| Attachments upload (video/audio) | PARTIAL | Upload + posting works; composer preview is currently icon-based for non-images. |
-| Attachment preview grid in composer | PARTIAL | Image previews + basic file indicators; no playback/lightbox yet. |
+| Attachments upload (video/audio) | DONE | Upload + posting works; composer previews video thumbnails and provides preview players for video/audio. |
+| Attachment preview grid in composer | PARTIAL | Image/video thumbnails + preview players; still needs richer grid UX (reorder, polished playback/expand). |
 | Attachment alt text / description editing | DONE | Per-attachment “Alt text” input is supported. |
 | Content warning / spoiler text | DONE | Composer “Content warning” field exists. |
 | Mark media as sensitive | DONE | Composer “Mark media as sensitive” toggle exists. |

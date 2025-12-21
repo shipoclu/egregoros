@@ -135,6 +135,53 @@ defmodule PleromaReduxWeb.StatusLiveTest do
     assert has_element?(view, "#post-#{reply.id} img[data-role='attachment']")
   end
 
+  test "reply composer renders video upload previews", %{conn: conn, user: user} do
+    assert {:ok, parent} = Pipeline.ingest(Note.build(user, "Parent post"), local: true)
+    uuid = uuid_from_ap_id(parent.ap_id)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}?reply=true")
+
+    upload =
+      file_input(view, "#reply-form", :reply_media, [
+        %{
+          last_modified: 1_694_171_879_000,
+          name: "clip.mp4",
+          content: "video",
+          size: 5,
+          type: "video/mp4"
+        }
+      ])
+
+    assert render_upload(upload, "clip.mp4") =~ "100%"
+
+    assert has_element?(view, "video[data-role='upload-preview'][data-kind='video']")
+    assert has_element?(view, "video[data-role='upload-player'][data-kind='video']")
+  end
+
+  test "reply composer renders audio upload previews", %{conn: conn, user: user} do
+    assert {:ok, parent} = Pipeline.ingest(Note.build(user, "Parent post"), local: true)
+    uuid = uuid_from_ap_id(parent.ap_id)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}?reply=true")
+
+    upload =
+      file_input(view, "#reply-form", :reply_media, [
+        %{
+          last_modified: 1_694_171_879_000,
+          name: "clip.ogg",
+          content: "audio",
+          size: 5,
+          type: "audio/ogg"
+        }
+      ])
+
+    assert render_upload(upload, "clip.ogg") =~ "100%"
+
+    assert has_element?(view, "audio[data-role='upload-player'][data-kind='audio']")
+  end
+
   test "signed-in users can like posts from the status page", %{conn: conn, user: user} do
     assert {:ok, note} = Pipeline.ingest(Note.build(user, "Like me"), local: true)
     uuid = uuid_from_ap_id(note.ap_id)
