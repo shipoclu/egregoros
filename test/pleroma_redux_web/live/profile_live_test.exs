@@ -90,6 +90,31 @@ defmodule PleromaReduxWeb.ProfileLiveTest do
     assert has_element?(view, "[data-role='profile-handle']", "@#{profile_user.nickname}")
   end
 
+  test "profile avatar resolves remote relative urls against the actor host", %{
+    conn: conn,
+    viewer: viewer
+  } do
+    {:ok, remote} =
+      Users.create_user(%{
+        nickname: "bob",
+        ap_id: "https://remote.example/users/bob",
+        inbox: "https://remote.example/users/bob/inbox",
+        outbox: "https://remote.example/users/bob/outbox",
+        public_key: "remote-key",
+        private_key: nil,
+        local: false,
+        avatar_url: "/media/avatar.png"
+      })
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: viewer.id})
+    {:ok, view, _html} = live(conn, "/@#{remote.nickname}@remote.example")
+
+    assert has_element?(
+             view,
+             "[data-role='profile-avatar'] img[src='https://remote.example/media/avatar.png']"
+           )
+  end
+
   test "profile posts support copying permalinks", %{
     conn: conn,
     viewer: viewer,

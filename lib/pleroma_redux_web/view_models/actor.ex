@@ -24,7 +24,7 @@ defmodule PleromaReduxWeb.ViewModels.Actor do
           display_name: user.name || user.nickname || ap_id,
           nickname: user.nickname,
           handle: handle(user, ap_id),
-          avatar_url: URL.absolute(user.avatar_url),
+          avatar_url: URL.absolute(user.avatar_url, user.ap_id),
           local?: user.local
         }
 

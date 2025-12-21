@@ -281,7 +281,7 @@ defmodule PleromaReduxWeb.ProfileLive do
                     data_role="profile-avatar"
                     size="xl"
                     name={@profile_user.name || @profile_user.nickname}
-                    src={URL.absolute(@profile_user.avatar_url)}
+                    src={URL.absolute(@profile_user.avatar_url, @profile_user.ap_id)}
                     class="ring-4 ring-white shadow-lg shadow-slate-900/10 dark:ring-slate-900 dark:shadow-slate-950/40"
                   />
                 </div>

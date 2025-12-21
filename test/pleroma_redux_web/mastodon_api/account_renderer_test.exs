@@ -32,4 +32,22 @@ defmodule PleromaReduxWeb.MastodonAPI.AccountRendererTest do
     assert rendered["note"] =~ "<p>ok</p>"
     refute rendered["note"] =~ "<script"
   end
+
+  test "renders remote avatar urls relative to their ap id host" do
+    {:ok, user} =
+      Users.create_user(%{
+        nickname: "bob",
+        ap_id: "https://remote.example/users/bob",
+        inbox: "https://remote.example/users/bob/inbox",
+        outbox: "https://remote.example/users/bob/outbox",
+        public_key: "PUB",
+        private_key: nil,
+        local: false,
+        avatar_url: "/media/avatar.png"
+      })
+
+    rendered = AccountRenderer.render_account(user)
+    assert rendered["avatar"] == "https://remote.example/media/avatar.png"
+    assert rendered["avatar_static"] == "https://remote.example/media/avatar.png"
+  end
 end
