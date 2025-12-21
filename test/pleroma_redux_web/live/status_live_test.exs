@@ -96,6 +96,31 @@ defmodule PleromaReduxWeb.StatusLiveTest do
     assert reply.data["inReplyTo"] == parent.ap_id
   end
 
+  test "signed-in users can reply to remote posts from the status page", %{conn: conn, user: user} do
+    assert {:ok, remote_parent} =
+             Pipeline.ingest(
+               %{
+                 "id" => "https://remote.example/objects/parent",
+                 "type" => "Note",
+                 "attributedTo" => "https://remote.example/users/bob",
+                 "content" => "<p>Remote parent</p>"
+               },
+               local: false
+             )
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    assert {:ok, view, _html} = live(conn, "/@bob@remote.example/#{remote_parent.id}?reply=true")
+
+    view
+    |> form("#reply-form", reply: %{content: "Remote reply"})
+    |> render_submit()
+
+    assert has_element?(view, "article", "Remote reply")
+
+    [reply] = Objects.list_replies_to(remote_parent.ap_id, limit: 1)
+    assert reply.data["inReplyTo"] == remote_parent.ap_id
+  end
+
   test "replying rejects content longer than 5000 characters", %{conn: conn, user: user} do
     assert {:ok, parent} = Pipeline.ingest(Note.build(user, "Parent post"), local: true)
     uuid = uuid_from_ap_id(parent.ap_id)

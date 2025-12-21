@@ -471,6 +471,38 @@ defmodule PleromaReduxWeb.StatusCardTest do
     assert html =~ ~s(href="/@alice/#{uuid}?reply=true#reply-form")
   end
 
+  test "renders a reply action for remote statuses that links to the local status page" do
+    html =
+      render_component(&StatusCard.status_card/1, %{
+        id: "post-123",
+        current_user: %{id: 1},
+        entry: %{
+          object: %{
+            id: 123,
+            ap_id: "https://remote.example/objects/123",
+            inserted_at: ~U[2025-01-01 00:00:00Z],
+            local: false,
+            data: %{"content" => "<p>Hello world</p>"}
+          },
+          actor: %{
+            display_name: "Bob",
+            nickname: "bob",
+            handle: "@bob@remote.example",
+            avatar_url: nil
+          },
+          attachments: [],
+          liked?: false,
+          likes_count: 0,
+          reposted?: false,
+          reposts_count: 0,
+          reactions: %{}
+        }
+      })
+
+    assert html =~ ~s(data-role="reply")
+    assert html =~ ~s(href="/@bob@remote.example/123?reply=true#reply-form")
+  end
+
   test "renders content warnings as a toggle and keeps the post content inside it" do
     html =
       render_component(&StatusCard.status_card/1, %{

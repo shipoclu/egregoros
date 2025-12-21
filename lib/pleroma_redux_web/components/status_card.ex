@@ -478,6 +478,14 @@ defmodule PleromaReduxWeb.StatusCard do
     end
   end
 
+  defp status_permalink_path(%{object: %{id: id, local: false}, actor: actor})
+       when is_integer(id) do
+    case ProfilePaths.profile_path(actor) do
+      "/@" <> _rest = profile_path -> profile_path <> "/" <> Integer.to_string(id)
+      _ -> nil
+    end
+  end
+
   defp status_permalink_path(_entry), do: nil
 
   defp status_reply_path(entry) do
@@ -490,9 +498,10 @@ defmodule PleromaReduxWeb.StatusCard do
   defp status_share_url(entry) when is_map(entry) do
     object = Map.get(entry, :object) || %{}
     ap_id = Map.get(object, :ap_id) || Map.get(object, "ap_id")
+    path = status_permalink_path(entry)
 
     cond do
-      is_binary(path = status_permalink_path(entry)) and path != "" ->
+      Map.get(object, :local) == true and is_binary(path) and path != "" ->
         URL.absolute(path)
 
       is_binary(ap_id) and ap_id != "" ->

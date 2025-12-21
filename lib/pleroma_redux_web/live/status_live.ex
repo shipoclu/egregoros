@@ -20,7 +20,7 @@ defmodule PleromaReduxWeb.StatusLive do
         id -> Users.get(id)
       end
 
-    object = object_for_uuid(uuid)
+    object = object_for_uuid_param(uuid)
 
     reply_open? = truthy?(Map.get(params, "reply"))
     reply_form = Phoenix.Component.to_form(%{"content" => ""}, as: :reply)
@@ -533,18 +533,24 @@ defmodule PleromaReduxWeb.StatusLive do
     """
   end
 
-  defp object_for_uuid(uuid) when is_binary(uuid) do
+  defp object_for_uuid_param(uuid) when is_binary(uuid) do
     uuid = String.trim(uuid)
 
     if uuid == "" do
       nil
     else
-      ap_id = Endpoint.url() <> "/objects/" <> uuid
-      Objects.get_by_ap_id(ap_id)
+      case Integer.parse(uuid) do
+        {id, ""} ->
+          Objects.get(id)
+
+        _ ->
+          ap_id = Endpoint.url() <> "/objects/" <> uuid
+          Objects.get_by_ap_id(ap_id)
+      end
     end
   end
 
-  defp object_for_uuid(_uuid), do: nil
+  defp object_for_uuid_param(_uuid), do: nil
 
   defp notifications_count(nil), do: 0
 
