@@ -98,7 +98,7 @@ defmodule PleromaReduxWeb.MediaViewer do
             JS.dispatch("predux:media-prev", to: "#media-viewer")
             |> JS.push("media_prev")
           }
-          class="absolute left-4 top-1/2 -translate-y-1/2 inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-white transition hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+          class="absolute left-4 top-1/2 z-20 -translate-y-1/2 inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-white transition hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
           aria-label="Previous media"
         >
           <.icon name="hero-chevron-left" class="size-5" />
@@ -111,7 +111,7 @@ defmodule PleromaReduxWeb.MediaViewer do
             JS.dispatch("predux:media-close", to: "#media-viewer")
             |> JS.push("close_media")
           }
-          class="absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-white transition hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+          class="absolute right-4 top-4 z-20 inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-white transition hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
           aria-label="Close media viewer"
         >
           <.icon name="hero-x-mark" class="size-5" />
@@ -125,7 +125,7 @@ defmodule PleromaReduxWeb.MediaViewer do
             JS.dispatch("predux:media-next", to: "#media-viewer")
             |> JS.push("media_next")
           }
-          class="absolute right-4 top-1/2 -translate-y-1/2 inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-white transition hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+          class="absolute right-4 top-1/2 z-20 -translate-y-1/2 inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-white transition hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
           aria-label="Next media"
         >
           <.icon name="hero-chevron-right" class="size-5" />
