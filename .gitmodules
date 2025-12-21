@@ -1,3 +1,0 @@
-[submodule "pleroma-old"]
-	path = pleroma-old
-	url = ssh://git@git.pleroma.social:2222/pleroma/pleroma.git
