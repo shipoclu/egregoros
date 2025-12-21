@@ -346,20 +346,17 @@ const MediaViewer = {
 
       if (e.key === "Escape" || e.key === "Esc") {
         this.close()
-        this.pushEvent("close_media", {})
         return
       }
 
       if (e.key === "ArrowRight") {
         this.bump(1)
-        this.pushEvent("media_next", {})
         e.preventDefault()
         return
       }
 
       if (e.key === "ArrowLeft") {
         this.bump(-1)
-        this.pushEvent("media_prev", {})
         e.preventDefault()
       }
     }
@@ -473,6 +470,8 @@ const MediaViewer = {
   clearSlides() {
     const container = this.slidesContainer()
     if (container) container.replaceChildren()
+    this.el.dataset.count = "0"
+    this.updateControls(0)
   },
 
   setSlides(items) {
@@ -481,6 +480,16 @@ const MediaViewer = {
 
     container.replaceChildren(...items.map((item, index) => this.renderSlide(item, index)))
     this.el.dataset.count = String(items.length)
+    this.updateControls(items.length)
+  },
+
+  updateControls(count) {
+    const prev = this.el.querySelector("[data-role='media-viewer-prev']")
+    const next = this.el.querySelector("[data-role='media-viewer-next']")
+
+    const showNav = count > 1
+    if (prev) prev.classList.toggle("hidden", !showNav)
+    if (next) next.classList.toggle("hidden", !showNav)
   },
 
   renderSlide(item, index) {
@@ -566,10 +575,6 @@ const MediaViewer = {
       slide.classList.toggle("hidden", !isActive)
       slide.setAttribute("aria-hidden", isActive ? "false" : "true")
     })
-  },
-
-  close() {
-    this.el.classList.add("hidden")
   },
 }
 

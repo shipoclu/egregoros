@@ -31,7 +31,6 @@ defmodule PleromaReduxWeb.TagLive do
      |> assign(
        current_user: current_user,
        notifications_count: notifications_count(current_user),
-       media_viewer: nil,
        tag: tag,
        posts: StatusVM.decorate_many(objects, current_user),
        posts_cursor: posts_cursor(objects),
@@ -42,27 +41,6 @@ defmodule PleromaReduxWeb.TagLive do
   @impl true
   def handle_event("copied_link", _params, socket) do
     {:noreply, put_flash(socket, :info, "Copied link to clipboard.")}
-  end
-
-  def handle_event("open_media", %{} = params, socket) do
-    socket = MediaViewer.open(socket, params, socket.assigns.current_user)
-    {:noreply, socket}
-  end
-
-  def handle_event("close_media", _params, socket) do
-    {:noreply, MediaViewer.close(socket)}
-  end
-
-  def handle_event("media_next", _params, socket) do
-    {:noreply, MediaViewer.next(socket)}
-  end
-
-  def handle_event("media_prev", _params, socket) do
-    {:noreply, MediaViewer.prev(socket)}
-  end
-
-  def handle_event("media_keydown", %{} = params, socket) do
-    {:noreply, MediaViewer.handle_keydown(socket, params)}
   end
 
   def handle_event("toggle_like", %{"id" => id}, socket) do
@@ -237,8 +215,8 @@ defmodule PleromaReduxWeb.TagLive do
       </AppShell.app_shell>
 
       <MediaViewer.media_viewer
-        viewer={@media_viewer || %{items: [], index: 0}}
-        open={@media_viewer != nil}
+        viewer={%{items: [], index: 0}}
+        open={false}
       />
     </Layouts.app>
     """

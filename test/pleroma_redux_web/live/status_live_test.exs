@@ -275,7 +275,7 @@ defmodule PleromaReduxWeb.StatusLiveTest do
     assert render(view) =~ "Copied link to clipboard."
   end
 
-  test "opens the media viewer for image attachments and supports navigation", %{
+  test "status media viewer controls are wired client-side without server roundtrips", %{
     conn: conn,
     user: user
   } do
@@ -299,38 +299,38 @@ defmodule PleromaReduxWeb.StatusLiveTest do
 
     assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}")
 
-    view
-    |> element("#post-#{object.id} button[data-role='attachment-open'][data-index='0']")
-    |> render_click()
-
-    assert has_element?(view, "#media-viewer[data-role='media-viewer'][data-state='open']")
-
-    assert has_element?(
-             view,
-             "[data-role='media-viewer-slide'][data-state='active'] img[src*='/uploads/first.png']"
-           )
-
-    view
-    |> element("#media-viewer [data-role='media-viewer-next']")
-    |> render_click()
-
-    assert has_element?(
-             view,
-             "[data-role='media-viewer-slide'][data-state='active'] img[src*='/uploads/second.png']"
-           )
-
-    view
-    |> element("#media-viewer [data-role='media-viewer-prev']")
-    |> render_click()
-
-    assert has_element?(
-             view,
-             "[data-role='media-viewer-slide'][data-state='active'] img[src*='/uploads/first.png']"
-           )
-
-    _html = render_keydown(view, "media_keydown", %{"key" => "Escape"})
-
     assert has_element?(view, "#media-viewer[data-role='media-viewer'][data-state='closed']")
+
+    html =
+      view
+      |> element("#post-#{object.id} button[data-role='attachment-open'][data-index='0']")
+      |> render()
+
+    assert html =~ "predux:media-open"
+    refute html =~ "open_media"
+
+    prev_html =
+      view
+      |> element("#media-viewer [data-role='media-viewer-prev']")
+      |> render()
+
+    next_html =
+      view
+      |> element("#media-viewer [data-role='media-viewer-next']")
+      |> render()
+
+    assert prev_html =~ "predux:media-prev"
+    refute prev_html =~ "media_prev"
+    assert next_html =~ "predux:media-next"
+    refute next_html =~ "media_next"
+
+    close_html =
+      view
+      |> element("#media-viewer [data-role='media-viewer-close']")
+      |> render()
+
+    assert close_html =~ "predux:media-close"
+    refute close_html =~ "close_media"
   end
 
   test "signed-in users can open and close the reply composer and changes persist", %{

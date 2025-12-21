@@ -699,7 +699,9 @@ defmodule PleromaReduxWeb.TimelineLiveTest do
     refute has_element?(view, "button[data-role='new-posts']")
   end
 
-  test "clicking an image attachment opens a media viewer", %{conn: conn} do
+  test "attachment open buttons dispatch media viewer events without a server roundtrip", %{
+    conn: conn
+  } do
     assert {:ok, note} =
              Pipeline.ingest(
                %{
@@ -723,30 +725,26 @@ defmodule PleromaReduxWeb.TimelineLiveTest do
 
     assert has_element?(view, "#media-viewer[data-role='media-viewer'][data-state='closed']")
 
-    view
-    |> element("#post-#{note.id} button[data-role='attachment-open'][data-index='0']")
-    |> render_click()
+    html =
+      view
+      |> element("#post-#{note.id} button[data-role='attachment-open'][data-index='0']")
+      |> render()
 
-    assert has_element?(view, "#media-viewer[data-role='media-viewer'][data-state='open']")
+    assert html =~ "predux:media-open"
+    refute html =~ "open_media"
+    refute html =~ "phx-value-id="
+    refute html =~ "phx-value-index="
 
-    assert has_element?(
-             view,
-             "#media-viewer[data-state='open'] #media-viewer-dialog[phx-hook='Phoenix.FocusWrap']"
-           )
+    close_html =
+      view
+      |> element("#media-viewer button[data-role='media-viewer-close']")
+      |> render()
 
-    assert has_element?(
-             view,
-             "[data-role='media-viewer-slide'][data-state='active'] img[src='https://cdn.example/image.png']"
-           )
-
-    view
-    |> element("button[data-role='media-viewer-close']")
-    |> render_click()
-
-    assert has_element?(view, "#media-viewer[data-role='media-viewer'][data-state='closed']")
+    assert close_html =~ "predux:media-close"
+    refute close_html =~ "close_media"
   end
 
-  test "media viewer renders video attachments", %{conn: conn} do
+  test "video attachments render a preview and a media viewer affordance", %{conn: conn} do
     assert {:ok, note} =
              Pipeline.ingest(
                %{
@@ -770,22 +768,21 @@ defmodule PleromaReduxWeb.TimelineLiveTest do
 
     assert has_element?(view, "#media-viewer[data-role='media-viewer'][data-state='closed']")
 
-    view
-    |> element("#post-#{note.id} button[data-role='attachment-open'][data-index='0']")
-    |> render_click()
-
     assert has_element?(
              view,
-             "[data-role='media-viewer-slide'][data-state='active'] video[data-role='media-viewer-item']"
+             "#post-#{note.id} video[data-role='attachment'][data-kind='video']"
            )
 
-    assert has_element?(
-             view,
-             "[data-role='media-viewer-slide'][data-state='active'] source[src='https://cdn.example/clip.mp4']"
-           )
+    html =
+      view
+      |> element("#post-#{note.id} button[data-role='attachment-open'][data-index='0']")
+      |> render()
+
+    assert html =~ "predux:media-open"
+    refute html =~ "open_media"
   end
 
-  test "media viewer renders audio attachments", %{conn: conn} do
+  test "audio attachments render a player and a media viewer affordance", %{conn: conn} do
     assert {:ok, note} =
              Pipeline.ingest(
                %{
@@ -809,55 +806,21 @@ defmodule PleromaReduxWeb.TimelineLiveTest do
 
     assert has_element?(view, "#media-viewer[data-role='media-viewer'][data-state='closed']")
 
-    view
-    |> element("#post-#{note.id} button[data-role='attachment-open'][data-index='0']")
-    |> render_click()
-
     assert has_element?(
              view,
-             "[data-role='media-viewer-slide'][data-state='active'] audio[data-role='media-viewer-item']"
+             "#post-#{note.id} audio[data-role='attachment'][data-kind='audio']"
            )
 
-    assert has_element?(
-             view,
-             "[data-role='media-viewer-slide'][data-state='active'] source[src='https://cdn.example/clip.ogg']"
-           )
+    html =
+      view
+      |> element("#post-#{note.id} button[data-role='attachment-open'][data-index='0']")
+      |> render()
+
+    assert html =~ "predux:media-open"
+    refute html =~ "open_media"
   end
 
-  test "media viewer closes on escape", %{conn: conn} do
-    assert {:ok, note} =
-             Pipeline.ingest(
-               %{
-                 "id" => "https://remote.example/objects/with-image-escape",
-                 "type" => "Note",
-                 "attributedTo" => "https://remote.example/users/bob",
-                 "content" => "<p>Hello</p>",
-                 "attachment" => [
-                   %{
-                     "type" => "Document",
-                     "mediaType" => "image/png",
-                     "name" => "Alt",
-                     "url" => "https://cdn.example/image.png"
-                   }
-                 ]
-               },
-               local: false
-             )
-
-    {:ok, view, _html} = live(conn, "/?timeline=public")
-
-    view
-    |> element("#post-#{note.id} button[data-role='attachment-open'][data-index='0']")
-    |> render_click()
-
-    assert has_element?(view, "#media-viewer[data-role='media-viewer'][data-state='open']")
-
-    _html = render_keydown(view, "media_keydown", %{"key" => "Escape"})
-
-    assert has_element?(view, "#media-viewer[data-role='media-viewer'][data-state='closed']")
-  end
-
-  test "media viewer can navigate between image attachments", %{conn: conn} do
+  test "media viewer renders navigation controls for multi-attachment posts", %{conn: conn} do
     assert {:ok, note} =
              Pipeline.ingest(
                %{
@@ -885,27 +848,22 @@ defmodule PleromaReduxWeb.TimelineLiveTest do
 
     {:ok, view, _html} = live(conn, "/?timeline=public")
 
-    view
-    |> element("#post-#{note.id} button[data-role='attachment-open'][data-index='0']")
-    |> render_click()
+    assert has_element?(view, "#post-#{note.id} button[data-role='attachment-open'][data-index='0']")
+    assert has_element?(view, "#post-#{note.id} button[data-role='attachment-open'][data-index='1']")
 
-    assert has_element?(
-             view,
-             "[data-role='media-viewer-slide'][data-state='active'] img[src='https://cdn.example/one.png']"
-           )
+    prev_html =
+      view
+      |> element("#media-viewer button[data-role='media-viewer-prev']")
+      |> render()
 
-    _html = render_keydown(view, "media_keydown", %{"key" => "ArrowRight"})
+    next_html =
+      view
+      |> element("#media-viewer button[data-role='media-viewer-next']")
+      |> render()
 
-    assert has_element?(
-             view,
-             "[data-role='media-viewer-slide'][data-state='active'] img[src='https://cdn.example/two.png']"
-           )
-
-    _html = render_keydown(view, "media_keydown", %{"key" => "ArrowLeft"})
-
-    assert has_element?(
-             view,
-             "[data-role='media-viewer-slide'][data-state='active'] img[src='https://cdn.example/one.png']"
-           )
+    assert prev_html =~ "predux:media-prev"
+    refute prev_html =~ "media_prev"
+    assert next_html =~ "predux:media-next"
+    refute next_html =~ "media_next"
   end
 end

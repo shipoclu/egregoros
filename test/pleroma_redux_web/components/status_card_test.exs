@@ -172,10 +172,10 @@ defmodule PleromaReduxWeb.StatusCardTest do
 
     assert html =~ ~s(data-role="attachment-open")
     assert html =~ ~s(predux:media-open)
-    assert html =~ ~s(open_media)
     assert html =~ ~s(#media-viewer)
-    assert html =~ ~s(phx-value-id="1")
-    assert html =~ ~s(phx-value-index="0")
+    refute html =~ ~s(open_media)
+    refute html =~ ~s(phx-value-id="1")
+    refute html =~ ~s(phx-value-index="0")
   end
 
   test "links actor to the profile page when nickname is present" do

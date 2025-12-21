@@ -46,7 +46,6 @@ defmodule PleromaReduxWeb.TimelineLive do
         error: nil,
         pending_posts: [],
         timeline_at_top?: true,
-        media_viewer: nil,
         form: form,
         media_alt: %{},
         posts_cursor: posts_cursor(posts),
@@ -166,27 +165,6 @@ defmodule PleromaReduxWeb.TimelineLive do
 
   def handle_event("copied_link", _params, socket) do
     {:noreply, put_flash(socket, :info, "Copied link to clipboard.")}
-  end
-
-  def handle_event("open_media", %{} = params, socket) do
-    socket = MediaViewer.open(socket, params, socket.assigns.current_user)
-    {:noreply, socket}
-  end
-
-  def handle_event("close_media", _params, socket) do
-    {:noreply, MediaViewer.close(socket)}
-  end
-
-  def handle_event("media_next", _params, socket) do
-    {:noreply, MediaViewer.next(socket)}
-  end
-
-  def handle_event("media_prev", _params, socket) do
-    {:noreply, MediaViewer.prev(socket)}
-  end
-
-  def handle_event("media_keydown", %{} = params, socket) do
-    {:noreply, MediaViewer.handle_keydown(socket, params)}
   end
 
   def handle_event("cancel_media", %{"ref" => ref}, socket) do
@@ -955,8 +933,8 @@ defmodule PleromaReduxWeb.TimelineLive do
       </AppShell.app_shell>
 
       <MediaViewer.media_viewer
-        viewer={@media_viewer || %{items: [], index: 0}}
-        open={@media_viewer != nil}
+        viewer={%{items: [], index: 0}}
+        open={false}
       />
     </Layouts.app>
     """

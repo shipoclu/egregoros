@@ -151,7 +151,7 @@ defmodule PleromaReduxWeb.ProfileLiveTest do
     assert render(view) =~ "Copied link to clipboard."
   end
 
-  test "profile posts can open the media viewer", %{
+  test "profile posts provide media viewer controls without a server roundtrip", %{
     conn: conn,
     viewer: viewer,
     profile_user: profile_user
@@ -176,40 +176,38 @@ defmodule PleromaReduxWeb.ProfileLiveTest do
     conn = Plug.Test.init_test_session(conn, %{user_id: viewer.id})
     {:ok, view, _html} = live(conn, "/@#{profile_user.nickname}")
 
-    view
-    |> element("#post-#{object.id} button[data-role='attachment-open'][data-index='0']")
-    |> render_click()
-
-    assert has_element?(view, "#media-viewer[data-role='media-viewer'][data-state='open']")
-
-    assert has_element?(
-             view,
-             "[data-role='media-viewer-slide'][data-state='active'] img[src*='/uploads/first.png']"
-           )
-
-    view
-    |> element("#media-viewer [data-role='media-viewer-next']")
-    |> render_click()
-
-    assert has_element?(
-             view,
-             "[data-role='media-viewer-slide'][data-state='active'] img[src*='/uploads/second.png']"
-           )
-
-    view
-    |> element("#media-viewer [data-role='media-viewer-prev']")
-    |> render_click()
-
-    assert has_element?(
-             view,
-             "[data-role='media-viewer-slide'][data-state='active'] img[src*='/uploads/first.png']"
-           )
-
-    view
-    |> element("#media-viewer [data-role='media-viewer-close']")
-    |> render_click()
-
     assert has_element?(view, "#media-viewer[data-role='media-viewer'][data-state='closed']")
+
+    html =
+      view
+      |> element("#post-#{object.id} button[data-role='attachment-open'][data-index='0']")
+      |> render()
+
+    assert html =~ "predux:media-open"
+    refute html =~ "open_media"
+
+    prev_html =
+      view
+      |> element("#media-viewer [data-role='media-viewer-prev']")
+      |> render()
+
+    next_html =
+      view
+      |> element("#media-viewer [data-role='media-viewer-next']")
+      |> render()
+
+    assert prev_html =~ "predux:media-prev"
+    refute prev_html =~ "media_prev"
+    assert next_html =~ "predux:media-next"
+    refute next_html =~ "media_next"
+
+    close_html =
+      view
+      |> element("#media-viewer [data-role='media-viewer-close']")
+      |> render()
+
+    assert close_html =~ "predux:media-close"
+    refute close_html =~ "close_media"
   end
 
   test "profile allows deleting your own posts", %{conn: conn, viewer: viewer} do
