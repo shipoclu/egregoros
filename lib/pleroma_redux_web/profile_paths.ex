@@ -29,7 +29,7 @@ defmodule PleromaReduxWeb.ProfilePaths do
         nil
 
       String.starts_with?(handle, ["http://", "https://"]) ->
-        nil
+        profile_path_from_url(handle)
 
       true ->
         handle
@@ -62,6 +62,47 @@ defmodule PleromaReduxWeb.ProfilePaths do
 
       _ ->
         nil
+    end
+  end
+
+  defp profile_path_from_url(url) when is_binary(url) do
+    with %URI{host: host} = uri <- URI.parse(url),
+         true <- is_binary(host) and host != "",
+         domain <- domain_from_uri(uri),
+         nickname <- nickname_from_uri(uri),
+         true <- nickname != "" do
+      "/@" <> encode_segment(nickname) <> "@" <> encode_segment(domain)
+    else
+      _ -> nil
+    end
+  end
+
+  defp domain_from_uri(%URI{host: host, port: port}) when is_binary(host) do
+    cond do
+      is_integer(port) and port > 0 and port not in [80, 443] ->
+        host <> ":" <> Integer.to_string(port)
+
+      true ->
+        host
+    end
+  end
+
+  defp domain_from_uri(_uri), do: ""
+
+  defp nickname_from_uri(%URI{path: path}) do
+    path
+    |> to_string()
+    |> String.trim("/")
+    |> path_basename()
+    |> String.trim_leading("@")
+  end
+
+  defp nickname_from_uri(_uri), do: ""
+
+  defp path_basename(path) when is_binary(path) do
+    case String.split(path, "/", trim: true) do
+      [] -> ""
+      segments -> List.last(segments)
     end
   end
 

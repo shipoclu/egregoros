@@ -585,8 +585,8 @@ defmodule PleromaReduxWeb.StatusLive do
     handle = String.trim(handle)
 
     case ProfilePaths.profile_path(handle) do
-      profile_path when is_binary(profile_path) ->
-        {String.trim_leading(handle, "@"), profile_path}
+      "/@" <> rest = profile_path ->
+        {URI.decode(rest), profile_path}
 
       _ ->
         canonical_profile_path_from_ap_id(ap_id)
