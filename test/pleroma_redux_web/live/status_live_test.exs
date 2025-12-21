@@ -23,6 +23,32 @@ defmodule PleromaReduxWeb.StatusLiveTest do
     assert has_element?(view, "article[data-role='status-card']", "Hello from status")
   end
 
+  test "redirects to the canonical nickname for local status permalinks", %{conn: conn, user: user} do
+    assert {:ok, note} = Pipeline.ingest(Note.build(user, "Hello from status"), local: true)
+    uuid = uuid_from_ap_id(note.ap_id)
+
+    assert {:error, {kind, %{to: to}}} = live(conn, "/@not-alice/#{uuid}")
+    assert kind in [:redirect, :live_redirect]
+    assert to == "/@alice/#{uuid}"
+  end
+
+  test "redirects to the canonical nickname for remote status permalinks", %{conn: conn} do
+    assert {:ok, remote_parent} =
+             Pipeline.ingest(
+               %{
+                 "id" => "https://remote.example/objects/parent",
+                 "type" => "Note",
+                 "attributedTo" => "https://remote.example/users/bob",
+                 "content" => "<p>Remote parent</p>"
+               },
+               local: false
+             )
+
+    assert {:error, {kind, %{to: to}}} = live(conn, "/@not-bob/#{remote_parent.id}")
+    assert kind in [:redirect, :live_redirect]
+    assert to == "/@bob@remote.example/#{remote_parent.id}"
+  end
+
   test "renders thread context around the status", %{conn: conn, user: user} do
     assert {:ok, root} = Pipeline.ingest(Note.build(user, "Root"), local: true)
 

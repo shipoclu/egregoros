@@ -10,6 +10,7 @@ defmodule PleromaReduxWeb.StatusLive do
   alias PleromaRedux.User
   alias PleromaRedux.Users
   alias PleromaReduxWeb.Endpoint
+  alias PleromaReduxWeb.ProfilePaths
   alias PleromaReduxWeb.ViewModels.Status, as: StatusVM
 
   @impl true
@@ -74,6 +75,7 @@ defmodule PleromaReduxWeb.StatusLive do
         max_file_size: 10_000_000,
         auto_upload: true
       )
+      |> maybe_redirect_to_canonical_permalink(params)
 
     {:ok, socket}
   end
@@ -551,6 +553,87 @@ defmodule PleromaReduxWeb.StatusLive do
   end
 
   defp object_for_uuid_param(_uuid), do: nil
+
+  defp maybe_redirect_to_canonical_permalink(socket, %{"nickname" => nickname, "uuid" => uuid} = params)
+       when is_binary(nickname) and is_binary(uuid) do
+    with %{actor: actor} <- socket.assigns.status,
+         {canonical, profile_path} when is_binary(canonical) and is_binary(profile_path) <-
+           canonical_profile_path(actor),
+         true <- canonical != "" and canonical != nickname,
+         to when is_binary(to) <- canonical_permalink_path(profile_path, uuid, params) do
+      if connected?(socket) do
+        push_navigate(socket, to: to)
+      else
+        redirect(socket, to: to)
+      end
+    else
+      _ -> socket
+    end
+  end
+
+  defp maybe_redirect_to_canonical_permalink(socket, _params), do: socket
+
+  defp canonical_profile_path(%{handle: handle, ap_id: ap_id}) do
+    canonical_profile_path(handle, ap_id)
+  end
+
+  defp canonical_profile_path(%{handle: handle}) do
+    canonical_profile_path(handle, nil)
+  end
+
+  defp canonical_profile_path(handle, ap_id) when is_binary(handle) do
+    handle = String.trim(handle)
+
+    case ProfilePaths.profile_path(handle) do
+      profile_path when is_binary(profile_path) ->
+        {String.trim_leading(handle, "@"), profile_path}
+
+      _ ->
+        canonical_profile_path_from_ap_id(ap_id)
+    end
+  end
+
+  defp canonical_profile_path(_handle, ap_id) do
+    canonical_profile_path_from_ap_id(ap_id)
+  end
+
+  defp canonical_profile_path_from_ap_id(ap_id) when is_binary(ap_id) do
+    with %{host: host, path: path} <- URI.parse(ap_id),
+         true <- is_binary(host) and host != "",
+         nickname when is_binary(nickname) <- path |> to_string() |> String.trim("/") |> path_basename(),
+         true <- nickname != "",
+         canonical <- nickname <> "@" <> host,
+         profile_path when is_binary(profile_path) <- ProfilePaths.profile_path(canonical) do
+      {canonical, profile_path}
+    else
+      _ -> nil
+    end
+  end
+
+  defp canonical_profile_path_from_ap_id(_ap_id), do: nil
+
+  defp path_basename(path) when is_binary(path) do
+    case String.split(path, "/", trim: true) do
+      [] -> ""
+      segments -> List.last(segments)
+    end
+  end
+
+  defp canonical_permalink_path(profile_path, uuid, params)
+       when is_binary(profile_path) and is_binary(uuid) do
+    if uuid == "" do
+      nil
+    else
+      query_params = Map.drop(params, ["nickname", "uuid"])
+      query = URI.encode_query(query_params)
+
+      if query == "" do
+        profile_path <> "/" <> uuid
+      else
+        profile_path <> "/" <> uuid <> "?" <> query
+      end
+    end
+  end
 
   defp notifications_count(nil), do: 0
 
