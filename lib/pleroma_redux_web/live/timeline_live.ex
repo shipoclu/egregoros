@@ -760,6 +760,7 @@ defmodule PleromaReduxWeb.TimelineLive do
                       <.button
                         type="submit"
                         phx-disable-with="Posting..."
+                        disabled={remaining_chars(@form) < 0}
                         size="sm"
                         class="normal-case tracking-normal"
                       >

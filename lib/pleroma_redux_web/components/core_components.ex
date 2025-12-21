@@ -96,7 +96,8 @@ defmodule PleromaReduxWeb.CoreComponents do
       <.button navigate={~p"/"}>Home</.button>
   """
   attr :rest, :global,
-    include: ~w(href navigate patch method download phx-click phx-disable-with phx-target)
+    include:
+      ~w(href navigate patch method download disabled phx-click phx-disable-with phx-target)
 
   attr :class, :any, default: nil
   attr :type, :string, default: nil
