@@ -25,8 +25,8 @@ This is a **web UI** checklist for Pleroma‑Redux. Items are ordered roughly by
 | “Compose” quick access on mobile (FAB / sheet) | PARTIAL | A mobile compose affordance exists, but compose is still basic and lacks attachments/etc. |
 | Light/dark/system theme toggle | DONE | Theme toggle exists in layout; keep improving contrast + consistency. |
 | Flash/toast feedback on user actions | PARTIAL | Controllers use flash; LiveView actions should consistently show success/error (and reduce silent failures). |
-| Consistent button affordances (hover/focus/cursor/disabled) | PARTIAL | Some UI elements still feel non‑interactive; standardize via components. |
-| Consistent design system components (Button, Card, Input, Avatar, etc.) | PARTIAL | Components exist, but not used everywhere (class duplication). |
+| Consistent button affordances (hover/focus/cursor/disabled) | PARTIAL | Many buttons are polished; keep standardizing remaining custom buttons + icon buttons. |
+| Consistent design system components (Button, Card, Input, Avatar, etc.) | PARTIAL | Core components exist; keep replacing duplicated class lists with shared components. |
 
 ### Authentication and account basics
 | Feature | Status | Notes |

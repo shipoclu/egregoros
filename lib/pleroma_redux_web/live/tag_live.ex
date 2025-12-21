@@ -193,16 +193,15 @@ defmodule PleromaReduxWeb.TagLive do
           </div>
 
           <div :if={!@posts_end?} class="flex justify-center py-2">
-            <button
-              type="button"
+            <.button
               data-role="tag-load-more"
               phx-click="load_more_posts"
               phx-disable-with="Loading..."
-              class="inline-flex items-center justify-center gap-2 rounded-full border border-slate-200/80 bg-white/70 px-6 py-3 text-sm font-semibold text-slate-700 shadow-sm shadow-slate-200/20 transition hover:-translate-y-0.5 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:shadow-slate-900/40 dark:hover:bg-slate-950"
               aria-label="Load more posts"
+              variant="secondary"
             >
               <.icon name="hero-chevron-down" class="size-4" /> Load more
-            </button>
+            </.button>
           </div>
         </section>
       </AppShell.app_shell>
