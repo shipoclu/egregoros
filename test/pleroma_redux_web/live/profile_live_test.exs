@@ -76,6 +76,20 @@ defmodule PleromaReduxWeb.ProfileLiveTest do
     assert has_element?(view, "a[href='/@#{profile_user.nickname}/following']")
   end
 
+  test "profile header exposes banner, avatar, and identity elements", %{
+    conn: conn,
+    viewer: viewer,
+    profile_user: profile_user
+  } do
+    conn = Plug.Test.init_test_session(conn, %{user_id: viewer.id})
+    {:ok, view, _html} = live(conn, "/@#{profile_user.nickname}")
+
+    assert has_element?(view, "[data-role='profile-banner']")
+    assert has_element?(view, "[data-role='profile-avatar']")
+    assert has_element?(view, "[data-role='profile-name']", profile_user.nickname)
+    assert has_element?(view, "[data-role='profile-handle']", "@#{profile_user.nickname}")
+  end
+
   test "profile posts support copying permalinks", %{
     conn: conn,
     viewer: viewer,

@@ -265,36 +265,46 @@ defmodule PleromaReduxWeb.ProfileLive do
         <%= if @profile_user do %>
           <section class="space-y-6">
             <.card class="overflow-hidden p-0" data_role="profile-header">
-              <div class="relative h-28 bg-gradient-to-r from-slate-900 via-slate-800 to-rose-700 dark:from-slate-950 dark:via-slate-900 dark:to-rose-600">
+              <div
+                data-role="profile-banner"
+                class="relative h-32 bg-gradient-to-r from-slate-900 via-slate-800 to-rose-700 dark:from-slate-950 dark:via-slate-900 dark:to-rose-600 sm:h-36"
+              >
                 <div class="pointer-events-none absolute inset-0 opacity-70 mix-blend-overlay">
                   <div class="absolute -left-14 -top-10 h-40 w-40 rounded-full bg-white/10 blur-2xl">
                   </div>
                   <div class="absolute -right-12 bottom-0 h-32 w-32 rounded-full bg-white/10 blur-2xl">
                   </div>
                 </div>
+
+                <div class="absolute -bottom-10 left-6">
+                  <.avatar
+                    data_role="profile-avatar"
+                    size="xl"
+                    name={@profile_user.name || @profile_user.nickname}
+                    src={URL.absolute(@profile_user.avatar_url)}
+                    class="ring-4 ring-white shadow-lg shadow-slate-900/10 dark:ring-slate-900 dark:shadow-slate-950/40"
+                  />
+                </div>
               </div>
 
-              <div class="px-6 pb-6 pt-5">
-                <div class="-mt-16 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-                  <div class="flex items-end gap-4">
-                    <.avatar
-                      size="xl"
-                      name={@profile_user.name || @profile_user.nickname}
-                      src={URL.absolute(@profile_user.avatar_url)}
-                      class="ring-4 ring-white dark:ring-slate-900"
-                    />
-
-                    <div class="min-w-0 pb-2">
-                      <h2 class="truncate font-display text-2xl text-slate-900 dark:text-slate-100">
-                        {@profile_user.name || @profile_user.nickname}
-                      </h2>
-                      <p class="mt-1 truncate text-sm text-slate-500 dark:text-slate-400">
-                        {@profile_handle}
-                      </p>
-                    </div>
+              <div class="px-6 pb-6 pt-14 sm:pt-16">
+                <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div class="min-w-0">
+                    <h2
+                      data-role="profile-name"
+                      class="truncate font-display text-2xl text-slate-900 dark:text-slate-100"
+                    >
+                      {@profile_user.name || @profile_user.nickname}
+                    </h2>
+                    <p
+                      data-role="profile-handle"
+                      class="mt-1 truncate text-sm text-slate-500 dark:text-slate-400"
+                    >
+                      {@profile_handle}
+                    </p>
                   </div>
 
-                  <div class="flex flex-wrap items-center gap-2 pb-2">
+                  <div class="flex flex-wrap items-center gap-2">
                     <%= if @current_user && @current_user.id != @profile_user.id do %>
                       <%= if @follow_relationship do %>
                         <button
