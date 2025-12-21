@@ -90,6 +90,7 @@ defmodule PleromaReduxWeb do
       # Common modules used in templates
       alias Phoenix.LiveView.JS
       alias PleromaReduxWeb.AppShell
+      alias PleromaReduxWeb.Composer
       alias PleromaReduxWeb.Layouts
       alias PleromaReduxWeb.MediaViewer
       alias PleromaReduxWeb.StatusCard
