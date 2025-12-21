@@ -93,6 +93,7 @@ defmodule PleromaReduxWeb do
       alias PleromaReduxWeb.Composer
       alias PleromaReduxWeb.Layouts
       alias PleromaReduxWeb.MediaViewer
+      alias PleromaReduxWeb.ReplyModal
       alias PleromaReduxWeb.StatusCard
 
       # Routes generation with the ~p sigil

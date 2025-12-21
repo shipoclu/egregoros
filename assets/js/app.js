@@ -581,11 +581,80 @@ const MediaViewer = {
   },
 }
 
+const ReplyModal = {
+  mounted() {
+    this.lastFocused = null
+
+    this.onOpen = () => {
+      this.lastFocused = document.activeElement
+      this.open()
+      this.focusTextarea()
+    }
+
+    this.onClose = () => {
+      this.close()
+    }
+
+    this.el.addEventListener("predux:reply-open", this.onOpen)
+    this.el.addEventListener("predux:reply-close", this.onClose)
+
+    this.onKeydown = e => {
+      if (!this.el.isConnected) return
+      if (e.defaultPrevented) return
+      if (!this.isOpen()) return
+
+      if (e.key === "Escape" || e.key === "Esc") {
+        this.close()
+        this.pushEvent("close_reply_modal", {})
+        e.preventDefault()
+      }
+    }
+
+    window.addEventListener("keydown", this.onKeydown)
+    this.handleEvent("reply_modal_close", () => this.close())
+  },
+
+  destroyed() {
+    this.el.removeEventListener("predux:reply-open", this.onOpen)
+    this.el.removeEventListener("predux:reply-close", this.onClose)
+    window.removeEventListener("keydown", this.onKeydown)
+  },
+
+  isOpen() {
+    return this.el.dataset.state === "open" && !this.el.classList.contains("hidden")
+  },
+
+  open() {
+    this.el.classList.remove("hidden")
+    this.el.dataset.state = "open"
+    this.el.setAttribute("aria-hidden", "false")
+  },
+
+  close() {
+    this.el.classList.add("hidden")
+    this.el.dataset.state = "closed"
+    this.el.setAttribute("aria-hidden", "true")
+    this.restoreFocus()
+  },
+
+  restoreFocus() {
+    if (!this.lastFocused) return
+    const target = this.lastFocused
+    this.lastFocused = null
+    if (target.isConnected && typeof target.focus === "function") target.focus({preventScroll: true})
+  },
+
+  focusTextarea() {
+    const textarea = this.el.querySelector("textarea[data-role='compose-content']")
+    if (textarea) textarea.focus({preventScroll: true})
+  },
+}
+
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
-  hooks: {...colocatedHooks, TimelineTopSentinel, TimelineBottomSentinel, ComposeCharCounter, EmojiPicker, MediaViewer},
+  hooks: {...colocatedHooks, TimelineTopSentinel, TimelineBottomSentinel, ComposeCharCounter, EmojiPicker, MediaViewer, ReplyModal},
 })
 
 window.addEventListener("predux:scroll-top", () => {
