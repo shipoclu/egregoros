@@ -190,7 +190,7 @@ defmodule PleromaReduxWeb.StatusLive do
         Enum.any?(upload.entries, &(!&1.done?)) ->
           {:noreply, put_flash(socket, :error, "Wait for attachments to finish uploading.")}
 
-        upload.errors != [] or Enum.any?(upload.entries, &(!&1.valid?)) ->
+        upload_has_errors?(upload) ->
           {:noreply, put_flash(socket, :error, "Remove invalid attachments before posting.")}
 
         true ->
@@ -549,6 +549,16 @@ defmodule PleromaReduxWeb.StatusLive do
   end
 
   defp media_upload_icon(_entry), do: "hero-paper-clip"
+
+  defp upload_has_errors?(%{errors: errors, entries: entries} = upload)
+       when is_list(errors) and is_list(entries) do
+    upload.errors != [] or
+      Enum.any?(entries, fn entry ->
+        (not entry.valid?) or upload_errors(upload, entry) != []
+      end)
+  end
+
+  defp upload_has_errors?(_upload), do: false
 
   defp refresh_thread(socket) do
     current_user = socket.assigns.current_user

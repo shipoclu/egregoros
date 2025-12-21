@@ -191,6 +191,214 @@ defmodule PleromaReduxWeb.StatusLiveTest do
            )
   end
 
+  test "renders a not-found state when the status cannot be loaded", %{conn: conn} do
+    assert {:ok, view, html} = live(conn, "/@alice/missing")
+
+    assert html =~ "Post not found"
+    assert render(view) =~ "Post not found"
+  end
+
+  test "shows feedback when copying a status permalink", %{conn: conn, user: user} do
+    assert {:ok, note} = Pipeline.ingest(Note.build(user, "Copy me"), local: true)
+    uuid = uuid_from_ap_id(note.ap_id)
+
+    assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}")
+
+    view
+    |> element("#post-#{note.id} button[data-role='copy-link']")
+    |> render_click()
+
+    assert render(view) =~ "Copied link to clipboard."
+  end
+
+  test "opens the media viewer for image attachments and supports navigation", %{conn: conn, user: user} do
+    note =
+      Note.build(user, "With images")
+      |> Map.put("attachment", [
+        %{
+          "mediaType" => "image/png",
+          "name" => "first",
+          "url" => [%{"href" => "/uploads/first.png", "mediaType" => "image/png"}]
+        },
+        %{
+          "mediaType" => "image/png",
+          "name" => "second",
+          "url" => [%{"href" => "/uploads/second.png", "mediaType" => "image/png"}]
+        }
+      ])
+
+    assert {:ok, object} = Pipeline.ingest(note, local: true)
+    uuid = uuid_from_ap_id(object.ap_id)
+
+    assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}")
+
+    view
+    |> element("#post-#{object.id} button[data-role='attachment-open'][data-index='0']")
+    |> render_click()
+
+    assert has_element?(view, "#media-viewer[data-role='media-viewer']")
+    assert render(view) =~ "/uploads/first.png"
+
+    view
+    |> element("#media-viewer [data-role='media-viewer-next']")
+    |> render_click()
+
+    assert render(view) =~ "/uploads/second.png"
+
+    view
+    |> element("#media-viewer [data-role='media-viewer-prev']")
+    |> render_click()
+
+    assert render(view) =~ "/uploads/first.png"
+
+    _html = render_keydown(view, "media_keydown", %{"key" => "Escape"})
+
+    refute has_element?(view, "#media-viewer[data-role='media-viewer']")
+  end
+
+  test "signed-in users can open and close the reply composer and changes persist", %{
+    conn: conn,
+    user: user
+  } do
+    assert {:ok, note} = Pipeline.ingest(Note.build(user, "Parent post"), local: true)
+    uuid = uuid_from_ap_id(note.ap_id)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}")
+
+    view
+    |> element("button[data-role='reply-open']")
+    |> render_click()
+
+    assert has_element?(view, "#reply-form")
+
+    view
+    |> form("#reply-form", reply: %{content: "Typing..."})
+    |> render_change()
+
+    assert render(view) =~ "Typing..."
+
+    view
+    |> element("button[phx-click='close_reply']")
+    |> render_click()
+
+    assert has_element?(view, "button[data-role='reply-open']")
+    refute has_element?(view, "#reply-form")
+  end
+
+  test "signed-in users can remove reply uploads before posting", %{conn: conn, user: user} do
+    assert {:ok, note} = Pipeline.ingest(Note.build(user, "Parent post"), local: true)
+    uuid = uuid_from_ap_id(note.ap_id)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}")
+
+    view
+    |> element("button[data-role='reply-open']")
+    |> render_click()
+
+    fixture_path = Fixtures.path!("DSCN0010.png")
+    content = File.read!(fixture_path)
+
+    upload =
+      file_input(view, "#reply-form", :reply_media, [
+        %{
+          last_modified: 1_694_171_879_000,
+          name: "photo.png",
+          content: content,
+          size: byte_size(content),
+          type: "image/png"
+        }
+      ])
+
+    assert render_upload(upload, "photo.png") =~ "100%"
+    assert has_element?(view, "[data-role='reply-media-entry']")
+
+    view
+    |> element("[data-role='reply-media-entry'] button[phx-click='cancel_reply_media']")
+    |> render_click()
+
+    refute has_element?(view, "[data-role='reply-media-entry']")
+  end
+
+  test "blocks posting while reply uploads are still in flight", %{conn: conn, user: user} do
+    assert {:ok, note} = Pipeline.ingest(Note.build(user, "Parent post"), local: true)
+    uuid = uuid_from_ap_id(note.ap_id)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}?reply=true")
+
+    fixture_path = Fixtures.path!("DSCN0010.png")
+    content = File.read!(fixture_path)
+
+    upload =
+      file_input(view, "#reply-form", :reply_media, [
+        %{
+          last_modified: 1_694_171_879_000,
+          name: "photo.png",
+          content: content,
+          type: "image/png"
+        }
+      ])
+
+    assert render_upload(upload, "photo.png", 10) =~ "10%"
+
+    view
+    |> form("#reply-form", reply: %{content: "Reply while uploading"})
+    |> render_submit()
+
+    assert render(view) =~ "Wait for attachments to finish uploading."
+  end
+
+  test "shows feedback when reply attachments fail to store", %{conn: conn, user: user} do
+    assert {:ok, note} = Pipeline.ingest(Note.build(user, "Parent post"), local: true)
+    uuid = uuid_from_ap_id(note.ap_id)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}?reply=true")
+
+    fixture_path = Fixtures.path!("DSCN0010.png")
+    content = File.read!(fixture_path)
+
+    upload =
+      file_input(view, "#reply-form", :reply_media, [
+        %{
+          last_modified: 1_694_171_879_000,
+          name: "photo.png",
+          content: content,
+          type: "image/png"
+        }
+      ])
+
+    expect(PleromaRedux.MediaStorage.Mock, :store_media, fn passed_user, passed_upload ->
+      assert passed_user.id == user.id
+      assert passed_upload.filename == "photo.png"
+      {:error, :storage_failed}
+    end)
+
+    assert render_upload(upload, "photo.png") =~ "100%"
+
+    view
+    |> form("#reply-form", reply: %{content: "Reply with media"})
+    |> render_submit()
+
+    assert render(view) =~ "Could not upload attachment."
+  end
+
+  test "rejects empty replies", %{conn: conn, user: user} do
+    assert {:ok, note} = Pipeline.ingest(Note.build(user, "Parent post"), local: true)
+    uuid = uuid_from_ap_id(note.ap_id)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}?reply=true")
+
+    view
+    |> form("#reply-form", reply: %{content: ""})
+    |> render_submit()
+
+    assert render(view) =~ "Reply can&#39;t be empty."
+  end
+
   defp uuid_from_ap_id(ap_id) when is_binary(ap_id) do
     case URI.parse(ap_id) do
       %URI{path: path} when is_binary(path) and path != "" -> Path.basename(path)
