@@ -9,7 +9,7 @@ defmodule PleromaReduxWeb.AppShell do
   attr :aside_id, :string, default: "app-aside"
 
   attr :active, :atom,
-    values: [:timeline, :search, :notifications, :profile, :settings],
+    values: [:timeline, :search, :notifications, :profile, :settings, :login, :register],
     required: true
 
   attr :current_user, :any, default: nil
@@ -137,7 +137,7 @@ defmodule PleromaReduxWeb.AppShell do
                 <% else %>
                   <.nav_link
                     role="nav-login"
-                    active={false}
+                    active={@active == :login}
                     icon="hero-arrow-right-on-rectangle"
                     label="Login"
                     navigate={~p"/login"}
@@ -145,7 +145,7 @@ defmodule PleromaReduxWeb.AppShell do
 
                   <.nav_link
                     role="nav-register"
-                    active={false}
+                    active={@active == :register}
                     icon="hero-user-plus"
                     label="Register"
                     navigate={~p"/register"}
@@ -219,7 +219,7 @@ defmodule PleromaReduxWeb.AppShell do
           <% else %>
             <.bottom_nav_link
               role="nav-login"
-              active={false}
+              active={@active == :login}
               icon="hero-arrow-right-on-rectangle"
               label="Login"
               navigate={~p"/login"}
@@ -227,7 +227,7 @@ defmodule PleromaReduxWeb.AppShell do
 
             <.bottom_nav_link
               role="nav-register"
-              active={false}
+              active={@active == :register}
               icon="hero-user-plus"
               label="Register"
               navigate={~p"/register"}

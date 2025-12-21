@@ -5,7 +5,10 @@ defmodule PleromaReduxWeb.RegistrationControllerTest do
 
   test "GET /register renders form", %{conn: conn} do
     conn = get(conn, "/register")
-    assert html_response(conn, 200) =~ "Register"
+    html = html_response(conn, 200)
+    assert html =~ "Register"
+    assert html =~ ~s(data-role="app-shell")
+    assert html =~ ~s(data-role="nav-register")
   end
 
   test "POST /register creates user and sets session", %{conn: conn} do

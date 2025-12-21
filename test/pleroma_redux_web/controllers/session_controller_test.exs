@@ -5,7 +5,10 @@ defmodule PleromaReduxWeb.SessionControllerTest do
 
   test "GET /login renders form", %{conn: conn} do
     conn = get(conn, "/login")
-    assert html_response(conn, 200) =~ "Login"
+    html = html_response(conn, 200)
+    assert html =~ "Login"
+    assert html =~ ~s(data-role="app-shell")
+    assert html =~ ~s(data-role="nav-login")
   end
 
   test "POST /login sets session for valid credentials", %{conn: conn} do

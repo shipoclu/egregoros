@@ -1,44 +1,52 @@
 <Layouts.app flash={@flash} current_user={@current_user}>
-  <section class="mx-auto max-w-xl rounded-3xl border border-white/80 bg-white/80 p-8 shadow-xl shadow-slate-200/40 backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/70 dark:shadow-slate-900/40">
-    <h2 class="font-display text-2xl text-slate-900 dark:text-slate-100">Login</h2>
-    <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">
-      Sign in to manage your profile and post as your local actor.
-    </p>
+  <AppShell.app_shell
+    id="login-shell"
+    nav_id="login-nav"
+    main_id="login-main"
+    active={:login}
+    current_user={@current_user}
+  >
+    <section class="mx-auto max-w-xl rounded-3xl border border-white/80 bg-white/80 p-8 shadow-xl shadow-slate-200/40 backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/70 dark:shadow-slate-900/40">
+      <h2 class="font-display text-2xl text-slate-900 dark:text-slate-100">Login</h2>
+      <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">
+        Sign in to manage your profile and post as your local actor.
+      </p>
 
-    <p :if={@error} class="mt-4 text-sm text-rose-500">{@error}</p>
+      <p :if={@error} class="mt-4 text-sm text-rose-500">{@error}</p>
 
-    <.form for={@form} id="login-form" action={~p"/login"} class="mt-6 space-y-4">
-      <.input type="hidden" field={@form[:return_to]} />
+      <.form for={@form} id="login-form" action={~p"/login"} class="mt-6 space-y-4">
+        <.input type="hidden" field={@form[:return_to]} />
 
-      <.input
-        type="email"
-        field={@form[:email]}
-        label="Email"
-        placeholder="alice@example.com"
-      />
+        <.input
+          type="email"
+          field={@form[:email]}
+          label="Email"
+          placeholder="alice@example.com"
+        />
 
-      <.input
-        type="password"
-        field={@form[:password]}
-        label="Password"
-        placeholder="••••••••"
-      />
+        <.input
+          type="password"
+          field={@form[:password]}
+          label="Password"
+          placeholder="••••••••"
+        />
 
-      <.button type="submit" class="w-full">Sign in</.button>
-    </.form>
+        <.button type="submit" class="w-full">Sign in</.button>
+      </.form>
 
-    <p class="mt-6 text-sm text-slate-600 dark:text-slate-300">
-      New here?
-      <a href={~p"/register"} class="font-semibold text-slate-900 underline dark:text-slate-100">
-        Create an account
+      <p class="mt-6 text-sm text-slate-600 dark:text-slate-300">
+        New here?
+        <a href={~p"/register"} class="font-semibold text-slate-900 underline dark:text-slate-100">
+          Create an account
+        </a>
+      </p>
+
+      <a
+        href={~p"/"}
+        class="mt-6 inline-flex text-xs uppercase tracking-[0.25em] text-slate-500 transition hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+      >
+        Back to feed
       </a>
-    </p>
-
-    <a
-      href={~p"/"}
-      class="mt-6 inline-flex text-xs uppercase tracking-[0.25em] text-slate-500 transition hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
-    >
-      Back to feed
-    </a>
-  </section>
+    </section>
+  </AppShell.app_shell>
 </Layouts.app>
