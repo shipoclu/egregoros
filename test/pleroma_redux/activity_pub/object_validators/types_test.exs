@@ -26,8 +26,19 @@ defmodule PleromaRedux.ActivityPub.ObjectValidators.TypesTest do
                Ecto.Type.cast(ObjectID, %{"id" => %{"id" => "https://example.com/objects/1"}})
     end
 
+    test "casts a struct with an id field" do
+      assert {:ok, "https://example.com/objects/1"} =
+               Ecto.Type.cast(ObjectID, %{id: "https://example.com/objects/1"})
+    end
+
     test "rejects empty strings" do
       assert :error = Ecto.Type.cast(ObjectID, "   ")
+    end
+
+    test "rejects non-binary values" do
+      assert {:ok, nil} = Ecto.Type.cast(ObjectID, nil)
+      assert :error = Ecto.Type.cast(ObjectID, %{})
+      assert :error = Ecto.Type.cast(ObjectID, 123)
     end
   end
 
@@ -55,6 +66,20 @@ defmodule PleromaRedux.ActivityPub.ObjectValidators.TypesTest do
     test "returns nil for nil" do
       assert {:ok, nil} = Ecto.Type.cast(Recipients, nil)
     end
+
+    test "rejects invalid maps" do
+      assert :error = Ecto.Type.cast(Recipients, %{})
+      assert :error = Ecto.Type.cast(Recipients, %{"id" => "   "})
+    end
+
+    test "sorts and deduplicates recipients" do
+      assert {:ok, ["https://example.com/users/alice", "https://example.com/users/bob"]} =
+               Ecto.Type.cast(Recipients, [
+                 "https://example.com/users/bob",
+                 "https://example.com/users/alice",
+                 "https://example.com/users/bob"
+               ])
+    end
   end
 
   describe "DateTime" do
@@ -68,6 +93,11 @@ defmodule PleromaRedux.ActivityPub.ObjectValidators.TypesTest do
 
     test "rejects invalid values" do
       assert :error = Ecto.Type.cast(APDateTime, "nope")
+    end
+
+    test "rejects non-binary values" do
+      assert {:ok, nil} = Ecto.Type.cast(APDateTime, nil)
+      assert :error = Ecto.Type.cast(APDateTime, 123)
     end
   end
 end
