@@ -760,7 +760,7 @@ defmodule PleromaReduxWeb.TimelineLive do
                       <.button
                         type="submit"
                         phx-disable-with="Posting..."
-                        disabled={remaining_chars(@form) < 0}
+                        disabled={compose_submit_disabled?(@form, @uploads.media)}
                         size="sm"
                         class="normal-case tracking-normal"
                       >
@@ -1013,17 +1013,33 @@ defmodule PleromaReduxWeb.TimelineLive do
   end
 
   defp remaining_chars(%Phoenix.HTML.Form{} = form) do
-    content =
-      (form.params || %{})
-      |> Map.get("content", "")
-      |> to_string()
-
-    @compose_max_chars - String.length(content)
+    @compose_max_chars - String.length(content_value(form))
   end
 
   defp remaining_chars(_form), do: @compose_max_chars
 
   defp compose_max_chars, do: @compose_max_chars
+
+  defp compose_submit_disabled?(form, upload) do
+    over_limit = remaining_chars(form) < 0
+    content_blank = String.trim(content_value(form)) == ""
+    entries = upload_entries(upload)
+    no_attachments = entries == []
+    attachments_pending = Enum.any?(entries, &(!&1.done?))
+
+    over_limit or (content_blank and no_attachments) or attachments_pending
+  end
+
+  defp content_value(%Phoenix.HTML.Form{} = form) do
+    (form.params || %{})
+    |> Map.get("content", "")
+    |> to_string()
+  end
+
+  defp content_value(_form), do: ""
+
+  defp upload_entries(%Phoenix.LiveView.UploadConfig{} = upload), do: upload.entries
+  defp upload_entries(_upload), do: []
 
   defp visibility_label(visibility) when is_binary(visibility) do
     case String.trim(visibility) do
