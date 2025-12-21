@@ -113,6 +113,8 @@ defmodule PleromaReduxWeb.TimelineLive do
     post_params = Map.merge(default_post_params(), post_params)
     media_alt = Map.get(post_params, "media_alt", %{})
 
+    compose_options_open? = truthy?(Map.get(post_params, "ui_options_open"))
+
     compose_cw_open? =
       socket.assigns.compose_cw_open? ||
         post_params |> Map.get("spoiler_text", "") |> to_string() |> String.trim() != ""
@@ -121,6 +123,7 @@ defmodule PleromaReduxWeb.TimelineLive do
      assign(socket,
        form: Phoenix.Component.to_form(post_params, as: :post),
        media_alt: media_alt,
+       compose_options_open?: compose_options_open?,
        compose_cw_open?: compose_cw_open?
      )}
   end
@@ -131,10 +134,6 @@ defmodule PleromaReduxWeb.TimelineLive do
 
   def handle_event("close_compose", _params, socket) do
     {:noreply, assign(socket, compose_open?: false)}
-  end
-
-  def handle_event("toggle_compose_options", _params, socket) do
-    {:noreply, assign(socket, compose_options_open?: !socket.assigns.compose_options_open?)}
   end
 
   def handle_event("toggle_compose_cw", _params, socket) do
@@ -484,6 +483,14 @@ defmodule PleromaReduxWeb.TimelineLive do
                 phx-submit="create_post"
                 class="mt-6 space-y-3"
               >
+                <.input
+                  type="hidden"
+                  id="compose-options-state"
+                  name="post[ui_options_open]"
+                  value={Map.get(@form.params || %{}, "ui_options_open", "false")}
+                  data-role="compose-options-state"
+                />
+
                 <div
                   data-role="compose-editor"
                   phx-drop-target={@uploads.media.ref}
@@ -493,10 +500,7 @@ defmodule PleromaReduxWeb.TimelineLive do
                     <button
                       type="button"
                       data-role="compose-visibility-pill"
-                      phx-click={
-                        toggle_compose_options_js()
-                        |> JS.push("toggle_compose_options")
-                      }
+                      phx-click={toggle_compose_options_js()}
                       class="inline-flex items-center gap-2 rounded-xl border border-slate-200/80 bg-white/70 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:hover:bg-slate-950"
                       aria-label="Post visibility"
                     >
@@ -507,10 +511,7 @@ defmodule PleromaReduxWeb.TimelineLive do
                     <button
                       type="button"
                       data-role="compose-language-pill"
-                      phx-click={
-                        toggle_compose_options_js()
-                        |> JS.push("toggle_compose_options")
-                      }
+                      phx-click={toggle_compose_options_js()}
                       class="inline-flex items-center gap-2 rounded-xl border border-slate-200/80 bg-white/70 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:hover:bg-slate-950"
                       aria-label="Post language"
                     >
@@ -712,10 +713,7 @@ defmodule PleromaReduxWeb.TimelineLive do
                       <button
                         type="button"
                         data-role="compose-toggle-options"
-                        phx-click={
-                          toggle_compose_options_js()
-                          |> JS.push("toggle_compose_options")
-                        }
+                        phx-click={toggle_compose_options_js()}
                         aria-label="Post options"
                         class={[
                           "inline-flex h-10 w-10 items-center justify-center rounded-2xl transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400",
@@ -944,7 +942,9 @@ defmodule PleromaReduxWeb.TimelineLive do
   end
 
   defp toggle_compose_options_js(js \\ %JS{}) do
-    JS.toggle_class(js, "hidden", to: "#compose-options")
+    js
+    |> JS.toggle_class("hidden", to: "#compose-options")
+    |> JS.toggle_attribute({"value", "true", "false"}, to: "#compose-options-state")
   end
 
   defp toggle_compose_cw_js(js \\ %JS{}) do
@@ -998,6 +998,7 @@ defmodule PleromaReduxWeb.TimelineLive do
       "visibility" => "public",
       "sensitive" => "false",
       "language" => "",
+      "ui_options_open" => "false",
       "media_alt" => %{}
     }
   end

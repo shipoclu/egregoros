@@ -82,6 +82,25 @@ defmodule PleromaReduxWeb.TimelineLiveTest do
     assert has_element?(view, "[data-role='compose-char-counter']", "4995")
   end
 
+  test "compose options panel can be persisted via ui_options_open param", %{
+    conn: conn,
+    user: user
+  } do
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/")
+
+    assert has_element?(
+             view,
+             "input[type='hidden'][data-role='compose-options-state'][name='post[ui_options_open]'][value='false']"
+           )
+
+    assert has_element?(view, "#compose-options[data-state='closed']")
+
+    _html = render_change(view, "compose_change", %{"post" => %{"ui_options_open" => "true"}})
+
+    assert has_element?(view, "#compose-options[data-state='open']")
+  end
+
   test "post cards show actor handle", %{conn: conn, user: user} do
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     {:ok, view, _html} = live(conn, "/")
