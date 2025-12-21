@@ -164,4 +164,3 @@ defmodule PleromaReduxWeb.MastodonAPI.StreamingSocketTest do
     }
   end
 end
-

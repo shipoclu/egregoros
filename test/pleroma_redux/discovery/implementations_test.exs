@@ -12,4 +12,3 @@ defmodule PleromaRedux.Discovery.ImplementationsTest do
     assert DHT.peers() == []
   end
 end
-

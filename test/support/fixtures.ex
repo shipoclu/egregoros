@@ -12,4 +12,3 @@ defmodule PleromaRedux.TestSupport.Fixtures do
     |> Jason.decode!()
   end
 end
-

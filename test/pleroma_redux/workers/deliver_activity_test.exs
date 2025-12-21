@@ -71,4 +71,3 @@ defmodule PleromaRedux.Workers.DeliverActivityTest do
     assert {:discard, :invalid_args} = DeliverActivity.perform(%Oban.Job{args: %{}})
   end
 end
-

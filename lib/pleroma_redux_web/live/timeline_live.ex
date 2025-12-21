@@ -1059,7 +1059,8 @@ defmodule PleromaReduxWeb.TimelineLive do
 
       {socket, cursor} =
         Enum.reduce(Enum.reverse(pending_posts), {socket, socket.assigns.posts_cursor}, fn post,
-                                                                                        {socket, cursor} ->
+                                                                                           {socket,
+                                                                                            cursor} ->
           socket = stream_insert(socket, :posts, StatusVM.decorate(post, current_user), at: 0)
 
           cursor =

@@ -150,7 +150,10 @@ defmodule PleromaReduxWeb.TimelineLiveTest do
     assert has_element?(view, "#post-#{oldest.id}")
   end
 
-  test "timeline exposes an infinite scroll sentinel for loading more posts", %{conn: conn, user: user} do
+  test "timeline exposes an infinite scroll sentinel for loading more posts", %{
+    conn: conn,
+    user: user
+  } do
     for idx <- 1..25 do
       assert {:ok, _} = Pipeline.ingest(Note.build(user, "Post #{idx}"), local: true)
     end
@@ -254,7 +257,10 @@ defmodule PleromaReduxWeb.TimelineLiveTest do
     refute has_element?(view, "#post-#{note.id}")
   end
 
-  test "delete affordances are hidden for posts not owned by the viewer", %{conn: conn, user: user} do
+  test "delete affordances are hidden for posts not owned by the viewer", %{
+    conn: conn,
+    user: user
+  } do
     {:ok, bob} = Users.create_local_user("bob")
     assert {:ok, note} = Pipeline.ingest(Note.build(bob, "Hello"), local: true)
 
@@ -649,7 +655,11 @@ defmodule PleromaReduxWeb.TimelineLiveTest do
     assert has_element?(view, "[data-role='media-viewer']")
     assert has_element?(view, "#media-viewer")
     assert has_element?(view, "#media-viewer-dialog[phx-hook='Phoenix.FocusWrap']")
-    assert has_element?(view, "[data-role='media-viewer'] img[src='https://cdn.example/image.png']")
+
+    assert has_element?(
+             view,
+             "[data-role='media-viewer'] img[src='https://cdn.example/image.png']"
+           )
 
     view
     |> element("button[data-role='media-viewer-close']")

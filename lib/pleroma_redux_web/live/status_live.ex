@@ -245,7 +245,10 @@ defmodule PleromaReduxWeb.StatusLive do
               {:noreply, put_flash(socket, :error, "Could not upload attachment.")}
 
             nil ->
-              case Publish.post_note(user, content, in_reply_to: in_reply_to, attachments: attachments) do
+              case Publish.post_note(user, content,
+                     in_reply_to: in_reply_to,
+                     attachments: attachments
+                   ) do
                 {:ok, _create} ->
                   note = socket.assigns.status.object
 
@@ -298,8 +301,7 @@ defmodule PleromaReduxWeb.StatusLive do
                 class="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/70 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700 transition hover:-translate-y-0.5 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:hover:bg-slate-950"
                 aria-label="Back to timeline"
               >
-                <.icon name="hero-arrow-left" class="size-4" />
-                Timeline
+                <.icon name="hero-arrow-left" class="size-4" /> Timeline
               </.link>
 
               <div class="text-right">
@@ -343,7 +345,10 @@ defmodule PleromaReduxWeb.StatusLive do
               </div>
             </div>
 
-            <section :if={@current_user} class="rounded-3xl border border-white/80 bg-white/80 p-6 shadow-lg shadow-slate-200/20 backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/70 dark:shadow-slate-900/40">
+            <section
+              :if={@current_user}
+              class="rounded-3xl border border-white/80 bg-white/80 p-6 shadow-lg shadow-slate-200/20 backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/70 dark:shadow-slate-900/40"
+            >
               <%= if @reply_open? do %>
                 <.form
                   for={@reply_form}
@@ -511,8 +516,7 @@ defmodule PleromaReduxWeb.StatusLive do
                   phx-click="open_reply"
                   class="inline-flex w-full items-center justify-center gap-2 rounded-full border border-slate-200/80 bg-white/70 px-6 py-3 text-sm font-semibold text-slate-700 shadow-sm shadow-slate-200/20 transition hover:-translate-y-0.5 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:shadow-slate-900/40 dark:hover:bg-slate-950"
                 >
-                  <.icon name="hero-chat-bubble-left-right" class="size-5" />
-                  Write a reply
+                  <.icon name="hero-chat-bubble-left-right" class="size-5" /> Write a reply
                 </button>
               <% end %>
             </section>
@@ -528,8 +532,7 @@ defmodule PleromaReduxWeb.StatusLive do
                 navigate={timeline_href(@current_user)}
                 class="inline-flex items-center gap-2 rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/20 transition hover:-translate-y-0.5 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
               >
-                <.icon name="hero-home" class="size-5" />
-                Go to timeline
+                <.icon name="hero-home" class="size-5" /> Go to timeline
               </.link>
             </div>
           </section>
@@ -571,7 +574,7 @@ defmodule PleromaReduxWeb.StatusLive do
        when is_list(errors) and is_list(entries) do
     upload.errors != [] or
       Enum.any?(entries, fn entry ->
-        (not entry.valid?) or upload_errors(upload, entry) != []
+        not entry.valid? or upload_errors(upload, entry) != []
       end)
   end
 

@@ -97,4 +97,3 @@ defmodule PleromaRedux.MediaStorage.LocalTest do
     assert {:error, :enoent} = Local.store_media(user, upload, root)
   end
 end
-

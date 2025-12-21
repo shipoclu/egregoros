@@ -79,4 +79,3 @@ defmodule PleromaRedux.AvatarStorage.LocalTest do
     assert {:error, :enoent} = Local.store_avatar(user, upload, root)
   end
 end
-

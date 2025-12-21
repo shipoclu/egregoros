@@ -36,7 +36,7 @@ defmodule PleromaReduxWeb.TagLive do
        posts: StatusVM.decorate_many(objects, current_user),
        posts_cursor: posts_cursor(objects),
        posts_end?: length(objects) < @page_size
-      )}
+     )}
   end
 
   @impl true
@@ -189,12 +189,14 @@ defmodule PleromaReduxWeb.TagLive do
                 class="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/70 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700 transition hover:-translate-y-0.5 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:hover:bg-slate-950"
                 aria-label="Back to timeline"
               >
-                <.icon name="hero-arrow-left" class="size-4" />
-                Timeline
+                <.icon name="hero-arrow-left" class="size-4" /> Timeline
               </.link>
 
               <div class="text-right">
-                <p data-role="tag-title" class="font-display text-lg text-slate-900 dark:text-slate-100">
+                <p
+                  data-role="tag-title"
+                  class="font-display text-lg text-slate-900 dark:text-slate-100"
+                >
                   #{to_string(@tag)}
                 </p>
                 <p class="mt-1 text-xs uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">

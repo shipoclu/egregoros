@@ -12,4 +12,3 @@ defmodule PleromaRedux.Auth.DefaultTest do
     assert Users.get_by_nickname("local").id == user.id
   end
 end
-

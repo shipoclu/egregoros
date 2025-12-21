@@ -154,7 +154,10 @@ defmodule PleromaReduxWeb.MediaViewer do
     """
   end
 
-  defp bump_index(%{assigns: %{media_viewer: %{items: items, index: index} = viewer}} = socket, delta) do
+  defp bump_index(
+         %{assigns: %{media_viewer: %{items: items, index: index} = viewer}} = socket,
+         delta
+       ) do
     count = length(items)
 
     cond do
@@ -179,7 +182,9 @@ defmodule PleromaReduxWeb.MediaViewer do
     items = Enum.map(media, &elem(&1, 0))
 
     selected_index =
-      case Enum.find_index(media, fn {_attachment, original_index} -> original_index == selected_index end) do
+      case Enum.find_index(media, fn {_attachment, original_index} ->
+             original_index == selected_index
+           end) do
         nil -> 0
         index -> index
       end

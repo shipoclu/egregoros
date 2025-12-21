@@ -48,7 +48,11 @@ defmodule PleromaReduxWeb.ObjectControllerTest do
                type: "Note",
                actor: "https://remote.example/users/mallory",
                local: false,
-               data: %{"id" => ap_id, "type" => "Note", "actor" => "https://remote.example/users/mallory"}
+               data: %{
+                 "id" => ap_id,
+                 "type" => "Note",
+                 "actor" => "https://remote.example/users/mallory"
+               }
              })
 
     conn = get(conn, "/objects/#{uuid}")

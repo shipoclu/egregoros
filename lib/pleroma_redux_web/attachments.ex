@@ -85,4 +85,3 @@ defmodule PleromaReduxWeb.Attachments do
 
   defp kind_from_href(_href), do: :link
 end
-

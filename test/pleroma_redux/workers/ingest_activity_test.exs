@@ -33,4 +33,3 @@ defmodule PleromaRedux.Workers.IngestActivityTest do
     assert {:discard, :invalid_args} = IngestActivity.perform(%Oban.Job{args: %{"activity" => 1}})
   end
 end
-

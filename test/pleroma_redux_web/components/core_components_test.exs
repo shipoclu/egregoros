@@ -234,7 +234,7 @@ defmodule PleromaReduxWeb.CoreComponentsTest do
         value: "user",
         label: "Role",
         prompt: "Pick one",
-        options: ["Admin": "admin", "User": "user"],
+        options: [Admin: "admin", User: "user"],
         multiple: false,
         errors: [],
         class: nil,

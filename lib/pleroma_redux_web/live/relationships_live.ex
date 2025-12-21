@@ -42,15 +42,15 @@ defmodule PleromaReduxWeb.RelationshipsLive do
      socket
      |> assign(
        current_user: current_user,
-        notifications_count: notifications_count(current_user),
-        profile_user: profile_user,
-        profile_handle: profile_handle,
-        title: title,
-        items: items,
-        follow_map: follow_map,
-        items_cursor: cursor,
-        items_end?: items_end?
-      )}
+       notifications_count: notifications_count(current_user),
+       profile_user: profile_user,
+       profile_handle: profile_handle,
+       title: title,
+       items: items,
+       follow_map: follow_map,
+       items_cursor: cursor,
+       items_end?: items_end?
+     )}
   end
 
   @impl true
@@ -80,7 +80,8 @@ defmodule PleromaReduxWeb.RelationshipsLive do
     with %User{} = viewer <- socket.assigns.current_user,
          ap_id when is_binary(ap_id) <- to_string(ap_id),
          %{} = relationship <- Map.get(socket.assigns.follow_map, ap_id),
-         {:ok, _undo} <- Pipeline.ingest(Undo.build(viewer, relationship.activity_ap_id), local: true) do
+         {:ok, _undo} <-
+           Pipeline.ingest(Undo.build(viewer, relationship.activity_ap_id), local: true) do
       socket =
         socket
         |> put_flash(:info, "Unfollowed.")
@@ -368,7 +369,8 @@ defmodule PleromaReduxWeb.RelationshipsLive do
 
   defp show_follow_button?(_current_user, _actor), do: false
 
-  defp maybe_drop_item(%{assigns: %{live_action: :following}} = socket, ap_id) when is_binary(ap_id) do
+  defp maybe_drop_item(%{assigns: %{live_action: :following}} = socket, ap_id)
+       when is_binary(ap_id) do
     case {socket.assigns.profile_user, socket.assigns.current_user} do
       {%User{id: id}, %User{id: id}} ->
         items = Enum.reject(socket.assigns.items, &(&1.ap_id == ap_id))

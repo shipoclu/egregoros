@@ -516,8 +516,7 @@ defmodule PleromaReduxWeb.StatusCard do
               phx-click={JS.toggle(to: "#delete-post-confirm-#{@entry.object.id}")}
               class="flex w-full items-center gap-3 px-4 py-3 text-sm font-semibold text-rose-700 transition hover:bg-rose-50/60 dark:text-rose-200 dark:hover:bg-rose-500/10"
             >
-              <.icon name="hero-trash" class="size-5 text-rose-600 dark:text-rose-300" />
-              Delete post
+              <.icon name="hero-trash" class="size-5 text-rose-600 dark:text-rose-300" /> Delete post
             </button>
 
             <div

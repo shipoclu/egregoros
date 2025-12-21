@@ -149,7 +149,11 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusRendererTest do
         type: "Note",
         actor: alice.ap_id,
         local: false,
-        data: %{"id" => "https://remote.example/objects/unlisted", "to" => [followers], "cc" => [public]}
+        data: %{
+          "id" => "https://remote.example/objects/unlisted",
+          "to" => [followers],
+          "cc" => [public]
+        }
       })
 
     {:ok, note_private} =
@@ -167,7 +171,11 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusRendererTest do
         type: "Note",
         actor: alice.ap_id,
         local: false,
-        data: %{"id" => "https://remote.example/objects/direct", "to" => ["https://remote.example/users/bob"], "cc" => []}
+        data: %{
+          "id" => "https://remote.example/objects/direct",
+          "to" => ["https://remote.example/users/bob"],
+          "cc" => []
+        }
       })
 
     assert StatusRenderer.render_status(note_public)["visibility"] == "public"
@@ -186,7 +194,11 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusRendererTest do
         type: "Note",
         actor: alice.ap_id,
         local: false,
-        data: %{"id" => "https://remote.example/objects/parent", "type" => "Note", "actor" => alice.ap_id}
+        data: %{
+          "id" => "https://remote.example/objects/parent",
+          "type" => "Note",
+          "actor" => alice.ap_id
+        }
       })
 
     {:ok, child} =

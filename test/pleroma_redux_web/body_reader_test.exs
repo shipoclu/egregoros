@@ -22,4 +22,3 @@ defmodule PleromaReduxWeb.BodyReaderTest do
     assert conn.assigns.raw_body == "abcdef"
   end
 end
-

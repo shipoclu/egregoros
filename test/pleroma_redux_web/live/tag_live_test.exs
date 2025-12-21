@@ -70,7 +70,11 @@ defmodule PleromaReduxWeb.TagLiveTest do
            )
   end
 
-  test "signed-in users can delete their own posts from tag pages", %{conn: conn, user: user, note: note} do
+  test "signed-in users can delete their own posts from tag pages", %{
+    conn: conn,
+    user: user,
+    note: note
+  } do
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     assert {:ok, view, _html} = live(conn, "/tags/elixir")
 

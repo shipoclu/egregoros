@@ -13,4 +13,3 @@ defmodule PleromaRedux.DNS.InetTest do
     assert {:error, :nxdomain} = Inet.lookup_ips("")
   end
 end
-

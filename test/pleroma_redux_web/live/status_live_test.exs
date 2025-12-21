@@ -258,7 +258,10 @@ defmodule PleromaReduxWeb.StatusLiveTest do
     assert render(view) =~ "Copied link to clipboard."
   end
 
-  test "opens the media viewer for image attachments and supports navigation", %{conn: conn, user: user} do
+  test "opens the media viewer for image attachments and supports navigation", %{
+    conn: conn,
+    user: user
+  } do
     note =
       Note.build(user, "With images")
       |> Map.put("attachment", [
