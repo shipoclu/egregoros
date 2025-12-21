@@ -101,6 +101,20 @@ defmodule PleromaReduxWeb.TimelineLiveTest do
     assert has_element?(view, "#compose-options[data-state='open']")
   end
 
+  test "posting rejects content longer than 5000 characters", %{conn: conn, user: user} do
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/")
+
+    too_long = String.duplicate("a", 5001)
+
+    view
+    |> form("#timeline-form", post: %{content: too_long})
+    |> render_submit()
+
+    assert has_element?(view, "[data-role='compose-error']", "Post is too long.")
+    assert Objects.list_notes() == []
+  end
+
   test "post cards show actor handle", %{conn: conn, user: user} do
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     {:ok, view, _html} = live(conn, "/")

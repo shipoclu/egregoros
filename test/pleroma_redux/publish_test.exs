@@ -8,6 +8,11 @@ defmodule PleromaRedux.PublishTest do
   alias PleromaRedux.Users
   alias PleromaRedux.Workers.DeliverActivity
 
+  test "post_note/2 rejects content longer than 5000 characters" do
+    {:ok, local} = Users.create_local_user("alice")
+    assert {:error, :too_long} = Publish.post_note(local, String.duplicate("a", 5001))
+  end
+
   test "post_note/2 delivers Create with addressing to remote followers" do
     {:ok, local} = Users.create_local_user("alice")
 

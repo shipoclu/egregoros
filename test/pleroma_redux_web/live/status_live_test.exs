@@ -96,6 +96,23 @@ defmodule PleromaReduxWeb.StatusLiveTest do
     assert reply.data["inReplyTo"] == parent.ap_id
   end
 
+  test "replying rejects content longer than 5000 characters", %{conn: conn, user: user} do
+    assert {:ok, parent} = Pipeline.ingest(Note.build(user, "Parent post"), local: true)
+    uuid = uuid_from_ap_id(parent.ap_id)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}?reply=true")
+
+    too_long = String.duplicate("a", 5001)
+
+    view
+    |> form("#reply-form", reply: %{content: too_long})
+    |> render_submit()
+
+    assert render(view) =~ "Reply is too long."
+    assert Objects.list_replies_to(parent.ap_id, limit: 10) == []
+  end
+
   test "signed-in users can attach media when replying", %{conn: conn, user: user} do
     assert {:ok, parent} = Pipeline.ingest(Note.build(user, "Parent post"), local: true)
     uuid = uuid_from_ap_id(parent.ap_id)

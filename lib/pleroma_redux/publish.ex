@@ -5,6 +5,7 @@ defmodule PleromaRedux.Publish do
   alias PleromaRedux.User
 
   @as_public "https://www.w3.org/ns/activitystreams#Public"
+  @max_note_chars 5000
 
   def post_note(%User{} = user, content) when is_binary(content) do
     post_note(user, content, [])
@@ -19,22 +20,27 @@ defmodule PleromaRedux.Publish do
     sensitive = Keyword.get(opts, :sensitive)
     language = Keyword.get(opts, :language)
 
-    if content == "" and attachments == [] do
-      {:error, :empty}
-    else
-      note =
-        user
-        |> Note.build(content)
-        |> maybe_put_attachments(attachments)
-        |> maybe_put_in_reply_to(in_reply_to)
-        |> maybe_put_visibility(visibility, user.ap_id)
-        |> maybe_put_summary(spoiler_text)
-        |> maybe_put_sensitive(sensitive)
-        |> maybe_put_language(language)
+    cond do
+      content == "" and attachments == [] ->
+        {:error, :empty}
 
-      create = Create.build(user, note)
+      String.length(content) > @max_note_chars ->
+        {:error, :too_long}
 
-      Pipeline.ingest(create, local: true)
+      true ->
+        note =
+          user
+          |> Note.build(content)
+          |> maybe_put_attachments(attachments)
+          |> maybe_put_in_reply_to(in_reply_to)
+          |> maybe_put_visibility(visibility, user.ap_id)
+          |> maybe_put_summary(spoiler_text)
+          |> maybe_put_sensitive(sensitive)
+          |> maybe_put_language(language)
+
+        create = Create.build(user, note)
+
+        Pipeline.ingest(create, local: true)
     end
   end
 

@@ -277,6 +277,14 @@ defmodule PleromaReduxWeb.TimelineLive do
                        media_alt: %{}
                      )}
 
+                  {:error, :too_long} ->
+                    {:noreply,
+                     assign(socket,
+                       error: "Post is too long.",
+                       form: Phoenix.Component.to_form(post_params, as: :post),
+                       media_alt: media_alt
+                     )}
+
                   {:error, :empty} ->
                     {:noreply,
                      assign(socket,

@@ -264,6 +264,9 @@ defmodule PleromaReduxWeb.StatusLive do
                      reply_media_alt: %{}
                    )}
 
+                {:error, :too_long} ->
+                  {:noreply, put_flash(socket, :error, "Reply is too long.")}
+
                 {:error, :empty} ->
                   {:noreply, put_flash(socket, :error, "Reply can't be empty.")}
 
