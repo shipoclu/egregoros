@@ -1,7 +1,10 @@
 defmodule PleromaReduxWeb.RelationshipsLive do
   use PleromaReduxWeb, :live_view
 
+  alias PleromaRedux.Activities.Follow
+  alias PleromaRedux.Activities.Undo
   alias PleromaRedux.Notifications
+  alias PleromaRedux.Pipeline
   alias PleromaRedux.Relationships
   alias PleromaRedux.User
   alias PleromaRedux.Users
@@ -33,18 +36,65 @@ defmodule PleromaReduxWeb.RelationshipsLive do
     {title, items, cursor, items_end?} =
       list_relationships(profile_user, socket.assigns.live_action, current_user)
 
+    follow_map = follow_map(current_user, items)
+
     {:ok,
      socket
      |> assign(
        current_user: current_user,
-       notifications_count: notifications_count(current_user),
-       profile_user: profile_user,
-       profile_handle: profile_handle,
-       title: title,
-       items: items,
-       items_cursor: cursor,
-       items_end?: items_end?
-     )}
+        notifications_count: notifications_count(current_user),
+        profile_user: profile_user,
+        profile_handle: profile_handle,
+        title: title,
+        items: items,
+        follow_map: follow_map,
+        items_cursor: cursor,
+        items_end?: items_end?
+      )}
+  end
+
+  @impl true
+  def handle_event("follow_actor", %{"ap_id" => ap_id}, socket) do
+    with %User{} = viewer <- socket.assigns.current_user,
+         ap_id when is_binary(ap_id) <- to_string(ap_id),
+         %User{} = target <- Users.get_by_ap_id(ap_id),
+         true <- viewer.ap_id != target.ap_id,
+         nil <- Relationships.get_by_type_actor_object("Follow", viewer.ap_id, target.ap_id),
+         {:ok, _follow} <- Pipeline.ingest(Follow.build(viewer, target), local: true) do
+      relationship = Relationships.get_by_type_actor_object("Follow", viewer.ap_id, target.ap_id)
+
+      {:noreply,
+       socket
+       |> put_flash(:info, "Following #{ActorVM.handle(target, target.ap_id)}.")
+       |> assign(follow_map: Map.put(socket.assigns.follow_map, target.ap_id, relationship))}
+    else
+      nil ->
+        {:noreply, put_flash(socket, :error, "Register to follow people.")}
+
+      _ ->
+        {:noreply, socket}
+    end
+  end
+
+  def handle_event("unfollow_actor", %{"ap_id" => ap_id}, socket) do
+    with %User{} = viewer <- socket.assigns.current_user,
+         ap_id when is_binary(ap_id) <- to_string(ap_id),
+         %{} = relationship <- Map.get(socket.assigns.follow_map, ap_id),
+         {:ok, _undo} <- Pipeline.ingest(Undo.build(viewer, relationship.activity_ap_id), local: true) do
+      socket =
+        socket
+        |> put_flash(:info, "Unfollowed.")
+        |> assign(follow_map: Map.delete(socket.assigns.follow_map, ap_id))
+        |> maybe_drop_item(ap_id)
+
+      {:noreply, socket}
+    else
+      nil ->
+        {:noreply, put_flash(socket, :error, "Register to unfollow people.")}
+
+      _ ->
+        {:noreply, socket}
+    end
   end
 
   @impl true
@@ -72,9 +122,14 @@ defmodule PleromaReduxWeb.RelationshipsLive do
           |> Kernel.++(items)
           |> Enum.uniq_by(& &1.ap_id)
 
+        follow_map =
+          socket.assigns.follow_map
+          |> Map.merge(follow_map(socket.assigns.current_user, items))
+
         {:noreply,
          assign(socket,
            items: merged,
+           follow_map: follow_map,
            items_cursor: new_cursor,
            items_end?: items_end?
          )}
@@ -133,26 +188,54 @@ defmodule PleromaReduxWeb.RelationshipsLive do
                 :for={actor <- @items}
                 class="p-4"
                 data_role="relationship-item"
+                data-ap-id={actor.ap_id}
               >
-                <.link
-                  navigate={actor_profile_path(actor)}
-                  class="flex items-center gap-3"
-                >
-                  <.avatar
-                    size="sm"
-                    name={actor.display_name}
-                    src={actor.avatar_url}
-                  />
+                <div class="flex items-center justify-between gap-3">
+                  <.link
+                    navigate={actor_profile_path(actor)}
+                    class="flex min-w-0 flex-1 items-center gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+                  >
+                    <.avatar
+                      size="sm"
+                      name={actor.display_name}
+                      src={actor.avatar_url}
+                    />
 
-                  <div class="min-w-0 flex-1">
-                    <p class="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
-                      {actor.display_name}
-                    </p>
-                    <p class="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">
-                      {actor.handle}
-                    </p>
-                  </div>
-                </.link>
+                    <div class="min-w-0 flex-1">
+                      <p class="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
+                        {actor.display_name}
+                      </p>
+                      <p class="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">
+                        {actor.handle}
+                      </p>
+                    </div>
+                  </.link>
+
+                  <%= if show_follow_button?(@current_user, actor) do %>
+                    <%= if followed?(@follow_map, actor.ap_id) do %>
+                      <.button
+                        data-role="relationship-unfollow"
+                        phx-click="unfollow_actor"
+                        phx-value-ap_id={actor.ap_id}
+                        phx-disable-with="..."
+                        variant="secondary"
+                        size="sm"
+                      >
+                        Unfollow
+                      </.button>
+                    <% else %>
+                      <.button
+                        data-role="relationship-follow"
+                        phx-click="follow_actor"
+                        phx-value-ap_id={actor.ap_id}
+                        phx-disable-with="..."
+                        size="sm"
+                      >
+                        Follow
+                      </.button>
+                    <% end %>
+                  <% end %>
+                </div>
               </.card>
             </div>
 
@@ -256,6 +339,47 @@ defmodule PleromaReduxWeb.RelationshipsLive do
   defp title_for(:followers, _user, _current_user), do: "Followers"
   defp title_for(:following, _user, _current_user), do: "Following"
   defp title_for(_action, _user, _current_user), do: ""
+
+  defp follow_map(nil, _items), do: %{}
+
+  defp follow_map(%User{} = viewer, items) when is_list(items) do
+    object_ap_ids =
+      items
+      |> Enum.map(& &1.ap_id)
+      |> Enum.filter(&is_binary/1)
+
+    viewer.ap_id
+    |> Relationships.list_follows_by_actor_for_objects(object_ap_ids)
+    |> Map.new(&{&1.object, &1})
+  end
+
+  defp follow_map(_viewer, _items), do: %{}
+
+  defp followed?(follow_map, ap_id) when is_map(follow_map) and is_binary(ap_id) do
+    Map.has_key?(follow_map, ap_id)
+  end
+
+  defp followed?(_follow_map, _ap_id), do: false
+
+  defp show_follow_button?(%User{} = current_user, %{ap_id: ap_id})
+       when is_binary(ap_id) and ap_id != "" do
+    current_user.ap_id != ap_id
+  end
+
+  defp show_follow_button?(_current_user, _actor), do: false
+
+  defp maybe_drop_item(%{assigns: %{live_action: :following}} = socket, ap_id) when is_binary(ap_id) do
+    case {socket.assigns.profile_user, socket.assigns.current_user} do
+      {%User{id: id}, %User{id: id}} ->
+        items = Enum.reject(socket.assigns.items, &(&1.ap_id == ap_id))
+        assign(socket, items: items)
+
+      _ ->
+        socket
+    end
+  end
+
+  defp maybe_drop_item(socket, _ap_id), do: socket
 
   defp actor_profile_path(%{handle: "@" <> handle}) when is_binary(handle) and handle != "" do
     ProfilePaths.profile_path(handle)

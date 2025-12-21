@@ -82,7 +82,35 @@ defmodule PleromaReduxWeb.RelationshipsLiveTest do
     assert has_element?(
              view,
              "[data-role='relationship-item']",
-             "@#{excluded_user.nickname}@remote.example"
-           )
+           "@#{excluded_user.nickname}@remote.example"
+         )
+  end
+
+  test "followers page lets you follow back from the list", %{conn: conn, bob: bob, alice: alice} do
+    conn = Plug.Test.init_test_session(conn, %{user_id: bob.id})
+    assert {:ok, view, _html} = live(conn, "/@#{bob.nickname}/followers")
+
+    refute Relationships.get_by_type_actor_object("Follow", bob.ap_id, alice.ap_id)
+
+    view
+    |> element("button[data-role='relationship-follow'][phx-value-ap_id='#{alice.ap_id}']")
+    |> render_click()
+
+    assert Relationships.get_by_type_actor_object("Follow", bob.ap_id, alice.ap_id)
+    assert has_element?(view, "button[data-role='relationship-unfollow'][phx-value-ap_id='#{alice.ap_id}']")
+  end
+
+  test "following page lets you unfollow from the list", %{conn: conn, alice: alice, bob: bob} do
+    conn = Plug.Test.init_test_session(conn, %{user_id: alice.id})
+    assert {:ok, view, _html} = live(conn, "/@#{alice.nickname}/following")
+
+    assert Relationships.get_by_type_actor_object("Follow", alice.ap_id, bob.ap_id)
+
+    view
+    |> element("button[data-role='relationship-unfollow'][phx-value-ap_id='#{bob.ap_id}']")
+    |> render_click()
+
+    refute Relationships.get_by_type_actor_object("Follow", alice.ap_id, bob.ap_id)
+    refute has_element?(view, "[data-role='relationship-item'][data-ap-id='#{bob.ap_id}']")
   end
 end

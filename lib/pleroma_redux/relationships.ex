@@ -54,6 +54,25 @@ defmodule PleromaRedux.Relationships do
     |> Repo.all()
   end
 
+  def list_follows_by_actor_for_objects(actor_ap_id, object_ap_ids)
+      when is_binary(actor_ap_id) and is_list(object_ap_ids) do
+    object_ap_ids =
+      object_ap_ids
+      |> Enum.filter(&is_binary/1)
+      |> Enum.map(&String.trim/1)
+      |> Enum.reject(&(&1 == ""))
+      |> Enum.uniq()
+
+    if object_ap_ids == [] do
+      []
+    else
+      from(r in Relationship,
+        where: r.type == "Follow" and r.actor == ^actor_ap_id and r.object in ^object_ap_ids
+      )
+      |> Repo.all()
+    end
+  end
+
   def list_follows_by_actor(actor_ap_id, opts) when is_binary(actor_ap_id) and is_list(opts) do
     limit = opts |> Keyword.get(:limit, 40) |> normalize_limit()
     max_id = Keyword.get(opts, :max_id)
