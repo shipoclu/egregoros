@@ -215,6 +215,37 @@ defmodule PleromaReduxWeb.TimelineLiveTest do
            )
   end
 
+  test "users can delete their own posts from the timeline", %{conn: conn, user: user} do
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/")
+
+    view
+    |> form("#timeline-form", post: %{content: "Delete me"})
+    |> render_submit()
+
+    [note] = Objects.list_notes()
+
+    assert has_element?(view, "#post-#{note.id} [data-role='delete-post']")
+
+    view
+    |> element("#post-#{note.id} button[data-role='delete-post-confirm']")
+    |> render_click()
+
+    assert Objects.get(note.id) == nil
+    refute has_element?(view, "#post-#{note.id}")
+  end
+
+  test "delete affordances are hidden for posts not owned by the viewer", %{conn: conn, user: user} do
+    {:ok, bob} = Users.create_local_user("bob")
+    assert {:ok, note} = Pipeline.ingest(Note.build(bob, "Hello"), local: true)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/?timeline=public")
+
+    assert has_element?(view, "#post-#{note.id}")
+    refute has_element?(view, "#post-#{note.id} [data-role='delete-post']")
+  end
+
   test "posting with an attachment renders it in the timeline", %{conn: conn, user: user} do
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     {:ok, view, _html} = live(conn, "/")

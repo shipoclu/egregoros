@@ -223,6 +223,33 @@ defmodule PleromaReduxWeb.ProfileLive do
     end
   end
 
+  def handle_event("delete_post", %{"id" => id}, socket) do
+    with %User{} = user <- socket.assigns.current_user,
+         {post_id, ""} <- Integer.parse(to_string(id)),
+         {:ok, _delete} <- Interactions.delete_post(user, post_id) do
+      profile_user = socket.assigns.profile_user
+
+      socket =
+        socket
+        |> put_flash(:info, "Post deleted.")
+        |> stream_delete(:posts, %{object: %{id: post_id}})
+
+      socket =
+        case profile_user do
+          %User{} -> assign(socket, posts_count: count_posts(profile_user))
+          _ -> socket
+        end
+
+      {:noreply, socket}
+    else
+      nil ->
+        {:noreply, put_flash(socket, :error, "Register to delete posts.")}
+
+      _ ->
+        {:noreply, put_flash(socket, :error, "Could not delete post.")}
+    end
+  end
+
   @impl true
   def render(assigns) do
     ~H"""

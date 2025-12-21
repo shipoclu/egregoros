@@ -158,6 +158,33 @@ defmodule PleromaReduxWeb.StatusLive do
     end
   end
 
+  def handle_event("delete_post", %{"id" => id}, socket) do
+    with %User{} = user <- socket.assigns.current_user,
+         {post_id, ""} <- Integer.parse(to_string(id)),
+         {:ok, _delete} <- Interactions.delete_post(user, post_id) do
+      socket =
+        case socket.assigns.status do
+          %{object: %{id: ^post_id}} ->
+            socket
+            |> put_flash(:info, "Post deleted.")
+            |> push_navigate(to: timeline_href(user))
+
+          _ ->
+            socket
+            |> put_flash(:info, "Post deleted.")
+            |> refresh_thread()
+        end
+
+      {:noreply, socket}
+    else
+      nil ->
+        {:noreply, put_flash(socket, :error, "Register to delete posts.")}
+
+      _ ->
+        {:noreply, put_flash(socket, :error, "Could not delete post.")}
+    end
+  end
+
   def handle_event("open_reply", _params, socket) do
     {:noreply, assign(socket, reply_open?: true)}
   end

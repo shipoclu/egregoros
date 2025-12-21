@@ -70,6 +70,20 @@ defmodule PleromaReduxWeb.TagLiveTest do
            )
   end
 
+  test "signed-in users can delete their own posts from tag pages", %{conn: conn, user: user, note: note} do
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    assert {:ok, view, _html} = live(conn, "/tags/elixir")
+
+    assert has_element?(view, "#post-#{note.id} [data-role='delete-post']")
+
+    view
+    |> element("#post-#{note.id} button[data-role='delete-post-confirm']")
+    |> render_click()
+
+    assert Objects.get(note.id) == nil
+    refute has_element?(view, "#post-#{note.id}")
+  end
+
   test "tag pages can load more posts", %{conn: conn, user: user} do
     for idx <- 1..25 do
       assert {:ok, _note} = Pipeline.ingest(Note.build(user, "Post #{idx} #elixir"), local: true)

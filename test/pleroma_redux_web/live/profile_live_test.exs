@@ -144,6 +144,22 @@ defmodule PleromaReduxWeb.ProfileLiveTest do
     refute has_element?(view, "#media-viewer[data-role='media-viewer']")
   end
 
+  test "profile allows deleting your own posts", %{conn: conn, viewer: viewer} do
+    assert {:ok, note} = Pipeline.ingest(Note.build(viewer, "Delete me"), local: true)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: viewer.id})
+    {:ok, view, _html} = live(conn, "/@#{viewer.nickname}")
+
+    assert has_element?(view, "#post-#{note.id} [data-role='delete-post']")
+
+    view
+    |> element("#post-#{note.id} button[data-role='delete-post-confirm']")
+    |> render_click()
+
+    assert Objects.get(note.id) == nil
+    refute has_element?(view, "#post-#{note.id}")
+  end
+
   test "remote profiles are addressed by nickname@domain and do not hijack local routes", %{
     conn: conn,
     viewer: viewer

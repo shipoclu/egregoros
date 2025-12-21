@@ -84,7 +84,7 @@ This is a **web UI** checklist for Pleroma‑Redux. Items are ordered roughly by
 | Repost / unrepost | DONE | |
 | Reply action | PARTIAL | Reply links to the status page (local permalinks); remote reply UX still TODO. |
 | Bookmark action | TODO | |
-| Delete own post | TODO | |
+| Delete own post | DONE | Available from the status “…” menu for local posts owned by the current user (with confirm step). |
 | Edit own post | TODO | (Optional; Mastodon doesn’t support editing by default.) |
 | Report post/user action menu | TODO | Common “…” menu. |
 | Media attachments render | PARTIAL | Images/video/audio render; documents fall back to download links; still needs lightbox/carousel. |

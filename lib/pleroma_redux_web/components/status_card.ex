@@ -2,6 +2,7 @@ defmodule PleromaReduxWeb.StatusCard do
   use PleromaReduxWeb, :html
 
   alias PleromaRedux.HTML
+  alias PleromaRedux.User
   alias PleromaReduxWeb.ProfilePaths
   alias PleromaReduxWeb.URL
   alias PleromaReduxWeb.ViewModels.Status, as: StatusVM
@@ -94,7 +95,7 @@ defmodule PleromaReduxWeb.StatusCard do
             <.time_ago at={@entry.object.inserted_at} />
           <% end %>
 
-          <.status_menu entry={@entry} />
+          <.status_menu entry={@entry} current_user={@current_user} />
         </div>
       </div>
 
@@ -464,9 +465,13 @@ defmodule PleromaReduxWeb.StatusCard do
   defp safe_http_url?(_url), do: false
 
   attr :entry, :map, required: true
+  attr :current_user, :any, default: nil
 
   defp status_menu(assigns) do
-    assigns = assign(assigns, :share_url, status_share_url(assigns.entry))
+    assigns =
+      assigns
+      |> assign(:share_url, status_share_url(assigns.entry))
+      |> assign(:can_delete?, can_delete_post?(assigns.entry, assigns.current_user))
 
     ~H"""
     <details data-role="status-menu" class="relative">
@@ -502,10 +507,62 @@ defmodule PleromaReduxWeb.StatusCard do
             class="size-5 text-slate-500 dark:text-slate-400"
           /> Open link
         </a>
+
+        <%= if @can_delete? do %>
+          <div class="border-t border-slate-200/80 dark:border-slate-700/70">
+            <button
+              type="button"
+              data-role="delete-post"
+              phx-click={JS.toggle(to: "#delete-post-confirm-#{@entry.object.id}")}
+              class="flex w-full items-center gap-3 px-4 py-3 text-sm font-semibold text-rose-700 transition hover:bg-rose-50/60 dark:text-rose-200 dark:hover:bg-rose-500/10"
+            >
+              <.icon name="hero-trash" class="size-5 text-rose-600 dark:text-rose-300" />
+              Delete post
+            </button>
+
+            <div
+              id={"delete-post-confirm-#{@entry.object.id}"}
+              class="hidden space-y-3 px-4 pb-4 pt-2 text-sm text-slate-600 dark:text-slate-300"
+            >
+              <p class="text-xs text-slate-500 dark:text-slate-400">
+                This cannot be undone.
+              </p>
+
+              <div class="flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  data-role="delete-post-cancel"
+                  phx-click={JS.hide(to: "#delete-post-confirm-#{@entry.object.id}")}
+                  class="inline-flex items-center justify-center rounded-full border border-slate-200/80 bg-white/70 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700 transition hover:-translate-y-0.5 hover:bg-white dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:hover:bg-slate-950"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  data-role="delete-post-confirm"
+                  phx-click="delete_post"
+                  phx-value-id={@entry.object.id}
+                  phx-disable-with="Deleting..."
+                  class="inline-flex items-center justify-center rounded-full bg-rose-600 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white shadow-lg shadow-rose-600/20 transition hover:-translate-y-0.5 hover:bg-rose-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 dark:bg-rose-500 dark:hover:bg-rose-400"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        <% end %>
       </div>
     </details>
     """
   end
+
+  defp can_delete_post?(%{object: %{type: "Note", local: true, actor: actor}}, %User{ap_id: actor})
+       when is_binary(actor) and actor != "" do
+    true
+  end
+
+  defp can_delete_post?(_entry, _user), do: false
 
   attr :actor, :map, required: true
 

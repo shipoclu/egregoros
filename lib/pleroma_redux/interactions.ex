@@ -2,6 +2,7 @@ defmodule PleromaRedux.Interactions do
   @moduledoc false
 
   alias PleromaRedux.Activities.Announce
+  alias PleromaRedux.Activities.Delete
   alias PleromaRedux.Activities.EmojiReact
   alias PleromaRedux.Activities.Like
   alias PleromaRedux.Activities.Undo
@@ -59,8 +60,18 @@ defmodule PleromaRedux.Interactions do
     end
   end
 
+  def delete_post(%User{} = user, post_id) when is_integer(post_id) do
+    with %{} = post <- Objects.get(post_id),
+         true <- post.type == "Note",
+         true <- post.local,
+         true <- post.actor == user.ap_id do
+      Pipeline.ingest(Delete.build(user, post), local: true)
+    else
+      _ -> {:error, :not_found}
+    end
+  end
+
   defp undo(%User{} = user, %Relationship{} = relationship) do
     Pipeline.ingest(Undo.build(user, relationship.activity_ap_id), local: true)
   end
 end
-
