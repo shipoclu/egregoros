@@ -6,6 +6,10 @@ defmodule PleromaRedux.ActivityPub.ObjectValidators.TypesTest do
   alias PleromaRedux.ActivityPub.ObjectValidators.Types.DateTime, as: APDateTime
 
   describe "ObjectID" do
+    test "declares its ecto type" do
+      assert ObjectID.type() == :string
+    end
+
     test "casts a non-empty string" do
       assert {:ok, "https://example.com/objects/1"} =
                Ecto.Type.cast(ObjectID, "https://example.com/objects/1")
@@ -40,9 +44,25 @@ defmodule PleromaRedux.ActivityPub.ObjectValidators.TypesTest do
       assert :error = Ecto.Type.cast(ObjectID, %{})
       assert :error = Ecto.Type.cast(ObjectID, 123)
     end
+
+    test "rejects nil via direct cast" do
+      assert :error == ObjectID.cast(nil)
+    end
+
+    test "dump/load are passthrough" do
+      assert {:ok, "https://example.com/objects/1"} =
+               ObjectID.dump("https://example.com/objects/1")
+
+      assert {:ok, "https://example.com/objects/1"} =
+               ObjectID.load("https://example.com/objects/1")
+    end
   end
 
   describe "Recipients" do
+    test "declares its ecto type" do
+      assert Recipients.type() == {:array, ObjectID}
+    end
+
     test "casts a string into a singleton list" do
       assert {:ok, ["https://example.com/users/alice"]} =
                Ecto.Type.cast(Recipients, "https://example.com/users/alice")
@@ -72,6 +92,10 @@ defmodule PleromaRedux.ActivityPub.ObjectValidators.TypesTest do
       assert :error = Ecto.Type.cast(Recipients, %{"id" => "   "})
     end
 
+    test "rejects invalid values via direct cast" do
+      assert :error == Recipients.cast(123)
+    end
+
     test "sorts and deduplicates recipients" do
       assert {:ok, ["https://example.com/users/alice", "https://example.com/users/bob"]} =
                Ecto.Type.cast(Recipients, [
@@ -80,9 +104,21 @@ defmodule PleromaRedux.ActivityPub.ObjectValidators.TypesTest do
                  "https://example.com/users/bob"
                ])
     end
+
+    test "dump/load are passthrough" do
+      assert {:ok, ["https://example.com/users/alice"]} =
+               Recipients.dump(["https://example.com/users/alice"])
+
+      assert {:ok, ["https://example.com/users/alice"]} =
+               Recipients.load(["https://example.com/users/alice"])
+    end
   end
 
   describe "DateTime" do
+    test "declares its ecto type" do
+      assert APDateTime.type() == :string
+    end
+
     test "casts iso8601 values" do
       assert {:ok, "2020-01-01T00:00:00Z"} = Ecto.Type.cast(APDateTime, "2020-01-01T00:00:00Z")
     end
@@ -98,6 +134,15 @@ defmodule PleromaRedux.ActivityPub.ObjectValidators.TypesTest do
     test "rejects non-binary values" do
       assert {:ok, nil} = Ecto.Type.cast(APDateTime, nil)
       assert :error = Ecto.Type.cast(APDateTime, 123)
+    end
+
+    test "rejects nil via direct cast" do
+      assert :error == APDateTime.cast(nil)
+    end
+
+    test "dump/load are passthrough" do
+      assert {:ok, "2020-01-01T00:00:00Z"} = APDateTime.dump("2020-01-01T00:00:00Z")
+      assert {:ok, "2020-01-01T00:00:00Z"} = APDateTime.load("2020-01-01T00:00:00Z")
     end
   end
 end
