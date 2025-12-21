@@ -52,6 +52,121 @@ defmodule PleromaRedux.Federation.ActorTest do
     assert Users.get_by_ap_id(actor_url)
   end
 
+  test "fetch_and_store preserves existing profile fields when refetched actors omit them" do
+    actor_url = "https://remote.example/users/alice"
+    {public_key, _private_key} = Keys.generate_rsa_keypair()
+
+    expect(PleromaRedux.HTTP.Mock, :get, fn _url, _headers ->
+      {:ok,
+       %{
+         status: 200,
+         body: %{
+           "id" => actor_url,
+           "type" => "Person",
+           "preferredUsername" => "alice",
+           "name" => "Alice",
+           "summary" => "bio",
+           "inbox" => actor_url <> "/inbox",
+           "outbox" => actor_url <> "/outbox",
+           "icon" => %{"url" => "https://remote.example/media/avatar.png"},
+           "publicKey" => %{
+             "id" => actor_url <> "#main-key",
+             "owner" => actor_url,
+             "publicKeyPem" => public_key
+           }
+         },
+         headers: []
+       }}
+    end)
+
+    assert {:ok, _user} = Actor.fetch_and_store(actor_url)
+
+    expect(PleromaRedux.HTTP.Mock, :get, fn _url, _headers ->
+      {:ok,
+       %{
+         status: 200,
+         body: %{
+           "id" => actor_url,
+           "type" => "Person",
+           "preferredUsername" => "alice",
+           "inbox" => actor_url <> "/inbox",
+           "outbox" => actor_url <> "/outbox",
+           "publicKey" => %{
+             "id" => actor_url <> "#main-key",
+             "owner" => actor_url,
+             "publicKeyPem" => public_key
+           }
+         },
+         headers: []
+       }}
+    end)
+
+    assert {:ok, _user} = Actor.fetch_and_store(actor_url)
+
+    user = Users.get_by_ap_id(actor_url)
+    assert user.name == "Alice"
+    assert user.bio == "bio"
+    assert user.avatar_url == "https://remote.example/media/avatar.png"
+  end
+
+  test "fetch_and_store resolves relative icon urls against actor ids" do
+    actor_url = "https://remote.example/users/alice"
+    {public_key, _private_key} = Keys.generate_rsa_keypair()
+
+    expect(PleromaRedux.HTTP.Mock, :get, fn _url, _headers ->
+      {:ok,
+       %{
+         status: 200,
+         body: %{
+           "id" => actor_url,
+           "type" => "Person",
+           "preferredUsername" => "alice",
+           "inbox" => actor_url <> "/inbox",
+           "outbox" => actor_url <> "/outbox",
+           "icon" => %{"url" => "/media/avatar.png"},
+           "publicKey" => %{
+             "id" => actor_url <> "#main-key",
+             "owner" => actor_url,
+             "publicKeyPem" => public_key
+           }
+         },
+         headers: []
+       }}
+    end)
+
+    assert {:ok, user} = Actor.fetch_and_store(actor_url)
+    assert user.avatar_url == "https://remote.example/media/avatar.png"
+  end
+
+  test "fetch_and_store supports icon url lists" do
+    actor_url = "https://remote.example/users/alice"
+    {public_key, _private_key} = Keys.generate_rsa_keypair()
+
+    expect(PleromaRedux.HTTP.Mock, :get, fn _url, _headers ->
+      {:ok,
+       %{
+         status: 200,
+         body: %{
+           "id" => actor_url,
+           "type" => "Person",
+           "preferredUsername" => "alice",
+           "inbox" => actor_url <> "/inbox",
+           "outbox" => actor_url <> "/outbox",
+           "icon" => %{"url" => [%{"href" => "https://remote.example/media/avatar.png"}]},
+           "publicKey" => %{
+             "id" => actor_url <> "#main-key",
+             "owner" => actor_url,
+             "publicKeyPem" => public_key
+           }
+         },
+         headers: []
+       }}
+    end)
+
+    assert {:ok, user} = Actor.fetch_and_store(actor_url)
+    assert user.avatar_url == "https://remote.example/media/avatar.png"
+  end
+
   test "fetch_and_store returns :missing_public_key when the actor has no public key" do
     actor_url = "https://remote.example/users/alice"
 

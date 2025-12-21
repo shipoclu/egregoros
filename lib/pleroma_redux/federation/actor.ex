@@ -81,20 +81,24 @@ defmodule PleromaRedux.Federation.Actor do
 
       with :ok <- SafeURL.validate_http_url(inbox),
            :ok <- SafeURL.validate_http_url(outbox) do
-        {:ok,
-         %{
-           nickname: nickname,
-           domain: domain,
-           ap_id: id,
-           inbox: inbox,
-           outbox: outbox,
-           public_key: public_key,
-           private_key: nil,
-           local: false,
-           name: Map.get(actor, "name"),
-           bio: Map.get(actor, "summary"),
-           avatar_url: icon_url(actor)
-         }}
+        attrs = %{
+          nickname: nickname,
+          domain: domain,
+          ap_id: id,
+          inbox: inbox,
+          outbox: outbox,
+          public_key: public_key,
+          private_key: nil,
+          local: false
+        }
+
+        attrs =
+          attrs
+          |> maybe_put_string(:name, Map.get(actor, "name"))
+          |> maybe_put_string(:bio, Map.get(actor, "summary"))
+          |> maybe_put_icon(actor, id)
+
+        {:ok, attrs}
       end
     end
   end
@@ -111,7 +115,77 @@ defmodule PleromaRedux.Federation.Actor do
     end
   end
 
-  defp icon_url(%{"icon" => %{"url" => url}}) when is_binary(url), do: url
-  defp icon_url(%{"icon" => url}) when is_binary(url), do: url
-  defp icon_url(_), do: nil
+  defp maybe_put_string(attrs, key, value)
+       when is_map(attrs) and is_atom(key) and is_binary(value) do
+    value = String.trim(value)
+    if value == "", do: attrs, else: Map.put(attrs, key, value)
+  end
+
+  defp maybe_put_string(attrs, _key, _value), do: attrs
+
+  defp maybe_put_icon(attrs, actor, actor_id) when is_map(attrs) and is_map(actor) do
+    case icon_url(actor, actor_id) do
+      url when is_binary(url) and url != "" -> Map.put(attrs, :avatar_url, url)
+      _ -> attrs
+    end
+  end
+
+  defp maybe_put_icon(attrs, _actor, _actor_id), do: attrs
+
+  defp icon_url(%{} = actor, actor_id) when is_binary(actor_id) do
+    actor
+    |> Map.get("icon")
+    |> extract_url()
+    |> resolve_url(actor_id)
+    |> case do
+      url when is_binary(url) ->
+        case SafeURL.validate_http_url(url) do
+          :ok -> url
+          _ -> nil
+        end
+
+      _ ->
+        nil
+    end
+  end
+
+  defp icon_url(_actor, _actor_id), do: nil
+
+  defp extract_url(url) when is_binary(url), do: url
+  defp extract_url(%{"href" => href}) when is_binary(href), do: href
+  defp extract_url(%{"url" => url}), do: extract_url(url)
+
+  defp extract_url(list) when is_list(list) do
+    Enum.find_value(list, &extract_url/1)
+  end
+
+  defp extract_url(_), do: nil
+
+  defp resolve_url(nil, _base), do: nil
+
+  defp resolve_url(url, base) when is_binary(url) and is_binary(base) do
+    url = String.trim(url)
+
+    cond do
+      url == "" ->
+        nil
+
+      String.starts_with?(url, ["http://", "https://"]) ->
+        url
+
+      true ->
+        case URI.parse(base) do
+          %URI{scheme: scheme, host: host}
+          when scheme in ["http", "https"] and is_binary(host) and host != "" ->
+            base
+            |> URI.merge(url)
+            |> URI.to_string()
+
+          _ ->
+            nil
+        end
+    end
+  end
+
+  defp resolve_url(_url, _base), do: nil
 end
