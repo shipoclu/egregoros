@@ -349,176 +349,181 @@ defmodule PleromaReduxWeb.StatusLive do
               :if={@current_user}
               class="rounded-3xl border border-white/80 bg-white/80 p-6 shadow-lg shadow-slate-200/20 backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/70 dark:shadow-slate-900/40"
             >
-              <%= if @reply_open? do %>
-                <.form
-                  for={@reply_form}
-                  id="reply-form"
-                  phx-change="reply_change"
-                  phx-submit="create_reply"
-                  class="space-y-4"
-                >
-                  <div class="flex items-center justify-between gap-3">
-                    <p class="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
-                      Reply
-                    </p>
-                    <button
-                      type="button"
-                      phx-click="close_reply"
-                      class="inline-flex h-9 w-9 items-center justify-center rounded-2xl text-slate-500 transition hover:bg-slate-900/5 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
-                      aria-label="Close reply composer"
-                    >
-                      <.icon name="hero-x-mark" class="size-4" />
-                    </button>
-                  </div>
-
-                  <.input
-                    field={@reply_form[:content]}
-                    type="textarea"
-                    label="Your reply"
-                    placeholder="Write a reply…"
-                    class="min-h-28"
-                  />
-
-                  <section
-                    class="rounded-2xl border border-slate-200/80 bg-white/70 p-4 dark:border-slate-700/70 dark:bg-slate-950/50"
-                    aria-label="Attachments"
+              <.form
+                for={@reply_form}
+                id="reply-form"
+                data-state={if @reply_open?, do: "open", else: "closed"}
+                phx-change="reply_change"
+                phx-submit="create_reply"
+                class={["space-y-4", !@reply_open? && "hidden"]}
+              >
+                <div class="flex items-center justify-between gap-3">
+                  <p class="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
+                    Reply
+                  </p>
+                  <button
+                    type="button"
+                    data-role="reply-close"
+                    phx-click={close_reply_js() |> JS.push("close_reply")}
+                    class="inline-flex h-9 w-9 items-center justify-center rounded-2xl text-slate-500 transition hover:bg-slate-900/5 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
+                    aria-label="Close reply composer"
                   >
-                    <div class="flex flex-col gap-3">
-                      <div>
-                        <p class="text-xs uppercase tracking-[0.25em] text-slate-500 dark:text-slate-400">
-                          Attachments
-                        </p>
-                        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                          Images, video, audio — up to 10MB
-                        </p>
-                      </div>
+                    <.icon name="hero-x-mark" class="size-4" />
+                  </button>
+                </div>
 
-                      <label
-                        data-role="reply-add-media"
-                        class="relative inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-full border border-slate-200/80 bg-white/70 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700 transition hover:-translate-y-0.5 hover:bg-white dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:hover:bg-slate-950"
-                      >
-                        <.icon name="hero-photo" class="size-4" /> Add media
-                        <.live_file_input
-                          upload={@uploads.reply_media}
-                          id="reply-media-input"
-                          class="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                        />
-                      </label>
+                <.input
+                  field={@reply_form[:content]}
+                  type="textarea"
+                  label="Your reply"
+                  placeholder="Write a reply…"
+                  class="min-h-28"
+                />
+
+                <section
+                  class="rounded-2xl border border-slate-200/80 bg-white/70 p-4 dark:border-slate-700/70 dark:bg-slate-950/50"
+                  aria-label="Attachments"
+                >
+                  <div class="flex flex-col gap-3">
+                    <div>
+                      <p class="text-xs uppercase tracking-[0.25em] text-slate-500 dark:text-slate-400">
+                        Attachments
+                      </p>
+                      <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                        Images, video, audio — up to 10MB
+                      </p>
                     </div>
 
-                    <div
-                      class="mt-4 grid gap-3"
-                      phx-drop-target={@uploads.reply_media.ref}
-                      data-role="reply-media-drop"
+                    <label
+                      data-role="reply-add-media"
+                      class="relative inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-full border border-slate-200/80 bg-white/70 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700 transition hover:-translate-y-0.5 hover:bg-white dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:hover:bg-slate-950"
                     >
-                      <p
-                        :if={@uploads.reply_media.entries == []}
-                        class="rounded-2xl border border-dashed border-slate-200/80 bg-white/50 p-4 text-sm text-slate-600 dark:border-slate-700/70 dark:bg-slate-950/40 dark:text-slate-300"
-                      >
-                        Drop media here or use “Add media”.
-                      </p>
+                      <.icon name="hero-photo" class="size-4" /> Add media
+                      <.live_file_input
+                        upload={@uploads.reply_media}
+                        id="reply-media-input"
+                        class="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                      />
+                    </label>
+                  </div>
 
-                      <div
-                        :for={entry <- @uploads.reply_media.entries}
-                        id={"reply-media-entry-#{entry.ref}"}
-                        data-role="reply-media-entry"
-                        class="rounded-2xl border border-slate-200/80 bg-white/60 p-3 shadow-sm shadow-slate-200/20 dark:border-slate-700/70 dark:bg-slate-950/50 dark:shadow-slate-900/40"
-                      >
-                        <div class="flex gap-3">
-                          <div class="relative h-16 w-16 overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm shadow-slate-200/20 dark:border-slate-700/70 dark:bg-slate-950/60 dark:shadow-slate-900/40">
-                            <.upload_entry_preview entry={entry} />
-                          </div>
+                  <div
+                    class="mt-4 grid gap-3"
+                    phx-drop-target={@uploads.reply_media.ref}
+                    data-role="reply-media-drop"
+                  >
+                    <p
+                      :if={@uploads.reply_media.entries == []}
+                      class="rounded-2xl border border-dashed border-slate-200/80 bg-white/50 p-4 text-sm text-slate-600 dark:border-slate-700/70 dark:bg-slate-950/40 dark:text-slate-300"
+                    >
+                      Drop media here or use “Add media”.
+                    </p>
 
-                          <div class="min-w-0 flex-1 space-y-3">
-                            <div class="flex items-start justify-between gap-3">
-                              <p class="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
-                                {entry.client_name}
-                              </p>
-                              <button
-                                type="button"
-                                phx-click="cancel_reply_media"
-                                phx-value-ref={entry.ref}
-                                class="inline-flex h-9 w-9 items-center justify-center rounded-2xl text-slate-500 transition hover:bg-slate-900/5 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
-                                aria-label="Remove attachment"
-                              >
-                                <.icon name="hero-x-mark" class="size-4" />
-                              </button>
-                            </div>
+                    <div
+                      :for={entry <- @uploads.reply_media.entries}
+                      id={"reply-media-entry-#{entry.ref}"}
+                      data-role="reply-media-entry"
+                      class="rounded-2xl border border-slate-200/80 bg-white/60 p-3 shadow-sm shadow-slate-200/20 dark:border-slate-700/70 dark:bg-slate-950/50 dark:shadow-slate-900/40"
+                    >
+                      <div class="flex gap-3">
+                        <div class="relative h-16 w-16 overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm shadow-slate-200/20 dark:border-slate-700/70 dark:bg-slate-950/60 dark:shadow-slate-900/40">
+                          <.upload_entry_preview entry={entry} />
+                        </div>
 
-                            <div class="h-2 overflow-hidden rounded-full bg-slate-200/70 dark:bg-slate-700/50">
-                              <div
-                                class="h-full bg-slate-900 transition-all dark:bg-slate-100"
-                                style={"width: #{entry.progress}%"}
-                              >
-                              </div>
-                            </div>
-                            <span class="sr-only" data-role="reply-media-progress">
-                              {entry.progress}%
-                            </span>
-
-                            <details
-                              :if={upload_entry_kind(entry) in [:video, :audio]}
-                              class="rounded-2xl border border-slate-200/80 bg-white/70 px-4 py-3 dark:border-slate-700/70 dark:bg-slate-950/50"
-                            >
-                              <summary class="cursor-pointer select-none text-xs font-semibold uppercase tracking-[0.2em] text-slate-600 dark:text-slate-300 list-none [&::-webkit-details-marker]:hidden">
-                                Preview
-                              </summary>
-                              <div class="mt-3">
-                                <.upload_entry_player entry={entry} />
-                              </div>
-                            </details>
-
-                            <.input
-                              type="text"
-                              id={"reply-media-alt-#{entry.ref}"}
-                              name={"reply[media_alt][#{entry.ref}]"}
-                              label="Alt text"
-                              value={Map.get(@reply_media_alt, entry.ref, "")}
-                              placeholder={upload_entry_description_placeholder(entry)}
-                              phx-debounce="blur"
-                            />
-
-                            <p
-                              :for={err <- upload_errors(@uploads.reply_media, entry)}
-                              data-role="reply-upload-error"
-                              class="text-sm text-rose-600 dark:text-rose-400"
-                            >
-                              {upload_error_text(err)}
+                        <div class="min-w-0 flex-1 space-y-3">
+                          <div class="flex items-start justify-between gap-3">
+                            <p class="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
+                              {entry.client_name}
                             </p>
+                            <button
+                              type="button"
+                              phx-click="cancel_reply_media"
+                              phx-value-ref={entry.ref}
+                              class="inline-flex h-9 w-9 items-center justify-center rounded-2xl text-slate-500 transition hover:bg-slate-900/5 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
+                              aria-label="Remove attachment"
+                            >
+                              <.icon name="hero-x-mark" class="size-4" />
+                            </button>
                           </div>
+
+                          <div class="h-2 overflow-hidden rounded-full bg-slate-200/70 dark:bg-slate-700/50">
+                            <div
+                              class="h-full bg-slate-900 transition-all dark:bg-slate-100"
+                              style={"width: #{entry.progress}%"}
+                            >
+                            </div>
+                          </div>
+                          <span class="sr-only" data-role="reply-media-progress">
+                            {entry.progress}%
+                          </span>
+
+                          <details
+                            :if={upload_entry_kind(entry) in [:video, :audio]}
+                            class="rounded-2xl border border-slate-200/80 bg-white/70 px-4 py-3 dark:border-slate-700/70 dark:bg-slate-950/50"
+                          >
+                            <summary class="cursor-pointer select-none text-xs font-semibold uppercase tracking-[0.2em] text-slate-600 dark:text-slate-300 list-none [&::-webkit-details-marker]:hidden">
+                              Preview
+                            </summary>
+                            <div class="mt-3">
+                              <.upload_entry_player entry={entry} />
+                            </div>
+                          </details>
+
+                          <.input
+                            type="text"
+                            id={"reply-media-alt-#{entry.ref}"}
+                            name={"reply[media_alt][#{entry.ref}]"}
+                            label="Alt text"
+                            value={Map.get(@reply_media_alt, entry.ref, "")}
+                            placeholder={upload_entry_description_placeholder(entry)}
+                            phx-debounce="blur"
+                          />
+
+                          <p
+                            :for={err <- upload_errors(@uploads.reply_media, entry)}
+                            data-role="reply-upload-error"
+                            class="text-sm text-rose-600 dark:text-rose-400"
+                          >
+                            {upload_error_text(err)}
+                          </p>
                         </div>
                       </div>
                     </div>
-
-                    <p
-                      :for={err <- upload_errors(@uploads.reply_media)}
-                      data-role="reply-upload-error"
-                      class="mt-3 text-sm text-rose-600 dark:text-rose-400"
-                    >
-                      {upload_error_text(err)}
-                    </p>
-                  </section>
-
-                  <div class="flex items-center justify-end gap-3">
-                    <button
-                      type="submit"
-                      phx-disable-with="Posting…"
-                      class="inline-flex items-center gap-2 rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/20 transition hover:-translate-y-0.5 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
-                    >
-                      <.icon name="hero-paper-airplane" class="size-5" /> Post reply
-                    </button>
                   </div>
-                </.form>
-              <% else %>
-                <button
-                  type="button"
-                  data-role="reply-open"
-                  phx-click="open_reply"
-                  class="inline-flex w-full items-center justify-center gap-2 rounded-full border border-slate-200/80 bg-white/70 px-6 py-3 text-sm font-semibold text-slate-700 shadow-sm shadow-slate-200/20 transition hover:-translate-y-0.5 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:shadow-slate-900/40 dark:hover:bg-slate-950"
-                >
-                  <.icon name="hero-chat-bubble-left-right" class="size-5" /> Write a reply
-                </button>
-              <% end %>
+
+                  <p
+                    :for={err <- upload_errors(@uploads.reply_media)}
+                    data-role="reply-upload-error"
+                    class="mt-3 text-sm text-rose-600 dark:text-rose-400"
+                  >
+                    {upload_error_text(err)}
+                  </p>
+                </section>
+
+                <div class="flex items-center justify-end gap-3">
+                  <button
+                    type="submit"
+                    phx-disable-with="Posting…"
+                    class="inline-flex items-center gap-2 rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/20 transition hover:-translate-y-0.5 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+                  >
+                    <.icon name="hero-paper-airplane" class="size-5" /> Post reply
+                  </button>
+                </div>
+              </.form>
+
+              <button
+                type="button"
+                id="reply-open-button"
+                data-role="reply-open"
+                data-state={if @reply_open?, do: "hidden", else: "visible"}
+                phx-click={open_reply_js() |> JS.push("open_reply")}
+                class={[
+                  "mt-4 inline-flex w-full items-center justify-center gap-2 rounded-full border border-slate-200/80 bg-white/70 px-6 py-3 text-sm font-semibold text-slate-700 shadow-sm shadow-slate-200/20 transition hover:-translate-y-0.5 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:shadow-slate-900/40 dark:hover:bg-slate-950",
+                  @reply_open? && "hidden"
+                ]}
+              >
+                <.icon name="hero-chat-bubble-left-right" class="size-5" /> Write a reply
+              </button>
             </section>
           </section>
         <% else %>
@@ -650,6 +655,18 @@ defmodule PleromaReduxWeb.StatusLive do
       "true" -> true
       _ -> false
     end
+  end
+
+  defp open_reply_js(js \\ %JS{}) do
+    js
+    |> JS.remove_class("hidden", to: "#reply-form")
+    |> JS.add_class("hidden", to: "#reply-open-button")
+  end
+
+  defp close_reply_js(js \\ %JS{}) do
+    js
+    |> JS.add_class("hidden", to: "#reply-form")
+    |> JS.remove_class("hidden", to: "#reply-open-button")
   end
 
   defp timeline_href(%{id: _}), do: ~p"/?timeline=home"

@@ -316,11 +316,13 @@ defmodule PleromaReduxWeb.StatusLiveTest do
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}")
 
+    assert has_element?(view, "#reply-form[data-state='closed']")
+
     view
     |> element("button[data-role='reply-open']")
     |> render_click()
 
-    assert has_element?(view, "#reply-form")
+    assert has_element?(view, "#reply-form[data-state='open']")
 
     view
     |> form("#reply-form", reply: %{content: "Typing..."})
@@ -329,11 +331,11 @@ defmodule PleromaReduxWeb.StatusLiveTest do
     assert render(view) =~ "Typing..."
 
     view
-    |> element("button[phx-click='close_reply']")
+    |> element("button[data-role='reply-close']")
     |> render_click()
 
     assert has_element?(view, "button[data-role='reply-open']")
-    refute has_element?(view, "#reply-form")
+    assert has_element?(view, "#reply-form[data-state='closed']")
   end
 
   test "signed-in users can remove reply uploads before posting", %{conn: conn, user: user} do

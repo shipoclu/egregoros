@@ -500,21 +500,30 @@ defmodule PleromaReduxWeb.TimelineLive do
         <:aside>
           <section
             id="compose-panel"
+            data-role="compose-panel"
+            data-state={if @compose_open?, do: "open", else: "closed"}
             class={[
               "rounded-3xl border border-white/80 bg-white/80 p-6 shadow-xl shadow-slate-200/40 backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/70 dark:shadow-slate-900/40",
-              !@compose_open? && "hidden lg:block",
-              @compose_open? &&
-                "fixed inset-x-4 bottom-24 z-50 max-h-[78vh] overflow-y-auto lg:static lg:inset-auto lg:bottom-auto lg:z-auto lg:max-h-none lg:overflow-visible"
+              "fixed inset-x-4 bottom-24 z-50 max-h-[78vh] overflow-y-auto lg:static lg:inset-auto lg:bottom-auto lg:z-auto lg:max-h-none lg:overflow-visible",
+              !@compose_open? && "hidden lg:block"
             ]}
           >
-            <div :if={@compose_open?} class="mb-4 flex items-center justify-between lg:hidden">
+            <div
+              id="compose-mobile-header"
+              data-role="compose-mobile-header"
+              data-state={if @compose_open?, do: "open", else: "closed"}
+              class={[
+                "mb-4 flex items-center justify-between lg:hidden",
+                !@compose_open? && "hidden"
+              ]}
+            >
               <p class="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
                 Compose
               </p>
               <button
                 type="button"
                 data-role="compose-close"
-                phx-click="close_compose"
+                phx-click={close_compose_js() |> JS.push("close_compose")}
                 class="inline-flex h-9 w-9 items-center justify-center rounded-2xl text-slate-500 transition hover:bg-slate-900/5 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
                 aria-label="Close composer"
               >
@@ -553,7 +562,10 @@ defmodule PleromaReduxWeb.TimelineLive do
                     <button
                       type="button"
                       data-role="compose-visibility-pill"
-                      phx-click="toggle_compose_options"
+                      phx-click={
+                        toggle_compose_options_js()
+                        |> JS.push("toggle_compose_options")
+                      }
                       class="inline-flex items-center gap-2 rounded-xl border border-slate-200/80 bg-white/70 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:hover:bg-slate-950"
                       aria-label="Post visibility"
                     >
@@ -564,7 +576,10 @@ defmodule PleromaReduxWeb.TimelineLive do
                     <button
                       type="button"
                       data-role="compose-language-pill"
-                      phx-click="toggle_compose_options"
+                      phx-click={
+                        toggle_compose_options_js()
+                        |> JS.push("toggle_compose_options")
+                      }
                       class="inline-flex items-center gap-2 rounded-xl border border-slate-200/80 bg-white/70 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:hover:bg-slate-950"
                       aria-label="Post language"
                     >
@@ -573,7 +588,12 @@ defmodule PleromaReduxWeb.TimelineLive do
                     </button>
                   </div>
 
-                  <div :if={@compose_cw_open?} class="px-4 pt-3">
+                  <div
+                    id="compose-cw"
+                    data-role="compose-cw"
+                    data-state={if @compose_cw_open?, do: "open", else: "closed"}
+                    class={["px-4 pt-3", !@compose_cw_open? && "hidden"]}
+                  >
                     <.input
                       type="text"
                       field={@form[:spoiler_text]}
@@ -595,9 +615,13 @@ defmodule PleromaReduxWeb.TimelineLive do
                   </div>
 
                   <div
-                    :if={@compose_options_open?}
+                    id="compose-options"
                     data-role="compose-options"
-                    class="border-t border-slate-200/70 bg-white/60 px-4 py-4 dark:border-slate-700/70 dark:bg-slate-950/40"
+                    data-state={if @compose_options_open?, do: "open", else: "closed"}
+                    class={[
+                      "border-t border-slate-200/70 bg-white/60 px-4 py-4 dark:border-slate-700/70 dark:bg-slate-950/40",
+                      !@compose_options_open? && "hidden"
+                    ]}
                   >
                     <div class="grid gap-4">
                       <.input
@@ -735,7 +759,10 @@ defmodule PleromaReduxWeb.TimelineLive do
                       <button
                         type="button"
                         data-role="compose-toggle-cw"
-                        phx-click="toggle_compose_cw"
+                        phx-click={
+                          toggle_compose_cw_js()
+                          |> JS.push("toggle_compose_cw")
+                        }
                         aria-label="Content warning"
                         class={[
                           "inline-flex h-10 w-10 items-center justify-center rounded-2xl transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400",
@@ -751,7 +778,10 @@ defmodule PleromaReduxWeb.TimelineLive do
                       <button
                         type="button"
                         data-role="compose-toggle-options"
-                        phx-click="toggle_compose_options"
+                        phx-click={
+                          toggle_compose_options_js()
+                          |> JS.push("toggle_compose_options")
+                        }
                         aria-label="Post options"
                         class={[
                           "inline-flex h-10 w-10 items-center justify-center rounded-2xl transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400",
@@ -1044,20 +1074,29 @@ defmodule PleromaReduxWeb.TimelineLive do
         </section>
 
         <div
-          :if={@compose_open?}
           id="compose-overlay"
-          class="fixed inset-0 z-40 bg-slate-950/50 backdrop-blur-sm lg:hidden"
-          phx-click="close_compose"
-          aria-hidden="true"
+          data-role="compose-overlay"
+          data-state={if @compose_open?, do: "open", else: "closed"}
+          class={[
+            "fixed inset-0 z-40 bg-slate-950/50 backdrop-blur-sm lg:hidden",
+            !@compose_open? && "hidden"
+          ]}
+          phx-click={close_compose_js() |> JS.push("close_compose")}
+          aria-hidden={!@compose_open?}
         >
         </div>
 
         <button
-          :if={@current_user && !@compose_open?}
+          :if={@current_user}
           type="button"
+          id="compose-open-button"
           data-role="compose-open"
-          phx-click="open_compose"
-          class="fixed bottom-24 right-6 z-40 inline-flex h-14 w-14 items-center justify-center rounded-full bg-slate-900 text-white shadow-xl shadow-slate-900/30 transition hover:-translate-y-0.5 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white lg:hidden"
+          data-state={if @compose_open?, do: "hidden", else: "visible"}
+          phx-click={open_compose_js() |> JS.push("open_compose")}
+          class={[
+            "fixed bottom-24 right-6 z-40 inline-flex h-14 w-14 items-center justify-center rounded-full bg-slate-900 text-white shadow-xl shadow-slate-900/30 transition hover:-translate-y-0.5 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white lg:hidden",
+            @compose_open? && "hidden"
+          ]}
           aria-label="Compose a new post"
         >
           <.icon name="hero-pencil-square" class="size-6" />
@@ -1084,6 +1123,30 @@ defmodule PleromaReduxWeb.TimelineLive do
   defp timeline_from_params(%{"timeline" => "home"}, %User{}), do: :home
   defp timeline_from_params(_params, %User{}), do: :home
   defp timeline_from_params(_params, _user), do: :public
+
+  defp open_compose_js(js \\ %JS{}) do
+    js
+    |> JS.remove_class("hidden", to: "#compose-panel")
+    |> JS.remove_class("hidden", to: "#compose-overlay")
+    |> JS.remove_class("hidden", to: "#compose-mobile-header")
+    |> JS.add_class("hidden", to: "#compose-open-button")
+  end
+
+  defp close_compose_js(js \\ %JS{}) do
+    js
+    |> JS.add_class("hidden lg:block", to: "#compose-panel")
+    |> JS.add_class("hidden", to: "#compose-overlay")
+    |> JS.add_class("hidden", to: "#compose-mobile-header")
+    |> JS.remove_class("hidden", to: "#compose-open-button")
+  end
+
+  defp toggle_compose_options_js(js \\ %JS{}) do
+    JS.toggle_class(js, "hidden", to: "#compose-options")
+  end
+
+  defp toggle_compose_cw_js(js \\ %JS{}) do
+    JS.toggle_class(js, "hidden", to: "#compose-cw")
+  end
 
   defp list_timeline_posts(:home, %User{} = user, opts) when is_list(opts) do
     Objects.list_home_notes(user.ap_id, opts)

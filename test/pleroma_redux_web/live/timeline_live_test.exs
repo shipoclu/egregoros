@@ -95,19 +95,19 @@ defmodule PleromaReduxWeb.TimelineLiveTest do
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     {:ok, view, _html} = live(conn, "/")
 
-    refute has_element?(view, "#compose-overlay")
+    assert has_element?(view, "#compose-overlay[data-state='closed']")
 
     view
     |> element("button[data-role='compose-open']")
     |> render_click()
 
-    assert has_element?(view, "#compose-overlay")
+    assert has_element?(view, "#compose-overlay[data-state='open']")
 
     view
     |> element("button[data-role='compose-close']")
     |> render_click()
 
-    refute has_element?(view, "#compose-overlay")
+    assert has_element?(view, "#compose-overlay[data-state='closed']")
   end
 
   test "public timeline sanitizes remote html content", %{conn: conn} do
