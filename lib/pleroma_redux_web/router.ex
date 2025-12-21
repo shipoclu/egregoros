@@ -44,7 +44,7 @@ defmodule PleromaReduxWeb.Router do
     post "/settings/profile", SettingsController, :update_profile
     post "/settings/account", SettingsController, :update_account
     post "/settings/password", SettingsController, :update_password
-    get "/logout", RegistrationController, :logout
+    post "/logout", RegistrationController, :logout
 
     live "/", TimelineLive
     live "/tags/:tag", TagLive

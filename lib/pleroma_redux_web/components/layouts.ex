@@ -70,12 +70,14 @@ defmodule PleromaReduxWeb.Layouts do
               >
                 Settings
               </a>
-              <a
-                href={~p"/logout"}
-                class="hidden text-xs uppercase tracking-[0.25em] text-slate-500 transition hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 sm:block"
-              >
-                {@current_user.nickname} · Logout
-              </a>
+              <.form for={%{}} action={~p"/logout"} method="post" class="hidden sm:block">
+                <button
+                  type="submit"
+                  class="text-xs uppercase tracking-[0.25em] text-slate-500 transition hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+                >
+                  {@current_user.nickname} · Logout
+                </button>
+              </.form>
             <% else %>
               <a
                 href={~p"/login"}

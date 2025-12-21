@@ -69,11 +69,18 @@ defmodule PleromaReduxWeb.SessionControllerTest do
     assert get_session(conn, :user_id) == nil
   end
 
-  test "GET /logout clears the session", %{conn: conn} do
+  test "POST /logout clears the session", %{conn: conn} do
     conn =
       conn
       |> Plug.Test.init_test_session(%{user_id: 123})
-      |> get("/logout")
+      |> get("/")
+
+    csrf_token = Phoenix.Controller.get_csrf_token()
+
+    conn =
+      conn
+      |> recycle()
+      |> post("/logout", %{"_csrf_token" => csrf_token})
 
     assert redirected_to(conn) == "/"
     assert get_session(conn, :user_id) == nil
