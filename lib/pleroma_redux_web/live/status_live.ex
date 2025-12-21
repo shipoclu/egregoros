@@ -28,7 +28,7 @@ defmodule PleromaReduxWeb.StatusLive do
         %{type: "Note"} = note ->
           status_entry = StatusVM.decorate(note, current_user)
           ancestors = note |> Objects.thread_ancestors() |> StatusVM.decorate_many(current_user)
-          descendants = note |> Objects.thread_descendants() |> StatusVM.decorate_many(current_user)
+          descendants = decorate_descendants(note, current_user)
           {status_entry, ancestors, descendants}
 
         _ ->
@@ -149,9 +149,7 @@ defmodule PleromaReduxWeb.StatusLive do
           note = socket.assigns.status.object
 
           descendants =
-            note
-            |> Objects.thread_descendants()
-            |> StatusVM.decorate_many(user)
+            decorate_descendants(note, user)
 
           {:noreply,
            socket
@@ -225,12 +223,21 @@ defmodule PleromaReduxWeb.StatusLive do
                 />
               </div>
 
-              <StatusCard.status_card
-                :for={entry <- @descendants}
-                id={"post-#{entry.object.id}"}
-                entry={entry}
-                current_user={@current_user}
-              />
+              <div
+                :for={%{entry: entry, depth: depth} <- @descendants}
+                data-role="thread-descendant"
+                data-depth={depth}
+                style={"margin-left: #{thread_indent(depth)}px"}
+                class={[
+                  depth > 1 && "border-l border-slate-200/60 pl-4 dark:border-slate-700/60"
+                ]}
+              >
+                <StatusCard.status_card
+                  id={"post-#{entry.object.id}"}
+                  entry={entry}
+                  current_user={@current_user}
+                />
+              </div>
             </div>
 
             <section :if={@current_user} class="rounded-3xl border border-white/80 bg-white/80 p-6 shadow-lg shadow-slate-200/20 backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/70 dark:shadow-slate-900/40">
@@ -341,13 +348,58 @@ defmodule PleromaReduxWeb.StatusLive do
         |> assign(
           status: StatusVM.decorate(note, current_user),
           ancestors: note |> Objects.thread_ancestors() |> StatusVM.decorate_many(current_user),
-          descendants: note |> Objects.thread_descendants() |> StatusVM.decorate_many(current_user)
+          descendants: decorate_descendants(note, current_user)
         )
 
       _ ->
         socket
     end
   end
+
+  defp decorate_descendants(%{} = note, current_user) do
+    descendants = Objects.thread_descendants(note)
+    depths = descendant_depths(note.ap_id, descendants)
+
+    descendants
+    |> StatusVM.decorate_many(current_user)
+    |> Enum.zip(depths)
+    |> Enum.map(fn {entry, depth} -> %{entry: entry, depth: depth} end)
+  end
+
+  defp decorate_descendants(_note, _current_user), do: []
+
+  defp descendant_depths(root_ap_id, descendants)
+       when is_binary(root_ap_id) and is_list(descendants) do
+    {depths, _depth_map} =
+      Enum.map_reduce(descendants, %{root_ap_id => 0}, fn descendant, depth_map ->
+        parent_ap_id =
+          descendant
+          |> Map.get(:data, %{})
+          |> Map.get("inReplyTo")
+          |> in_reply_to_ap_id()
+
+        depth = Map.get(depth_map, parent_ap_id, 0) + 1
+        {depth, Map.put(depth_map, Map.get(descendant, :ap_id), depth)}
+      end)
+
+    depths
+  end
+
+  defp descendant_depths(_root_ap_id, _descendants), do: []
+
+  defp in_reply_to_ap_id(value) when is_binary(value), do: value
+  defp in_reply_to_ap_id(%{"id" => id}) when is_binary(id), do: id
+  defp in_reply_to_ap_id(_), do: nil
+
+  defp thread_indent(depth) when is_integer(depth) do
+    depth
+    |> Kernel.-(1)
+    |> max(0)
+    |> min(5)
+    |> Kernel.*(24)
+  end
+
+  defp thread_indent(_depth), do: 0
 
   defp truthy?(value) do
     case value do

@@ -50,7 +50,7 @@ This is a **web UI** checklist for Pleroma‑Redux. Items are ordered roughly by
 | “New posts” indicator when scrolled | DONE | Timeline buffers incoming posts while scrolled down and shows a “new posts” button. |
 | Human‑friendly timestamps (“5m”, “2h”) | DONE | Rendered as relative time with a full timestamp on hover. |
 | Status permalink page (single post view) | PARTIAL | LiveView route `/@:nickname/:uuid` exists; actions (like/repost/reaction/reply) are wired, but needs polish (error states, canonical redirects). |
-| Thread/context view (replies chain) | PARTIAL | Renders basic ancestors + descendants on the status page; needs better nesting + reply polish. |
+| Thread/context view (replies chain) | PARTIAL | Status page renders ancestors + descendants with basic indentation for nested replies; still needs richer threading UI and reply polish. |
 | Clickable actor profile from timeline | DONE | Status cards link actor → profile. |
 | Link handling (open external safely, copy link) | PARTIAL | Status menu supports “Copy link” + “Open link”; needs richer share affordances. |
 

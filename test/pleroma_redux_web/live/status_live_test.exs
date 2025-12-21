@@ -55,6 +55,29 @@ defmodule PleromaReduxWeb.StatusLiveTest do
     assert reply_index < child_index
   end
 
+  test "renders descendant replies with depth indicators", %{conn: conn, user: user} do
+    assert {:ok, root} = Pipeline.ingest(Note.build(user, "Root"), local: true)
+
+    assert {:ok, reply} =
+             Pipeline.ingest(
+               Note.build(user, "Reply") |> Map.put("inReplyTo", root.ap_id),
+               local: true
+             )
+
+    assert {:ok, _child} =
+             Pipeline.ingest(
+               Note.build(user, "Child") |> Map.put("inReplyTo", reply.ap_id),
+               local: true
+             )
+
+    uuid = uuid_from_ap_id(root.ap_id)
+
+    assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}")
+
+    assert has_element?(view, "[data-role='thread-descendant'][data-depth='1']", "Reply")
+    assert has_element?(view, "[data-role='thread-descendant'][data-depth='2']", "Child")
+  end
+
   test "signed-in users can reply from the status page", %{conn: conn, user: user} do
     assert {:ok, parent} = Pipeline.ingest(Note.build(user, "Parent post"), local: true)
     uuid = uuid_from_ap_id(parent.ap_id)
