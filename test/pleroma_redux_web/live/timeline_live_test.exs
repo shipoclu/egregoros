@@ -3,11 +3,9 @@ defmodule PleromaReduxWeb.TimelineLiveTest do
 
   import Phoenix.LiveViewTest
 
-  alias PleromaRedux.Activities.Follow
   alias PleromaRedux.Activities.Note
   alias PleromaRedux.Objects
   alias PleromaRedux.Pipeline
-  alias PleromaRedux.Relationships
   alias PleromaRedux.TestSupport.Fixtures
   alias PleromaRedux.Timeline
   alias PleromaRedux.Users
@@ -57,13 +55,13 @@ defmodule PleromaReduxWeb.TimelineLiveTest do
     refute has_element?(view, "#timeline-aside")
   end
 
-  test "following list is not part of the compose panel", %{conn: conn, user: user} do
+  test "follow panels are removed from the timeline UI", %{conn: conn, user: user} do
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     {:ok, view, _html} = live(conn, "/")
 
     assert has_element?(view, "#compose-panel")
-    assert has_element?(view, "#following-panel")
-    refute has_element?(view, "#compose-panel #following-panel")
+    refute has_element?(view, "#follow-panel")
+    refute has_element?(view, "#following-panel")
   end
 
   test "post cards show actor handle", %{conn: conn, user: user} do
@@ -488,37 +486,6 @@ defmodule PleromaReduxWeb.TimelineLiveTest do
 
     assert Objects.list_notes() == []
     assert has_element?(view, "[data-role='compose-error']")
-  end
-
-  test "unfollowing removes the follow from the UI", %{conn: conn, user: user} do
-    {:ok, remote} =
-      Users.create_user(%{
-        nickname: "bob",
-        ap_id: "https://remote.example/users/bob",
-        inbox: "https://remote.example/users/bob/inbox",
-        outbox: "https://remote.example/users/bob/outbox",
-        public_key: "PUB",
-        private_key: nil,
-        local: false
-      })
-
-    assert {:ok, _follow_object} = Pipeline.ingest(Follow.build(user, remote), local: true)
-
-    assert %{} =
-             relationship =
-             Relationships.get_by_type_actor_object("Follow", user.ap_id, remote.ap_id)
-
-    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
-    {:ok, view, _html} = live(conn, "/")
-
-    assert has_element?(view, "#following-#{relationship.id}")
-
-    view
-    |> element("#following-#{relationship.id} button[data-role='unfollow']")
-    |> render_click()
-
-    assert Relationships.get(relationship.id) == nil
-    refute has_element?(view, "#following-#{relationship.id}")
   end
 
   test "duplicate likes are deduped and can be fully unliked", %{conn: conn, user: user} do

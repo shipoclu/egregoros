@@ -1,21 +1,16 @@
 defmodule PleromaReduxWeb.TimelineLive do
   use PleromaReduxWeb, :live_view
 
-  alias PleromaRedux.Activities.Undo
-  alias PleromaRedux.Federation
   alias PleromaRedux.Interactions
   alias PleromaRedux.Media
   alias PleromaRedux.MediaStorage
   alias PleromaRedux.Notifications
   alias PleromaRedux.Objects
-  alias PleromaRedux.Pipeline
   alias PleromaRedux.Publish
   alias PleromaRedux.Relationships
   alias PleromaRedux.Timeline
   alias PleromaRedux.User
   alias PleromaRedux.Users
-  alias PleromaReduxWeb.URL
-  alias PleromaReduxWeb.ViewModels.Actor, as: ActorVM
   alias PleromaReduxWeb.ViewModels.Status, as: StatusVM
 
   @page_size 20
@@ -37,8 +32,6 @@ defmodule PleromaReduxWeb.TimelineLive do
 
     form = Phoenix.Component.to_form(default_post_params(), as: :post)
 
-    follow_form = Phoenix.Component.to_form(%{"handle" => ""}, as: :follow)
-
     posts = list_timeline_posts(timeline, current_user, limit: @page_size)
 
     socket =
@@ -51,14 +44,10 @@ defmodule PleromaReduxWeb.TimelineLive do
         compose_options_open?: false,
         compose_cw_open?: false,
         error: nil,
-        follow_error: nil,
-        follow_success: nil,
-        following: list_following(current_user),
         pending_posts: [],
         timeline_at_top?: true,
         media_viewer: nil,
         form: form,
-        follow_form: follow_form,
         media_alt: %{},
         posts_cursor: posts_cursor(posts),
         posts_end?: length(posts) < @page_size,
@@ -299,63 +288,6 @@ defmodule PleromaReduxWeb.TimelineLive do
                 end
             end
         end
-    end
-  end
-
-  def handle_event("follow_remote", %{"follow" => %{"handle" => handle}}, socket) do
-    case socket.assigns.current_user do
-      nil ->
-        {:noreply,
-         assign(socket, follow_error: "Register to follow people.", follow_success: nil)}
-
-      user ->
-        case Federation.follow_remote(user, handle) do
-          {:ok, remote} ->
-            home_actor_ids = home_actor_ids(user)
-
-            socket =
-              socket
-              |> assign(
-                follow_form: Phoenix.Component.to_form(%{"handle" => ""}, as: :follow),
-                follow_error: nil,
-                follow_success: "Following #{remote.ap_id}.",
-                following: list_following(user),
-                home_actor_ids: home_actor_ids
-              )
-              |> maybe_refresh_home_posts(user)
-
-            {:noreply, socket}
-
-          {:error, _reason} ->
-            {:noreply, assign(socket, follow_error: "Could not follow.", follow_success: nil)}
-        end
-    end
-  end
-
-  def handle_event("unfollow", %{"id" => id}, socket) do
-    with %User{} = user <- socket.assigns.current_user,
-         {relationship_id, ""} <- Integer.parse(to_string(id)),
-         %{type: "Follow", actor: actor} = relationship <- Relationships.get(relationship_id),
-         true <- actor == user.ap_id,
-         {:ok, _undo} <-
-           Pipeline.ingest(Undo.build(user, relationship.activity_ap_id), local: true) do
-      home_actor_ids = home_actor_ids(user)
-
-      socket =
-        socket
-        |> assign(
-          following: list_following(user),
-          home_actor_ids: home_actor_ids
-        )
-        |> maybe_refresh_home_posts(user)
-
-      {:noreply, socket}
-    else
-      nil ->
-        {:noreply, assign(socket, follow_error: "Register to unfollow.", follow_success: nil)}
-
-      _ ->
-        {:noreply, socket}
     end
   end
 
@@ -844,131 +776,6 @@ defmodule PleromaReduxWeb.TimelineLive do
           </section>
         </:nav_top>
 
-        <:nav_bottom>
-          <section
-            id="follow-panel"
-            class="hidden rounded-3xl border border-white/80 bg-white/80 p-6 shadow-lg shadow-slate-200/30 backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/70 dark:shadow-slate-900/50 lg:block"
-          >
-            <div class="flex items-center justify-between gap-4">
-              <div>
-                <p class="text-xs uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
-                  Follow
-                </p>
-                <h2 class="mt-2 font-display text-xl text-slate-900 dark:text-slate-100">
-                  Find someone
-                </h2>
-              </div>
-              <p class="hidden text-right text-xs text-slate-500 dark:text-slate-400 sm:block">
-                alice@remote.example
-              </p>
-            </div>
-
-            <%= if @current_user do %>
-              <.form
-                for={@follow_form}
-                id="follow-form"
-                phx-submit="follow_remote"
-                class="mt-6 flex flex-col gap-4 sm:flex-row sm:items-end"
-              >
-                <div class="flex-1">
-                  <.input
-                    type="text"
-                    field={@follow_form[:handle]}
-                    label="Handle"
-                    placeholder="bob@remote.example"
-                  />
-                </div>
-
-                <.button type="submit" phx-disable-with="Following..." variant="secondary">
-                  Follow
-                </.button>
-              </.form>
-
-              <p :if={@follow_error} class="mt-3 text-sm text-rose-500">{@follow_error}</p>
-              <p :if={@follow_success} class="mt-3 text-sm text-emerald-600 dark:text-emerald-400">
-                {@follow_success}
-              </p>
-            <% else %>
-              <div class="mt-6 rounded-2xl border border-slate-200/80 bg-white/70 p-4 text-sm text-slate-600 dark:border-slate-700/70 dark:bg-slate-950/50 dark:text-slate-300">
-                Following requires a local account.
-              </div>
-            <% end %>
-          </section>
-
-          <section
-            :if={@current_user}
-            id="following-panel"
-            class="hidden rounded-3xl border border-white/80 bg-white/80 p-6 shadow-lg shadow-slate-200/30 backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/70 dark:shadow-slate-900/50 lg:block"
-          >
-            <div class="flex items-center justify-between">
-              <h3 class="text-xs uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
-                Following
-              </h3>
-              <span class="text-xs text-slate-400 dark:text-slate-500">
-                {length(@following)}
-              </span>
-            </div>
-
-            <div class="mt-4 space-y-2">
-              <%= for entry <- @following do %>
-                <div
-                  id={"following-#{entry.relationship.id}"}
-                  class="flex items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-white/70 px-4 py-3 text-sm shadow-sm shadow-slate-200/20 backdrop-blur dark:border-slate-700/70 dark:bg-slate-950/60 dark:shadow-slate-900/40"
-                >
-                  <div class="flex min-w-0 items-center gap-3">
-                    <div class="shrink-0">
-                      <%= if entry.target &&
-                             is_binary(entry.target.avatar_url) and
-                             entry.target.avatar_url != "" do %>
-                        <img
-                          src={URL.absolute(entry.target.avatar_url)}
-                          alt={entry.target.nickname}
-                          class="h-9 w-9 rounded-xl border border-slate-200/80 bg-white object-cover shadow-sm shadow-slate-200/40 dark:border-slate-700/60 dark:bg-slate-950/60 dark:shadow-slate-900/40"
-                          loading="lazy"
-                        />
-                      <% else %>
-                        <div class="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200/80 bg-white/70 text-xs font-semibold text-slate-700 shadow-sm shadow-slate-200/30 dark:border-slate-700/60 dark:bg-slate-950/60 dark:text-slate-200 dark:shadow-slate-900/40">
-                          {if entry.target,
-                            do: avatar_initial(entry.target.name || entry.target.nickname),
-                            else: "?"}
-                        </div>
-                      <% end %>
-                    </div>
-
-                    <div class="min-w-0">
-                      <p class="truncate font-semibold text-slate-900 dark:text-slate-100">
-                        {if entry.target,
-                          do: entry.target.name || entry.target.nickname,
-                          else: entry.relationship.object}
-                      </p>
-                      <p class="truncate text-xs text-slate-500 dark:text-slate-400">
-                        {if entry.target,
-                          do: ActorVM.handle(entry.target, entry.target.ap_id),
-                          else: entry.relationship.object}
-                      </p>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    data-role="unfollow"
-                    phx-click="unfollow"
-                    phx-value-id={entry.relationship.id}
-                    phx-disable-with="Unfollowing..."
-                    class="shrink-0 rounded-full border border-slate-200/80 bg-white/70 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700 transition hover:-translate-y-0.5 hover:bg-white dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:hover:bg-slate-950"
-                  >
-                    Unfollow
-                  </button>
-                </div>
-              <% end %>
-
-              <p :if={@following == []} class="text-sm text-slate-500 dark:text-slate-400">
-                Follow someone to start building your home graph.
-              </p>
-            </div>
-          </section>
-        </:nav_bottom>
-
         <section class="space-y-4">
           <div
             id="timeline-top-sentinel"
@@ -1112,17 +919,6 @@ defmodule PleromaReduxWeb.TimelineLive do
     """
   end
 
-  defp list_following(nil), do: []
-
-  defp list_following(%User{} = user) do
-    user.ap_id
-    |> Relationships.list_follows_by_actor()
-    |> Enum.sort_by(& &1.updated_at, :desc)
-    |> Enum.map(fn follow ->
-      %{relationship: follow, target: Users.get_by_ap_id(follow.object)}
-    end)
-  end
-
   defp timeline_from_params(%{"timeline" => "public"}, _user), do: :public
   defp timeline_from_params(%{"timeline" => "home"}, %User{}), do: :home
   defp timeline_from_params(_params, %User{}), do: :home
@@ -1191,19 +987,6 @@ defmodule PleromaReduxWeb.TimelineLive do
 
     Enum.uniq([user.ap_id | followed_actor_ids])
   end
-
-  defp maybe_refresh_home_posts(%{assigns: %{timeline: :home}} = socket, %User{} = user) do
-    posts = list_timeline_posts(:home, user, limit: @page_size)
-
-    socket
-    |> assign(
-      posts_cursor: posts_cursor(posts),
-      posts_end?: length(posts) < @page_size
-    )
-    |> stream(:posts, StatusVM.decorate_many(posts, user), reset: true, dom_id: &post_dom_id/1)
-  end
-
-  defp maybe_refresh_home_posts(socket, _user), do: socket
 
   defp default_post_params do
     %{
@@ -1314,15 +1097,4 @@ defmodule PleromaReduxWeb.TimelineLive do
         socket
     end
   end
-
-  defp avatar_initial(name) when is_binary(name) do
-    name = String.trim(name)
-
-    case String.first(name) do
-      nil -> "?"
-      letter -> String.upcase(letter)
-    end
-  end
-
-  defp avatar_initial(_), do: "?"
 end
