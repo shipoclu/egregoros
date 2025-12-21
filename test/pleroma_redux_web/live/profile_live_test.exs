@@ -75,4 +75,55 @@ defmodule PleromaReduxWeb.ProfileLiveTest do
     assert has_element?(view, "a[href='/@#{profile_user.nickname}/followers']")
     assert has_element?(view, "a[href='/@#{profile_user.nickname}/following']")
   end
+
+  test "remote profiles are addressed by nickname@domain and do not hijack local routes", %{
+    conn: conn,
+    viewer: viewer
+  } do
+    {:ok, _remote} =
+      Users.create_user(%{
+        nickname: "lain",
+        domain: "lain.com",
+        ap_id: "https://lain.com/users/lain",
+        inbox: "https://lain.com/users/lain/inbox",
+        outbox: "https://lain.com/users/lain/outbox",
+        public_key: "remote-key",
+        private_key: nil,
+        local: false
+      })
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: viewer.id})
+
+    {:ok, view, _html} = live(conn, "/@lain@lain.com")
+    assert has_element?(view, "[data-role='profile-header']", "@lain@lain.com")
+
+    {:ok, view, _html} = live(conn, "/@lain")
+    assert has_element?(view, "section", "Profile not found.")
+  end
+
+  test "multiple remote users can share a nickname across domains", %{viewer: _viewer} do
+    {:ok, _remote_a} =
+      Users.create_user(%{
+        nickname: "lain",
+        domain: "lain.com",
+        ap_id: "https://lain.com/users/lain",
+        inbox: "https://lain.com/users/lain/inbox",
+        outbox: "https://lain.com/users/lain/outbox",
+        public_key: "remote-key-a",
+        private_key: nil,
+        local: false
+      })
+
+    assert {:ok, _remote_b} =
+             Users.create_user(%{
+               nickname: "lain",
+               domain: "example.com",
+               ap_id: "https://example.com/users/lain",
+               inbox: "https://example.com/users/lain/inbox",
+               outbox: "https://example.com/users/lain/outbox",
+               public_key: "remote-key-b",
+               private_key: nil,
+               local: false
+             })
+  end
 end

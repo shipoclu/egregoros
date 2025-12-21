@@ -207,7 +207,38 @@ defmodule PleromaReduxWeb.StatusCardTest do
     assert html =~ ~s(data-role="actor-link")
   end
 
-  test "does not link actor when nickname is missing" do
+  test "links remote actors to domain-qualified profile pages" do
+    html =
+      render_component(&StatusCard.status_card/1, %{
+        id: "post-1",
+        current_user: nil,
+        entry: %{
+          object: %{
+            id: 1,
+            inserted_at: ~U[2025-01-01 00:00:00Z],
+            local: false,
+            data: %{"content" => "<p>Hello world</p>"}
+          },
+          actor: %{
+            display_name: "Lain",
+            nickname: "lain",
+            handle: "@lain@lain.com",
+            avatar_url: nil
+          },
+          attachments: [],
+          liked?: false,
+          likes_count: 0,
+          reposted?: false,
+          reposts_count: 0,
+          reactions: %{}
+        }
+      })
+
+    assert html =~ ~s(href="/@lain@lain.com")
+    assert html =~ ~s(data-role="actor-link")
+  end
+
+  test "does not link actor when handle is missing" do
     html =
       render_component(&StatusCard.status_card/1, %{
         id: "post-1",
@@ -221,7 +252,7 @@ defmodule PleromaReduxWeb.StatusCardTest do
           },
           actor: %{
             display_name: "Alice",
-            handle: "@alice",
+            handle: nil,
             avatar_url: nil
           },
           attachments: [],

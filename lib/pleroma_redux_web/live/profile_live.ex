@@ -10,13 +10,15 @@ defmodule PleromaReduxWeb.ProfileLive do
   alias PleromaRedux.Relationships
   alias PleromaRedux.User
   alias PleromaRedux.Users
+  alias PleromaReduxWeb.ProfilePaths
   alias PleromaReduxWeb.URL
+  alias PleromaReduxWeb.ViewModels.Actor, as: ActorVM
   alias PleromaReduxWeb.ViewModels.Status, as: StatusVM
 
   @page_size 20
 
   @impl true
-  def mount(%{"nickname" => nickname}, session, socket) do
+  def mount(%{"nickname" => handle}, session, socket) do
     current_user =
       case Map.get(session, "user_id") do
         nil -> nil
@@ -24,10 +26,16 @@ defmodule PleromaReduxWeb.ProfileLive do
       end
 
     profile_user =
-      nickname
+      handle
       |> to_string()
       |> String.trim()
-      |> Users.get_by_nickname()
+      |> Users.get_by_handle()
+
+    profile_handle =
+      case profile_user do
+        %User{} = user -> ActorVM.handle(user, user.ap_id)
+        _ -> nil
+      end
 
     posts =
       case profile_user do
@@ -43,6 +51,7 @@ defmodule PleromaReduxWeb.ProfileLive do
      |> assign(
        current_user: current_user,
        profile_user: profile_user,
+       profile_handle: profile_handle,
        notifications_count: notifications_count(current_user),
        media_viewer: nil,
        follow_relationship: follow_relationship,
@@ -253,7 +262,7 @@ defmodule PleromaReduxWeb.ProfileLive do
                         {@profile_user.name || @profile_user.nickname}
                       </h2>
                       <p class="mt-1 truncate text-sm text-slate-500 dark:text-slate-400">
-                        @{to_string(@profile_user.nickname)}
+                        {@profile_handle}
                       </p>
                     </div>
                   </div>
@@ -296,14 +305,14 @@ defmodule PleromaReduxWeb.ProfileLive do
                   <.stat value={@posts_count} label="Posts" />
 
                   <.link
-                    navigate={~p"/@#{@profile_user.nickname}/followers"}
+                    navigate={ProfilePaths.followers_path(@profile_user)}
                     class="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
                   >
                     <.stat value={@followers_count} label="Followers" />
                   </.link>
 
                   <.link
-                    navigate={~p"/@#{@profile_user.nickname}/following"}
+                    navigate={ProfilePaths.following_path(@profile_user)}
                     class="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
                   >
                     <.stat value={@following_count} label="Following" />

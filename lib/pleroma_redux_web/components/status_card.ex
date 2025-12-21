@@ -2,6 +2,7 @@ defmodule PleromaReduxWeb.StatusCard do
   use PleromaReduxWeb, :html
 
   alias PleromaRedux.HTML
+  alias PleromaReduxWeb.ProfilePaths
   alias PleromaReduxWeb.URL
   alias PleromaReduxWeb.ViewModels.Status, as: StatusVM
 
@@ -141,8 +142,7 @@ defmodule PleromaReduxWeb.StatusCard do
             data-role="reply"
             class="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/70 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm shadow-slate-200/20 transition hover:-translate-y-0.5 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:shadow-slate-900/40 dark:hover:bg-slate-950"
           >
-            <.icon name="hero-chat-bubble-left-right" class="size-4" />
-            Reply
+            <.icon name="hero-chat-bubble-left-right" class="size-4" /> Reply
           </.link>
         <% end %>
 
@@ -304,8 +304,7 @@ defmodule PleromaReduxWeb.StatusCard do
         }
         class="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-sm shadow-slate-900/20 transition hover:-translate-y-0.5 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 dark:bg-white dark:text-slate-900 dark:shadow-slate-900/40 dark:hover:bg-slate-100"
       >
-        <.icon name="hero-eye" class="size-4" />
-        Reveal
+        <.icon name="hero-eye" class="size-4" /> Reveal
       </button>
     </div>
 
@@ -416,12 +415,7 @@ defmodule PleromaReduxWeb.StatusCard do
 
   defp avatar_initial(_), do: "?"
 
-  defp actor_profile_path(%{nickname: nickname})
-       when is_binary(nickname) and nickname != "" do
-    ~p"/@#{nickname}"
-  end
-
-  defp actor_profile_path(_actor), do: nil
+  defp actor_profile_path(actor), do: ProfilePaths.profile_path(actor)
 
   defp status_permalink_path(%{object: %{local: true} = object, actor: %{nickname: nickname}})
        when is_binary(nickname) and nickname != "" do
@@ -490,8 +484,10 @@ defmodule PleromaReduxWeb.StatusCard do
           rel="noreferrer noopener"
           class="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-900/5 dark:text-slate-200 dark:hover:bg-white/10"
         >
-          <.icon name="hero-arrow-top-right-on-square" class="size-5 text-slate-500 dark:text-slate-400" />
-          Open link
+          <.icon
+            name="hero-arrow-top-right-on-square"
+            class="size-5 text-slate-500 dark:text-slate-400"
+          /> Open link
         </a>
       </div>
     </details>

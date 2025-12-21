@@ -99,7 +99,43 @@ defmodule PleromaRedux.Users do
   end
 
   def get_by_nickname(nil), do: nil
-  def get_by_nickname(nickname), do: Repo.get_by(User, nickname: nickname)
+
+  def get_by_nickname(nickname) when is_binary(nickname) do
+    nickname = String.trim(nickname)
+    Repo.get_by(User, nickname: nickname, local: true)
+  end
+
+  def get_by_nickname(_nickname), do: nil
+
+  def get_by_nickname_and_domain(nickname, domain)
+      when is_binary(nickname) and is_binary(domain) do
+    nickname = String.trim(nickname)
+    domain = String.trim(domain)
+
+    Repo.get_by(User, nickname: nickname, domain: domain, local: false)
+  end
+
+  def get_by_nickname_and_domain(_nickname, _domain), do: nil
+
+  def get_by_handle(handle) when is_binary(handle) do
+    handle =
+      handle
+      |> String.trim()
+      |> String.trim_leading("@")
+
+    case String.split(handle, "@", parts: 2) do
+      [nickname] when nickname != "" ->
+        get_by_nickname(nickname)
+
+      [nickname, domain] when nickname != "" and domain != "" ->
+        get_by_nickname_and_domain(nickname, domain)
+
+      _ ->
+        nil
+    end
+  end
+
+  def get_by_handle(_handle), do: nil
 
   def get_by_email(nil), do: nil
 

@@ -5,6 +5,7 @@ defmodule PleromaReduxWeb.RelationshipsLive do
   alias PleromaRedux.Relationships
   alias PleromaRedux.User
   alias PleromaRedux.Users
+  alias PleromaReduxWeb.ProfilePaths
   alias PleromaReduxWeb.ViewModels.Actor, as: ActorVM
 
   @page_size 40
@@ -21,7 +22,13 @@ defmodule PleromaReduxWeb.RelationshipsLive do
       nickname
       |> to_string()
       |> String.trim()
-      |> Users.get_by_nickname()
+      |> Users.get_by_handle()
+
+    profile_handle =
+      case profile_user do
+        %User{} = user -> ActorVM.handle(user, user.ap_id)
+        _ -> nil
+      end
 
     {title, items, cursor, items_end?} =
       list_relationships(profile_user, socket.assigns.live_action, current_user)
@@ -32,6 +39,7 @@ defmodule PleromaReduxWeb.RelationshipsLive do
        current_user: current_user,
        notifications_count: notifications_count(current_user),
        profile_user: profile_user,
+       profile_handle: profile_handle,
        title: title,
        items: items,
        items_cursor: cursor,
@@ -90,11 +98,10 @@ defmodule PleromaReduxWeb.RelationshipsLive do
             <.card class="px-5 py-4">
               <div class="flex flex-wrap items-center justify-between gap-3">
                 <.link
-                  navigate={~p"/@#{@profile_user.nickname}"}
+                  navigate={ProfilePaths.profile_path(@profile_user)}
                   class="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/70 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700 transition hover:-translate-y-0.5 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:hover:bg-slate-950"
                 >
-                  <.icon name="hero-arrow-left" class="size-4" />
-                  Profile
+                  <.icon name="hero-arrow-left" class="size-4" /> Profile
                 </.link>
 
                 <div class="text-right">
@@ -104,8 +111,8 @@ defmodule PleromaReduxWeb.RelationshipsLive do
                   >
                     {@title}
                   </p>
-                  <p class="mt-1 text-xs uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
-                    @{to_string(@profile_user.nickname)}
+                  <p class="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">
+                    {@profile_handle}
                   </p>
                 </div>
               </div>
@@ -226,7 +233,8 @@ defmodule PleromaReduxWeb.RelationshipsLive do
     {title_for(:following, profile_user, current_user), items, cursor, items_end?}
   end
 
-  defp list_relationships(_profile_user, _live_action, _current_user, _opts), do: {"", [], nil, true}
+  defp list_relationships(_profile_user, _live_action, _current_user, _opts),
+    do: {"", [], nil, true}
 
   defp cursor_from_relationships([]), do: nil
 
@@ -249,8 +257,12 @@ defmodule PleromaReduxWeb.RelationshipsLive do
   defp title_for(:following, _user, _current_user), do: "Following"
   defp title_for(_action, _user, _current_user), do: ""
 
+  defp actor_profile_path(%{handle: "@" <> handle}) when is_binary(handle) and handle != "" do
+    ProfilePaths.profile_path(handle)
+  end
+
   defp actor_profile_path(%{nickname: nickname}) when is_binary(nickname) and nickname != "" do
-    ~p"/@#{nickname}"
+    ProfilePaths.profile_path(nickname)
   end
 
   defp actor_profile_path(_actor), do: "#"

@@ -42,6 +42,12 @@ defmodule PleromaRedux.Federation.Actor do
     if not is_binary(public_key) or public_key == "" do
       {:error, :missing_public_key}
     else
+      domain =
+        case URI.parse(id) do
+          %URI{host: host} when is_binary(host) and host != "" -> host
+          _ -> nil
+        end
+
       nickname =
         actor
         |> Map.get("preferredUsername")
@@ -61,6 +67,7 @@ defmodule PleromaRedux.Federation.Actor do
       {:ok,
        %{
          nickname: nickname,
+         domain: domain,
          ap_id: id,
          inbox: inbox,
          outbox: outbox,
