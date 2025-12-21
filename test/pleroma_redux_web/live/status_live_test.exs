@@ -480,13 +480,13 @@ defmodule PleromaReduxWeb.StatusLiveTest do
       ])
 
     assert render_upload(upload, "photo.png") =~ "100%"
-    assert has_element?(view, "[data-role='reply-media-entry']")
+    assert has_element?(view, "[data-role='media-entry']")
 
     view
-    |> element("[data-role='reply-media-entry'] button[phx-click='cancel_reply_media']")
+    |> element("[data-role='media-entry'] button[phx-click='cancel_reply_media']")
     |> render_click()
 
-    refute has_element?(view, "[data-role='reply-media-entry']")
+    refute has_element?(view, "[data-role='media-entry']")
   end
 
   test "blocks posting while reply uploads are still in flight", %{conn: conn, user: user} do

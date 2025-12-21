@@ -26,7 +26,7 @@ defmodule PleromaReduxWeb.StatusLive do
     object = object_for_uuid_param(uuid)
 
     reply_open? = truthy?(Map.get(params, "reply"))
-    reply_form = Phoenix.Component.to_form(%{"content" => ""}, as: :reply)
+    reply_form = Phoenix.Component.to_form(default_reply_params(), as: :reply)
 
     {status_entry, ancestor_entries, descendant_entries} =
       case object do
@@ -52,7 +52,9 @@ defmodule PleromaReduxWeb.StatusLive do
         descendants: descendant_entries,
         reply_open?: reply_open?,
         reply_form: reply_form,
-        reply_media_alt: %{}
+        reply_media_alt: %{},
+        reply_options_open?: false,
+        reply_cw_open?: false
       )
       |> allow_upload(:reply_media,
         accept: ~w(
@@ -175,20 +177,43 @@ defmodule PleromaReduxWeb.StatusLive do
     {:noreply, assign(socket, reply_open?: false)}
   end
 
+  def handle_event("toggle_reply_cw", _params, socket) do
+    {:noreply, assign(socket, reply_cw_open?: !socket.assigns.reply_cw_open?)}
+  end
+
   def handle_event("reply_change", %{"reply" => %{} = reply_params}, socket) do
-    content = reply_params |> Map.get("content", "") |> to_string()
+    reply_params = Map.merge(default_reply_params(), reply_params)
     media_alt = Map.get(reply_params, "media_alt", %{})
+
+    reply_options_open? = truthy?(Map.get(reply_params, "ui_options_open"))
+
+    reply_cw_open? =
+      socket.assigns.reply_cw_open? ||
+        reply_params |> Map.get("spoiler_text", "") |> to_string() |> String.trim() != ""
 
     {:noreply,
      assign(socket,
-       reply_form: Phoenix.Component.to_form(%{"content" => content}, as: :reply),
-       reply_media_alt: media_alt
+       reply_form: Phoenix.Component.to_form(reply_params, as: :reply),
+       reply_media_alt: media_alt,
+       reply_options_open?: reply_options_open?,
+       reply_cw_open?: reply_cw_open?
      )}
   end
 
   def handle_event("create_reply", %{"reply" => %{} = reply_params}, socket) do
+    reply_params = Map.merge(default_reply_params(), reply_params)
     content = reply_params |> Map.get("content", "") |> to_string()
     media_alt = Map.get(reply_params, "media_alt", %{})
+    visibility = Map.get(reply_params, "visibility", "public")
+    spoiler_text = Map.get(reply_params, "spoiler_text")
+    sensitive = Map.get(reply_params, "sensitive")
+    language = Map.get(reply_params, "language")
+
+    reply_options_open? = truthy?(Map.get(reply_params, "ui_options_open"))
+
+    reply_cw_open? =
+      socket.assigns.reply_cw_open? ||
+        reply_params |> Map.get("spoiler_text", "") |> to_string() |> String.trim() != ""
 
     with %User{} = user <- socket.assigns.current_user,
          %{object: %{ap_id: in_reply_to}} <- socket.assigns.status,
@@ -197,10 +222,28 @@ defmodule PleromaReduxWeb.StatusLive do
 
       cond do
         Enum.any?(upload.entries, &(!&1.done?)) ->
-          {:noreply, put_flash(socket, :error, "Wait for attachments to finish uploading.")}
+          {:noreply,
+           socket
+           |> put_flash(:error, "Wait for attachments to finish uploading.")
+           |> assign(
+             reply_open?: true,
+             reply_form: Phoenix.Component.to_form(reply_params, as: :reply),
+             reply_media_alt: media_alt,
+             reply_options_open?: reply_options_open?,
+             reply_cw_open?: reply_cw_open?
+           )}
 
         upload_has_errors?(upload) ->
-          {:noreply, put_flash(socket, :error, "Remove invalid attachments before posting.")}
+          {:noreply,
+           socket
+           |> put_flash(:error, "Remove invalid attachments before posting.")
+           |> assign(
+             reply_open?: true,
+             reply_form: Phoenix.Component.to_form(reply_params, as: :reply),
+             reply_media_alt: media_alt,
+             reply_options_open?: reply_options_open?,
+             reply_cw_open?: reply_cw_open?
+           )}
 
         true ->
           attachments =
@@ -224,12 +267,25 @@ defmodule PleromaReduxWeb.StatusLive do
 
           case Enum.find(attachments, &match?({:error, _}, &1)) do
             {:error, _reason} ->
-              {:noreply, put_flash(socket, :error, "Could not upload attachment.")}
+              {:noreply,
+               socket
+               |> put_flash(:error, "Could not upload attachment.")
+               |> assign(
+                 reply_open?: true,
+                 reply_form: Phoenix.Component.to_form(reply_params, as: :reply),
+                 reply_media_alt: media_alt,
+                 reply_options_open?: reply_options_open?,
+                 reply_cw_open?: reply_cw_open?
+               )}
 
             nil ->
               case Publish.post_note(user, content,
                      in_reply_to: in_reply_to,
-                     attachments: attachments
+                     attachments: attachments,
+                     visibility: visibility,
+                     spoiler_text: spoiler_text,
+                     sensitive: sensitive,
+                     language: language
                    ) do
                 {:ok, _create} ->
                   note = socket.assigns.status.object
@@ -241,19 +297,48 @@ defmodule PleromaReduxWeb.StatusLive do
                    |> put_flash(:info, "Reply posted.")
                    |> assign(
                      descendants: descendants,
-                     reply_form: Phoenix.Component.to_form(%{"content" => ""}, as: :reply),
+                     reply_form: Phoenix.Component.to_form(default_reply_params(), as: :reply),
                      reply_open?: false,
-                     reply_media_alt: %{}
+                     reply_media_alt: %{},
+                     reply_options_open?: false,
+                     reply_cw_open?: false
                    )}
 
                 {:error, :too_long} ->
-                  {:noreply, put_flash(socket, :error, "Reply is too long.")}
+                  {:noreply,
+                   socket
+                   |> put_flash(:error, "Reply is too long.")
+                   |> assign(
+                     reply_open?: true,
+                     reply_form: Phoenix.Component.to_form(reply_params, as: :reply),
+                     reply_media_alt: media_alt,
+                     reply_options_open?: reply_options_open?,
+                     reply_cw_open?: reply_cw_open?
+                   )}
 
                 {:error, :empty} ->
-                  {:noreply, put_flash(socket, :error, "Reply can't be empty.")}
+                  {:noreply,
+                   socket
+                   |> put_flash(:error, "Reply can't be empty.")
+                   |> assign(
+                     reply_open?: true,
+                     reply_form: Phoenix.Component.to_form(reply_params, as: :reply),
+                     reply_media_alt: media_alt,
+                     reply_options_open?: reply_options_open?,
+                     reply_cw_open?: reply_cw_open?
+                   )}
 
                 _ ->
-                  {:noreply, put_flash(socket, :error, "Could not post reply.")}
+                  {:noreply,
+                   socket
+                   |> put_flash(:error, "Could not post reply.")
+                   |> assign(
+                     reply_open?: true,
+                     reply_form: Phoenix.Component.to_form(reply_params, as: :reply),
+                     reply_media_alt: media_alt,
+                     reply_options_open?: reply_options_open?,
+                     reply_cw_open?: reply_cw_open?
+                   )}
               end
           end
       end
@@ -334,190 +419,41 @@ defmodule PleromaReduxWeb.StatusLive do
               :if={@current_user}
               class="rounded-3xl border border-white/80 bg-white/80 p-6 shadow-lg shadow-slate-200/20 backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/70 dark:shadow-slate-900/40"
             >
-              <.form
-                for={@reply_form}
+              <Composer.composer_form
                 id="reply-form"
+                id_prefix="reply"
+                form={@reply_form}
+                upload={@uploads.reply_media}
+                media_alt={@reply_media_alt}
+                param_prefix="reply"
+                max_chars={reply_max_chars()}
+                options_open?={@reply_options_open?}
+                cw_open?={@reply_cw_open?}
+                change_event="reply_change"
+                submit_event="create_reply"
+                cancel_event="cancel_reply_media"
+                toggle_cw_event="toggle_reply_cw"
+                submit_label="Reply"
                 data-state={if @reply_open?, do: "open", else: "closed"}
-                phx-change="reply_change"
-                phx-submit="create_reply"
-                class={["space-y-4", !@reply_open? && "hidden"]}
+                class={if @reply_open?, do: nil, else: "hidden"}
               >
-                <div class="flex items-center justify-between gap-3">
-                  <p class="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
-                    Reply
-                  </p>
-                  <button
-                    type="button"
-                    data-role="reply-close"
-                    phx-click={close_reply_js() |> JS.push("close_reply")}
-                    class="inline-flex h-9 w-9 items-center justify-center rounded-2xl text-slate-500 transition hover:bg-slate-900/5 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
-                    aria-label="Close reply composer"
-                  >
-                    <.icon name="hero-x-mark" class="size-4" />
-                  </button>
-                </div>
-
-                <.input
-                  field={@reply_form[:content]}
-                  type="textarea"
-                  label="Your reply"
-                  placeholder="Write a reply…"
-                  data-role="compose-content"
-                  data-max-chars={reply_max_chars()}
-                  phx-hook="ComposeCharCounter"
-                  phx-debounce="blur"
-                  class="min-h-28"
-                />
-
-                <section
-                  class="rounded-2xl border border-slate-200/80 bg-white/70 p-4 dark:border-slate-700/70 dark:bg-slate-950/50"
-                  aria-label="Attachments"
-                >
-                  <div class="flex flex-col gap-3">
-                    <div>
-                      <p class="text-xs uppercase tracking-[0.25em] text-slate-500 dark:text-slate-400">
-                        Attachments
-                      </p>
-                      <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                        Images, video, audio — up to 10MB
-                      </p>
-                    </div>
-
-                    <label
-                      data-role="reply-add-media"
-                      class="relative inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-full border border-slate-200/80 bg-white/70 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700 transition hover:-translate-y-0.5 hover:bg-white dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:hover:bg-slate-950"
-                    >
-                      <.icon name="hero-photo" class="size-4" /> Add media
-                      <.live_file_input
-                        upload={@uploads.reply_media}
-                        id="reply-media-input"
-                        class="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                      />
-                    </label>
-                  </div>
-
-                  <div
-                    class="mt-4 grid gap-3"
-                    phx-drop-target={@uploads.reply_media.ref}
-                    data-role="reply-media-drop"
-                  >
-                    <p
-                      :if={@uploads.reply_media.entries == []}
-                      class="rounded-2xl border border-dashed border-slate-200/80 bg-white/50 p-4 text-sm text-slate-600 dark:border-slate-700/70 dark:bg-slate-950/40 dark:text-slate-300"
-                    >
-                      Drop media here or use “Add media”.
+                <:extra_fields>
+                  <div class="flex items-center justify-between gap-3">
+                    <p class="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
+                      Reply
                     </p>
-
-                    <div
-                      :for={entry <- @uploads.reply_media.entries}
-                      id={"reply-media-entry-#{entry.ref}"}
-                      data-role="reply-media-entry"
-                      class="rounded-2xl border border-slate-200/80 bg-white/60 p-3 shadow-sm shadow-slate-200/20 dark:border-slate-700/70 dark:bg-slate-950/50 dark:shadow-slate-900/40"
+                    <button
+                      type="button"
+                      data-role="reply-close"
+                      phx-click={close_reply_js() |> JS.push("close_reply")}
+                      class="inline-flex h-9 w-9 items-center justify-center rounded-2xl text-slate-500 transition hover:bg-slate-900/5 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
+                      aria-label="Close reply composer"
                     >
-                      <div class="flex gap-3">
-                        <div class="relative h-16 w-16 overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm shadow-slate-200/20 dark:border-slate-700/70 dark:bg-slate-950/60 dark:shadow-slate-900/40">
-                          <.upload_entry_preview entry={entry} />
-                        </div>
-
-                        <div class="min-w-0 flex-1 space-y-3">
-                          <div class="flex items-start justify-between gap-3">
-                            <p class="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
-                              {entry.client_name}
-                            </p>
-                            <button
-                              type="button"
-                              phx-click="cancel_reply_media"
-                              phx-value-ref={entry.ref}
-                              class="inline-flex h-9 w-9 items-center justify-center rounded-2xl text-slate-500 transition hover:bg-slate-900/5 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
-                              aria-label="Remove attachment"
-                            >
-                              <.icon name="hero-x-mark" class="size-4" />
-                            </button>
-                          </div>
-
-                          <div class="h-2 overflow-hidden rounded-full bg-slate-200/70 dark:bg-slate-700/50">
-                            <div
-                              class="h-full bg-slate-900 transition-all dark:bg-slate-100"
-                              style={"width: #{entry.progress}%"}
-                            >
-                            </div>
-                          </div>
-                          <span class="sr-only" data-role="reply-media-progress">
-                            {entry.progress}%
-                          </span>
-
-                          <details
-                            :if={upload_entry_kind(entry) in [:video, :audio]}
-                            class="rounded-2xl border border-slate-200/80 bg-white/70 px-4 py-3 dark:border-slate-700/70 dark:bg-slate-950/50"
-                          >
-                            <summary class="cursor-pointer select-none text-xs font-semibold uppercase tracking-[0.2em] text-slate-600 dark:text-slate-300 list-none [&::-webkit-details-marker]:hidden">
-                              Preview
-                            </summary>
-                            <div class="mt-3">
-                              <.upload_entry_player entry={entry} />
-                            </div>
-                          </details>
-
-                          <.input
-                            type="text"
-                            id={"reply-media-alt-#{entry.ref}"}
-                            name={"reply[media_alt][#{entry.ref}]"}
-                            label="Alt text"
-                            value={Map.get(@reply_media_alt, entry.ref, "")}
-                            placeholder={upload_entry_description_placeholder(entry)}
-                            phx-debounce="blur"
-                          />
-
-                          <p
-                            :for={err <- upload_errors(@uploads.reply_media, entry)}
-                            data-role="reply-upload-error"
-                            class="text-sm text-rose-600 dark:text-rose-400"
-                          >
-                            {upload_error_text(err)}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
+                      <.icon name="hero-x-mark" class="size-4" />
+                    </button>
                   </div>
-
-                  <p
-                    :for={err <- upload_errors(@uploads.reply_media)}
-                    data-role="reply-upload-error"
-                    class="mt-3 text-sm text-rose-600 dark:text-rose-400"
-                  >
-                    {upload_error_text(err)}
-                  </p>
-                </section>
-
-                <div class="flex items-center justify-between gap-3">
-                  <div class="flex items-center gap-3">
-                    <.compose_emoji_picker id="reply-emoji-picker" />
-
-                    <span
-                      data-role="compose-char-counter"
-                      class={[
-                        "tabular-nums text-sm font-semibold",
-                        reply_remaining_chars(@reply_form) < 0 &&
-                          "text-rose-600 dark:text-rose-400",
-                        reply_remaining_chars(@reply_form) >= 0 &&
-                          "text-slate-500 dark:text-slate-400"
-                      ]}
-                    >
-                      {reply_remaining_chars(@reply_form)}
-                    </span>
-                  </div>
-
-                  <button
-                    type="submit"
-                    data-role="compose-submit"
-                    phx-disable-with="Posting…"
-                    disabled={reply_submit_disabled?(@reply_form, @uploads.reply_media)}
-                    class="inline-flex items-center gap-2 rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/20 transition hover:-translate-y-0.5 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:bg-slate-900 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white dark:disabled:hover:bg-slate-100"
-                  >
-                    <.icon name="hero-paper-airplane" class="size-5" /> Post reply
-                  </button>
-                </div>
-              </.form>
+                </:extra_fields>
+              </Composer.composer_form>
 
               <button
                 type="button"
@@ -747,33 +683,17 @@ defmodule PleromaReduxWeb.StatusLive do
 
   defp reply_max_chars, do: @reply_max_chars
 
-  defp reply_remaining_chars(%Phoenix.HTML.Form{} = form) do
-    @reply_max_chars - String.length(reply_content_value(form))
+  defp default_reply_params do
+    %{
+      "content" => "",
+      "spoiler_text" => "",
+      "visibility" => "public",
+      "sensitive" => "false",
+      "language" => "",
+      "ui_options_open" => "false",
+      "media_alt" => %{}
+    }
   end
-
-  defp reply_remaining_chars(_form), do: @reply_max_chars
-
-  defp reply_submit_disabled?(form, upload) do
-    over_limit = reply_remaining_chars(form) < 0
-    content_blank = String.trim(reply_content_value(form)) == ""
-    entries = upload_entries(upload)
-    no_attachments = entries == []
-    attachments_pending = Enum.any?(entries, &(!&1.done?))
-    has_errors = upload_has_errors?(upload)
-
-    over_limit or (content_blank and no_attachments) or attachments_pending or has_errors
-  end
-
-  defp reply_content_value(%Phoenix.HTML.Form{} = form) do
-    (form.params || %{})
-    |> Map.get("content", "")
-    |> to_string()
-  end
-
-  defp reply_content_value(_form), do: ""
-
-  defp upload_entries(%Phoenix.LiveView.UploadConfig{} = upload), do: upload.entries
-  defp upload_entries(_upload), do: []
 
   defp truthy?(value) do
     case value do
