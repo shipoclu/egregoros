@@ -76,8 +76,11 @@ defmodule PleromaReduxWeb.OAuthControllerTest do
         "scope" => "read"
       })
 
-    assert html_response(conn, 200) =~ "Authorize"
-    assert html_response(conn, 200) =~ "Husky"
+    html = html_response(conn, 200)
+    assert html =~ "Authorize"
+    assert html =~ "Husky"
+    assert html =~ ~s(data-role="app-shell")
+    assert html =~ ~s(data-role="nav-settings")
   end
 
   test "POST /oauth/authorize approves and redirects with code", %{conn: conn} do
