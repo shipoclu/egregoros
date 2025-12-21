@@ -3,40 +3,98 @@ defmodule PleromaRedux.MediaStorage.LocalTest do
 
   alias PleromaRedux.MediaStorage.Local
 
-  defp tmp_upload(content_type, filename) do
-    path = Path.join(System.tmp_dir!(), "pleroma-redux-test-upload-#{Ecto.UUID.generate()}")
-    File.write!(path, <<0, 1, 2, 3>>)
+  defp uploads_root do
+    Path.join(["tmp", "test_uploads", Ecto.UUID.generate()])
+  end
 
-    %Plug.Upload{
-      path: path,
-      filename: filename,
-      content_type: content_type
+  defp temp_file_path(name) do
+    Path.join(["tmp", "test_uploads", Ecto.UUID.generate(), name])
+  end
+
+  defp write_temp_file!(name, contents) do
+    path = temp_file_path(name)
+    File.mkdir_p!(Path.dirname(path))
+    File.write!(path, contents)
+    path
+  end
+
+  test "stores media and returns the public url path" do
+    root = uploads_root()
+    user = %{id: 42}
+
+    upload_path = write_temp_file!("photo.png", "png")
+
+    upload = %Plug.Upload{
+      path: upload_path,
+      filename: "photo.png",
+      content_type: "image/png"
     }
+
+    assert {:ok, "/uploads/media/42/" <> filename} = Local.store_media(user, upload, root)
+
+    destination = Path.join([root, "media", "42", filename])
+    assert File.exists?(destination)
   end
 
-  test "stores video attachments" do
-    uploads_root =
-      Path.join(System.tmp_dir!(), "pleroma-redux-test-uploads-#{Ecto.UUID.generate()}")
+  test "supports storing video media" do
+    root = uploads_root()
+    user = %{id: 42}
 
-    upload = tmp_upload("video/mp4", "clip.mp4")
+    upload_path = write_temp_file!("clip.mp4", "video")
 
-    assert {:ok, url_path} = Local.store_media(%{id: 123}, upload, uploads_root)
-    assert url_path =~ ~r|^/uploads/media/123/.+\.mp4$|
+    upload = %Plug.Upload{
+      path: upload_path,
+      filename: "clip.mp4",
+      content_type: "video/mp4"
+    }
 
-    stored_path = Path.join([uploads_root, "media", "123", Path.basename(url_path)])
-    assert File.exists?(stored_path)
+    assert {:ok, "/uploads/media/42/" <> filename} = Local.store_media(user, upload, root)
+
+    destination = Path.join([root, "media", "42", filename])
+    assert File.exists?(destination)
   end
 
-  test "stores HEIC images" do
-    uploads_root =
-      Path.join(System.tmp_dir!(), "pleroma-redux-test-uploads-#{Ecto.UUID.generate()}")
+  test "rejects unsupported media content types" do
+    root = uploads_root()
+    user = %{id: 1}
 
-    upload = tmp_upload("image/heic", "photo.heic")
+    upload_path = write_temp_file!("photo.bmp", "nope")
 
-    assert {:ok, url_path} = Local.store_media(%{id: 123}, upload, uploads_root)
-    assert url_path =~ ~r|^/uploads/media/123/.+\.heic$|
+    upload = %Plug.Upload{
+      path: upload_path,
+      filename: "photo.bmp",
+      content_type: "image/bmp"
+    }
 
-    stored_path = Path.join([uploads_root, "media", "123", Path.basename(url_path)])
-    assert File.exists?(stored_path)
+    assert {:error, :unsupported_media_type} = Local.store_media(user, upload, root)
+  end
+
+  test "rejects media larger than the size limit" do
+    root = uploads_root()
+    user = %{id: 1}
+
+    upload_path = write_temp_file!("big.mp4", :binary.copy("a", 10_000_001))
+
+    upload = %Plug.Upload{
+      path: upload_path,
+      filename: "big.mp4",
+      content_type: "video/mp4"
+    }
+
+    assert {:error, :file_too_large} = Local.store_media(user, upload, root)
+  end
+
+  test "returns a file error when the upload path is missing" do
+    root = uploads_root()
+    user = %{id: 1}
+
+    upload = %Plug.Upload{
+      path: Path.join(root, "missing.mp4"),
+      filename: "missing.mp4",
+      content_type: "video/mp4"
+    }
+
+    assert {:error, :enoent} = Local.store_media(user, upload, root)
   end
 end
+
