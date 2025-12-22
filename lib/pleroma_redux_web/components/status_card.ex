@@ -780,7 +780,7 @@ defmodule PleromaReduxWeb.StatusCard do
           data-kind="link"
           href={@attachment.href}
           target="_blank"
-          rel="noreferrer noopener"
+          rel="nofollow noopener noreferrer"
           class="flex h-44 w-full items-center justify-center gap-3 px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50/80 dark:text-slate-200 dark:hover:bg-white/5"
           title={attachment_link_label(@attachment)}
         >

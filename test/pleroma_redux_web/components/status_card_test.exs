@@ -204,6 +204,7 @@ defmodule PleromaReduxWeb.StatusCardTest do
 
     assert html =~ ~s(data-kind="link")
     assert html =~ ~s(href="/uploads/media/1/file.pdf")
+    assert html =~ ~s(rel="nofollow noopener noreferrer")
   end
 
   test "renders image attachments as media viewer buttons" do
