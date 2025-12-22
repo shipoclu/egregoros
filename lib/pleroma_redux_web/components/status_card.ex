@@ -563,6 +563,7 @@ defmodule PleromaReduxWeb.StatusCard do
       assigns
       |> assign(:share_url, status_share_url(assigns.entry))
       |> assign(:can_delete?, can_delete_post?(assigns.entry, assigns.current_user))
+      |> assign(:bookmarked?, Map.get(assigns.entry, :bookmarked?, false))
 
     ~H"""
     <details data-role="status-menu" class="relative">
@@ -598,6 +599,26 @@ defmodule PleromaReduxWeb.StatusCard do
             class="size-5 text-slate-500 dark:text-slate-400"
           /> Open link
         </a>
+
+        <button
+          :if={@current_user}
+          type="button"
+          data-role="bookmark"
+          phx-click="toggle_bookmark"
+          phx-value-id={@entry.object.id}
+          phx-disable-with="..."
+          class={[
+            "flex w-full items-center gap-3 px-4 py-3 text-sm font-semibold transition hover:bg-slate-900/5 dark:hover:bg-white/10",
+            @bookmarked? && "text-slate-900 dark:text-slate-100",
+            !@bookmarked? && "text-slate-700 dark:text-slate-200"
+          ]}
+        >
+          <.icon
+            name={if @bookmarked?, do: "hero-bookmark-solid", else: "hero-bookmark"}
+            class="size-5 text-slate-500 dark:text-slate-400"
+          />
+          {if @bookmarked?, do: "Unbookmark", else: "Bookmark"}
+        </button>
 
         <%= if @can_delete? do %>
           <div class="border-t border-slate-200/80 dark:border-slate-700/70">

@@ -337,6 +337,20 @@ defmodule PleromaReduxWeb.TagLive do
     end
   end
 
+  def handle_event("toggle_bookmark", %{"id" => id}, socket) do
+    with %User{} = user <- socket.assigns.current_user,
+         {post_id, ""} <- Integer.parse(to_string(id)),
+         {:ok, _} <- Interactions.toggle_bookmark(user, post_id) do
+      {:noreply, refresh_posts(socket)}
+    else
+      nil ->
+        {:noreply, put_flash(socket, :error, "Register to bookmark posts.")}
+
+      _ ->
+        {:noreply, socket}
+    end
+  end
+
   def handle_event("delete_post", %{"id" => id}, socket) do
     with %User{} = user <- socket.assigns.current_user,
          {post_id, ""} <- Integer.parse(to_string(id)),

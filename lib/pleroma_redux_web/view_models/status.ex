@@ -17,6 +17,7 @@ defmodule PleromaReduxWeb.ViewModels.Status do
       liked?: liked_by_user?(object, current_user),
       reposts_count: Relationships.count_by_type_object("Announce", object.ap_id),
       reposted?: reposted_by_user?(object, current_user),
+      bookmarked?: bookmarked_by_user?(object, current_user),
       reactions: reactions_for_object(object, current_user)
     }
   end
@@ -30,6 +31,7 @@ defmodule PleromaReduxWeb.ViewModels.Status do
       liked?: false,
       reposts_count: 0,
       reposted?: false,
+      bookmarked?: false,
       reactions: reactions_for_object(object, current_user)
     }
   end
@@ -50,6 +52,12 @@ defmodule PleromaReduxWeb.ViewModels.Status do
 
   defp reposted_by_user?(object, %User{} = current_user) do
     Relationships.get_by_type_actor_object("Announce", current_user.ap_id, object.ap_id) != nil
+  end
+
+  defp bookmarked_by_user?(_object, nil), do: false
+
+  defp bookmarked_by_user?(object, %User{} = current_user) do
+    Relationships.get_by_type_actor_object("Bookmark", current_user.ap_id, object.ap_id) != nil
   end
 
   defp reactions_for_object(%{ap_id: ap_id}, current_user) when is_binary(ap_id) do

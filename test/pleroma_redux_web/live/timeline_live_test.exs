@@ -6,6 +6,7 @@ defmodule PleromaReduxWeb.TimelineLiveTest do
   alias PleromaRedux.Activities.Note
   alias PleromaRedux.Objects
   alias PleromaRedux.Pipeline
+  alias PleromaRedux.Relationships
   alias PleromaRedux.TestSupport.Fixtures
   alias PleromaRedux.Timeline
   alias PleromaRedux.Users
@@ -379,6 +380,33 @@ defmodule PleromaReduxWeb.TimelineLiveTest do
              "#post-#{note.id} button[data-role='reaction'][data-emoji='🔥']",
              "1"
            )
+  end
+
+  test "bookmarking a post toggles a local bookmark", %{conn: conn, user: user} do
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/")
+
+    view
+    |> form("#timeline-form", post: %{content: "Hello world"})
+    |> render_submit()
+
+    [note] = Objects.list_notes()
+
+    refute Relationships.get_by_type_actor_object("Bookmark", user.ap_id, note.ap_id)
+
+    view
+    |> element("#post-#{note.id} button[data-role='bookmark']")
+    |> render_click()
+
+    assert Relationships.get_by_type_actor_object("Bookmark", user.ap_id, note.ap_id)
+    assert has_element?(view, "#post-#{note.id} button[data-role='bookmark']", "Unbookmark")
+
+    view
+    |> element("#post-#{note.id} button[data-role='bookmark']")
+    |> render_click()
+
+    refute Relationships.get_by_type_actor_object("Bookmark", user.ap_id, note.ap_id)
+    assert has_element?(view, "#post-#{note.id} button[data-role='bookmark']", "Bookmark")
   end
 
   test "users can delete their own posts from the timeline", %{conn: conn, user: user} do

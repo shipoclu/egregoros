@@ -11,6 +11,7 @@ defmodule PleromaRedux.Interactions do
   alias PleromaRedux.Relationship
   alias PleromaRedux.Relationships
   alias PleromaRedux.User
+  alias PleromaReduxWeb.Endpoint
 
   def toggle_like(%User{} = user, post_id) when is_integer(post_id) do
     with %{} = post <- Objects.get(post_id),
@@ -54,6 +55,31 @@ defmodule PleromaRedux.Interactions do
 
         nil ->
           Pipeline.ingest(EmojiReact.build(user, post, emoji), local: true)
+      end
+    else
+      _ -> {:error, :not_found}
+    end
+  end
+
+  def toggle_bookmark(%User{} = user, post_id) when is_integer(post_id) do
+    with %{} = post <- Objects.get(post_id),
+         true <- post.type == "Note" do
+      case Relationships.get_by_type_actor_object("Bookmark", user.ap_id, post.ap_id) do
+        %Relationship{} ->
+          _ = Relationships.delete_by_type_actor_object("Bookmark", user.ap_id, post.ap_id)
+          {:ok, :unbookmarked}
+
+        nil ->
+          Relationships.upsert_relationship(%{
+            type: "Bookmark",
+            actor: user.ap_id,
+            object: post.ap_id,
+            activity_ap_id: Endpoint.url() <> "/activities/bookmark/" <> Ecto.UUID.generate()
+          })
+          |> case do
+            {:ok, _relationship} -> {:ok, :bookmarked}
+            {:error, reason} -> {:error, reason}
+          end
       end
     else
       _ -> {:error, :not_found}
