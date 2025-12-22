@@ -33,4 +33,3 @@ defmodule PleromaRedux.Federation.SignedFetchTest do
     assert {:ok, %{status: 200, body: %{"ok" => true}}} = SignedFetch.get(url)
   end
 end
-

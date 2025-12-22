@@ -35,4 +35,3 @@ defmodule PleromaRedux.Federation.SignedFetch do
     ]
   end
 end
-
