@@ -56,6 +56,14 @@ defmodule PleromaReduxWeb.TimelineLiveTest do
     refute has_element?(view, "#timeline-aside")
   end
 
+  test "theme toggle buttons are labeled for accessibility", %{conn: conn} do
+    {:ok, view, _html} = live(conn, "/")
+
+    assert has_element?(view, "button[data-phx-theme='system'][aria-label='Use system theme']")
+    assert has_element?(view, "button[data-phx-theme='light'][aria-label='Use light theme']")
+    assert has_element?(view, "button[data-phx-theme='dark'][aria-label='Use dark theme']")
+  end
+
   test "follow panels are removed from the timeline UI", %{conn: conn, user: user} do
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     {:ok, view, _html} = live(conn, "/")
