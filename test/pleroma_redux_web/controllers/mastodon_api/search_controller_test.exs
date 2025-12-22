@@ -77,4 +77,62 @@ defmodule PleromaReduxWeb.MastodonAPI.SearchControllerTest do
              &(&1["username"] == "bob" and &1["acct"] == "bob@remote.example")
            )
   end
+
+  test "GET /api/v2/search resolves remote accounts with extra @ segments (elk compatibility)", %{
+    conn: conn
+  } do
+    actor_url = "https://remote.example/users/bob"
+
+    PleromaRedux.HTTP.Mock
+    |> expect(:get, fn url, _headers ->
+      assert url ==
+               "https://remote.example/.well-known/webfinger?resource=acct:bob@remote.example"
+
+      {:ok,
+       %{
+         status: 200,
+         body: %{
+           "links" => [
+             %{
+               "rel" => "self",
+               "type" => "application/activity+json",
+               "href" => actor_url
+             }
+           ]
+         },
+         headers: []
+       }}
+    end)
+    |> expect(:get, fn url, _headers ->
+      assert url == actor_url
+
+      {:ok,
+       %{
+         status: 200,
+         body: %{
+           "id" => actor_url,
+           "type" => "Person",
+           "preferredUsername" => "bob",
+           "inbox" => "https://remote.example/users/bob/inbox",
+           "outbox" => "https://remote.example/users/bob/outbox",
+           "publicKey" => %{
+             "id" => actor_url <> "#main-key",
+             "owner" => actor_url,
+             "publicKeyPem" => "-----BEGIN PUBLIC KEY-----\nMIIB...\n-----END PUBLIC KEY-----\n"
+           }
+         },
+         headers: []
+       }}
+    end)
+
+    conn =
+      get(conn, "/api/v2/search", %{"q" => "bob@remote.example@localhost", "resolve" => "true"})
+
+    response = json_response(conn, 200)
+
+    assert Enum.any?(
+             response["accounts"],
+             &(&1["username"] == "bob" and &1["acct"] == "bob@remote.example")
+           )
+  end
 end

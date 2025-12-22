@@ -3,6 +3,7 @@ defmodule PleromaReduxWeb.MastodonAPI.SearchController do
 
   alias PleromaRedux.Federation.Actor
   alias PleromaRedux.Federation.WebFinger
+  alias PleromaRedux.Handles
   alias PleromaRedux.Users
   alias PleromaReduxWeb.Endpoint
   alias PleromaReduxWeb.MastodonAPI.AccountRenderer
@@ -46,21 +47,29 @@ defmodule PleromaReduxWeb.MastodonAPI.SearchController do
       |> String.trim()
       |> String.trim_leading("@")
 
-    case String.split(q, "@", parts: 2) do
-      [nickname, domain] when nickname != "" and domain != "" ->
+    case Handles.parse_acct(q) do
+      {:ok, %{nickname: nickname, domain: nil}} ->
+        case Users.get_by_nickname(nickname) do
+          nil -> {:error, :not_found}
+          user -> {:ok, user}
+        end
+
+      {:ok, %{nickname: nickname, domain: domain}} ->
         if domain == local_domain() do
           case Users.get_by_nickname(nickname) do
             nil -> {:error, :not_found}
             user -> {:ok, user}
           end
         else
-          with {:ok, actor_url} <- WebFinger.lookup(q),
+          handle = nickname <> "@" <> domain
+
+          with {:ok, actor_url} <- WebFinger.lookup(handle),
                {:ok, user} <- Actor.fetch_and_store(actor_url) do
             {:ok, user}
           end
         end
 
-      _ ->
+      :error ->
         {:error, :invalid_handle}
     end
   end

@@ -6,6 +6,7 @@ defmodule PleromaReduxWeb.MastodonAPI.AccountsController do
   alias PleromaRedux.AvatarStorage
   alias PleromaRedux.Federation.Actor
   alias PleromaRedux.Federation.WebFinger
+  alias PleromaRedux.Handles
   alias PleromaRedux.Objects
   alias PleromaRedux.Pipeline
   alias PleromaRedux.Relationships
@@ -56,12 +57,19 @@ defmodule PleromaReduxWeb.MastodonAPI.AccountsController do
     if acct == "" do
       send_resp(conn, 422, "Unprocessable Entity")
     else
-      case parse_acct(acct) do
-        {:local, nickname} ->
+      case Handles.parse_acct(acct) do
+        {:ok, %{nickname: nickname, domain: nil}} ->
           lookup_local(conn, nickname)
 
-        {:remote, handle} ->
-          lookup_remote(conn, handle)
+        {:ok, %{nickname: nickname, domain: domain}} ->
+          if domain == local_domain() do
+            lookup_local(conn, nickname)
+          else
+            lookup_remote(conn, nickname <> "@" <> domain)
+          end
+
+        :error ->
+          send_resp(conn, 422, "Unprocessable Entity")
       end
     end
   end
@@ -175,23 +183,6 @@ defmodule PleromaReduxWeb.MastodonAPI.AccountsController do
     else
       nil -> send_resp(conn, 404, "Not Found")
       {:error, _} -> send_resp(conn, 422, "Unprocessable Entity")
-    end
-  end
-
-  defp parse_acct(acct) when is_binary(acct) do
-    case String.split(acct, "@", parts: 2) do
-      [nickname] when nickname != "" ->
-        {:local, nickname}
-
-      [nickname, domain] when nickname != "" and domain != "" ->
-        if domain == local_domain() do
-          {:local, nickname}
-        else
-          {:remote, nickname <> "@" <> domain}
-        end
-
-      _ ->
-        {:local, acct}
     end
   end
 
