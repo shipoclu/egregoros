@@ -45,6 +45,19 @@ defmodule PleromaReduxWeb.MastodonAPI.AccountsControllerTest do
     assert Enum.at(response, 1)["content"] == "<p>First post</p>"
   end
 
+  test "GET /api/v1/accounts/:id/statuses with pinned=true only returns pinned statuses", %{
+    conn: conn
+  } do
+    {:ok, user} = Users.create_local_user("alice")
+
+    {:ok, _} = Publish.post_note(user, "First post")
+
+    conn = get(conn, "/api/v1/accounts/#{user.id}/statuses", %{"pinned" => "true"})
+    response = json_response(conn, 200)
+
+    assert response == []
+  end
+
   test "GET /api/v1/accounts/:id/statuses includes reblogs", %{conn: conn} do
     {:ok, alice} = Users.create_local_user("alice")
     {:ok, bob} = Users.create_local_user("bob")

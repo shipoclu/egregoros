@@ -79,11 +79,15 @@ defmodule PleromaReduxWeb.MastodonAPI.AccountsController do
         pagination = Pagination.parse(params)
 
         objects =
-          Objects.list_statuses_by_actor(user.ap_id,
-            limit: pagination.limit + 1,
-            max_id: pagination.max_id,
-            since_id: pagination.since_id
-          )
+          if pinned_only?(params) do
+            []
+          else
+            Objects.list_statuses_by_actor(user.ap_id,
+              limit: pagination.limit + 1,
+              max_id: pagination.max_id,
+              since_id: pagination.since_id
+            )
+          end
 
         has_more? = length(objects) > pagination.limit
         objects = Enum.take(objects, pagination.limit)
@@ -188,6 +192,16 @@ defmodule PleromaReduxWeb.MastodonAPI.AccountsController do
 
       _ ->
         {:local, acct}
+    end
+  end
+
+  defp pinned_only?(params) when is_map(params) do
+    case Map.get(params, "pinned") do
+      true -> true
+      "true" -> true
+      1 -> true
+      "1" -> true
+      _ -> false
     end
   end
 
