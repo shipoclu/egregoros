@@ -50,7 +50,8 @@ defmodule PleromaReduxWeb.Router do
     live "/search", SearchLive
     live "/tags/:tag", TagLive
     live "/notifications", NotificationsLive
-    live "/bookmarks", BookmarksLive
+    live "/bookmarks", BookmarksLive, :bookmarks
+    live "/favourites", BookmarksLive, :favourites
     live "/@:nickname", ProfileLive
     live "/@:nickname/followers", RelationshipsLive, :followers
     live "/@:nickname/following", RelationshipsLive, :following

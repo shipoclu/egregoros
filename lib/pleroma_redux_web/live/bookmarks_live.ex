@@ -23,18 +23,25 @@ defmodule PleromaReduxWeb.BookmarksLive do
         id -> Users.get(id)
       end
 
-    bookmarks = list_bookmarks(current_user, limit: @page_size)
-    posts = bookmarks |> Enum.map(fn {_bookmark_id, object} -> object end)
-
     {:ok,
      socket
      |> assign(
        current_user: current_user,
        notifications_count: notifications_count(current_user),
-       bookmarks_cursor: bookmarks_cursor(bookmarks),
-       bookmarks_end?: length(bookmarks) < @page_size
-     )
-     |> stream(:bookmarks, StatusVM.decorate_many(posts, current_user), dom_id: &post_dom_id/1)}
+       kind: kind_for_action(socket.assigns.live_action),
+       relationship_type: relationship_type(kind_for_action(socket.assigns.live_action)),
+       saved_cursor: nil,
+       saved_end?: true,
+       page_kicker: nil,
+       page_title: nil,
+       empty_message: nil
+     )}
+  end
+
+  @impl true
+  def handle_params(_params, _uri, socket) do
+    kind = kind_for_action(socket.assigns.live_action)
+    {:noreply, apply_kind(socket, kind)}
   end
 
   @impl true
@@ -46,7 +53,14 @@ defmodule PleromaReduxWeb.BookmarksLive do
     with %User{} = user <- socket.assigns.current_user,
          {post_id, ""} <- Integer.parse(to_string(id)) do
       _ = Interactions.toggle_like(user, post_id)
-      {:noreply, refresh_post(socket, post_id)}
+
+      socket =
+        case socket.assigns.kind do
+          :favourites -> refresh_or_drop_favourite(socket, post_id)
+          _ -> refresh_post(socket, post_id)
+        end
+
+      {:noreply, socket}
     else
       nil ->
         {:noreply, put_flash(socket, :error, "Register to like posts.")}
@@ -90,9 +104,12 @@ defmodule PleromaReduxWeb.BookmarksLive do
          {post_id, ""} <- Integer.parse(to_string(id)),
          {:ok, result} <- Interactions.toggle_bookmark(user, post_id) do
       socket =
-        case result do
-          :unbookmarked -> stream_delete(socket, :bookmarks, %{object: %{id: post_id}})
-          _ -> refresh_post(socket, post_id)
+        case {socket.assigns.kind, result} do
+          {:bookmarks, :unbookmarked} ->
+            stream_delete(socket, :saved_posts, %{object: %{id: post_id}})
+
+          _ ->
+            refresh_post(socket, post_id)
         end
 
       {:noreply, socket}
@@ -112,7 +129,7 @@ defmodule PleromaReduxWeb.BookmarksLive do
       {:noreply,
        socket
        |> put_flash(:info, "Post deleted.")
-       |> stream_delete(:bookmarks, %{object: %{id: post_id}})}
+       |> stream_delete(:saved_posts, %{object: %{id: post_id}})}
     else
       nil ->
         {:noreply, put_flash(socket, :error, "Register to delete posts.")}
@@ -123,37 +140,37 @@ defmodule PleromaReduxWeb.BookmarksLive do
   end
 
   def handle_event("load_more", _params, socket) do
-    cursor = socket.assigns.bookmarks_cursor
+    cursor = socket.assigns.saved_cursor
 
     cond do
-      socket.assigns.bookmarks_end? ->
+      socket.assigns.saved_end? ->
         {:noreply, socket}
 
       is_nil(cursor) ->
-        {:noreply, assign(socket, bookmarks_end?: true)}
+        {:noreply, assign(socket, saved_end?: true)}
 
       true ->
-        bookmarks =
-          list_bookmarks(socket.assigns.current_user,
+        saved =
+          list_saved_posts(socket.assigns.current_user, socket.assigns.relationship_type,
             limit: @page_size,
             max_id: cursor
           )
 
         socket =
-          if bookmarks == [] do
-            assign(socket, bookmarks_end?: true)
+          if saved == [] do
+            assign(socket, saved_end?: true)
           else
-            posts = bookmarks |> Enum.map(fn {_bookmark_id, object} -> object end)
-            new_cursor = bookmarks_cursor(bookmarks)
-            bookmarks_end? = length(bookmarks) < @page_size
+            posts = saved |> Enum.map(fn {_cursor_id, object} -> object end)
+            new_cursor = saved_cursor(saved)
+            saved_end? = length(saved) < @page_size
             current_user = socket.assigns.current_user
 
             socket =
               Enum.reduce(StatusVM.decorate_many(posts, current_user), socket, fn entry, socket ->
-                stream_insert(socket, :bookmarks, entry, at: -1)
+                stream_insert(socket, :saved_posts, entry, at: -1)
               end)
 
-            assign(socket, bookmarks_cursor: new_cursor, bookmarks_end?: bookmarks_end?)
+            assign(socket, saved_cursor: new_cursor, saved_end?: saved_end?)
           end
 
         {:noreply, socket}
@@ -175,13 +192,43 @@ defmodule PleromaReduxWeb.BookmarksLive do
         <section class="space-y-4">
           <.card class="p-6">
             <div class="flex items-center justify-between gap-4">
-              <div>
+              <div class="min-w-0">
                 <p class="text-xs uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
-                  Bookmarks
+                  {@page_kicker}
                 </p>
-                <h2 class="mt-2 font-display text-2xl text-slate-900 dark:text-slate-100">
-                  Saved posts
+                <h2 class="mt-2 truncate font-display text-2xl text-slate-900 dark:text-slate-100">
+                  {@page_title}
                 </h2>
+              </div>
+
+              <div class="flex items-center gap-2">
+                <.link
+                  patch={~p"/bookmarks"}
+                  class={[
+                    "rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] transition",
+                    @kind == :bookmarks &&
+                      "bg-slate-900 text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white",
+                    @kind != :bookmarks &&
+                      "border border-slate-200/80 bg-white/70 text-slate-700 hover:-translate-y-0.5 hover:bg-white dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:hover:bg-slate-950"
+                  ]}
+                  aria-label="View bookmarks"
+                >
+                  Bookmarks
+                </.link>
+
+                <.link
+                  patch={~p"/favourites"}
+                  class={[
+                    "rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] transition",
+                    @kind == :favourites &&
+                      "bg-slate-900 text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white",
+                    @kind != :favourites &&
+                      "border border-slate-200/80 bg-white/70 text-slate-700 hover:-translate-y-0.5 hover:bg-white dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:hover:bg-slate-950"
+                  ]}
+                  aria-label="View favourites"
+                >
+                  Favourites
+                </.link>
               </div>
             </div>
           </.card>
@@ -192,23 +239,23 @@ defmodule PleromaReduxWeb.BookmarksLive do
                 id="bookmarks-empty"
                 class="hidden only:block rounded-3xl border border-slate-200/80 bg-white/70 p-6 text-sm text-slate-600 shadow-sm shadow-slate-200/20 dark:border-slate-700/70 dark:bg-slate-950/50 dark:text-slate-300 dark:shadow-slate-900/30"
               >
-                No bookmarks yet.
+                {@empty_message}
               </div>
 
               <StatusCard.status_card
-                :for={{id, entry} <- @streams.bookmarks}
+                :for={{id, entry} <- @streams.saved_posts}
                 id={id}
                 entry={entry}
                 current_user={@current_user}
               />
             </div>
 
-            <div :if={!@bookmarks_end?} class="flex justify-center py-2">
+            <div :if={!@saved_end?} class="flex justify-center py-2">
               <.button
                 data-role="bookmarks-load-more"
                 phx-click="load_more"
                 phx-disable-with="Loading..."
-                aria-label="Load more bookmarks"
+                aria-label="Load more saved posts"
                 variant="secondary"
               >
                 <.icon name="hero-chevron-down" class="size-4" /> Load more
@@ -220,7 +267,7 @@ defmodule PleromaReduxWeb.BookmarksLive do
                 data-role="bookmarks-auth-required"
                 class="text-sm text-slate-600 dark:text-slate-300"
               >
-                Sign in to view bookmarks.
+                Sign in to view saved posts.
               </p>
               <div class="mt-4 flex flex-wrap items-center gap-2">
                 <.button navigate={~p"/login"} size="sm">Login</.button>
@@ -244,23 +291,90 @@ defmodule PleromaReduxWeb.BookmarksLive do
 
     case Objects.get(post_id) do
       %{type: "Note"} = object ->
-        stream_insert(socket, :bookmarks, StatusVM.decorate(object, current_user))
+        stream_insert(socket, :saved_posts, StatusVM.decorate(object, current_user))
 
       _ ->
         socket
     end
   end
 
-  defp list_bookmarks(nil, _opts), do: []
+  defp refresh_or_drop_favourite(socket, post_id) when is_integer(post_id) do
+    current_user = socket.assigns.current_user
 
-  defp list_bookmarks(%User{} = user, opts) when is_list(opts) do
+    case Objects.get(post_id) do
+      %{type: "Note"} = object ->
+        entry = StatusVM.decorate(object, current_user)
+
+        if entry.liked? do
+          stream_insert(socket, :saved_posts, entry)
+        else
+          stream_delete(socket, :saved_posts, %{object: %{id: post_id}})
+        end
+
+      _ ->
+        socket
+    end
+  end
+
+  defp apply_kind(socket, kind) do
+    relationship_type = relationship_type(kind)
+
+    %{page_kicker: page_kicker, page_title: page_title, empty_message: empty_message} =
+      labels(kind)
+
+    saved = list_saved_posts(socket.assigns.current_user, relationship_type, limit: @page_size)
+    posts = saved |> Enum.map(fn {_cursor_id, object} -> object end)
+    cursor = saved_cursor(saved)
+
+    socket
+    |> assign(
+      kind: kind,
+      relationship_type: relationship_type,
+      saved_cursor: cursor,
+      saved_end?: length(saved) < @page_size,
+      page_kicker: page_kicker,
+      page_title: page_title,
+      empty_message: empty_message
+    )
+    |> stream(:saved_posts, StatusVM.decorate_many(posts, socket.assigns.current_user),
+      reset: true,
+      dom_id: &post_dom_id/1
+    )
+  end
+
+  defp labels(:favourites) do
+    %{
+      page_kicker: "Favourites",
+      page_title: "Liked posts",
+      empty_message: "No favourites yet."
+    }
+  end
+
+  defp labels(_kind) do
+    %{
+      page_kicker: "Bookmarks",
+      page_title: "Saved posts",
+      empty_message: "No bookmarks yet."
+    }
+  end
+
+  defp relationship_type(:favourites), do: "Like"
+  defp relationship_type(_kind), do: "Bookmark"
+
+  defp kind_for_action(:favourites), do: :favourites
+  defp kind_for_action(_live_action), do: :bookmarks
+
+  defp list_saved_posts(nil, _relationship_type, _opts), do: []
+
+  defp list_saved_posts(%User{} = user, relationship_type, opts)
+       when is_binary(relationship_type) and is_list(opts) do
     limit = opts |> Keyword.get(:limit, @page_size) |> normalize_limit()
     max_id = opts |> Keyword.get(:max_id) |> normalize_id()
 
     from(r in Relationship,
       join: o in Object,
       on: o.ap_id == r.object,
-      where: r.type == "Bookmark" and r.actor == ^user.ap_id and o.type == "Note",
+      where: r.type == ^relationship_type and r.actor == ^user.ap_id and o.type == "Note",
       order_by: [desc: r.id],
       limit: ^limit,
       select: {r.id, o}
@@ -275,9 +389,9 @@ defmodule PleromaReduxWeb.BookmarksLive do
 
   defp maybe_where_max_id(query, _max_id), do: query
 
-  defp bookmarks_cursor(bookmarks) when is_list(bookmarks) do
-    case List.last(bookmarks) do
-      {bookmark_id, _object} when is_integer(bookmark_id) -> bookmark_id
+  defp saved_cursor(saved) when is_list(saved) do
+    case List.last(saved) do
+      {cursor_id, _object} when is_integer(cursor_id) -> cursor_id
       _ -> nil
     end
   end
