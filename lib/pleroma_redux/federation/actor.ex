@@ -35,17 +35,31 @@ defmodule PleromaRedux.Federation.Actor do
 
   defp decode_json(_), do: {:error, :invalid_json}
 
-  defp to_user_attrs(%{"id" => id, "inbox" => inbox} = actor, actor_url)
-       when is_binary(id) and is_binary(inbox) and is_binary(actor_url) do
+  defp to_user_attrs(%{"id" => id} = actor, actor_url) when is_binary(id) and is_binary(actor_url) do
     if id != actor_url do
       {:error, :actor_id_mismatch}
     else
+      inbox =
+        actor
+        |> Map.get("inbox")
+        |> case do
+          inbox when is_binary(inbox) and inbox != "" -> inbox
+          _ -> default_endpoint(id, "inbox")
+        end
+
       to_user_attrs(actor, id, inbox)
     end
   end
 
-  defp to_user_attrs(%{"id" => id, "inbox" => inbox} = actor, _actor_url)
-       when is_binary(id) and is_binary(inbox) do
+  defp to_user_attrs(%{"id" => id} = actor, _actor_url) when is_binary(id) do
+    inbox =
+      actor
+      |> Map.get("inbox")
+      |> case do
+        inbox when is_binary(inbox) and inbox != "" -> inbox
+        _ -> default_endpoint(id, "inbox")
+      end
+
     to_user_attrs(actor, id, inbox)
   end
 
@@ -75,8 +89,8 @@ defmodule PleromaRedux.Federation.Actor do
         actor
         |> Map.get("outbox")
         |> case do
-          value when is_binary(value) -> value
-          _ -> id <> "/outbox"
+          value when is_binary(value) and value != "" -> value
+          _ -> default_endpoint(id, "outbox")
         end
 
       with :ok <- SafeURL.validate_http_url(inbox),
@@ -188,4 +202,10 @@ defmodule PleromaRedux.Federation.Actor do
   end
 
   defp resolve_url(_url, _base), do: nil
+
+  defp default_endpoint(actor_id, suffix) when is_binary(actor_id) and is_binary(suffix) do
+    String.trim_trailing(actor_id, "/") <> "/" <> suffix
+  end
+
+  defp default_endpoint(_actor_id, _suffix), do: nil
 end

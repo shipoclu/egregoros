@@ -138,6 +138,32 @@ defmodule PleromaRedux.Federation.ActorTest do
     assert user.avatar_url == "https://remote.example/media/avatar.png"
   end
 
+  test "fetch_and_store falls back to actor_url/inbox when inbox is missing" do
+    actor_url = "https://remote.example/users/toast"
+    {public_key, _private_key} = Keys.generate_rsa_keypair()
+
+    expect(PleromaRedux.HTTP.Mock, :get, fn _url, _headers ->
+      {:ok,
+       %{
+         status: 200,
+         body: %{
+           "id" => actor_url,
+           "publicKey" => %{
+             "id" => actor_url <> "#main-key",
+             "owner" => actor_url,
+             "publicKeyPem" => public_key
+           }
+         },
+         headers: []
+       }}
+    end)
+
+    assert {:ok, user} = Actor.fetch_and_store(actor_url)
+    assert user.ap_id == actor_url
+    assert user.inbox == actor_url <> "/inbox"
+    assert user.outbox == actor_url <> "/outbox"
+  end
+
   test "fetch_and_store supports icon url lists" do
     actor_url = "https://remote.example/users/alice"
     {public_key, _private_key} = Keys.generate_rsa_keypair()
