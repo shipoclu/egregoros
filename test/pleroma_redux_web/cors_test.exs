@@ -14,6 +14,28 @@ defmodule PleromaReduxWeb.CORSTest do
     assert String.contains?(String.downcase(exposed), "link")
   end
 
+  test "adds CORS headers for nodeinfo responses", %{conn: conn} do
+    conn =
+      conn
+      |> put_req_header("origin", "https://frontend.example")
+      |> get("/nodeinfo/2.0")
+
+    assert get_resp_header(conn, "access-control-allow-origin") == ["*"]
+  end
+
+  test "responds to nodeinfo preflight requests", %{conn: conn} do
+    conn =
+      conn
+      |> put_req_header("origin", "https://frontend.example")
+      |> put_req_header("access-control-request-method", "GET")
+      |> put_req_header("access-control-request-headers", "accept")
+      |> options("/nodeinfo/2.0")
+
+    assert conn.status == 204
+    assert conn.resp_body == ""
+    assert get_resp_header(conn, "access-control-allow-origin") == ["*"]
+  end
+
   test "responds to API preflight requests", %{conn: conn} do
     conn =
       conn
