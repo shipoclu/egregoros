@@ -84,7 +84,7 @@ This is a **web UI** checklist for Pleroma‑Redux. Items are ordered roughly by
 | Like / unlike | DONE | |
 | Repost / unrepost | DONE | |
 | Reply action | DONE | Reply works for both local + remote posts via the status permalink page. |
-| Bookmark action | TODO | |
+| Bookmark action | DONE | Bookmark/unbookmark is available via the post “…” menu (stored locally). |
 | Delete own post | DONE | Available from the status “…” menu for local posts owned by the current user (with confirm step). |
 | Edit own post | TODO | (Optional; Mastodon doesn’t support editing by default.) |
 | Report post/user action menu | TODO | Common “…” menu. |
@@ -145,7 +145,7 @@ This is a **web UI** checklist for Pleroma‑Redux. Items are ordered roughly by
 | Keyboard navigation for all primary flows | PARTIAL | Needs systematic review + tests. |
 | Focus visible and consistent | PARTIAL | Standardize focus rings and focus traps (modals). |
 | Icon buttons have labels (`aria-label`) | PARTIAL | Some do; enforce everywhere. |
-| Reduced motion support | TODO | Respect `prefers-reduced-motion`. |
+| Reduced motion support | PARTIAL | Key entrance animations are gated behind `motion-safe:*`; still need a full pass for motion-reduce. |
 | High contrast checks (light/dark) | PARTIAL | Validate contrast ratios. |
 
 ### Performance / perceived performance
