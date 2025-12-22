@@ -613,16 +613,24 @@ defmodule PleromaReduxWeb.SearchLive do
     {search_query, remote_handle} = parse_query(q)
 
     tag_query =
-      if String.starts_with?(q, "#") do
-        q
-        |> String.trim_leading("#")
-        |> String.trim()
-        |> case do
-          "" -> nil
-          tag -> tag
-        end
-      else
-        nil
+      case q do
+        "#" <> rest ->
+          tag = rest |> String.trim()
+          if valid_hashtag?(tag), do: tag, else: nil
+
+        _ ->
+          tag = q |> String.trim()
+
+          if tag != "" and
+               remote_handle == nil and
+               !String.contains?(tag, " ") and
+               !String.starts_with?(tag, "@") and
+               valid_hashtag?(tag) and
+               Objects.list_notes_by_hashtag(tag, limit: 1) != [] do
+            tag
+          else
+            nil
+          end
       end
 
     results =
@@ -705,6 +713,12 @@ defmodule PleromaReduxWeb.SearchLive do
       _ -> false
     end
   end
+
+  defp valid_hashtag?(tag) when is_binary(tag) do
+    Regex.match?(~r/^[\p{L}\p{N}_][\p{L}\p{N}_-]{0,63}$/u, tag)
+  end
+
+  defp valid_hashtag?(_tag), do: false
 
   defp cancel_all_uploads(socket, upload_name) when is_atom(upload_name) do
     case socket.assigns.uploads |> Map.get(upload_name) do
