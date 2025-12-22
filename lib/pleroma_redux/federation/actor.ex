@@ -21,7 +21,7 @@ defmodule PleromaRedux.Federation.Actor do
       {:ok, %{status: status, body: body}} when status in 200..299 ->
         with {:ok, actor} <- decode_json(body) do
           actor =
-            if sparse_actor?(actor) do
+            if sparse_actor?(actor) or missing_endpoints?(actor) do
               case fetch_actor_signed(actor_url) do
                 {:ok, signed_actor} -> signed_actor
                 _ -> actor
@@ -65,6 +65,32 @@ defmodule PleromaRedux.Federation.Actor do
 
   defp sparse_actor?(_), do: false
 
+  defp missing_endpoints?(actor) when is_map(actor) do
+    has_required_id_and_key?(actor) and not has_endpoints?(actor)
+  end
+
+  defp missing_endpoints?(_), do: false
+
+  defp has_required_id_and_key?(actor) when is_map(actor) do
+    id = Map.get(actor, "id")
+    public_key = get_in(actor, ["publicKey", "publicKeyPem"])
+
+    is_binary(id) and String.trim(id) != "" and is_binary(public_key) and
+      String.trim(public_key) != ""
+  end
+
+  defp has_required_id_and_key?(_), do: false
+
+  defp has_endpoints?(actor) when is_map(actor) do
+    inbox = Map.get(actor, "inbox")
+    outbox = Map.get(actor, "outbox")
+
+    is_binary(inbox) and String.trim(inbox) != "" and is_binary(outbox) and
+      String.trim(outbox) != ""
+  end
+
+  defp has_endpoints?(_), do: false
+
   defp headers do
     [
       {"accept", "application/activity+json, application/ld+json"},
@@ -83,66 +109,45 @@ defmodule PleromaRedux.Federation.Actor do
 
   defp decode_json(_), do: {:error, :invalid_json}
 
-  defp to_user_attrs(%{"id" => id} = actor, actor_url) when is_binary(id) and is_binary(actor_url) do
+  defp to_user_attrs(%{"id" => id} = actor, actor_url)
+       when is_binary(id) and is_binary(actor_url) do
     if id != actor_url do
       {:error, :actor_id_mismatch}
     else
-      inbox =
-        actor
-        |> Map.get("inbox")
-        |> case do
-          inbox when is_binary(inbox) and inbox != "" -> inbox
-          _ -> default_endpoint(id, "inbox")
-        end
-
-      to_user_attrs(actor, id, inbox)
+      to_user_attrs_from_id(actor, id)
     end
   end
 
   defp to_user_attrs(%{"id" => id} = actor, _actor_url) when is_binary(id) do
-    inbox =
-      actor
-      |> Map.get("inbox")
-      |> case do
-        inbox when is_binary(inbox) and inbox != "" -> inbox
-        _ -> default_endpoint(id, "inbox")
-      end
-
-    to_user_attrs(actor, id, inbox)
+    to_user_attrs_from_id(actor, id)
   end
 
   defp to_user_attrs(_actor, _actor_url), do: {:error, :invalid_actor}
 
-  defp to_user_attrs(%{} = actor, id, inbox) when is_binary(id) and is_binary(inbox) do
+  defp to_user_attrs_from_id(%{} = actor, id) when is_binary(id) do
     public_key = get_in(actor, ["publicKey", "publicKeyPem"])
 
     if not is_binary(public_key) or public_key == "" do
       {:error, :missing_public_key}
     else
-      domain =
-        case URI.parse(id) do
-          %URI{host: host} when is_binary(host) and host != "" -> host
-          _ -> nil
-        end
-
-      nickname =
-        actor
-        |> Map.get("preferredUsername")
-        |> case do
-          value when is_binary(value) and value != "" -> value
-          _ -> id |> URI.parse() |> Map.get(:path) |> fallback_nickname()
-        end
-
-      outbox =
-        actor
-        |> Map.get("outbox")
-        |> case do
-          value when is_binary(value) and value != "" -> value
-          _ -> default_endpoint(id, "outbox")
-        end
-
-      with :ok <- SafeURL.validate_http_url(inbox),
+      with {:ok, inbox} <- required_string_field(actor, "inbox", :missing_inbox),
+           {:ok, outbox} <- required_string_field(actor, "outbox", :missing_outbox),
+           :ok <- SafeURL.validate_http_url(inbox),
            :ok <- SafeURL.validate_http_url(outbox) do
+        domain =
+          case URI.parse(id) do
+            %URI{host: host} when is_binary(host) and host != "" -> host
+            _ -> nil
+          end
+
+        nickname =
+          actor
+          |> Map.get("preferredUsername")
+          |> case do
+            value when is_binary(value) and value != "" -> value
+            _ -> id |> URI.parse() |> Map.get(:path) |> fallback_nickname()
+          end
+
         attrs = %{
           nickname: nickname,
           domain: domain,
@@ -162,6 +167,18 @@ defmodule PleromaRedux.Federation.Actor do
 
         {:ok, attrs}
       end
+    end
+  end
+
+  defp required_string_field(map, key, error)
+       when is_map(map) and is_binary(key) and is_atom(error) do
+    case Map.get(map, key) do
+      value when is_binary(value) ->
+        value = String.trim(value)
+        if value == "", do: {:error, error}, else: {:ok, value}
+
+      _ ->
+        {:error, error}
     end
   end
 
@@ -250,10 +267,4 @@ defmodule PleromaRedux.Federation.Actor do
   end
 
   defp resolve_url(_url, _base), do: nil
-
-  defp default_endpoint(actor_id, suffix) when is_binary(actor_id) and is_binary(suffix) do
-    String.trim_trailing(actor_id, "/") <> "/" <> suffix
-  end
-
-  defp default_endpoint(_actor_id, _suffix), do: nil
 end

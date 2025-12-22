@@ -138,7 +138,7 @@ defmodule PleromaRedux.Federation.ActorTest do
     assert user.avatar_url == "https://remote.example/media/avatar.png"
   end
 
-  test "fetch_and_store falls back to actor_url/inbox when inbox is missing" do
+  test "fetch_and_store retries with signed fetch when endpoints are missing" do
     actor_url = "https://remote.example/users/toast"
     {public_key, _private_key} = Keys.generate_rsa_keypair()
 
@@ -151,6 +151,8 @@ defmodule PleromaRedux.Federation.ActorTest do
          status: 200,
          body: %{
            "id" => actor_url,
+           "type" => "Person",
+           "preferredUsername" => "toast",
            "publicKey" => %{
              "id" => actor_url <> "#main-key",
              "owner" => actor_url,
@@ -170,6 +172,10 @@ defmodule PleromaRedux.Federation.ActorTest do
          status: 200,
          body: %{
            "id" => actor_url,
+           "type" => "Person",
+           "preferredUsername" => "toast",
+           "inbox" => actor_url <> "/inbox",
+           "outbox" => actor_url <> "/outbox",
            "publicKey" => %{
              "id" => actor_url <> "#main-key",
              "owner" => actor_url,
@@ -182,6 +188,7 @@ defmodule PleromaRedux.Federation.ActorTest do
 
     assert {:ok, user} = Actor.fetch_and_store(actor_url)
     assert user.ap_id == actor_url
+    assert user.nickname == "toast"
     assert user.inbox == actor_url <> "/inbox"
     assert user.outbox == actor_url <> "/outbox"
   end
@@ -223,6 +230,54 @@ defmodule PleromaRedux.Federation.ActorTest do
     assert user.nickname == "toast"
     assert user.inbox == actor_url <> "/inbox"
     assert user.outbox == actor_url <> "/outbox"
+  end
+
+  test "fetch_and_store rejects actors without inbox/outbox even after signed fetch" do
+    actor_url = "https://remote.example/users/toast"
+    {public_key, _private_key} = Keys.generate_rsa_keypair()
+
+    expect(PleromaRedux.HTTP.Mock, :get, fn _url, headers ->
+      refute List.keyfind(headers, "signature", 0)
+
+      {:ok,
+       %{
+         status: 200,
+         body: %{
+           "id" => actor_url,
+           "type" => "Person",
+           "preferredUsername" => "toast",
+           "publicKey" => %{
+             "id" => actor_url <> "#main-key",
+             "owner" => actor_url,
+             "publicKeyPem" => public_key
+           }
+         },
+         headers: []
+       }}
+    end)
+
+    expect(PleromaRedux.HTTP.Mock, :get, fn _url, headers ->
+      assert List.keyfind(headers, "signature", 0)
+      assert List.keyfind(headers, "authorization", 0)
+
+      {:ok,
+       %{
+         status: 200,
+         body: %{
+           "id" => actor_url,
+           "type" => "Person",
+           "preferredUsername" => "toast",
+           "publicKey" => %{
+             "id" => actor_url <> "#main-key",
+             "owner" => actor_url,
+             "publicKeyPem" => public_key
+           }
+         },
+         headers: []
+       }}
+    end)
+
+    assert {:error, :missing_inbox} = Actor.fetch_and_store(actor_url)
   end
 
   test "fetch_and_store supports icon url lists" do
