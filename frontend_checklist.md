@@ -119,7 +119,7 @@ This is a **web UI** checklist for Pleroma‑Redux. Items are ordered roughly by
 | Notification types coverage | PARTIAL | Follow/like/repost covered; expand (mentions, emoji reactions, etc.). |
 | Live updates for notifications | DONE | Notifications stream into the list while connected. |
 | Mark as read / unread | TODO | |
-| Notification filtering (mentions only, follows only, etc.) | TODO | |
+| Notification filtering (mentions only, follows only, etc.) | PARTIAL | Basic client-side filters exist (all/follows/likes/reposts); still missing mentions + richer filtering options. |
 
 ### Search & discovery
 | Feature | Status | Notes |
