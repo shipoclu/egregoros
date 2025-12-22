@@ -25,4 +25,3 @@ defmodule PleromaReduxWeb.MastodonAPI.PushSubscriptionController do
     |> json(%{"error" => "push subscriptions are not supported"})
   end
 end
-

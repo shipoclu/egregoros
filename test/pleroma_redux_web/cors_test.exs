@@ -40,4 +40,3 @@ defmodule PleromaReduxWeb.CORSTest do
     assert get_resp_header(conn, "access-control-allow-origin") == []
   end
 end
-

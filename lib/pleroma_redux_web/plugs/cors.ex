@@ -50,7 +50,11 @@ defmodule PleromaReduxWeb.Plugs.CORS do
   defp cors_path?(_request_path, _paths), do: false
 
   defp maybe_put_origin(conn, origin, opts) do
-    case allowed_origin(origin, Keyword.fetch!(opts, :origins), Keyword.fetch!(opts, :allow_credentials)) do
+    case allowed_origin(
+           origin,
+           Keyword.fetch!(opts, :origins),
+           Keyword.fetch!(opts, :allow_credentials)
+         ) do
       nil ->
         conn
 
@@ -103,7 +107,10 @@ defmodule PleromaReduxWeb.Plugs.CORS do
       conn
       |> put_resp_header("access-control-allow-methods", methods)
       |> put_resp_header("access-control-allow-headers", allow_headers(conn))
-      |> put_resp_header("access-control-max-age", Integer.to_string(Keyword.fetch!(opts, :max_age)))
+      |> put_resp_header(
+        "access-control-max-age",
+        Integer.to_string(Keyword.fetch!(opts, :max_age))
+      )
       |> send_resp(204, "")
       |> halt()
     else
@@ -121,4 +128,3 @@ defmodule PleromaReduxWeb.Plugs.CORS do
     end
   end
 end
-

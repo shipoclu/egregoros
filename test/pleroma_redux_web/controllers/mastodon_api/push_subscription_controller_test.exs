@@ -17,4 +17,3 @@ defmodule PleromaReduxWeb.MastodonAPI.PushSubscriptionControllerTest do
     assert body["error"] == "push subscriptions are not supported"
   end
 end
-
