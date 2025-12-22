@@ -19,7 +19,7 @@ defmodule PleromaReduxWeb.StatusCard do
     <article
       id={@id}
       data-role="status-card"
-      class="rounded-3xl border border-white/80 bg-white/80 p-6 shadow-lg shadow-slate-200/30 backdrop-blur transition hover:-translate-y-0.5 hover:shadow-xl dark:border-slate-700/60 dark:bg-slate-900/70 dark:shadow-slate-900/50 animate-rise"
+      class="rounded-3xl border border-white/80 bg-white/80 p-6 shadow-lg shadow-slate-200/30 backdrop-blur transition hover:-translate-y-0.5 hover:shadow-xl dark:border-slate-700/60 dark:bg-slate-900/70 dark:shadow-slate-900/50 motion-safe:animate-rise"
     >
       <div class="flex items-start justify-between gap-3">
         <div class="flex min-w-0 items-start gap-4">
@@ -137,79 +137,88 @@ defmodule PleromaReduxWeb.StatusCard do
         <.status_body entry={@entry} />
       <% end %>
 
-      <div :if={@current_user} class="mt-5 flex flex-wrap items-center gap-3">
-        <%= if @reply_mode == :modal do %>
+      <div :if={@current_user} class="mt-5 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex flex-wrap items-center gap-2">
+          <%= if @reply_mode == :modal do %>
+            <button
+              type="button"
+              data-role="reply"
+              phx-click={
+                JS.dispatch("predux:reply-open", to: "#reply-modal")
+                |> JS.push("open_reply_modal")
+              }
+              phx-value-in_reply_to={@entry.object.ap_id}
+              phx-value-actor_handle={@entry.actor.handle}
+              class="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/70 px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm shadow-slate-200/20 transition hover:-translate-y-0.5 hover:bg-white hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:shadow-slate-900/40 dark:hover:bg-slate-950 dark:hover:text-white"
+              aria-label="Reply"
+            >
+              <.icon name="hero-chat-bubble-left-right" class="size-5" />
+              <span class="sr-only">Reply</span>
+            </button>
+          <% else %>
+            <%= if is_binary(reply_path = status_reply_path(@entry)) do %>
+              <.link
+                navigate={reply_path}
+                data-role="reply"
+                class="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/70 px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm shadow-slate-200/20 transition hover:-translate-y-0.5 hover:bg-white hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:shadow-slate-900/40 dark:hover:bg-slate-950 dark:hover:text-white"
+                aria-label="Reply"
+              >
+                <.icon name="hero-chat-bubble-left-right" class="size-5" />
+                <span class="sr-only">Reply</span>
+              </.link>
+            <% end %>
+          <% end %>
+
           <button
             type="button"
-            data-role="reply"
-            phx-click={
-              JS.dispatch("predux:reply-open", to: "#reply-modal")
-              |> JS.push("open_reply_modal")
-            }
-            phx-value-in_reply_to={@entry.object.ap_id}
-            phx-value-actor_handle={@entry.actor.handle}
-            class="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/70 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm shadow-slate-200/20 transition hover:-translate-y-0.5 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:shadow-slate-900/40 dark:hover:bg-slate-950"
+            data-role="like"
+            phx-click="toggle_like"
+            phx-value-id={@entry.object.id}
+            phx-disable-with="..."
+            aria-pressed={@entry.liked?}
+            class={[
+              "inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-semibold transition hover:-translate-y-0.5",
+              @entry.liked? &&
+                "border-rose-200/70 bg-rose-50/80 text-rose-700 hover:bg-rose-50 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200 dark:hover:bg-rose-500/10",
+              !@entry.liked? &&
+                "border-slate-200/80 bg-white/70 text-slate-600 hover:bg-white hover:text-slate-900 dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:hover:bg-slate-950 dark:hover:text-white"
+            ]}
           >
-            <.icon name="hero-chat-bubble-left-right" class="size-4" /> Reply
+            <.icon
+              name={if @entry.liked?, do: "hero-heart-solid", else: "hero-heart"}
+              class="size-5"
+            />
+            <span class="sr-only">{if @entry.liked?, do: "Unlike", else: "Like"}</span>
+            <span class="text-xs font-semibold tabular-nums text-slate-500 dark:text-slate-300">
+              {@entry.likes_count}
+            </span>
           </button>
-        <% else %>
-          <%= if is_binary(reply_path = status_reply_path(@entry)) do %>
-            <.link
-              navigate={reply_path}
-              data-role="reply"
-              class="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/70 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm shadow-slate-200/20 transition hover:-translate-y-0.5 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:shadow-slate-900/40 dark:hover:bg-slate-950"
-            >
-              <.icon name="hero-chat-bubble-left-right" class="size-4" /> Reply
-            </.link>
-          <% end %>
-        <% end %>
 
-        <button
-          type="button"
-          data-role="like"
-          phx-click="toggle_like"
-          phx-value-id={@entry.object.id}
-          phx-disable-with="..."
-          aria-pressed={@entry.liked?}
-          class={[
-            "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition hover:-translate-y-0.5",
-            @entry.liked? &&
-              "border-rose-200/70 bg-rose-50/80 text-rose-700 hover:bg-rose-50 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200 dark:hover:bg-rose-500/10",
-            !@entry.liked? &&
-              "border-slate-200/80 bg-white/70 text-slate-700 hover:bg-white dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:hover:bg-slate-950"
-          ]}
-        >
-          <.icon name={if @entry.liked?, do: "hero-heart-solid", else: "hero-heart"} class="size-4" />
-          {if @entry.liked?, do: "Unlike", else: "Like"}
-          <span class="text-xs font-normal text-slate-500 dark:text-slate-400">
-            {@entry.likes_count}
-          </span>
-        </button>
-
-        <button
-          type="button"
-          data-role="repost"
-          phx-click="toggle_repost"
-          phx-value-id={@entry.object.id}
-          phx-disable-with="..."
-          aria-pressed={@entry.reposted?}
-          class={[
-            "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition hover:-translate-y-0.5",
-            @entry.reposted? &&
-              "border-emerald-200/70 bg-emerald-50/80 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200 dark:hover:bg-emerald-500/10",
-            !@entry.reposted? &&
-              "border-slate-200/80 bg-white/70 text-slate-700 hover:bg-white dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:hover:bg-slate-950"
-          ]}
-        >
-          <.icon
-            name={if @entry.reposted?, do: "hero-arrow-path-solid", else: "hero-arrow-path"}
-            class="size-4"
-          />
-          {if @entry.reposted?, do: "Unrepost", else: "Repost"}
-          <span class="text-xs font-normal text-slate-500 dark:text-slate-400">
-            {@entry.reposts_count}
-          </span>
-        </button>
+          <button
+            type="button"
+            data-role="repost"
+            phx-click="toggle_repost"
+            phx-value-id={@entry.object.id}
+            phx-disable-with="..."
+            aria-pressed={@entry.reposted?}
+            class={[
+              "inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-semibold transition hover:-translate-y-0.5",
+              @entry.reposted? &&
+                "border-emerald-200/70 bg-emerald-50/80 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200 dark:hover:bg-emerald-500/10",
+              !@entry.reposted? &&
+                "border-slate-200/80 bg-white/70 text-slate-600 hover:bg-white hover:text-slate-900 dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:hover:bg-slate-950 dark:hover:text-white"
+            ]}
+          >
+            <.icon
+              name={if @entry.reposted?, do: "hero-arrow-path-solid", else: "hero-arrow-path"}
+              class="size-5"
+            />
+            <span class="sr-only">{if @entry.reposted?, do: "Unrepost", else: "Repost"}</span>
+            <span class="text-xs font-semibold tabular-nums text-slate-500 dark:text-slate-300">
+              {@entry.reposts_count}
+            </span>
+          </button>
+        </div>
 
         <div class="flex flex-wrap items-center gap-2">
           <%= for emoji <- reaction_order(@entry.reactions) do %>

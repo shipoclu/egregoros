@@ -46,7 +46,7 @@ defmodule PleromaReduxWeb.CoreComponents do
       role="alert"
       data-role="toast"
       class={[
-        "pointer-events-auto w-full max-w-sm animate-rise overflow-hidden rounded-2xl border px-4 py-3 shadow-lg shadow-slate-900/10 backdrop-blur",
+        "pointer-events-auto w-full max-w-sm motion-safe:animate-rise overflow-hidden rounded-2xl border px-4 py-3 shadow-lg shadow-slate-900/10 backdrop-blur",
         "border-white/70 bg-white/90 text-slate-900 dark:border-slate-700/70 dark:bg-slate-950/70 dark:text-slate-100",
         @kind == :info && "ring-1 ring-slate-900/5 dark:ring-white/10",
         @kind == :error &&

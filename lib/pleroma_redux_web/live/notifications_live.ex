@@ -171,7 +171,7 @@ defmodule PleromaReduxWeb.NotificationsLive do
       id={@id}
       data-role="notification"
       data-type={@entry.type}
-      class="rounded-3xl border border-white/80 bg-white/80 p-6 shadow-lg shadow-slate-200/30 backdrop-blur transition hover:-translate-y-0.5 hover:shadow-xl dark:border-slate-700/60 dark:bg-slate-900/70 dark:shadow-slate-900/50 animate-rise"
+      class="rounded-3xl border border-white/80 bg-white/80 p-6 shadow-lg shadow-slate-200/30 backdrop-blur transition hover:-translate-y-0.5 hover:shadow-xl dark:border-slate-700/60 dark:bg-slate-900/70 dark:shadow-slate-900/50 motion-safe:animate-rise"
     >
       <div class="flex items-start gap-4">
         <.avatar size="sm" name={@entry.actor.display_name} src={@entry.actor.avatar_url} />
