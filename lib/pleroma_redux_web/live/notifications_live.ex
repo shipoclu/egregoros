@@ -29,6 +29,7 @@ defmodule PleromaReduxWeb.NotificationsLive do
      |> assign(
        current_user: current_user,
        notifications_count: notifications_count(current_user),
+       notifications_filter: "all",
        notifications_cursor: notifications_cursor(notifications),
        notifications_end?: length(notifications) < @page_size
      )
@@ -93,6 +94,16 @@ defmodule PleromaReduxWeb.NotificationsLive do
     end
   end
 
+  def handle_event("set_notifications_filter", %{"filter" => filter}, socket) do
+    filter = filter |> to_string() |> String.trim()
+
+    if filter in ~w(all follows likes reposts) do
+      {:noreply, assign(socket, notifications_filter: filter)}
+    else
+      {:noreply, socket}
+    end
+  end
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -117,10 +128,33 @@ defmodule PleromaReduxWeb.NotificationsLive do
                 </h2>
               </div>
             </div>
+
+            <div :if={@current_user} class="mt-4 flex flex-wrap items-center gap-2">
+              <.filter_button filter="all" current={@notifications_filter} label="All" icon="hero-squares-2x2" />
+              <.filter_button
+                filter="follows"
+                current={@notifications_filter}
+                label="Follows"
+                icon="hero-user-plus"
+              />
+              <.filter_button filter="likes" current={@notifications_filter} label="Likes" icon="hero-heart" />
+              <.filter_button
+                filter="reposts"
+                current={@notifications_filter}
+                label="Reposts"
+                icon="hero-arrow-path"
+              />
+            </div>
           </.card>
 
           <%= if @current_user do %>
-            <div id="notifications-list" phx-update="stream" class="space-y-4">
+            <div
+              id="notifications-list"
+              data-role="notifications-list"
+              data-filter={@notifications_filter}
+              phx-update="stream"
+              class="space-y-4"
+            >
               <div
                 id="notifications-empty"
                 class="hidden only:block rounded-3xl border border-slate-200/80 bg-white/70 p-6 text-sm text-slate-600 shadow-sm shadow-slate-200/20 dark:border-slate-700/70 dark:bg-slate-950/50 dark:text-slate-300 dark:shadow-slate-900/30"
@@ -159,6 +193,35 @@ defmodule PleromaReduxWeb.NotificationsLive do
         </section>
       </AppShell.app_shell>
     </Layouts.app>
+    """
+  end
+
+  attr :filter, :string, required: true
+  attr :current, :string, required: true
+  attr :label, :string, required: true
+  attr :icon, :string, required: true
+
+  defp filter_button(assigns) do
+    assigns = assign(assigns, active?: assigns.filter == assigns.current)
+
+    ~H"""
+    <button
+      type="button"
+      data-role="notifications-filter"
+      data-filter={@filter}
+      phx-click={set_filter_js(@filter)}
+      aria-pressed={@active?}
+      class={[
+        "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] transition",
+        @active? &&
+          "border-slate-900 bg-slate-900 text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800 dark:border-slate-100 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white",
+        !@active? &&
+          "border-slate-200/80 bg-white/70 text-slate-700 hover:-translate-y-0.5 hover:bg-white dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:hover:bg-slate-950"
+      ]}
+    >
+      <.icon name={@icon} class="size-4" />
+      {@label}
+    </button>
     """
   end
 
@@ -203,6 +266,11 @@ defmodule PleromaReduxWeb.NotificationsLive do
       </div>
     </article>
     """
+  end
+
+  defp set_filter_js(filter) when is_binary(filter) do
+    JS.set_attribute({"data-filter", filter}, to: "#notifications-list")
+    |> JS.push("set_notifications_filter", value: %{filter: filter})
   end
 
   defp list_notifications(nil, _opts), do: []

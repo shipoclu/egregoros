@@ -51,3 +51,16 @@ body {
     animation: none;
   }
 }
+
+/* Notifications filtering (client-side). */
+[data-role="notifications-list"][data-filter="follows"] [data-role="notification"]:not([data-type="Follow"]) {
+  display: none;
+}
+
+[data-role="notifications-list"][data-filter="likes"] [data-role="notification"]:not([data-type="Like"]) {
+  display: none;
+}
+
+[data-role="notifications-list"][data-filter="reposts"] [data-role="notification"]:not([data-type="Announce"]) {
+  display: none;
+}

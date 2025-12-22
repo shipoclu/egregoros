@@ -66,4 +66,17 @@ defmodule PleromaReduxWeb.NotificationsLiveTest do
 
     assert has_element?(view, "#notification-#{activity.id}")
   end
+
+  test "notifications can be filtered without losing the list", %{conn: conn, user: user} do
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/notifications")
+
+    assert has_element?(view, "#notifications-list[data-filter='all']")
+
+    view
+    |> element("button[data-role='notifications-filter'][data-filter='follows']")
+    |> render_click()
+
+    assert has_element?(view, "#notifications-list[data-filter='follows']")
+  end
 end
