@@ -282,5 +282,23 @@ defmodule PleromaRedux.HTMLTest do
       safe = HTML.to_safe_html("hi #elixir,", format: :text)
       assert safe =~ ">#elixir</a>,"
     end
+
+    test "linkifies http(s) urls in plain text" do
+      safe = HTML.to_safe_html("see https://example.com/path", format: :text)
+      assert safe =~ ~s(href="https://example.com/path")
+      assert safe =~ ">https://example.com/path</a>"
+    end
+
+    test "keeps trailing punctuation outside url links" do
+      safe = HTML.to_safe_html("see https://example.com).", format: :text)
+      assert safe =~ ~s(href="https://example.com")
+      assert safe =~ ">https://example.com</a>)."
+    end
+
+    test "does not linkify non-http urls in plain text" do
+      safe = HTML.to_safe_html("see javascript:alert(1)", format: :text)
+      refute safe =~ "<a "
+      assert safe =~ "javascript:alert(1)"
+    end
   end
 end

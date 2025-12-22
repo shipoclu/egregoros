@@ -129,6 +129,14 @@ defmodule PleromaRedux.HTML do
           :error -> escape(token)
         end
 
+      String.starts_with?(token, ["http://", "https://"]) ->
+        {core, trailing} = split_trailing_punctuation(token, @mention_trailing)
+
+        case url_href(core) do
+          {:ok, href} -> [anchor(href, core), escape(trailing)]
+          :error -> escape(token)
+        end
+
       true ->
         escape(token)
     end
@@ -168,6 +176,19 @@ defmodule PleromaRedux.HTML do
   end
 
   defp hashtag_href(_token), do: :error
+
+  defp url_href(url) when is_binary(url) do
+    case URI.parse(url) do
+      %URI{scheme: scheme, host: host}
+      when scheme in ["http", "https"] and is_binary(host) and host != "" ->
+        {:ok, url}
+
+      _ ->
+        :error
+    end
+  end
+
+  defp url_href(_url), do: :error
 
   defp parse_mention(rest) when is_binary(rest) do
     case String.split(rest, "@", parts: 2) do
