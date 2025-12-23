@@ -116,26 +116,38 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesController do
   end
 
   def favourited_by(conn, %{"id" => id}) do
+    current_user = conn.assigns.current_user
+
     case Objects.get(id) do
       nil ->
         send_resp(conn, 404, "Not Found")
 
       object ->
-        Relationships.list_by_type_object("Like", object.ap_id)
-        |> Enum.map(&render_actor_account(&1.actor))
-        |> then(&json(conn, &1))
+        if Objects.visible_to?(object, current_user) do
+          Relationships.list_by_type_object("Like", object.ap_id)
+          |> Enum.map(&render_actor_account(&1.actor))
+          |> then(&json(conn, &1))
+        else
+          send_resp(conn, 404, "Not Found")
+        end
     end
   end
 
   def reblogged_by(conn, %{"id" => id}) do
+    current_user = conn.assigns.current_user
+
     case Objects.get(id) do
       nil ->
         send_resp(conn, 404, "Not Found")
 
       object ->
-        Relationships.list_by_type_object("Announce", object.ap_id)
-        |> Enum.map(&render_actor_account(&1.actor))
-        |> then(&json(conn, &1))
+        if Objects.visible_to?(object, current_user) do
+          Relationships.list_by_type_object("Announce", object.ap_id)
+          |> Enum.map(&render_actor_account(&1.actor))
+          |> then(&json(conn, &1))
+        else
+          send_resp(conn, 404, "Not Found")
+        end
     end
   end
 
@@ -154,7 +166,8 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesController do
 
   def favourite(conn, %{"id" => id}) do
     with %{} = object <- Objects.get(id),
-         %{} = user <- conn.assigns.current_user do
+         %{} = user <- conn.assigns.current_user,
+         true <- Objects.visible_to?(object, user) do
       case Relationships.get_by_type_actor_object("Like", user.ap_id, object.ap_id) do
         %{} ->
           json(conn, StatusRenderer.render_status(object, user))
@@ -168,33 +181,38 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesController do
       end
     else
       nil -> send_resp(conn, 404, "Not Found")
+      false -> send_resp(conn, 404, "Not Found")
       {:error, _} -> send_resp(conn, 422, "Unprocessable Entity")
     end
   end
 
   def unfavourite(conn, %{"id" => id}) do
     with %{} = object <- Objects.get(id),
+         %{} = user <- conn.assigns.current_user,
+         true <- Objects.visible_to?(object, user),
          %{} =
            relationship <-
            Relationships.get_by_type_actor_object(
              "Like",
-             conn.assigns.current_user.ap_id,
+             user.ap_id,
              object.ap_id
            ),
          {:ok, _undo} <-
-           Pipeline.ingest(Undo.build(conn.assigns.current_user, relationship.activity_ap_id),
+           Pipeline.ingest(Undo.build(user, relationship.activity_ap_id),
              local: true
            ) do
-      json(conn, StatusRenderer.render_status(object, conn.assigns.current_user))
+      json(conn, StatusRenderer.render_status(object, user))
     else
       nil -> send_resp(conn, 404, "Not Found")
+      false -> send_resp(conn, 404, "Not Found")
       {:error, _} -> send_resp(conn, 422, "Unprocessable Entity")
     end
   end
 
   def reblog(conn, %{"id" => id}) do
     with %{} = object <- Objects.get(id),
-         %{} = user <- conn.assigns.current_user do
+         %{} = user <- conn.assigns.current_user,
+         true <- Objects.visible_to?(object, user) do
       case Relationships.get_by_type_actor_object("Announce", user.ap_id, object.ap_id) do
         %{} = relationship ->
           relationship.activity_ap_id
@@ -213,26 +231,30 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesController do
       end
     else
       nil -> send_resp(conn, 404, "Not Found")
+      false -> send_resp(conn, 404, "Not Found")
       {:error, _} -> send_resp(conn, 422, "Unprocessable Entity")
     end
   end
 
   def unreblog(conn, %{"id" => id}) do
     with %{} = object <- Objects.get(id),
+         %{} = user <- conn.assigns.current_user,
+         true <- Objects.visible_to?(object, user),
          %{} =
            relationship <-
            Relationships.get_by_type_actor_object(
              "Announce",
-             conn.assigns.current_user.ap_id,
+             user.ap_id,
              object.ap_id
            ),
          {:ok, _undo} <-
-           Pipeline.ingest(Undo.build(conn.assigns.current_user, relationship.activity_ap_id),
+           Pipeline.ingest(Undo.build(user, relationship.activity_ap_id),
              local: true
            ) do
-      json(conn, StatusRenderer.render_status(object, conn.assigns.current_user))
+      json(conn, StatusRenderer.render_status(object, user))
     else
       nil -> send_resp(conn, 404, "Not Found")
+      false -> send_resp(conn, 404, "Not Found")
       {:error, _} -> send_resp(conn, 422, "Unprocessable Entity")
     end
   end

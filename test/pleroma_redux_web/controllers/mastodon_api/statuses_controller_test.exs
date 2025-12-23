@@ -173,7 +173,9 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesControllerTest do
           "id" => "https://example.com/objects/2",
           "type" => "Note",
           "actor" => "https://example.com/users/alice",
-          "content" => "Hello like"
+          "content" => "Hello like",
+          "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+          "cc" => ["https://example.com/users/alice/followers"]
         },
         local: false
       )
@@ -185,6 +187,34 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesControllerTest do
     assert response["account"]["username"] == "alice"
 
     assert Objects.get_by_type_actor_object("Like", user.ap_id, object.ap_id)
+  end
+
+  test "POST /api/v1/statuses/:id/favourite does not expose direct statuses to non-recipients", %{
+    conn: conn
+  } do
+    {:ok, user} = Users.create_local_user("local")
+    {:ok, recipient} = Users.create_local_user("bob")
+
+    PleromaRedux.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, user} end)
+
+    {:ok, note} =
+      Pipeline.ingest(
+        %{
+          "id" => "https://example.com/objects/dm-favourite-1",
+          "type" => "Note",
+          "actor" => "https://example.com/users/alice",
+          "content" => "Secret DM for bob",
+          "to" => [recipient.ap_id],
+          "cc" => []
+        },
+        local: false
+      )
+
+    conn = post(conn, "/api/v1/statuses/#{note.id}/favourite")
+    assert response(conn, 404)
+
+    refute Objects.get_by_type_actor_object("Like", user.ap_id, note.ap_id)
   end
 
   test "POST /api/v1/statuses/:id/unfavourite creates an undo", %{conn: conn} do
@@ -199,7 +229,9 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesControllerTest do
           "id" => "https://example.com/objects/3",
           "type" => "Note",
           "actor" => "https://example.com/users/alice",
-          "content" => "Hello unlike"
+          "content" => "Hello unlike",
+          "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+          "cc" => ["https://example.com/users/alice/followers"]
         },
         local: false
       )
@@ -232,7 +264,9 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesControllerTest do
           "id" => "https://example.com/objects/4",
           "type" => "Note",
           "actor" => "https://example.com/users/alice",
-          "content" => "Hello reblog"
+          "content" => "Hello reblog",
+          "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+          "cc" => ["https://example.com/users/alice/followers"]
         },
         local: false
       )
@@ -241,6 +275,34 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesControllerTest do
     assert json_response(conn, 200)
 
     assert Objects.get_by_type_actor_object("Announce", user.ap_id, note.ap_id)
+  end
+
+  test "POST /api/v1/statuses/:id/reblog does not expose direct statuses to non-recipients", %{
+    conn: conn
+  } do
+    {:ok, user} = Users.create_local_user("local")
+    {:ok, recipient} = Users.create_local_user("bob")
+
+    PleromaRedux.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, user} end)
+
+    {:ok, note} =
+      Pipeline.ingest(
+        %{
+          "id" => "https://example.com/objects/dm-reblog-1",
+          "type" => "Note",
+          "actor" => "https://example.com/users/alice",
+          "content" => "Secret DM for bob",
+          "to" => [recipient.ap_id],
+          "cc" => []
+        },
+        local: false
+      )
+
+    conn = post(conn, "/api/v1/statuses/#{note.id}/reblog")
+    assert response(conn, 404)
+
+    refute Objects.get_by_type_actor_object("Announce", user.ap_id, note.ap_id)
   end
 
   test "POST /api/v1/statuses/:id/reblog returns a reblog status", %{conn: conn} do
@@ -255,7 +317,9 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesControllerTest do
           "id" => "https://example.com/objects/reblog-return",
           "type" => "Note",
           "actor" => "https://example.com/users/alice",
-          "content" => "Hello reblog"
+          "content" => "Hello reblog",
+          "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+          "cc" => ["https://example.com/users/alice/followers"]
         },
         local: false
       )
@@ -286,7 +350,9 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesControllerTest do
           "id" => "https://example.com/objects/5",
           "type" => "Note",
           "actor" => "https://example.com/users/alice",
-          "content" => "Hello unreblog"
+          "content" => "Hello unreblog",
+          "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+          "cc" => ["https://example.com/users/alice/followers"]
         },
         local: false
       )
@@ -319,7 +385,9 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesControllerTest do
           "id" => "https://example.com/objects/like-idempotent",
           "type" => "Note",
           "actor" => "https://example.com/users/alice",
-          "content" => "Hello like"
+          "content" => "Hello like",
+          "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+          "cc" => ["https://example.com/users/alice/followers"]
         },
         local: false
       )
@@ -345,7 +413,9 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesControllerTest do
           "id" => "https://example.com/objects/reblog-idempotent",
           "type" => "Note",
           "actor" => "https://example.com/users/alice",
-          "content" => "Hello reblog"
+          "content" => "Hello reblog",
+          "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+          "cc" => ["https://example.com/users/alice/followers"]
         },
         local: false
       )
@@ -604,6 +674,32 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesControllerTest do
     assert Enum.at(response, 0)["username"] == "bob"
   end
 
+  test "GET /api/v1/statuses/:id/favourited_by does not expose direct statuses to non-recipients", %{
+    conn: conn
+  } do
+    {:ok, alice} = Users.create_local_user("alice")
+    {:ok, bob} = Users.create_local_user("bob")
+
+    {:ok, note} =
+      Pipeline.ingest(
+        %{
+          "id" => "https://example.com/objects/dm-favourited-by-1",
+          "type" => "Note",
+          "actor" => "https://example.com/users/charlie",
+          "content" => "Secret DM for bob",
+          "to" => [bob.ap_id],
+          "cc" => []
+        },
+        local: false
+      )
+
+    PleromaRedux.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, alice} end)
+
+    conn = get(conn, "/api/v1/statuses/#{note.id}/favourited_by")
+    assert response(conn, 404)
+  end
+
   test "GET /api/v1/statuses/:id/reblogged_by returns accounts who reblogged a status", %{
     conn: conn
   } do
@@ -633,6 +729,32 @@ defmodule PleromaReduxWeb.MastodonAPI.StatusesControllerTest do
     assert is_list(response)
     assert length(response) == 1
     assert Enum.at(response, 0)["username"] == "bob"
+  end
+
+  test "GET /api/v1/statuses/:id/reblogged_by does not expose direct statuses to non-recipients", %{
+    conn: conn
+  } do
+    {:ok, alice} = Users.create_local_user("alice")
+    {:ok, bob} = Users.create_local_user("bob")
+
+    {:ok, note} =
+      Pipeline.ingest(
+        %{
+          "id" => "https://example.com/objects/dm-reblogged-by-1",
+          "type" => "Note",
+          "actor" => "https://example.com/users/charlie",
+          "content" => "Secret DM for bob",
+          "to" => [bob.ap_id],
+          "cc" => []
+        },
+        local: false
+      )
+
+    PleromaRedux.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, alice} end)
+
+    conn = get(conn, "/api/v1/statuses/#{note.id}/reblogged_by")
+    assert response(conn, 404)
   end
 
   test "DELETE /api/v1/statuses/:id deletes a local status", %{conn: conn} do

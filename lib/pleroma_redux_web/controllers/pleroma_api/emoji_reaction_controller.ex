@@ -9,7 +9,8 @@ defmodule PleromaReduxWeb.PleromaAPI.EmojiReactionController do
 
   def index(conn, %{"id" => id}) do
     with %{} = object <- Objects.get(id),
-         %{} = user <- conn.assigns.current_user do
+         %{} = user <- conn.assigns.current_user,
+         true <- Objects.visible_to?(object, user) do
       reactions =
         object.ap_id
         |> Relationships.emoji_reaction_counts()
@@ -26,13 +27,15 @@ defmodule PleromaReduxWeb.PleromaAPI.EmojiReactionController do
       json(conn, reactions)
     else
       nil -> send_resp(conn, 404, "Not Found")
+      false -> send_resp(conn, 404, "Not Found")
       {:error, _} -> send_resp(conn, 422, "Unprocessable Entity")
     end
   end
 
   def create(conn, %{"id" => id, "emoji" => emoji}) do
     with %{} = object <- Objects.get(id),
-         %{} = user <- conn.assigns.current_user do
+         %{} = user <- conn.assigns.current_user,
+         true <- Objects.visible_to?(object, user) do
       relationship_type = "EmojiReact:" <> to_string(emoji)
 
       case Relationships.get_by_type_actor_object(relationship_type, user.ap_id, object.ap_id) do
@@ -51,6 +54,7 @@ defmodule PleromaReduxWeb.PleromaAPI.EmojiReactionController do
       end
     else
       nil -> send_resp(conn, 404, "Not Found")
+      false -> send_resp(conn, 404, "Not Found")
       {:error, _} -> send_resp(conn, 422, "Unprocessable Entity")
     end
   end
@@ -58,6 +62,7 @@ defmodule PleromaReduxWeb.PleromaAPI.EmojiReactionController do
   def delete(conn, %{"id" => id, "emoji" => emoji}) do
     with %{} = object <- Objects.get(id),
          %{} = user <- conn.assigns.current_user,
+         true <- Objects.visible_to?(object, user),
          relationship_type = "EmojiReact:" <> to_string(emoji),
          %{} =
            relationship <-
@@ -71,6 +76,7 @@ defmodule PleromaReduxWeb.PleromaAPI.EmojiReactionController do
       send_resp(conn, 200, "")
     else
       nil -> send_resp(conn, 404, "Not Found")
+      false -> send_resp(conn, 404, "Not Found")
       {:error, _} -> send_resp(conn, 422, "Unprocessable Entity")
     end
   end

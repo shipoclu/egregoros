@@ -15,7 +15,8 @@ defmodule PleromaRedux.Interactions do
 
   def toggle_like(%User{} = user, post_id) when is_integer(post_id) do
     with %{} = post <- Objects.get(post_id),
-         true <- post.type == "Note" do
+         true <- post.type == "Note",
+         true <- Objects.visible_to?(post, user) do
       case Relationships.get_by_type_actor_object("Like", user.ap_id, post.ap_id) do
         %Relationship{} = relationship ->
           undo(user, relationship)
@@ -30,7 +31,8 @@ defmodule PleromaRedux.Interactions do
 
   def toggle_repost(%User{} = user, post_id) when is_integer(post_id) do
     with %{} = post <- Objects.get(post_id),
-         true <- post.type == "Note" do
+         true <- post.type == "Note",
+         true <- Objects.visible_to?(post, user) do
       case Relationships.get_by_type_actor_object("Announce", user.ap_id, post.ap_id) do
         %Relationship{} = relationship ->
           undo(user, relationship)
@@ -46,7 +48,8 @@ defmodule PleromaRedux.Interactions do
   def toggle_reaction(%User{} = user, post_id, emoji)
       when is_integer(post_id) and is_binary(emoji) do
     with %{} = post <- Objects.get(post_id),
-         true <- post.type == "Note" do
+         true <- post.type == "Note",
+         true <- Objects.visible_to?(post, user) do
       relationship_type = "EmojiReact:" <> emoji
 
       case Relationships.get_by_type_actor_object(relationship_type, user.ap_id, post.ap_id) do
@@ -63,7 +66,8 @@ defmodule PleromaRedux.Interactions do
 
   def toggle_bookmark(%User{} = user, post_id) when is_integer(post_id) do
     with %{} = post <- Objects.get(post_id),
-         true <- post.type == "Note" do
+         true <- post.type == "Note",
+         true <- Objects.visible_to?(post, user) do
       case Relationships.get_by_type_actor_object("Bookmark", user.ap_id, post.ap_id) do
         %Relationship{} ->
           _ = Relationships.delete_by_type_actor_object("Bookmark", user.ap_id, post.ap_id)

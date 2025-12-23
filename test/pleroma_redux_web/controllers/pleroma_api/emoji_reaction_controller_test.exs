@@ -18,7 +18,9 @@ defmodule PleromaReduxWeb.PleromaAPI.EmojiReactionControllerTest do
           "id" => "https://example.com/objects/emoji-1",
           "type" => "Note",
           "actor" => "https://example.com/users/alice",
-          "content" => "Emoji reaction target"
+          "content" => "Emoji reaction target",
+          "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+          "cc" => ["https://example.com/users/alice/followers"]
         },
         local: false
       )
@@ -34,6 +36,37 @@ defmodule PleromaReduxWeb.PleromaAPI.EmojiReactionControllerTest do
     assert reaction.data["content"] == "🔥"
   end
 
+  test "PUT /api/v1/pleroma/statuses/:id/reactions/:emoji does not expose direct statuses to non-recipients",
+       %{conn: conn} do
+    {:ok, user} = Users.create_local_user("local")
+    {:ok, recipient} = Users.create_local_user("bob")
+
+    PleromaRedux.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, user} end)
+
+    {:ok, note} =
+      Pipeline.ingest(
+        %{
+          "id" => "https://example.com/objects/emoji-direct-1",
+          "type" => "Note",
+          "actor" => "https://example.com/users/alice",
+          "content" => "Emoji reaction target",
+          "to" => [recipient.ap_id],
+          "cc" => []
+        },
+        local: false
+      )
+
+    conn = put(conn, "/api/v1/pleroma/statuses/#{note.id}/reactions/🔥")
+    assert response(conn, 404)
+
+    refute Relationships.get_by_type_actor_object(
+             "EmojiReact:🔥",
+             user.ap_id,
+             note.ap_id
+           )
+  end
+
   test "PUT /api/v1/pleroma/statuses/:id/reactions/:emoji is idempotent", %{conn: conn} do
     {:ok, user} = Users.create_local_user("local")
 
@@ -46,7 +79,9 @@ defmodule PleromaReduxWeb.PleromaAPI.EmojiReactionControllerTest do
           "id" => "https://example.com/objects/emoji-idempotent",
           "type" => "Note",
           "actor" => "https://example.com/users/alice",
-          "content" => "Emoji reaction target"
+          "content" => "Emoji reaction target",
+          "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+          "cc" => ["https://example.com/users/alice/followers"]
         },
         local: false
       )
@@ -79,7 +114,9 @@ defmodule PleromaReduxWeb.PleromaAPI.EmojiReactionControllerTest do
           "id" => "https://example.com/objects/emoji-2",
           "type" => "Note",
           "actor" => "https://example.com/users/alice",
-          "content" => "Emoji reaction target"
+          "content" => "Emoji reaction target",
+          "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+          "cc" => ["https://example.com/users/alice/followers"]
         },
         local: false
       )
@@ -115,7 +152,9 @@ defmodule PleromaReduxWeb.PleromaAPI.EmojiReactionControllerTest do
           "id" => "https://example.com/objects/emoji-3",
           "type" => "Note",
           "actor" => "https://example.com/users/alice",
-          "content" => "Emoji reaction target"
+          "content" => "Emoji reaction target",
+          "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+          "cc" => ["https://example.com/users/alice/followers"]
         },
         local: false
       )
