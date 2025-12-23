@@ -534,8 +534,24 @@ defmodule PleromaRedux.Objects do
     |> Repo.all()
   end
 
+  def list_public_creates_by_actor(actor, limit \\ 20) when is_binary(actor) do
+    from(o in Object,
+      where: o.type == "Create" and o.actor == ^actor,
+      order_by: [desc: o.inserted_at],
+      limit: ^limit
+    )
+    |> where_publicly_visible()
+    |> Repo.all()
+  end
+
   def count_creates_by_actor(actor) when is_binary(actor) do
     from(o in Object, where: o.type == "Create" and o.actor == ^actor)
+    |> Repo.aggregate(:count, :id)
+  end
+
+  def count_public_creates_by_actor(actor) when is_binary(actor) do
+    from(o in Object, where: o.type == "Create" and o.actor == ^actor)
+    |> where_publicly_visible()
     |> Repo.aggregate(:count, :id)
   end
 

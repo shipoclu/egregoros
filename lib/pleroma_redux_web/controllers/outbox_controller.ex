@@ -10,8 +10,8 @@ defmodule PleromaReduxWeb.OutboxController do
         send_resp(conn, 404, "Not Found")
 
       user ->
-        items = Objects.list_creates_by_actor(user.ap_id)
-        total = Objects.count_creates_by_actor(user.ap_id)
+        items = Objects.list_public_creates_by_actor(user.ap_id)
+        total = Objects.count_public_creates_by_actor(user.ap_id)
 
         payload = %{
           "@context" => "https://www.w3.org/ns/activitystreams",
