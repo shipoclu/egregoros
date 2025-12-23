@@ -41,6 +41,7 @@ defmodule PleromaReduxWeb.MastodonAPI.StreamingSocketTest do
   test "delivers user timeline updates for followed actors" do
     {:ok, user} = Users.create_local_user("alice")
     {:ok, followed} = Users.create_user(remote_user_attrs("bob@example.com"))
+    public = "https://www.w3.org/ns/activitystreams#Public"
 
     assert {:ok, _} =
              Relationships.upsert_relationship(%{
@@ -62,6 +63,8 @@ defmodule PleromaReduxWeb.MastodonAPI.StreamingSocketTest do
                  "id" => "https://remote.example/objects/1",
                  "type" => "Note",
                  "attributedTo" => followed.ap_id,
+                 "to" => [public],
+                 "cc" => [followed.ap_id <> "/followers"],
                  "content" => "<p>Hello</p>"
                }
              })
@@ -99,6 +102,7 @@ defmodule PleromaReduxWeb.MastodonAPI.StreamingSocketTest do
 
   test "delivers public timeline updates without a current user" do
     {:ok, state} = StreamingSocket.init(%{streams: ["public"], current_user: nil})
+    public = "https://www.w3.org/ns/activitystreams#Public"
 
     assert {:ok, note} =
              Objects.create_object(%{
@@ -110,6 +114,8 @@ defmodule PleromaReduxWeb.MastodonAPI.StreamingSocketTest do
                  "id" => "https://remote.example/objects/3",
                  "type" => "Note",
                  "attributedTo" => "https://remote.example/users/alice",
+                 "to" => [public],
+                 "cc" => ["https://remote.example/users/alice/followers"],
                  "content" => "<p>Hello</p>"
                }
              })
@@ -122,6 +128,61 @@ defmodule PleromaReduxWeb.MastodonAPI.StreamingSocketTest do
 
     assert is_binary(status_payload)
     assert %{"id" => _id} = Jason.decode!(status_payload)
+  end
+
+  test "does not deliver direct messages to the public stream" do
+    {:ok, state} = StreamingSocket.init(%{streams: ["public"], current_user: nil})
+
+    assert {:ok, note} =
+             Objects.create_object(%{
+               ap_id: "https://remote.example/objects/direct-public",
+               type: "Note",
+               actor: "https://remote.example/users/alice",
+               local: false,
+               data: %{
+                 "id" => "https://remote.example/objects/direct-public",
+                 "type" => "Note",
+                 "attributedTo" => "https://remote.example/users/alice",
+                 "to" => [],
+                 "cc" => [],
+                 "content" => "<p>Secret</p>"
+               }
+             })
+
+    assert {:ok, ^state} = StreamingSocket.handle_info({:post_created, note}, state)
+  end
+
+  test "does not deliver non-visible messages to the user stream" do
+    {:ok, user} = Users.create_local_user("alice")
+    {:ok, followed} = Users.create_user(remote_user_attrs("bob@example.com"))
+
+    assert {:ok, _} =
+             Relationships.upsert_relationship(%{
+               type: "Follow",
+               actor: user.ap_id,
+               object: followed.ap_id,
+               activity_ap_id: "https://example.com/activities/follow/1"
+             })
+
+    {:ok, state} = StreamingSocket.init(%{streams: ["user"], current_user: user})
+
+    assert {:ok, note} =
+             Objects.create_object(%{
+               ap_id: "https://remote.example/objects/direct-user",
+               type: "Note",
+               actor: followed.ap_id,
+               local: false,
+               data: %{
+                 "id" => "https://remote.example/objects/direct-user",
+                 "type" => "Note",
+                 "attributedTo" => followed.ap_id,
+                 "to" => [],
+                 "cc" => [],
+                 "content" => "<p>Secret</p>"
+               }
+             })
+
+    assert {:ok, ^state} = StreamingSocket.handle_info({:post_created, note}, state)
   end
 
   test "delivers notifications for signed-in user streams" do

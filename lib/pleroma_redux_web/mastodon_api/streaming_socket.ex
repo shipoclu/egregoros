@@ -3,6 +3,7 @@ defmodule PleromaReduxWeb.MastodonAPI.StreamingSocket do
 
   alias PleromaRedux.Notifications
   alias PleromaRedux.Object
+  alias PleromaRedux.Objects
   alias PleromaRedux.Relationships
   alias PleromaRedux.Timeline
   alias PleromaRedux.User
@@ -207,17 +208,13 @@ defmodule PleromaReduxWeb.MastodonAPI.StreamingSocket do
   defp maybe_put_home_actor_ids(state, _streams), do: state
 
   defp streams_for_status(%Object{} = object, %{streams: %MapSet{} = streams} = state) do
-    if deliver_public_status?(object) do
-      streams
-      |> Enum.filter(fn
-        "user" -> deliver_user_status?(object, state)
-        "public" -> true
-        "public:local" -> object.local
-        _ -> false
-      end)
-    else
-      []
-    end
+    streams
+    |> Enum.filter(fn
+      "user" -> deliver_user_status?(object, state)
+      "public" -> deliver_public_status?(object)
+      "public:local" -> deliver_public_status?(object) and object.local
+      _ -> false
+    end)
   end
 
   defp streams_for_notification(%{streams: %MapSet{} = streams}) do
@@ -225,12 +222,18 @@ defmodule PleromaReduxWeb.MastodonAPI.StreamingSocket do
     |> Enum.filter(&(&1 in StreamingStreams.notification_streams()))
   end
 
-  defp deliver_public_status?(%Object{type: type}) when type in ~w(Note Announce), do: true
+  defp deliver_public_status?(%Object{type: type} = object) when type in ~w(Note Announce) do
+    Objects.publicly_visible?(object)
+  end
+
   defp deliver_public_status?(_object), do: false
 
-  defp deliver_user_status?(%Object{type: type} = object, %{home_actor_ids: %MapSet{} = actor_ids})
+  defp deliver_user_status?(
+         %Object{type: type} = object,
+         %{current_user: %User{} = user, home_actor_ids: %MapSet{} = actor_ids}
+       )
        when type in ~w(Note Announce) do
-    is_binary(object.actor) and MapSet.member?(actor_ids, object.actor)
+    is_binary(object.actor) and MapSet.member?(actor_ids, object.actor) and Objects.visible_to?(object, user)
   end
 
   defp deliver_user_status?(_object, _state), do: false
