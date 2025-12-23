@@ -8,6 +8,7 @@ defmodule PleromaRedux.Bench.Seed do
   alias PleromaReduxWeb.Endpoint
 
   @default_password "bench-password-1234"
+  @max_pg_params 65_535
 
   def seed!(opts \\ []) when is_list(opts) do
     opts = normalize_opts(opts)
@@ -46,55 +47,69 @@ defmodule PleromaRedux.Bench.Seed do
   defp insert_users(now, opts) do
     base = Endpoint.url()
 
-    local_rows =
-      for i <- 1..opts.local_users do
-        nickname = "local#{i}"
-        actor_ap_id = base <> "/users/" <> nickname
-        {public_key, private_key} = Keys.generate_rsa_keypair()
+    local_users =
+      if opts.local_users > 0 do
+        local_rows =
+          for i <- 1..opts.local_users do
+            nickname = "local#{i}"
+            actor_ap_id = base <> "/users/" <> nickname
+            {public_key, private_key} = Keys.generate_rsa_keypair()
 
-        %{
-          nickname: nickname,
-          domain: nil,
-          ap_id: actor_ap_id,
-          inbox: actor_ap_id <> "/inbox",
-          outbox: actor_ap_id <> "/outbox",
-          public_key: public_key,
-          private_key: private_key,
-          local: true,
-          email: "#{nickname}@example.com",
-          password_hash: Password.hash(@default_password),
-          inserted_at: now,
-          updated_at: now
-        }
+            %{
+              nickname: nickname,
+              domain: nil,
+              ap_id: actor_ap_id,
+              inbox: actor_ap_id <> "/inbox",
+              outbox: actor_ap_id <> "/outbox",
+              public_key: public_key,
+              private_key: private_key,
+              local: true,
+              email: "#{nickname}@example.com",
+              password_hash: Password.hash(@default_password),
+              inserted_at: now,
+              updated_at: now
+            }
+          end
+
+        {_count, users} =
+          Repo.insert_all(User, local_rows, returning: [:ap_id, :local, :nickname])
+
+        users
+      else
+        []
       end
 
-    {_count, local_users} =
-      Repo.insert_all(User, local_rows, returning: [:ap_id, :local, :nickname])
+    remote_users =
+      if opts.remote_users > 0 do
+        {shared_remote_public_key, _private} = Keys.generate_rsa_keypair()
 
-    {shared_remote_public_key, _private} = Keys.generate_rsa_keypair()
+        remote_rows =
+          for i <- 1..opts.remote_users do
+            nickname = "remote#{i}"
+            domain = remote_domain(i)
+            actor_ap_id = "https://#{domain}/users/#{nickname}"
 
-    remote_rows =
-      for i <- 1..opts.remote_users do
-        nickname = "remote#{i}"
-        domain = remote_domain(i)
-        actor_ap_id = "https://#{domain}/users/#{nickname}"
+            %{
+              nickname: nickname,
+              domain: domain,
+              ap_id: actor_ap_id,
+              inbox: actor_ap_id <> "/inbox",
+              outbox: actor_ap_id <> "/outbox",
+              public_key: shared_remote_public_key,
+              private_key: nil,
+              local: false,
+              inserted_at: now,
+              updated_at: now
+            }
+          end
 
-        %{
-          nickname: nickname,
-          domain: domain,
-          ap_id: actor_ap_id,
-          inbox: actor_ap_id <> "/inbox",
-          outbox: actor_ap_id <> "/outbox",
-          public_key: shared_remote_public_key,
-          private_key: nil,
-          local: false,
-          inserted_at: now,
-          updated_at: now
-        }
+        {_count, users} =
+          Repo.insert_all(User, remote_rows, returning: [:ap_id, :local, :nickname, :domain])
+
+        users
+      else
+        []
       end
-
-    {_count, remote_users} =
-      Repo.insert_all(User, remote_rows, returning: [:ap_id, :local, :nickname, :domain])
 
     {local_users, remote_users}
   end
@@ -133,60 +148,88 @@ defmodule PleromaRedux.Bench.Seed do
     actors = Enum.map(local_users ++ remote_users, & &1.ap_id)
     local_actor_ids = local_users |> Enum.map(& &1.ap_id) |> MapSet.new()
 
-    start_dt =
-      now
-      |> DateTime.add(-opts.days * 86_400, :second)
-      |> DateTime.truncate(:microsecond)
+    total_notes = opts.days * opts.posts_per_day
 
-    {rows, notes_count} =
-      0..(opts.days * opts.posts_per_day - 1)
-      |> Enum.reduce({[], 0}, fn i, {rows, count} ->
-        actor = Enum.at(actors, :rand.uniform(length(actors)) - 1)
-        local? = MapSet.member?(local_actor_ids, actor)
-
-        published =
-          start_dt
-          |> DateTime.add(div(i, opts.posts_per_day) * 86_400, :second)
-          |> DateTime.add(:rand.uniform(86_400) - 1, :second)
-          |> DateTime.truncate(:microsecond)
-
-        ap_id = object_ap_id_for_actor(actor, local?)
-
-        content = note_content(i)
-
-        data = %{
-          "id" => ap_id,
-          "type" => "Note",
-          "actor" => actor,
-          "attributedTo" => actor,
-          "to" => ["https://www.w3.org/ns/activitystreams#Public"],
-          "cc" => [actor <> "/followers"],
-          "content" => content,
-          "published" => DateTime.to_iso8601(published)
-        }
-
-        row = %{
-          ap_id: ap_id,
-          type: "Note",
-          actor: actor,
-          object: nil,
-          data: data,
-          published: published,
-          local: local?,
-          inserted_at: published,
-          updated_at: published
-        }
-
-        {[row | rows], count + 1}
-      end)
-
-    if rows == [] do
+    if actors == [] or total_notes <= 0 do
       0
     else
-      {_count, _} = Repo.insert_all(Object, rows)
-      notes_count
+      start_dt =
+        now
+        |> DateTime.add(-opts.days * 86_400, :second)
+        |> DateTime.truncate(:microsecond)
+
+      sample_row = note_row(0, actors, local_actor_ids, start_dt, opts.posts_per_day)
+      chunk_size = insert_all_chunk_size(sample_row)
+
+      0..(total_notes - 1)
+      |> Enum.chunk_every(chunk_size)
+      |> Enum.reduce(0, fn indexes, inserted ->
+        rows =
+          Enum.map(indexes, fn i ->
+            note_row(i, actors, local_actor_ids, start_dt, opts.posts_per_day)
+          end)
+
+        {_count, _} = Repo.insert_all(Object, rows)
+        inserted + length(rows)
+      end)
     end
   end
+
+  defp note_row(i, actors, local_actor_ids, start_dt, posts_per_day)
+       when is_integer(i) and is_list(actors) and is_map(local_actor_ids) and
+              is_integer(posts_per_day) and posts_per_day > 0 do
+    actor = Enum.at(actors, :rand.uniform(length(actors)) - 1)
+    local? = MapSet.member?(local_actor_ids, actor)
+
+    published =
+      start_dt
+      |> DateTime.add(div(i, posts_per_day) * 86_400, :second)
+      |> DateTime.add(:rand.uniform(86_400) - 1, :second)
+      |> DateTime.truncate(:microsecond)
+
+    ap_id = object_ap_id_for_actor(actor, local?)
+
+    data = %{
+      "id" => ap_id,
+      "type" => "Note",
+      "actor" => actor,
+      "attributedTo" => actor,
+      "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+      "cc" => [actor <> "/followers"],
+      "content" => note_content(i),
+      "published" => DateTime.to_iso8601(published)
+    }
+
+    %{
+      ap_id: ap_id,
+      type: "Note",
+      actor: actor,
+      object: nil,
+      data: data,
+      published: published,
+      local: local?,
+      inserted_at: published,
+      updated_at: published
+    }
+  end
+
+  defp note_row(_i, _actors, _local_actor_ids, _start_dt, _posts_per_day), do: nil
+
+  defp insert_all_chunk_size(%{} = sample_row) do
+    fields_per_row = map_size(sample_row)
+
+    if fields_per_row <= 0 do
+      1
+    else
+      @max_pg_params
+      |> div(fields_per_row)
+      |> max(1)
+      |> Kernel.-(1)
+      |> max(1)
+    end
+  end
+
+  defp insert_all_chunk_size(_sample_row), do: 1
 
   defp note_content(i) when is_integer(i) do
     words = [
@@ -239,14 +282,22 @@ defmodule PleromaRedux.Bench.Seed do
 
   defp normalize_opts(opts) do
     %{
-      local_users: opts |> Keyword.get(:local_users, 10) |> normalize_int(0, 10_000),
-      remote_users: opts |> Keyword.get(:remote_users, 200) |> normalize_int(0, 1_000_000),
-      days: opts |> Keyword.get(:days, 365) |> normalize_int(0, 10_000),
-      posts_per_day: opts |> Keyword.get(:posts_per_day, 200) |> normalize_int(0, 1_000_000),
-      follows_per_user: opts |> Keyword.get(:follows_per_user, 50) |> normalize_int(0, 1_000_000),
-      seed: opts |> Keyword.get(:seed),
-      reset?: opts |> Keyword.get(:reset?, true)
+      local_users: opts |> fetch_opt(:local_users, 10) |> normalize_int(0, 10_000),
+      remote_users: opts |> fetch_opt(:remote_users, 200) |> normalize_int(0, 1_000_000),
+      days: opts |> fetch_opt(:days, 365) |> normalize_int(0, 10_000),
+      posts_per_day: opts |> fetch_opt(:posts_per_day, 200) |> normalize_int(0, 1_000_000),
+      follows_per_user: opts |> fetch_opt(:follows_per_user, 50) |> normalize_int(0, 1_000_000),
+      seed: Keyword.get(opts, :seed),
+      reset?: fetch_opt(opts, :reset?, true)
     }
+  end
+
+  defp fetch_opt(opts, key, default) when is_list(opts) do
+    case Keyword.fetch(opts, key) do
+      :error -> default
+      {:ok, nil} -> default
+      {:ok, value} -> value
+    end
   end
 
   defp normalize_int(value, min, max) when is_integer(value) do

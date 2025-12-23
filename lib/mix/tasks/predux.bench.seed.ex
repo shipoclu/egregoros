@@ -51,16 +51,21 @@ defmodule Mix.Tasks.Predux.Bench.Seed do
       Mix.raise("refusing to reset the database without --force (or pass --no-reset)")
     end
 
-    summary =
-      PleromaRedux.Bench.Seed.seed!(
+    seed_opts =
+      [
         local_users: Keyword.get(opts, :local_users),
         remote_users: Keyword.get(opts, :remote_users),
         days: Keyword.get(opts, :days),
         posts_per_day: Keyword.get(opts, :posts_per_day),
         follows_per_user: Keyword.get(opts, :follows_per_user),
-        seed: Keyword.get(opts, :seed),
-        reset?: reset?
-      )
+        seed: Keyword.get(opts, :seed)
+      ]
+      |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+      |> Keyword.put(:reset?, reset?)
+
+    summary =
+      seed_opts
+      |> PleromaRedux.Bench.Seed.seed!()
 
     Mix.shell().info("""
     Bench seed complete:
