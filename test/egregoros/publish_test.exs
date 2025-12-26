@@ -134,4 +134,40 @@ defmodule Egregoros.PublishTest do
 
     assert Enum.any?(create_jobs, &(&1.args["inbox_url"] == remote_recipient.inbox))
   end
+
+  test "post_note/2 delivers Create to mentioned remote actors" do
+    {:ok, alice} = Users.create_local_user("alice")
+
+    {:ok, remote} =
+      Users.create_user(%{
+        nickname: "lain",
+        domain: "lain.com",
+        ap_id: "https://lain.com/users/lain",
+        inbox: "https://lain.com/users/lain/inbox",
+        outbox: "https://lain.com/users/lain/outbox",
+        public_key: "-----BEGIN PUBLIC KEY-----\nMIIB...\n-----END PUBLIC KEY-----\n",
+        local: false
+      })
+
+    assert {:ok, create} = Publish.post_note(alice, "hi @lain@lain.com")
+
+    assert %{} = note = Objects.get_by_ap_id(create.object)
+    assert remote.ap_id in List.wrap(note.data["cc"])
+
+    assert Enum.any?(List.wrap(note.data["tag"]), fn
+             %{"type" => "Mention", "href" => href, "name" => name} ->
+               href == remote.ap_id and name == "@lain@lain.com"
+
+             _ ->
+               false
+           end)
+
+    create_jobs =
+      all_enqueued(worker: DeliverActivity)
+      |> Enum.filter(fn job ->
+        match?(%{"activity" => %{"type" => "Create"}}, job.args)
+      end)
+
+    assert Enum.any?(create_jobs, &(&1.args["inbox_url"] == remote.inbox))
+  end
 end

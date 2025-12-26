@@ -32,19 +32,17 @@ defmodule Egregoros.Publish do
         {:error, :too_long}
 
       true ->
-        direct_recipients =
-          if visibility == "direct" do
-            resolve_direct_recipients(content, user.ap_id)
-          else
-            []
-          end
+        mentions = resolve_mentions(content, user.ap_id)
+        mention_recipient_ids = Enum.map(mentions, & &1.ap_id)
+        mention_tags = Enum.map(mentions, &mention_tag/1)
 
         note =
           user
           |> Note.build(content)
           |> maybe_put_attachments(attachments)
           |> maybe_put_in_reply_to(in_reply_to)
-          |> maybe_put_visibility(visibility, user.ap_id, direct_recipients)
+          |> maybe_put_visibility(visibility, user.ap_id, mention_recipient_ids)
+          |> maybe_put_tags(mention_tags)
           |> maybe_put_summary(spoiler_text)
           |> maybe_put_sensitive(sensitive)
           |> maybe_put_language(language)
@@ -73,25 +71,25 @@ defmodule Egregoros.Publish do
 
   defp maybe_put_in_reply_to(note, _in_reply_to), do: note
 
-  defp maybe_put_visibility(note, visibility, actor, direct_recipients)
+  defp maybe_put_visibility(note, visibility, actor, mention_recipients)
        when is_map(note) and is_binary(visibility) and is_binary(actor) do
     followers = actor <> "/followers"
 
-    direct_recipients =
-      direct_recipients
+    mention_recipients =
+      mention_recipients
       |> List.wrap()
       |> Enum.filter(&is_binary/1)
       |> Enum.map(&String.trim/1)
-      |> Enum.reject(&(&1 == ""))
+      |> Enum.reject(&(&1 == "" or &1 == actor))
       |> Enum.uniq()
 
     {to, cc} =
       case visibility do
-        "public" -> {[@as_public], [followers]}
-        "unlisted" -> {[followers], [@as_public]}
-        "private" -> {[followers], []}
-        "direct" -> {direct_recipients, []}
-        _ -> {[@as_public], [followers]}
+        "public" -> {[@as_public], Enum.uniq([followers] ++ mention_recipients)}
+        "unlisted" -> {[followers], Enum.uniq([@as_public] ++ mention_recipients)}
+        "private" -> {[followers], mention_recipients}
+        "direct" -> {mention_recipients, []}
+        _ -> {[@as_public], Enum.uniq([followers] ++ mention_recipients)}
       end
 
     note
@@ -100,6 +98,29 @@ defmodule Egregoros.Publish do
   end
 
   defp maybe_put_visibility(note, _visibility, _actor, _direct_recipients), do: note
+
+  defp maybe_put_tags(note, tags) when is_map(note) and is_list(tags) do
+    tags =
+      tags
+      |> Enum.filter(&is_map/1)
+      |> Enum.uniq_by(fn tag ->
+        Map.get(tag, "href") || Map.get(tag, "id") || Map.get(tag, "name") || tag
+      end)
+
+    if tags == [] do
+      note
+    else
+      existing =
+        note
+        |> Map.get("tag", [])
+        |> List.wrap()
+        |> Enum.filter(&is_map/1)
+
+      Map.put(note, "tag", Enum.uniq_by(existing ++ tags, &(Map.get(&1, "href") || &1)))
+    end
+  end
+
+  defp maybe_put_tags(note, _tags), do: note
 
   defp maybe_put_summary(note, value) when is_map(note) and is_binary(value) do
     summary = String.trim(value)
@@ -135,22 +156,28 @@ defmodule Egregoros.Publish do
 
   defp maybe_put_language(note, _value), do: note
 
-  defp resolve_direct_recipients(content, actor_ap_id)
+  defp resolve_mentions(content, actor_ap_id)
        when is_binary(content) and is_binary(actor_ap_id) do
     local_domains = local_domains(actor_ap_id)
 
     content
     |> Mentions.extract()
     |> Enum.reduce([], fn {nickname, host}, acc ->
-      case resolve_mention_recipient(nickname, host, local_domains) do
-        ap_id when is_binary(ap_id) and ap_id != "" -> [ap_id | acc]
-        _ -> acc
+      host_normalized = normalize_host(host)
+      name = mention_name(nickname, host_normalized, local_domains)
+
+      case resolve_mention_recipient(nickname, host_normalized, local_domains) do
+        ap_id when is_binary(ap_id) and ap_id != "" ->
+          [%{nickname: nickname, host: host_normalized, ap_id: ap_id, name: name} | acc]
+
+        _ ->
+          acc
       end
     end)
-    |> Enum.uniq()
+    |> Enum.uniq_by(& &1.ap_id)
   end
 
-  defp resolve_direct_recipients(_content, _actor_ap_id), do: []
+  defp resolve_mentions(_content, _actor_ap_id), do: []
 
   defp resolve_mention_recipient(nickname, nil, _local_domains) when is_binary(nickname) do
     case Users.get_by_nickname(nickname) do
@@ -184,6 +211,39 @@ defmodule Egregoros.Publish do
   end
 
   defp resolve_mention_recipient(_nickname, _host, _local_domains), do: nil
+
+  defp normalize_host(nil), do: nil
+
+  defp normalize_host(host) when is_binary(host) do
+    host
+    |> String.trim()
+    |> String.downcase()
+  end
+
+  defp normalize_host(_host), do: nil
+
+  defp mention_name(nickname, nil, _local_domains) when is_binary(nickname) do
+    "@" <> nickname
+  end
+
+  defp mention_name(nickname, host, local_domains)
+       when is_binary(nickname) and is_binary(host) and is_list(local_domains) do
+    if host in local_domains do
+      "@" <> nickname
+    else
+      "@" <> nickname <> "@" <> host
+    end
+  end
+
+  defp mention_name(nickname, _host, _local_domains) when is_binary(nickname) do
+    "@" <> nickname
+  end
+
+  defp mention_tag(%{ap_id: ap_id, name: name}) when is_binary(ap_id) and is_binary(name) do
+    %{"type" => "Mention", "href" => ap_id, "name" => name}
+  end
+
+  defp mention_tag(_mention), do: nil
 
   defp local_domains(actor_ap_id) when is_binary(actor_ap_id) do
     case URI.parse(String.trim(actor_ap_id)) do
