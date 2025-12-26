@@ -3,6 +3,7 @@ defmodule Egregoros.Publish do
   alias Egregoros.Activities.Note
   alias Egregoros.Federation.Actor
   alias Egregoros.Federation.WebFinger
+  alias Egregoros.Objects
   alias Egregoros.Mentions
   alias Egregoros.Pipeline
   alias Egregoros.User
@@ -33,6 +34,13 @@ defmodule Egregoros.Publish do
 
       true ->
         mentions = resolve_mentions(content, user.ap_id)
+        reply_mentions = resolve_reply_mentions(in_reply_to, user.ap_id)
+
+        mentions =
+          (mentions ++ reply_mentions)
+          |> Enum.filter(&is_map/1)
+          |> Enum.uniq_by(& &1.ap_id)
+
         mention_recipient_ids = Enum.map(mentions, & &1.ap_id)
         mention_tags = Enum.map(mentions, &mention_tag/1)
 
@@ -179,6 +187,30 @@ defmodule Egregoros.Publish do
 
   defp resolve_mentions(_content, _actor_ap_id), do: []
 
+  defp resolve_reply_mentions(nil, _actor_ap_id), do: []
+
+  defp resolve_reply_mentions(in_reply_to, actor_ap_id)
+       when is_binary(in_reply_to) and is_binary(actor_ap_id) do
+    in_reply_to = String.trim(in_reply_to)
+
+    if in_reply_to == "" do
+      []
+    else
+      local_domains = local_domains(actor_ap_id)
+
+      with %{} = parent <- Objects.get_by_ap_id(in_reply_to),
+           parent_actor when is_binary(parent_actor) and parent_actor != "" <- parent.actor,
+           true <- parent_actor != actor_ap_id do
+        name = mention_name_for_ap_id(parent_actor, local_domains)
+        [%{nickname: nil, host: nil, ap_id: parent_actor, name: name}]
+      else
+        _ -> []
+      end
+    end
+  end
+
+  defp resolve_reply_mentions(_in_reply_to, _actor_ap_id), do: []
+
   defp resolve_mention_recipient(nickname, nil, _local_domains) when is_binary(nickname) do
     case Users.get_by_nickname(nickname) do
       %User{ap_id: ap_id} when is_binary(ap_id) -> ap_id
@@ -244,6 +276,52 @@ defmodule Egregoros.Publish do
   end
 
   defp mention_tag(_mention), do: nil
+
+  defp mention_name_for_ap_id(actor_ap_id, local_domains)
+       when is_binary(actor_ap_id) and is_list(local_domains) do
+    case Users.get_by_ap_id(actor_ap_id) do
+      %User{local: true, nickname: nickname} when is_binary(nickname) and nickname != "" ->
+        "@" <> nickname
+
+      %User{local: false, nickname: nickname, domain: domain}
+      when is_binary(nickname) and nickname != "" and is_binary(domain) and domain != "" ->
+        "@" <> nickname <> "@" <> domain
+
+      %User{nickname: nickname} when is_binary(nickname) and nickname != "" ->
+        "@" <> nickname
+
+      _ ->
+        case URI.parse(actor_ap_id) do
+          %URI{host: host} when is_binary(host) and host != "" ->
+            nickname =
+              actor_ap_id
+              |> URI.parse()
+              |> Map.get(:path)
+              |> fallback_nickname()
+
+            mention_name(nickname, host, local_domains)
+
+          _ ->
+            "@unknown"
+        end
+    end
+  end
+
+  defp mention_name_for_ap_id(_actor_ap_id, _local_domains), do: "@unknown"
+
+  defp fallback_nickname(nil), do: "unknown"
+
+  defp fallback_nickname(path) when is_binary(path) do
+    path
+    |> String.split("/", trim: true)
+    |> List.last()
+    |> case do
+      nil -> "unknown"
+      value -> value
+    end
+  end
+
+  defp fallback_nickname(_path), do: "unknown"
 
   defp local_domains(actor_ap_id) when is_binary(actor_ap_id) do
     case URI.parse(String.trim(actor_ap_id)) do

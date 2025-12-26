@@ -170,4 +170,50 @@ defmodule Egregoros.PublishTest do
 
     assert Enum.any?(create_jobs, &(&1.args["inbox_url"] == remote.inbox))
   end
+
+  test "post_note/3 replies deliver to the inReplyTo actor even without an explicit @mention" do
+    {:ok, alice} = Users.create_local_user("alice")
+
+    {:ok, remote_author} =
+      Users.create_user(%{
+        nickname: "lain",
+        domain: "lain.com",
+        ap_id: "https://lain.com/users/lain",
+        inbox: "https://lain.com/users/lain/inbox",
+        outbox: "https://lain.com/users/lain/outbox",
+        public_key: "-----BEGIN PUBLIC KEY-----\nMIIB...\n-----END PUBLIC KEY-----\n",
+        local: false
+      })
+
+    parent_note = %{
+      "id" => "https://lain.com/objects/parent",
+      "type" => "Note",
+      "attributedTo" => remote_author.ap_id,
+      "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+      "cc" => [],
+      "content" => "parent"
+    }
+
+    assert {:ok, _} = Pipeline.ingest(parent_note, local: false)
+
+    assert {:ok, create} =
+             Publish.post_note(alice, "a reply", in_reply_to: parent_note["id"])
+
+    assert %{} = note = Objects.get_by_ap_id(create.object)
+    assert note.data["inReplyTo"] == parent_note["id"]
+    assert remote_author.ap_id in List.wrap(note.data["cc"])
+
+    assert Enum.any?(List.wrap(note.data["tag"]), fn
+             %{"type" => "Mention", "href" => href} -> href == remote_author.ap_id
+             _ -> false
+           end)
+
+    create_jobs =
+      all_enqueued(worker: DeliverActivity)
+      |> Enum.filter(fn job ->
+        match?(%{"activity" => %{"type" => "Create"}}, job.args)
+      end)
+
+    assert Enum.any?(create_jobs, &(&1.args["inbox_url"] == remote_author.inbox))
+  end
 end
