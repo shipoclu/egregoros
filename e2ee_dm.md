@@ -357,3 +357,15 @@ Phase 4 (hardening):
 - optional message-level signatures
 - rate limiting / abuse considerations for DM payloads
 
+## Appendix: Notes on the ActivityPub-MLS draft
+
+There is an early draft exploring **Messaging Layer Security (MLS)** as an E2EE layer transported over ActivityPub: `https://swicg.github.io/activitypub-e2ee/mls`.
+
+Key takeaways (for PleromaRedux):
+- The document’s “ActivityPub envelope, MLS binary payload, app-data inside MLS” layering matches our direction: keep servers unaware of plaintext, but still use ActivityPub routing.
+- It explicitly calls out **key substitution** as a core risk when servers publish user keys. This aligns with our TOFU + key-change warnings, but MLS implementations typically want a stronger verification story.
+- It suggests a `keyPackages` actor property and lifecycle (Create/Add/Remove/Delete) that maps well to a **per-device key model** if we later choose to go beyond a single per-account key.
+
+Where we should likely diverge (at least for v1):
+- Full MLS support (RFC 9420) is a large implementation surface in the browser; for v1 1:1 DMs we should keep the simpler ECDH+AEAD design and keep “MLS later” as an evolution path.
+- The draft’s “self-contained encrypted app data” approach discourages external URLs and suggests embedding binary content as base64; for real-world media this will be too heavy for federation and should be replaced with “encrypted blobs + separate fetch” designs.
