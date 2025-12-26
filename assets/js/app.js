@@ -234,6 +234,11 @@ const ComposeMentions = {
     this.handleInput()
   },
 
+  isMentionBoundaryChar: ch => {
+    if (!ch) return true
+    return /\s/.test(ch) || /[\(\[\{\<"'.,!?;:]/.test(ch)
+  },
+
   updated() {
     const nextInput = this.findInput()
     if (nextInput !== this.input) {
@@ -324,7 +329,7 @@ const ComposeMentions = {
     }
 
     if (i < 0) return null
-    if (i > 0 && !/\s/.test(value[i - 1])) return null
+    if (i > 0 && !this.isMentionBoundaryChar(value[i - 1])) return null
 
     const raw = value.slice(i + 1, pos)
     if (!raw) return null

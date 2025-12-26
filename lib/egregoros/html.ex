@@ -132,6 +132,8 @@ defmodule Egregoros.HTML do
 
   @mention_trailing ".,!?;:)]},"
 
+  @inline_link_regex ~r/(^|[\s\(\[\{\<"'.,!?;:])((?:https?:\/\/[^\s]+)|(?:@[A-Za-z0-9][A-Za-z0-9_.-]{0,63}(?:@[A-Za-z0-9.-]+(?::\d{1,5})?)?)|(?:#[\p{L}\p{N}_][\p{L}\p{N}_-]{0,63}))/u
+
   defp linkify_token(token, emoji_map) when is_binary(token) and is_map(emoji_map) do
     token = to_string(token)
 
@@ -139,32 +141,63 @@ defmodule Egregoros.HTML do
       token == "" ->
         ""
 
-      String.starts_with?(token, "@") ->
-        {core, trailing} = split_trailing_punctuation(token, @mention_trailing)
+      true ->
+        linkify_inline(token, emoji_map)
+    end
+  end
 
-        case mention_href(core) do
-          {:ok, href} -> [anchor(href, core), escape(trailing)]
-          :error -> escape(token)
-        end
+  defp linkify_inline(token, emoji_map) when is_binary(token) and is_map(emoji_map) do
+    matches = Regex.scan(@inline_link_regex, token, return: :index)
 
-      String.starts_with?(token, "#") ->
-        {core, trailing} = split_trailing_punctuation(token, @mention_trailing)
+    case matches do
+      [] ->
+        emojify_token(token, emoji_map)
 
-        case hashtag_href(core) do
-          {:ok, href} -> [anchor(href, core), escape(trailing)]
-          :error -> escape(token)
-        end
+      _ ->
+        {iodata, last_pos} =
+          Enum.reduce(matches, {[], 0}, fn
+            [_, _boundary, {start, len}], {acc, last_pos} ->
+              prefix = String.slice(token, last_pos, start - last_pos)
+              match = String.slice(token, start, len)
 
-      String.starts_with?(token, ["http://", "https://"]) ->
-        {core, trailing} = split_trailing_punctuation(token, @mention_trailing)
+              acc = [acc, emojify_token(prefix, emoji_map), linkify_match(match)]
+              {acc, start + len}
 
-        case url_href(core) do
-          {:ok, href} -> [anchor(href, core), escape(trailing)]
-          :error -> escape(token)
-        end
+            _other, {acc, last_pos} ->
+              {acc, last_pos}
+          end)
+
+        suffix = String.slice(token, last_pos, String.length(token) - last_pos)
+        [iodata, emojify_token(suffix, emoji_map)]
+    end
+  end
+
+  defp linkify_inline(token, _emoji_map), do: escape(token)
+
+  defp linkify_match(match) when is_binary(match) do
+    cond do
+      String.starts_with?(match, "@") ->
+        linkify_prefixed(match, &mention_href/1)
+
+      String.starts_with?(match, "#") ->
+        linkify_prefixed(match, &hashtag_href/1)
+
+      String.starts_with?(match, ["http://", "https://"]) ->
+        linkify_prefixed(match, &url_href/1)
 
       true ->
-        emojify_token(token, emoji_map)
+        escape(match)
+    end
+  end
+
+  defp linkify_match(match), do: escape(match)
+
+  defp linkify_prefixed(token, href_fun) when is_binary(token) and is_function(href_fun, 1) do
+    {core, trailing} = split_trailing_punctuation(token, @mention_trailing)
+
+    case href_fun.(core) do
+      {:ok, href} -> [anchor(href, core), escape(trailing)]
+      :error -> escape(token)
     end
   end
 

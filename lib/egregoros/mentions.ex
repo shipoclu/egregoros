@@ -3,6 +3,8 @@ defmodule Egregoros.Mentions do
 
   @mention_trailing ".,!?;:)]},"
 
+  @mention_regex ~r/(^|[\s\(\[\{\<"'.,!?;:])(@[A-Za-z0-9][A-Za-z0-9_.-]{0,63}(?:@[A-Za-z0-9.-]+(?::\d{1,5})?)?)/u
+
   def parse(handle) when is_binary(handle) do
     handle =
       handle
@@ -29,20 +31,18 @@ defmodule Egregoros.Mentions do
     content
     |> String.replace("\r\n", "\n")
     |> String.replace("\r", "\n")
-    |> String.split(~r/\s+/, trim: true)
-    |> Enum.reduce(MapSet.new(), fn token, acc ->
-      token = to_string(token)
-
-      if String.starts_with?(token, "@") do
-        {core, _trailing} = split_trailing_punctuation(token, @mention_trailing)
+    |> then(&Regex.scan(@mention_regex, &1))
+    |> Enum.reduce(MapSet.new(), fn
+      [_, _boundary, mention], acc when is_binary(mention) ->
+        {core, _trailing} = split_trailing_punctuation(mention, @mention_trailing)
 
         case parse(core) do
           {:ok, nickname, host} -> MapSet.put(acc, {nickname, host})
           :error -> acc
         end
-      else
+
+      _other, acc ->
         acc
-      end
     end)
     |> MapSet.to_list()
   end

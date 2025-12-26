@@ -272,6 +272,24 @@ defmodule Egregoros.HTMLTest do
       assert safe =~ ">@alice</a>,"
     end
 
+    test "linkifies @mentions inside surrounding punctuation" do
+      safe = HTML.to_safe_html("hi (@alice)", format: :text)
+
+      assert safe =~ "(<a "
+      assert safe =~ ~s(href="#{EgregorosWeb.Endpoint.url()}/@alice")
+      assert safe =~ ">@alice</a>)"
+    end
+
+    test "linkifies multiple @mentions inside the same token" do
+      safe = HTML.to_safe_html("hi (@alice,@bob@example.com)", format: :text)
+
+      assert safe =~ "(<a "
+      assert safe =~ ~s(href="#{EgregorosWeb.Endpoint.url()}/@alice")
+      assert safe =~ ">@alice</a>,<a"
+      assert safe =~ ~s(href="#{EgregorosWeb.Endpoint.url()}/@bob@example.com")
+      assert safe =~ ">@bob@example.com</a>)"
+    end
+
     test "linkifies hashtags in plain text" do
       safe = HTML.to_safe_html("hi #elixir", format: :text)
       assert safe =~ ~s(href="#{EgregorosWeb.Endpoint.url()}/tags/elixir")
@@ -293,6 +311,13 @@ defmodule Egregoros.HTMLTest do
       safe = HTML.to_safe_html("see https://example.com).", format: :text)
       assert safe =~ ~s(href="https://example.com")
       assert safe =~ ">https://example.com</a>)."
+    end
+
+    test "linkifies urls inside surrounding punctuation" do
+      safe = HTML.to_safe_html("see (https://example.com)", format: :text)
+      assert safe =~ "(<a "
+      assert safe =~ ~s(href="https://example.com")
+      assert safe =~ ">https://example.com</a>)"
     end
 
     test "does not linkify non-http urls in plain text" do
