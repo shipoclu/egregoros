@@ -147,6 +147,54 @@ defmodule Egregoros.ObjectsTest do
     refute Enum.any?(notes, &(&1.actor == carol_ap_id))
   end
 
+  test "list_home_notes includes direct messages addressed to the user" do
+    {:ok, bob} = Users.create_local_user("bob")
+    dm_ap_id = "https://remote.example/objects/dm-1"
+
+    assert {:ok, %Object{} = dm} =
+             Objects.create_object(%{
+               ap_id: dm_ap_id,
+               type: "Note",
+               actor: "https://remote.example/users/carol",
+               object: nil,
+               local: false,
+               data: %{
+                 "id" => dm_ap_id,
+                 "type" => "Note",
+                 "actor" => "https://remote.example/users/carol",
+                 "to" => [bob.ap_id],
+                 "cc" => [],
+                 "content" => "secret"
+               }
+             })
+
+    assert Enum.any?(Objects.list_home_notes(bob.ap_id), &(&1.id == dm.id))
+  end
+
+  test "list_home_statuses includes direct messages addressed to the user" do
+    {:ok, bob} = Users.create_local_user("bob")
+    dm_ap_id = "https://remote.example/objects/dm-2"
+
+    assert {:ok, %Object{} = dm} =
+             Objects.create_object(%{
+               ap_id: dm_ap_id,
+               type: "Note",
+               actor: "https://remote.example/users/carol",
+               object: nil,
+               local: false,
+               data: %{
+                 "id" => dm_ap_id,
+                 "type" => "Note",
+                 "actor" => "https://remote.example/users/carol",
+                 "to" => [bob.ap_id],
+                 "cc" => [],
+                 "content" => "secret"
+               }
+             })
+
+    assert Enum.any?(Objects.list_home_statuses(bob.ap_id), &(&1.id == dm.id))
+  end
+
   test "search_notes finds notes by content or summary" do
     public = "https://www.w3.org/ns/activitystreams#Public"
 

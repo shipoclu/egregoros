@@ -233,11 +233,28 @@ defmodule EgregorosWeb.MastodonAPI.StreamingSocket do
          %{current_user: %User{} = user, home_actor_ids: %MapSet{} = actor_ids}
        )
        when type in ~w(Note Announce) do
-    is_binary(object.actor) and MapSet.member?(actor_ids, object.actor) and
-      Objects.visible_to?(object, user)
+    cond do
+      is_binary(object.actor) and MapSet.member?(actor_ids, object.actor) and
+          Objects.visible_to?(object, user) ->
+        true
+
+      recipient?(object, user.ap_id) and Objects.visible_to?(object, user) ->
+        true
+
+      true ->
+        false
+    end
   end
 
   defp deliver_user_status?(_object, _state), do: false
+
+  defp recipient?(%Object{data: %{} = data}, user_ap_id) when is_binary(user_ap_id) do
+    to = data |> Map.get("to", []) |> List.wrap()
+    cc = data |> Map.get("cc", []) |> List.wrap()
+    user_ap_id in to or user_ap_id in cc
+  end
+
+  defp recipient?(_object, _user_ap_id), do: false
 
   defp render_status_json(%Object{} = object, state) when is_map(state) do
     case Map.get(state, :current_user) do

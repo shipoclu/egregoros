@@ -309,7 +309,11 @@ defmodule Egregoros.Objects do
 
     from(o in Object,
       where:
-        o.type == "Note" and (o.actor == ^actor_ap_id or o.actor in subquery(followed_subquery)),
+        o.type == "Note" and
+          (o.actor == ^actor_ap_id or
+             o.actor in subquery(followed_subquery) or
+             fragment("? @> ?", o.data, ^%{"to" => [actor_ap_id]}) or
+             fragment("? @> ?", o.data, ^%{"cc" => [actor_ap_id]})),
       order_by: [desc: o.id],
       limit: ^limit
     )
@@ -337,7 +341,10 @@ defmodule Egregoros.Objects do
     from(o in Object,
       where:
         o.type in ^@status_types and
-          (o.actor == ^actor_ap_id or o.actor in subquery(followed_subquery)),
+          (o.actor == ^actor_ap_id or
+             o.actor in subquery(followed_subquery) or
+             fragment("? @> ?", o.data, ^%{"to" => [actor_ap_id]}) or
+             fragment("? @> ?", o.data, ^%{"cc" => [actor_ap_id]})),
       order_by: [desc: o.id],
       limit: ^limit
     )

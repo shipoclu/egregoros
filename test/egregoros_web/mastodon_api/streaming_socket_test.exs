@@ -100,6 +100,36 @@ defmodule EgregorosWeb.MastodonAPI.StreamingSocketTest do
     assert {:ok, ^state} = StreamingSocket.handle_info({:post_created, note}, state)
   end
 
+  test "delivers direct messages to the user stream even when the actor is not followed" do
+    {:ok, user} = Users.create_local_user("alice")
+    {:ok, state} = StreamingSocket.init(%{streams: ["user"], current_user: user})
+
+    assert {:ok, note} =
+             Objects.create_object(%{
+               ap_id: "https://remote.example/objects/direct-mention",
+               type: "Note",
+               actor: "https://remote.example/users/stranger",
+               local: false,
+               data: %{
+                 "id" => "https://remote.example/objects/direct-mention",
+                 "type" => "Note",
+                 "attributedTo" => "https://remote.example/users/stranger",
+                 "to" => [user.ap_id],
+                 "cc" => [],
+                 "content" => "<p>Secret</p>"
+               }
+             })
+
+    assert {:push, {:text, payload}, ^state} =
+             StreamingSocket.handle_info({:post_created, note}, state)
+
+    assert %{"event" => "update", "payload" => status_payload, "stream" => ["user"]} =
+             Jason.decode!(payload)
+
+    assert is_binary(status_payload)
+    assert %{"id" => _id} = Jason.decode!(status_payload)
+  end
+
   test "delivers public timeline updates without a current user" do
     {:ok, state} = StreamingSocket.init(%{streams: ["public"], current_user: nil})
     public = "https://www.w3.org/ns/activitystreams#Public"

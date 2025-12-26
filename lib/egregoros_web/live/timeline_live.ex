@@ -952,7 +952,24 @@ defmodule EgregorosWeb.TimelineLive do
 
   defp include_post?(%{type: "Note"} = post, :home, %User{} = user, home_actor_ids)
        when is_list(home_actor_ids) do
-    is_binary(post.actor) and post.actor in home_actor_ids and home_visible?(post, user)
+    actor = Map.get(post, :actor)
+    data = Map.get(post, :data, %{}) |> Map.new()
+    to = data |> Map.get("to", []) |> List.wrap()
+    cc = data |> Map.get("cc", []) |> List.wrap()
+
+    cond do
+      actor == user.ap_id ->
+        true
+
+      user.ap_id in to or user.ap_id in cc ->
+        true
+
+      is_binary(actor) and actor in home_actor_ids ->
+        home_visible?(post, user)
+
+      true ->
+        false
+    end
   end
 
   defp include_post?(%{type: "Note"} = post, _timeline, _user, _home_actor_ids) do

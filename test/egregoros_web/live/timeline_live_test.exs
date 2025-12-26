@@ -67,6 +67,16 @@ defmodule EgregorosWeb.TimelineLiveTest do
     refute has_element?(view, "article", "Secret DM")
   end
 
+  test "home timeline includes direct messages addressed to the signed-in user", %{conn: conn, user: user} do
+    {:ok, bob} = Users.create_local_user("bob")
+    {:ok, _} = Publish.post_note(user, "@bob Secret DM", visibility: "direct")
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: bob.id})
+    {:ok, view, _html} = live(conn, "/")
+
+    assert has_element?(view, "article", "Secret DM")
+  end
+
   test "theme toggle buttons are labeled for accessibility", %{conn: conn} do
     {:ok, view, _html} = live(conn, "/")
 
