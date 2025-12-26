@@ -1,11 +1,11 @@
 import Config
 
 # Configure your database
-config :pleroma_redux, PleromaRedux.Repo,
+config :egregoros, Egregoros.Repo,
   username: "postgres",
   password: "postgres",
   hostname: "localhost",
-  database: "pleroma_redux_dev",
+  database: "egregoros_dev",
   stacktrace: true,
   show_sensitive_data_on_connection_error: true,
   pool_size: 10
@@ -16,7 +16,7 @@ config :pleroma_redux, PleromaRedux.Repo,
 # The watchers configuration can be used to run external
 # watchers to your application. For example, we can use it
 # to bundle .js and .css sources.
-config :pleroma_redux, PleromaReduxWeb.Endpoint,
+config :egregoros, EgregorosWeb.Endpoint,
   # Binding to loopback ipv4 address prevents access from other machines.
   # Change to `ip: {0, 0, 0, 0}` to allow access from other machines.
   http: [ip: {127, 0, 0, 1}],
@@ -25,8 +25,8 @@ config :pleroma_redux, PleromaReduxWeb.Endpoint,
   debug_errors: true,
   secret_key_base: "RFrrbzD+3YXGdoOfCLlOGUA78V2NSQMEbnt55tOwAkxHFX/VmxeFjDEe49ujX8xW",
   watchers: [
-    esbuild: {Esbuild, :install_and_run, [:pleroma_redux, ~w(--sourcemap=inline --watch)]},
-    tailwind: {Tailwind, :install_and_run, [:pleroma_redux, ~w(--watch)]}
+    esbuild: {Esbuild, :install_and_run, [:egregoros, ~w(--sourcemap=inline --watch)]},
+    tailwind: {Tailwind, :install_and_run, [:egregoros, ~w(--watch)]}
   ]
 
 # ## SSL Support
@@ -53,7 +53,7 @@ config :pleroma_redux, PleromaReduxWeb.Endpoint,
 # different ports.
 
 # Reload browser tabs when matching files change.
-config :pleroma_redux, PleromaReduxWeb.Endpoint,
+config :egregoros, EgregorosWeb.Endpoint,
   live_reload: [
     web_console_logger: true,
     patterns: [
@@ -62,13 +62,13 @@ config :pleroma_redux, PleromaReduxWeb.Endpoint,
       # Gettext translations
       ~r"priv/gettext/.*\.po$",
       # Router, Controllers, LiveViews and LiveComponents
-      ~r"lib/pleroma_redux_web/router\.ex$",
-      ~r"lib/pleroma_redux_web/(controllers|live|components)/.*\.(ex|heex)$"
+      ~r"lib/egregoros_web/router\.ex$",
+      ~r"lib/egregoros_web/(controllers|live|components)/.*\.(ex|heex)$"
     ]
   ]
 
 # Enable dev routes for dashboard and mailbox
-config :pleroma_redux, dev_routes: true
+config :egregoros, dev_routes: true
 
 # Do not include metadata nor timestamps in development logs
 config :logger, :default_formatter, format: "[$level] $message\n"

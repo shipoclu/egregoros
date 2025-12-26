@@ -1,6 +1,6 @@
 # End-to-end encrypted (E2EE) direct messages — proposal
 
-This document proposes a pragmatic E2EE direct-message design for **PleromaRedux** (PostgreSQL + Elixir/OTP + Phoenix + LiveView), with **encryption/decryption happening in the browser** and **no plaintext keys ever sent to the server**.
+This document proposes a pragmatic E2EE direct-message design for **Egregoros** (PostgreSQL + Elixir/OTP + Phoenix + LiveView), with **encryption/decryption happening in the browser** and **no plaintext keys ever sent to the server**.
 
 It focuses on:
 - sensible **key management** (with **passkeys** as the best default)
@@ -56,7 +56,7 @@ Why P-256: WebCrypto compatibility. X25519 is nicer but not universally availabl
 For a DM from `alice` → `bob`:
 - Shared secret: `SS = ECDH(alice_priv, bob_pub)`
 - Derive a per-message AEAD key:
-  - `K = HKDF(SS, salt = msg_salt, info = "predux:e2ee:dm:v1")`
+  - `K = HKDF(SS, salt = msg_salt, info = "egregoros:e2ee:dm:v1")`
 - Encrypt with AES-GCM using a random 96-bit nonce.
 
 **Authentication property:** only someone with `alice_priv` can compute `SS` that `bob` can decrypt using `bob_priv + alice_pub`. This gives “implicit sender auth” assuming key pinning (TOFU) prevents MITM key substitution.
@@ -143,7 +143,7 @@ Add an extension field on the actor:
 
 ```json
 {
-  "predux:e2ee": {
+  "egregoros:e2ee": {
     "version": 1,
     "keys": [
       {
@@ -169,7 +169,7 @@ Notes:
 
 When sending a DM:
 - fetch recipient actor doc (prefer signed fetch if enabled)
-- extract `predux:e2ee.keys[0]` (or matching `kid`)
+- extract `egregoros:e2ee.keys[0]` (or matching `kid`)
 - apply TOFU pinning (below)
 
 ## TOFU key pinning and key-change warnings
@@ -202,7 +202,7 @@ Recommendation:
 
 Store ciphertext as an AP object field (not as the only `content`), so we can show placeholders to other clients.
 
-### `predux:e2ee_dm` payload
+### `egregoros:e2ee_dm` payload
 
 ```json
 {
@@ -236,7 +236,7 @@ Encryption inputs:
 Use a `Note` (or `ChatMessage`) with:
 - `to: [recipient_ap_id]` and no Public address
 - plaintext `content` is a placeholder (e.g. “Encrypted message”)
-- encrypted payload stored under `predux:e2ee_dm`
+- encrypted payload stored under `egregoros:e2ee_dm`
 
 Example (object):
 
@@ -247,14 +247,14 @@ Example (object):
   "actor": "https://example.com/users/alice",
   "to": ["https://remote.example/users/bob"],
   "content": "<p><em>Encrypted message</em></p>",
-  "predux:e2ee_dm": { "...": "..." }
+  "egregoros:e2ee_dm": { "...": "..." }
 }
 ```
 
 ### Rendering behavior
 
-In PleromaRedux LiveView:
-- if `predux:e2ee_dm` present and the viewer has an applicable `E2EE_PRIV`, attempt decrypt
+In Egregoros LiveView:
+- if `egregoros:e2ee_dm` present and the viewer has an applicable `E2EE_PRIV`, attempt decrypt
 - show decrypted plaintext content (sanitized / text-mode depending on local policy)
 - if decrypt fails:
   - show placeholder + reason (“missing key”, “key changed”, “corrupt payload”)
@@ -343,7 +343,7 @@ Phase 1 (local-only UX, no federation changes):
 - Store ciphertext in objects `data` and render decrypted content only in LiveView
 
 Phase 2 (publish keys, cross-server DMs):
-- Add actor doc `predux:e2ee` field for local users
+- Add actor doc `egregoros:e2ee` field for local users
 - Add remote key discovery + TOFU pins
 - Encrypt outbound DMs to remote actors and decrypt inbound
 
@@ -361,7 +361,7 @@ Phase 4 (hardening):
 
 There is an early draft exploring **Messaging Layer Security (MLS)** as an E2EE layer transported over ActivityPub: `https://swicg.github.io/activitypub-e2ee/mls`.
 
-Key takeaways (for PleromaRedux):
+Key takeaways (for Egregoros):
 - The document’s “ActivityPub envelope, MLS binary payload, app-data inside MLS” layering matches our direction: keep servers unaware of plaintext, but still use ActivityPub routing.
 - It explicitly calls out **key substitution** as a core risk when servers publish user keys. This aligns with our TOFU + key-change warnings, but MLS implementations typically want a stronger verification story.
 - It suggests a `keyPackages` actor property and lifecycle (Create/Add/Remove/Delete) that maps well to a **per-device key model** if we later choose to go beyond a single per-account key.

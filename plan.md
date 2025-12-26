@@ -185,7 +185,7 @@ Goal: move from ad‑hoc `normalize/validate` pattern matching toward **Pleroma�
 
 ### Current state (Pleroma‑Redux)
 - Each activity module implements `normalize/1` and `validate/1` using pattern matching and guards.
-- Compatibility ingestion tests exist using real fixture payloads from `test/fixtures` (vendored from upstream Pleroma) (`test/pleroma_redux/compat/upstream_fixtures_test.exs`).
+- Compatibility ingestion tests exist using real fixture payloads from `test/fixtures` (vendored from upstream Pleroma) (`test/egregoros/compat/upstream_fixtures_test.exs`).
 - Normalization is duplicated across modules (e.g. inline `"actor": {"id": ...}` handling).
 
 ### Reference (Pleroma‑old)
@@ -213,7 +213,7 @@ Goal: move from ad‑hoc `normalize/validate` pattern matching toward **Pleroma�
 
 ### Implementation plan (incremental, TDD‑first)
 1) **Introduce shared validator building blocks (small, testable)**
-   - Add `PleromaRedux.ActivityPub.ObjectValidators` helpers inspired by pleroma‑old:
+   - Add `Egregoros.ActivityPub.ObjectValidators` helpers inspired by pleroma‑old:
      - `CommonFields` (macros or functions for common AP fields)
      - `CommonValidations` (actor/object presence, type inclusion, recipients shape)
      - `Types.ObjectID` (casts `"id"` maps → ID strings; permissive schemes)
@@ -226,7 +226,7 @@ Goal: move from ad‑hoc `normalize/validate` pattern matching toward **Pleroma�
    - Add a pipeline test proving old + new paths both work.
 
 3) **Migrate one activity type end‑to‑end (Follow first)**
-   - Convert `PleromaRedux.Activities.Follow` to use `embedded_schema` + `cast_and_validate/1`.
+   - Convert `Egregoros.Activities.Follow` to use `embedded_schema` + `cast_and_validate/1`.
    - Keep `normalize/validate` as thin wrappers (or remove after all migrations).
    - Tests:
      - Changeset unit tests for Follow shape rules.
@@ -254,7 +254,7 @@ Goal: move from ad‑hoc `normalize/validate` pattern matching toward **Pleroma�
    - Standardize validation errors (HTTP 400 + machine‑readable reason for APIs; structured logs for federation).
 
 ### Testing plan (fixtures + unit tests)
-- Keep `test/pleroma_redux/compat/pleroma_old_fixtures_test.exs` as the “real‑world smoke suite”.
+- Keep `test/egregoros/compat/pleroma_old_fixtures_test.exs` as the “real‑world smoke suite”.
 - Add per‑type changeset tests that:
   - cover normalization (inline actor objects, nested `"id"` shapes),
   - assert *minimal* required fields (TDD‑friendly; tighten later as features demand),

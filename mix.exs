@@ -1,9 +1,9 @@
-defmodule PleromaRedux.MixProject do
+defmodule Egregoros.MixProject do
   use Mix.Project
 
   def project do
     [
-      app: :pleroma_redux,
+      app: :egregoros,
       version: "0.1.0",
       elixir: "~> 1.15",
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -21,7 +21,7 @@ defmodule PleromaRedux.MixProject do
   # Type `mix help compile.app` for more information.
   def application do
     [
-      mod: {PleromaRedux.Application, []},
+      mod: {Egregoros.Application, []},
       extra_applications: [:logger, :runtime_tools]
     ]
   end
@@ -87,10 +87,10 @@ defmodule PleromaRedux.MixProject do
       "ecto.reset": ["ecto.drop", "ecto.setup"],
       test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
-      "assets.build": ["compile", "tailwind pleroma_redux", "esbuild pleroma_redux"],
+      "assets.build": ["compile", "tailwind egregoros", "esbuild egregoros"],
       "assets.deploy": [
-        "tailwind pleroma_redux --minify",
-        "esbuild pleroma_redux --minify",
+        "tailwind egregoros --minify",
+        "esbuild egregoros --minify",
         "phx.digest"
       ],
       precommit: ["compile --warnings-as-errors", "deps.unlock --unused", "format", "test"]

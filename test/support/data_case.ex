@@ -1,4 +1,4 @@
-defmodule PleromaRedux.DataCase do
+defmodule Egregoros.DataCase do
   @moduledoc """
   This module defines the setup for tests requiring
   access to the application's data layer.
@@ -10,7 +10,7 @@ defmodule PleromaRedux.DataCase do
   we enable the SQL sandbox, so changes done to the database
   are reverted at the end of every test. If you are using
   PostgreSQL, you can even run database tests asynchronously
-  by setting `use PleromaRedux.DataCase, async: true`, although
+  by setting `use Egregoros.DataCase, async: true`, although
   this option is not recommended for other databases.
   """
 
@@ -18,25 +18,25 @@ defmodule PleromaRedux.DataCase do
 
   using do
     quote do
-      alias PleromaRedux.Repo
+      alias Egregoros.Repo
 
-      use Oban.Testing, repo: PleromaRedux.Repo
+      use Oban.Testing, repo: Egregoros.Repo
 
       import Ecto
       import Ecto.Changeset
       import Ecto.Query
-      import PleromaRedux.DataCase
+      import Egregoros.DataCase
       import Mox
     end
   end
 
   setup tags do
     Mox.set_mox_from_context(tags)
-    Mox.stub_with(PleromaRedux.HTTP.Mock, PleromaRedux.HTTP.Stub)
-    Mox.stub_with(PleromaRedux.DNS.Mock, PleromaRedux.DNS.Stub)
-    Mox.stub_with(PleromaRedux.AuthZ.Mock, PleromaRedux.AuthZ.Stub)
+    Mox.stub_with(Egregoros.HTTP.Mock, Egregoros.HTTP.Stub)
+    Mox.stub_with(Egregoros.DNS.Mock, Egregoros.DNS.Stub)
+    Mox.stub_with(Egregoros.AuthZ.Mock, Egregoros.AuthZ.Stub)
     Mox.verify_on_exit!(tags)
-    PleromaRedux.DataCase.setup_sandbox(tags)
+    Egregoros.DataCase.setup_sandbox(tags)
     :ok
   end
 
@@ -44,7 +44,7 @@ defmodule PleromaRedux.DataCase do
   Sets up the sandbox based on the test tags.
   """
   def setup_sandbox(tags) do
-    pid = Ecto.Adapters.SQL.Sandbox.start_owner!(PleromaRedux.Repo, shared: not tags[:async])
+    pid = Ecto.Adapters.SQL.Sandbox.start_owner!(Egregoros.Repo, shared: not tags[:async])
     on_exit(fn -> Ecto.Adapters.SQL.Sandbox.stop_owner(pid) end)
   end
 

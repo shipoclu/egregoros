@@ -11,15 +11,15 @@ MIX_ENV=bench mix ecto.create
 MIX_ENV=bench mix ecto.migrate
 
 # Destructive by default (wipes users/objects/relationships)
-MIX_ENV=bench mix predux.bench.seed --force
+MIX_ENV=bench mix egregoros.bench.seed --force
 
-MIX_ENV=bench mix predux.bench.run
+MIX_ENV=bench mix egregoros.bench.run
 ```
 
 ## Seeding options
 
 ```sh
-MIX_ENV=bench mix predux.bench.seed --force \
+MIX_ENV=bench mix egregoros.bench.seed --force \
   --local-users 10 \
   --remote-users 200 \
   --days 365 \
@@ -38,6 +38,6 @@ Notes:
 Filter the suite by substring:
 
 ```sh
-MIX_ENV=bench mix predux.bench.run --filter timeline.home
+MIX_ENV=bench mix egregoros.bench.run --filter timeline.home
 ```
 

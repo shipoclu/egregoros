@@ -12,29 +12,29 @@ import Config
 # If you use `mix release`, you need to explicitly enable the server
 # by passing the PHX_SERVER=true when you start it:
 #
-#     PHX_SERVER=true bin/pleroma_redux start
+#     PHX_SERVER=true bin/egregoros start
 #
 # Alternatively, you can use `mix phx.gen.release` to generate a `bin/server`
 # script that automatically sets the env var above.
 if System.get_env("PHX_SERVER") do
-  config :pleroma_redux, PleromaReduxWeb.Endpoint, server: true
+  config :egregoros, EgregorosWeb.Endpoint, server: true
 end
 
-config :pleroma_redux, PleromaReduxWeb.Endpoint,
+config :egregoros, EgregorosWeb.Endpoint,
   http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 
 if config_env() != :test do
-  external_host = System.get_env("PHX_HOST") || System.get_env("PLEROMA_REDUX_EXTERNAL_HOST")
+  external_host = System.get_env("PHX_HOST") || System.get_env("EGREGOROS_EXTERNAL_HOST")
 
   if is_binary(external_host) and external_host != "" do
     external_scheme =
-      System.get_env("PHX_SCHEME") || System.get_env("PLEROMA_REDUX_EXTERNAL_SCHEME") || "https"
+      System.get_env("PHX_SCHEME") || System.get_env("EGREGOROS_EXTERNAL_SCHEME") || "https"
 
     external_port =
-      System.get_env("PHX_PORT") || System.get_env("PLEROMA_REDUX_EXTERNAL_PORT") ||
+      System.get_env("PHX_PORT") || System.get_env("EGREGOROS_EXTERNAL_PORT") ||
         if(external_scheme == "https", do: "443", else: "80")
 
-    config :pleroma_redux, PleromaReduxWeb.Endpoint,
+    config :egregoros, EgregorosWeb.Endpoint,
       url: [
         host: external_host,
         scheme: external_scheme,
@@ -53,7 +53,7 @@ if config_env() == :prod do
 
   maybe_ipv6 = if System.get_env("ECTO_IPV6") in ~w(true 1), do: [:inet6], else: []
 
-  config :pleroma_redux, PleromaRedux.Repo,
+  config :egregoros, Egregoros.Repo,
     # ssl: true,
     url: database_url,
     pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10"),
@@ -75,9 +75,9 @@ if config_env() == :prod do
 
   host = System.get_env("PHX_HOST") || "example.com"
 
-  config :pleroma_redux, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
+  config :egregoros, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
 
-  config :pleroma_redux, PleromaReduxWeb.Endpoint,
+  config :egregoros, EgregorosWeb.Endpoint,
     url: [host: host, port: 443, scheme: "https"],
     http: [
       # Enable IPv6 and bind on all interfaces.
@@ -93,7 +93,7 @@ if config_env() == :prod do
   # To get SSL working, you will need to add the `https` key
   # to your endpoint configuration:
   #
-  #     config :pleroma_redux, PleromaReduxWeb.Endpoint,
+  #     config :egregoros, EgregorosWeb.Endpoint,
   #       https: [
   #         ...,
   #         port: 443,
@@ -115,7 +115,7 @@ if config_env() == :prod do
   # We also recommend setting `force_ssl` in your config/prod.exs,
   # ensuring no data is ever sent via http, always redirecting to https:
   #
-  #     config :pleroma_redux, PleromaReduxWeb.Endpoint,
+  #     config :egregoros, EgregorosWeb.Endpoint,
   #       force_ssl: [hsts: true]
   #
   # Check `Plug.SSL` for all available options in `force_ssl`.
@@ -125,7 +125,7 @@ if config_env() == :prod do
   # In production you need to configure the mailer to use a different adapter.
   # Here is an example configuration for Mailgun:
   #
-  #     config :pleroma_redux, PleromaRedux.Mailer,
+  #     config :egregoros, Egregoros.Mailer,
   #       adapter: Swoosh.Adapters.Mailgun,
   #       api_key: System.get_env("MAILGUN_API_KEY"),
   #       domain: System.get_env("MAILGUN_DOMAIN")

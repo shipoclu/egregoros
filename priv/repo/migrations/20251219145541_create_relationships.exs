@@ -1,4 +1,4 @@
-defmodule PleromaRedux.Repo.Migrations.CreateRelationships do
+defmodule Egregoros.Repo.Migrations.CreateRelationships do
   use Ecto.Migration
 
   def change do

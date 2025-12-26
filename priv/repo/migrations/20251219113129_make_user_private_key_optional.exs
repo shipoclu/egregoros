@@ -1,4 +1,4 @@
-defmodule PleromaRedux.Repo.Migrations.MakeUserPrivateKeyOptional do
+defmodule Egregoros.Repo.Migrations.MakeUserPrivateKeyOptional do
   use Ecto.Migration
 
   def change do

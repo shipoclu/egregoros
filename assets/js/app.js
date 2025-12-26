@@ -22,7 +22,7 @@ import "phoenix_html"
 // Establish Phoenix Socket and LiveView configuration.
 import {Socket} from "phoenix"
 import {LiveSocket} from "phoenix_live_view"
-import {hooks as colocatedHooks} from "phoenix-colocated/pleroma_redux"
+import {hooks as colocatedHooks} from "phoenix-colocated/egregoros"
 import topbar from "../vendor/topbar"
 
 const TimelineTopSentinel = {
@@ -332,10 +332,10 @@ const MediaViewer = {
     this.onPrev = () => this.bump(-1)
     this.onClose = () => this.close()
 
-    this.el.addEventListener("predux:media-open", this.onOpen)
-    this.el.addEventListener("predux:media-next", this.onNext)
-    this.el.addEventListener("predux:media-prev", this.onPrev)
-    this.el.addEventListener("predux:media-close", this.onClose)
+    this.el.addEventListener("egregoros:media-open", this.onOpen)
+    this.el.addEventListener("egregoros:media-next", this.onNext)
+    this.el.addEventListener("egregoros:media-prev", this.onPrev)
+    this.el.addEventListener("egregoros:media-close", this.onClose)
 
     this.onKeydown = e => {
       if (!this.el.isConnected) return
@@ -374,10 +374,10 @@ const MediaViewer = {
   },
 
   destroyed() {
-    this.el.removeEventListener("predux:media-open", this.onOpen)
-    this.el.removeEventListener("predux:media-next", this.onNext)
-    this.el.removeEventListener("predux:media-prev", this.onPrev)
-    this.el.removeEventListener("predux:media-close", this.onClose)
+    this.el.removeEventListener("egregoros:media-open", this.onOpen)
+    this.el.removeEventListener("egregoros:media-next", this.onNext)
+    this.el.removeEventListener("egregoros:media-prev", this.onPrev)
+    this.el.removeEventListener("egregoros:media-close", this.onClose)
     window.removeEventListener("keydown", this.onKeydown)
   },
 
@@ -595,8 +595,8 @@ const ReplyModal = {
       this.close()
     }
 
-    this.el.addEventListener("predux:reply-open", this.onOpen)
-    this.el.addEventListener("predux:reply-close", this.onClose)
+    this.el.addEventListener("egregoros:reply-open", this.onOpen)
+    this.el.addEventListener("egregoros:reply-close", this.onClose)
 
     this.onKeydown = e => {
       if (!this.el.isConnected) return
@@ -615,8 +615,8 @@ const ReplyModal = {
   },
 
   destroyed() {
-    this.el.removeEventListener("predux:reply-open", this.onOpen)
-    this.el.removeEventListener("predux:reply-close", this.onClose)
+    this.el.removeEventListener("egregoros:reply-open", this.onOpen)
+    this.el.removeEventListener("egregoros:reply-close", this.onClose)
     window.removeEventListener("keydown", this.onKeydown)
   },
 
@@ -657,7 +657,7 @@ const liveSocket = new LiveSocket("/live", Socket, {
   hooks: {...colocatedHooks, TimelineTopSentinel, TimelineBottomSentinel, ComposeCharCounter, EmojiPicker, MediaViewer, ReplyModal},
 })
 
-window.addEventListener("predux:scroll-top", () => {
+window.addEventListener("egregoros:scroll-top", () => {
   window.scrollTo({top: 0, behavior: "smooth"})
 })
 
@@ -683,7 +683,7 @@ async function copyToClipboard(text) {
   return ok
 }
 
-window.addEventListener("predux:copy", async e => {
+window.addEventListener("egregoros:copy", async e => {
   const text = e.target?.dataset?.copyText
   if (!text) return
 

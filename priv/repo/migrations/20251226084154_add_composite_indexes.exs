@@ -1,4 +1,4 @@
-defmodule PleromaRedux.Repo.Migrations.AddCompositeIndexes do
+defmodule Egregoros.Repo.Migrations.AddCompositeIndexes do
   use Ecto.Migration
 
   def change do

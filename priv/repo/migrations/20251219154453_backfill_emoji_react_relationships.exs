@@ -1,4 +1,4 @@
-defmodule PleromaRedux.Repo.Migrations.BackfillEmojiReactRelationships do
+defmodule Egregoros.Repo.Migrations.BackfillEmojiReactRelationships do
   use Ecto.Migration
 
   def up do

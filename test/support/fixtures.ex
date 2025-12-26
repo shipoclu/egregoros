@@ -1,4 +1,4 @@
-defmodule PleromaRedux.TestSupport.Fixtures do
+defmodule Egregoros.TestSupport.Fixtures do
   @base Path.expand("../fixtures", __DIR__)
 
   def path!(name) when is_binary(name) do

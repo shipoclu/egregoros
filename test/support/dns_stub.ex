@@ -1,5 +1,5 @@
-defmodule PleromaRedux.DNS.Stub do
-  @behaviour PleromaRedux.DNS
+defmodule Egregoros.DNS.Stub do
+  @behaviour Egregoros.DNS
 
   @impl true
   def lookup_ips(_host) do

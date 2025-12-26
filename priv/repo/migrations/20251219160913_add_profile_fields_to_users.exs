@@ -1,4 +1,4 @@
-defmodule PleromaRedux.Repo.Migrations.AddProfileFieldsToUsers do
+defmodule Egregoros.Repo.Migrations.AddProfileFieldsToUsers do
   use Ecto.Migration
 
   def change do

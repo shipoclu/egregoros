@@ -1,4 +1,4 @@
-defmodule PleromaRedux.Repo.Migrations.AddBannerUrlToUsers do
+defmodule Egregoros.Repo.Migrations.AddBannerUrlToUsers do
   use Ecto.Migration
 
   def change do

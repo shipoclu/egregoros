@@ -1,4 +1,4 @@
-defmodule PleromaRedux.Repo.Migrations.BackfillLikeAndAnnounceRelationships do
+defmodule Egregoros.Repo.Migrations.BackfillLikeAndAnnounceRelationships do
   use Ecto.Migration
 
   def up do

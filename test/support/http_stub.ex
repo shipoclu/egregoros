@@ -1,5 +1,5 @@
-defmodule PleromaRedux.HTTP.Stub do
-  @behaviour PleromaRedux.HTTP
+defmodule Egregoros.HTTP.Stub do
+  @behaviour Egregoros.HTTP
 
   @impl true
   def get(_url, _headers) do

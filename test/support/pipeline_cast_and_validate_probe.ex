@@ -1,4 +1,4 @@
-defmodule PleromaRedux.TestSupport.PipelineCastAndValidateProbe do
+defmodule Egregoros.TestSupport.PipelineCastAndValidateProbe do
   def type, do: "PipelineCastAndValidateProbe"
 
   def cast_and_validate(activity) when is_map(activity) do

@@ -1,4 +1,4 @@
-defmodule PleromaReduxWeb.ConnCase do
+defmodule EgregorosWeb.ConnCase do
   @moduledoc """
   This module defines the test case to be used by
   tests that require setting up a connection.
@@ -11,7 +11,7 @@ defmodule PleromaReduxWeb.ConnCase do
   we enable the SQL sandbox, so changes done to the database
   are reverted at the end of every test. If you are using
   PostgreSQL, you can even run database tests asynchronously
-  by setting `use PleromaReduxWeb.ConnCase, async: true`, although
+  by setting `use EgregorosWeb.ConnCase, async: true`, although
   this option is not recommended for other databases.
   """
 
@@ -20,27 +20,27 @@ defmodule PleromaReduxWeb.ConnCase do
   using do
     quote do
       # The default endpoint for testing
-      @endpoint PleromaReduxWeb.Endpoint
+      @endpoint EgregorosWeb.Endpoint
 
-      use PleromaReduxWeb, :verified_routes
+      use EgregorosWeb, :verified_routes
 
-      use Oban.Testing, repo: PleromaRedux.Repo
+      use Oban.Testing, repo: Egregoros.Repo
 
       # Import conveniences for testing with connections
       import Plug.Conn
       import Phoenix.ConnTest
-      import PleromaReduxWeb.ConnCase
+      import EgregorosWeb.ConnCase
       import Mox
     end
   end
 
   setup tags do
     Mox.set_mox_from_context(tags)
-    Mox.stub_with(PleromaRedux.HTTP.Mock, PleromaRedux.HTTP.Stub)
-    Mox.stub_with(PleromaRedux.DNS.Mock, PleromaRedux.DNS.Stub)
-    Mox.stub_with(PleromaRedux.AuthZ.Mock, PleromaRedux.AuthZ.Stub)
+    Mox.stub_with(Egregoros.HTTP.Mock, Egregoros.HTTP.Stub)
+    Mox.stub_with(Egregoros.DNS.Mock, Egregoros.DNS.Stub)
+    Mox.stub_with(Egregoros.AuthZ.Mock, Egregoros.AuthZ.Stub)
     Mox.verify_on_exit!(tags)
-    PleromaRedux.DataCase.setup_sandbox(tags)
+    Egregoros.DataCase.setup_sandbox(tags)
     {:ok, conn: Phoenix.ConnTest.build_conn()}
   end
 end

@@ -1,4 +1,4 @@
-defmodule PleromaRedux.Repo.Migrations.AddDomainToUsers do
+defmodule Egregoros.Repo.Migrations.AddDomainToUsers do
   use Ecto.Migration
 
   def up do

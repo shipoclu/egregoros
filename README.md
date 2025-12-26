@@ -1,4 +1,4 @@
-# PleromaRedux
+# Egregoros
 
 To start your Phoenix server:
 

@@ -58,7 +58,7 @@ Introduce a small, opinionated component layer so every view stops hand‑rollin
 
 ### 3) View models (avoid duplicated decoration logic)
 Right now, TimelineLive builds “decorated” post maps inline. Plan:
-- Create `PleromaReduxWeb.ViewModels.Status` (or similar) that:
+- Create `EgregorosWeb.ViewModels.Status` (or similar) that:
   - Takes an `Object` + current user, returns the renderable shape.
   - Centralizes counts, “liked?”, “reposted?”, reaction aggregates.
   - Mirrors Mastodon JSON projection where possible (reduces drift).

@@ -7,12 +7,12 @@
 # General application configuration
 import Config
 
-config :pleroma_redux,
-  ecto_repos: [PleromaRedux.Repo],
+config :egregoros,
+  ecto_repos: [Egregoros.Repo],
   generators: [timestamp_type: :utc_datetime]
 
-config :pleroma_redux, Oban,
-  repo: PleromaRedux.Repo,
+config :egregoros, Oban,
+  repo: Egregoros.Repo,
   notifier: Oban.Notifiers.PG,
   queues: [
     federation_incoming: 10,
@@ -20,25 +20,25 @@ config :pleroma_redux, Oban,
   ],
   plugins: [{Oban.Plugins.Pruner, max_age: 60 * 60 * 24}]
 
-config :pleroma_redux, PleromaRedux.Signature, PleromaRedux.Signature.HTTP
-config :pleroma_redux, PleromaRedux.Auth, PleromaRedux.Auth.BearerToken
-config :pleroma_redux, PleromaRedux.AuthZ, PleromaRedux.AuthZ.OAuthScopes
-config :pleroma_redux, PleromaRedux.Discovery, PleromaRedux.Discovery.DNS
-config :pleroma_redux, PleromaRedux.HTTP, PleromaRedux.HTTP.Req
-config :pleroma_redux, PleromaRedux.AvatarStorage, PleromaRedux.AvatarStorage.Local
-config :pleroma_redux, PleromaRedux.MediaStorage, PleromaRedux.MediaStorage.Local
+config :egregoros, Egregoros.Signature, Egregoros.Signature.HTTP
+config :egregoros, Egregoros.Auth, Egregoros.Auth.BearerToken
+config :egregoros, Egregoros.AuthZ, Egregoros.AuthZ.OAuthScopes
+config :egregoros, Egregoros.Discovery, Egregoros.Discovery.DNS
+config :egregoros, Egregoros.HTTP, Egregoros.HTTP.Req
+config :egregoros, Egregoros.AvatarStorage, Egregoros.AvatarStorage.Local
+config :egregoros, Egregoros.MediaStorage, Egregoros.MediaStorage.Local
 
-config :pleroma_redux, :password_iterations, 200_000
+config :egregoros, :password_iterations, 200_000
 
 # Configure the endpoint
-config :pleroma_redux, PleromaReduxWeb.Endpoint,
+config :egregoros, EgregorosWeb.Endpoint,
   url: [host: "localhost"],
   adapter: Bandit.PhoenixAdapter,
   render_errors: [
-    formats: [html: PleromaReduxWeb.ErrorHTML, json: PleromaReduxWeb.ErrorJSON],
+    formats: [html: EgregorosWeb.ErrorHTML, json: EgregorosWeb.ErrorJSON],
     layout: false
   ],
-  pubsub_server: PleromaRedux.PubSub,
+  pubsub_server: Egregoros.PubSub,
   live_view: [signing_salt: "o6GDDK1W"]
 
 # Configure the mailer
@@ -48,12 +48,12 @@ config :pleroma_redux, PleromaReduxWeb.Endpoint,
 #
 # For production it's recommended to configure a different adapter
 # at the `config/runtime.exs`.
-config :pleroma_redux, PleromaRedux.Mailer, adapter: Swoosh.Adapters.Local
+config :egregoros, Egregoros.Mailer, adapter: Swoosh.Adapters.Local
 
 # Configure esbuild (the version is required)
 config :esbuild,
   version: "0.25.4",
-  pleroma_redux: [
+  egregoros: [
     args:
       ~w(js/app.js --bundle --target=es2022 --outdir=../priv/static/assets/js --external:/fonts/* --external:/images/* --alias:@=.),
     cd: Path.expand("../assets", __DIR__),
@@ -63,7 +63,7 @@ config :esbuild,
 # Configure tailwind (the version is required)
 config :tailwind,
   version: "4.1.12",
-  pleroma_redux: [
+  egregoros: [
     args: ~w(
       --input=assets/css/app.css
       --output=priv/static/assets/css/app.css

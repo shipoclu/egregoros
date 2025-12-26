@@ -1,4 +1,4 @@
-defmodule PleromaRedux.Repo.Migrations.CreateMarkers do
+defmodule Egregoros.Repo.Migrations.CreateMarkers do
   use Ecto.Migration
 
   def change do
