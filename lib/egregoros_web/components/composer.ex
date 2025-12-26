@@ -22,6 +22,7 @@ defmodule EgregorosWeb.Composer do
   attr :cw_open?, :boolean, default: false
   attr :error, :string, default: nil
   attr :submit_label, :string, default: "Post"
+  attr :mention_suggestions, :list, default: []
 
   slot :extra_fields
 
@@ -34,6 +35,8 @@ defmodule EgregorosWeb.Composer do
       |> assign_new(:emoji_picker_id, fn -> "#{assigns.id_prefix}-emoji-picker" end)
       |> assign_new(:media_input_id, fn -> "#{assigns.id_prefix}-media-input" end)
       |> assign_new(:content_id, fn -> "#{assigns.id_prefix}-content" end)
+      |> assign_new(:editor_id, fn -> "#{assigns.id_prefix}-editor" end)
+      |> assign_new(:mentions_id, fn -> "#{assigns.id_prefix}-mention-suggestions" end)
 
     ~H"""
     <.form
@@ -55,7 +58,10 @@ defmodule EgregorosWeb.Composer do
       {render_slot(@extra_fields)}
 
       <div
+        id={@editor_id}
         data-role="compose-editor"
+        phx-hook="ComposeMentions"
+        data-mention-scope={@id_prefix}
         phx-drop-target={@upload.ref}
         class="overflow-hidden rounded-2xl border border-slate-200/80 bg-white/70 shadow-sm shadow-slate-200/20 transition focus-within:border-slate-400 focus-within:ring-2 focus-within:ring-slate-200 dark:border-slate-700/80 dark:bg-slate-950/60 dark:shadow-slate-900/30 dark:focus-within:border-slate-400 dark:focus-within:ring-slate-600"
       >
@@ -98,7 +104,7 @@ defmodule EgregorosWeb.Composer do
           />
         </div>
 
-        <div class="px-4 pb-4 pt-3">
+        <div class="relative px-4 pb-4 pt-3">
           <.input
             type="textarea"
             id={@content_id}
@@ -111,6 +117,74 @@ defmodule EgregorosWeb.Composer do
             phx-debounce="blur"
             class="min-h-[7rem] w-full resize-none border-0 bg-transparent p-0 text-base leading-6 text-slate-900 outline-none placeholder:text-slate-400 focus:ring-0 dark:text-slate-100 dark:placeholder:text-slate-500"
           />
+
+          <div
+            :if={@mention_suggestions != []}
+            id={@mentions_id}
+            data-role="compose-mention-suggestions"
+            class="absolute left-4 right-4 top-full z-30 mt-2 overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-xl shadow-slate-900/10 dark:border-slate-700/80 dark:bg-slate-950 dark:shadow-slate-950/40"
+          >
+            <ul class="max-h-64 divide-y divide-slate-100 overflow-y-auto dark:divide-slate-800">
+              <li :for={suggestion <- @mention_suggestions}>
+                <button
+                  type="button"
+                  data-role="mention-suggestion"
+                  data-handle={Map.get(suggestion, :handle) || Map.get(suggestion, "handle") || ""}
+                  phx-click={
+                    JS.dispatch("egregoros:mention-select",
+                      to: "##{@content_id}",
+                      detail: %{
+                        handle: Map.get(suggestion, :handle) || Map.get(suggestion, "handle") || ""
+                      }
+                    )
+                  }
+                  class="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-slate-900/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:hover:bg-white/10"
+                >
+                  <div class="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-100 text-sm font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-200">
+                    <img
+                      :if={
+                        is_binary(
+                          Map.get(suggestion, :avatar_url) || Map.get(suggestion, "avatar_url")
+                        ) and
+                          (Map.get(suggestion, :avatar_url) || Map.get(suggestion, "avatar_url")) !=
+                            ""
+                      }
+                      src={Map.get(suggestion, :avatar_url) || Map.get(suggestion, "avatar_url")}
+                      alt=""
+                      class="h-full w-full object-cover"
+                      loading="lazy"
+                      decoding="async"
+                      referrerpolicy="no-referrer"
+                    />
+                    <span :if={
+                      not is_binary(
+                        Map.get(suggestion, :avatar_url) || Map.get(suggestion, "avatar_url")
+                      ) or
+                        (Map.get(suggestion, :avatar_url) || Map.get(suggestion, "avatar_url")) == ""
+                    }>
+                      {String.first(
+                        to_string(
+                          Map.get(suggestion, :nickname) || Map.get(suggestion, "nickname") || "?"
+                        )
+                      )}
+                    </span>
+                  </div>
+
+                  <div class="min-w-0 flex-1">
+                    <p class="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
+                      {to_string(
+                        Map.get(suggestion, :display_name) || Map.get(suggestion, "display_name") ||
+                          ""
+                      )}
+                    </p>
+                    <p class="truncate text-xs text-slate-500 dark:text-slate-400">
+                      {to_string(Map.get(suggestion, :handle) || Map.get(suggestion, "handle") || "")}
+                    </p>
+                  </div>
+                </button>
+              </li>
+            </ul>
+          </div>
         </div>
 
         <div

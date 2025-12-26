@@ -11,6 +11,7 @@ defmodule EgregorosWeb.SearchLive do
   alias Egregoros.Relationships
   alias Egregoros.User
   alias Egregoros.Users
+  alias EgregorosWeb.MentionAutocomplete
   alias EgregorosWeb.ProfilePaths
   alias EgregorosWeb.URL
   alias EgregorosWeb.ViewModels.Actor, as: ActorVM
@@ -31,6 +32,7 @@ defmodule EgregorosWeb.SearchLive do
       |> assign(
         current_user: current_user,
         notifications_count: notifications_count(current_user),
+        mention_suggestions: %{},
         reply_to_ap_id: nil,
         reply_to_handle: nil,
         reply_form: Phoenix.Component.to_form(default_reply_params(), as: :reply),
@@ -104,6 +106,34 @@ defmodule EgregorosWeb.SearchLive do
 
   def handle_event("copied_link", _params, socket) do
     {:noreply, put_flash(socket, :info, "Copied link to clipboard.")}
+  end
+
+  def handle_event("mention_search", %{"q" => q, "scope" => scope}, socket) do
+    q = q |> to_string() |> String.trim() |> String.trim_leading("@")
+    scope = scope |> to_string() |> String.trim()
+
+    suggestions =
+      if q == "" or scope == "" do
+        []
+      else
+        MentionAutocomplete.suggestions(q, limit: 8)
+      end
+
+    mention_suggestions =
+      socket.assigns.mention_suggestions
+      |> Map.put(scope, suggestions)
+
+    {:noreply, assign(socket, mention_suggestions: mention_suggestions)}
+  end
+
+  def handle_event("mention_clear", %{"scope" => scope}, socket) do
+    scope = scope |> to_string() |> String.trim()
+
+    mention_suggestions =
+      socket.assigns.mention_suggestions
+      |> Map.delete(scope)
+
+    {:noreply, assign(socket, mention_suggestions: mention_suggestions)}
   end
 
   def handle_event("open_reply_modal", %{"in_reply_to" => in_reply_to} = params, socket) do
@@ -595,6 +625,7 @@ defmodule EgregorosWeb.SearchLive do
         upload={@uploads.reply_media}
         media_alt={@reply_media_alt}
         reply_to_handle={@reply_to_handle}
+        mention_suggestions={@mention_suggestions}
         options_open?={@reply_options_open?}
         cw_open?={@reply_cw_open?}
       />

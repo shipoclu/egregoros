@@ -67,7 +67,10 @@ defmodule EgregorosWeb.TimelineLiveTest do
     refute has_element?(view, "article", "Secret DM")
   end
 
-  test "home timeline includes direct messages addressed to the signed-in user", %{conn: conn, user: user} do
+  test "home timeline includes direct messages addressed to the signed-in user", %{
+    conn: conn,
+    user: user
+  } do
     {:ok, bob} = Users.create_local_user("bob")
     {:ok, _} = Publish.post_note(user, "@bob Secret DM", visibility: "direct")
 
@@ -110,6 +113,20 @@ defmodule EgregorosWeb.TimelineLiveTest do
     |> render_change()
 
     assert has_element?(view, "[data-role='compose-char-counter']", "4995")
+  end
+
+  test "compose mention autocomplete suggests users and can be cleared", %{conn: conn, user: user} do
+    {:ok, _} = Users.create_local_user("bob")
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/")
+
+    _html = render_hook(view, "mention_search", %{"q" => "bo", "scope" => "compose"})
+
+    assert has_element?(view, "[data-role='mention-suggestion']", "@bob")
+
+    _html = render_hook(view, "mention_clear", %{"scope" => "compose"})
+    refute has_element?(view, "[data-role='mention-suggestion']")
   end
 
   test "compose options panel can be persisted via ui_options_open param", %{

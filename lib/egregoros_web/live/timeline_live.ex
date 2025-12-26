@@ -12,6 +12,7 @@ defmodule EgregorosWeb.TimelineLive do
   alias Egregoros.User
   alias Egregoros.Users
   alias EgregorosWeb.ViewModels.Status, as: StatusVM
+  alias EgregorosWeb.MentionAutocomplete
 
   @page_size 20
   @impl true
@@ -48,6 +49,7 @@ defmodule EgregorosWeb.TimelineLive do
         reply_media_alt: %{},
         reply_options_open?: false,
         reply_cw_open?: false,
+        mention_suggestions: %{},
         error: nil,
         pending_posts: [],
         timeline_at_top?: true,
@@ -153,6 +155,34 @@ defmodule EgregorosWeb.TimelineLive do
        compose_options_open?: compose_options_open?,
        compose_cw_open?: compose_cw_open?
      )}
+  end
+
+  def handle_event("mention_search", %{"q" => q, "scope" => scope}, socket) do
+    q = q |> to_string() |> String.trim() |> String.trim_leading("@")
+    scope = scope |> to_string() |> String.trim()
+
+    suggestions =
+      if q == "" or scope == "" do
+        []
+      else
+        MentionAutocomplete.suggestions(q, limit: 8)
+      end
+
+    mention_suggestions =
+      socket.assigns.mention_suggestions
+      |> Map.put(scope, suggestions)
+
+    {:noreply, assign(socket, mention_suggestions: mention_suggestions)}
+  end
+
+  def handle_event("mention_clear", %{"scope" => scope}, socket) do
+    scope = scope |> to_string() |> String.trim()
+
+    mention_suggestions =
+      socket.assigns.mention_suggestions
+      |> Map.delete(scope)
+
+    {:noreply, assign(socket, mention_suggestions: mention_suggestions)}
   end
 
   def handle_event("open_compose", _params, socket) do
@@ -732,6 +762,7 @@ defmodule EgregorosWeb.TimelineLive do
                 form={@form}
                 upload={@uploads.media}
                 media_alt={@media_alt}
+                mention_suggestions={Map.get(@mention_suggestions, "compose", [])}
                 error={@error}
                 max_chars={5000}
                 param_prefix="post"
@@ -897,6 +928,7 @@ defmodule EgregorosWeb.TimelineLive do
         upload={@uploads.reply_media}
         media_alt={@reply_media_alt}
         reply_to_handle={@reply_to_handle}
+        mention_suggestions={@mention_suggestions}
         options_open?={@reply_options_open?}
         cw_open?={@reply_cw_open?}
       />

@@ -13,6 +13,8 @@ defmodule EgregorosWeb.ReplyModal do
 
   attr :reply_to_handle, :string, default: nil
 
+  attr :mention_suggestions, :map, default: %{}
+
   attr :max_chars, :integer, default: 5000
   attr :options_open?, :boolean, default: false
   attr :cw_open?, :boolean, default: false
@@ -72,6 +74,7 @@ defmodule EgregorosWeb.ReplyModal do
           form={@form}
           upload={@upload}
           media_alt={@media_alt}
+          mention_suggestions={Map.get(@mention_suggestions, @id_prefix, [])}
           param_prefix="reply"
           max_chars={@max_chars}
           options_open?={@options_open?}

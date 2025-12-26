@@ -9,6 +9,7 @@ defmodule EgregorosWeb.StatusLive do
   alias Egregoros.Publish
   alias Egregoros.User
   alias Egregoros.Users
+  alias EgregorosWeb.MentionAutocomplete
   alias EgregorosWeb.Endpoint
   alias EgregorosWeb.ProfilePaths
   alias EgregorosWeb.ViewModels.Status, as: StatusVM
@@ -67,7 +68,8 @@ defmodule EgregorosWeb.StatusLive do
         reply_form: reply_form,
         reply_media_alt: %{},
         reply_options_open?: false,
-        reply_cw_open?: false
+        reply_cw_open?: false,
+        mention_suggestions: %{}
       )
       |> allow_upload(:reply_media,
         accept: ~w(
@@ -100,6 +102,34 @@ defmodule EgregorosWeb.StatusLive do
   @impl true
   def handle_event("copied_link", _params, socket) do
     {:noreply, put_flash(socket, :info, "Copied link to clipboard.")}
+  end
+
+  def handle_event("mention_search", %{"q" => q, "scope" => scope}, socket) do
+    q = q |> to_string() |> String.trim() |> String.trim_leading("@")
+    scope = scope |> to_string() |> String.trim()
+
+    suggestions =
+      if q == "" or scope == "" do
+        []
+      else
+        MentionAutocomplete.suggestions(q, limit: 8)
+      end
+
+    mention_suggestions =
+      socket.assigns.mention_suggestions
+      |> Map.put(scope, suggestions)
+
+    {:noreply, assign(socket, mention_suggestions: mention_suggestions)}
+  end
+
+  def handle_event("mention_clear", %{"scope" => scope}, socket) do
+    scope = scope |> to_string() |> String.trim()
+
+    mention_suggestions =
+      socket.assigns.mention_suggestions
+      |> Map.delete(scope)
+
+    {:noreply, assign(socket, mention_suggestions: mention_suggestions)}
   end
 
   def handle_event("cancel_reply_media", %{"ref" => ref}, socket) do
@@ -453,6 +483,7 @@ defmodule EgregorosWeb.StatusLive do
                 form={@reply_form}
                 upload={@uploads.reply_media}
                 media_alt={@reply_media_alt}
+                mention_suggestions={Map.get(@mention_suggestions, "reply", [])}
                 param_prefix="reply"
                 max_chars={reply_max_chars()}
                 options_open?={@reply_options_open?}

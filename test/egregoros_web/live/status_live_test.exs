@@ -39,6 +39,18 @@ defmodule EgregorosWeb.StatusLiveTest do
     refute render(view) =~ "Secret DM"
   end
 
+  test "reply composer mention autocomplete suggests users", %{conn: conn, user: user} do
+    {:ok, note} = Pipeline.ingest(Note.build(user, "Hello from status"), local: true)
+    uuid = uuid_from_ap_id(note.ap_id)
+    {:ok, _} = Users.create_local_user("bob")
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/@alice/#{uuid}?reply=true")
+
+    _html = render_hook(view, "mention_search", %{"q" => "bo", "scope" => "reply"})
+    assert has_element?(view, "[data-role='mention-suggestion']", "@bob")
+  end
+
   test "redirects to the canonical nickname for local status permalinks", %{
     conn: conn,
     user: user
