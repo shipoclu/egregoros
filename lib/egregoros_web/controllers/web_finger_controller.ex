@@ -77,7 +77,8 @@ defmodule EgregorosWeb.WebFingerController do
   defp parse_acct_resource(resource) when is_binary(resource) do
     resource = String.trim(resource)
 
-    if resource == "" or String.starts_with?(resource, "http://") or String.starts_with?(resource, "https://") do
+    if resource == "" or String.starts_with?(resource, "http://") or
+         String.starts_with?(resource, "https://") do
       :error
     else
       case resource |> String.trim_leading("acct:") |> String.split("@", parts: 2) do
