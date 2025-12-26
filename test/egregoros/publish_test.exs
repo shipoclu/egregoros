@@ -216,4 +216,32 @@ defmodule Egregoros.PublishTest do
 
     assert Enum.any?(create_jobs, &(&1.args["inbox_url"] == remote_author.inbox))
   end
+
+  test "post_note/3 replies mention actors with non-default ports even when the actor is not stored" do
+    {:ok, alice} = Users.create_local_user("alice")
+
+    parent_note = %{
+      "id" => "https://example.com:8443/objects/parent",
+      "type" => "Note",
+      "attributedTo" => "https://example.com:8443/users/bob",
+      "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+      "cc" => [],
+      "content" => "parent"
+    }
+
+    assert {:ok, _} = Pipeline.ingest(parent_note, local: false)
+
+    assert {:ok, create} =
+             Publish.post_note(alice, "a reply", in_reply_to: parent_note["id"])
+
+    assert %{} = note = Objects.get_by_ap_id(create.object)
+
+    assert Enum.any?(List.wrap(note.data["tag"]), fn
+             %{"type" => "Mention", "href" => href, "name" => name} ->
+               href == parent_note["attributedTo"] and name == "@bob@example.com:8443"
+
+             _ ->
+               false
+           end)
+  end
 end

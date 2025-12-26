@@ -130,4 +130,17 @@ defmodule Egregoros.PipelineTest do
 
     assert {:error, :local_id} = Pipeline.ingest(note, local: false)
   end
+
+  test "ingest does not reject remote objects that use the same host but a different port" do
+    uuid = Ecto.UUID.generate()
+
+    note =
+      @note
+      |> Map.put("id", "http://localhost:5000/objects/" <> uuid)
+      |> Map.put("attributedTo", "https://example.com/users/alice")
+
+    assert {:ok, %Object{} = object} = Pipeline.ingest(note, local: false)
+    assert object.ap_id == note["id"]
+    assert object.local == false
+  end
 end

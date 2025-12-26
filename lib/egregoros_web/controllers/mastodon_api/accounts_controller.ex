@@ -4,6 +4,7 @@ defmodule EgregorosWeb.MastodonAPI.AccountsController do
   alias Egregoros.Activities.Follow
   alias Egregoros.Activities.Undo
   alias Egregoros.AvatarStorage
+  alias Egregoros.Domain
   alias Egregoros.Federation.Actor
   alias Egregoros.Federation.WebFinger
   alias Egregoros.Handles
@@ -62,7 +63,7 @@ defmodule EgregorosWeb.MastodonAPI.AccountsController do
           lookup_local(conn, nickname)
 
         {:ok, %{nickname: nickname, domain: domain}} ->
-          if domain == local_domain() do
+          if local_domain?(domain) do
             lookup_local(conn, nickname)
           else
             lookup_remote(conn, nickname <> "@" <> domain)
@@ -212,11 +213,18 @@ defmodule EgregorosWeb.MastodonAPI.AccountsController do
     end
   end
 
-  defp local_domain do
-    Endpoint.url()
-    |> URI.parse()
-    |> Map.get(:host)
+  defp local_domain?(domain) when is_binary(domain) do
+    domain = domain |> String.trim() |> String.downcase()
+
+    local_domains =
+      Endpoint.url()
+      |> URI.parse()
+      |> Domain.aliases_from_uri()
+
+    domain in local_domains
   end
+
+  defp local_domain?(_domain), do: false
 
   defp maybe_put_avatar(user, %{"avatar" => %Plug.Upload{} = upload}, attrs) when is_map(attrs) do
     case AvatarStorage.store_avatar(user, upload) do

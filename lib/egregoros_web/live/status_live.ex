@@ -1,6 +1,7 @@
 defmodule EgregorosWeb.StatusLive do
   use EgregorosWeb, :live_view
 
+  alias Egregoros.Domain
   alias Egregoros.Interactions
   alias Egregoros.Media
   alias Egregoros.MediaStorage
@@ -621,12 +622,13 @@ defmodule EgregorosWeb.StatusLive do
   end
 
   defp canonical_profile_path_from_ap_id(ap_id) when is_binary(ap_id) do
-    with %{host: host, path: path} <- URI.parse(ap_id),
-         true <- is_binary(host) and host != "",
+    with %URI{} = uri <- URI.parse(ap_id),
+         domain when is_binary(domain) and domain != "" <- Domain.from_uri(uri),
+         path when is_binary(path) and path != "" <- uri.path,
          nickname when is_binary(nickname) <-
-           path |> to_string() |> String.trim("/") |> path_basename(),
+           path |> String.trim("/") |> path_basename(),
          true <- nickname != "",
-         canonical <- nickname <> "@" <> host,
+         canonical <- nickname <> "@" <> domain,
          profile_path when is_binary(profile_path) <- ProfilePaths.profile_path(canonical) do
       {canonical, profile_path}
     else

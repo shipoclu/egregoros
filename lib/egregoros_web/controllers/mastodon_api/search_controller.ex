@@ -1,6 +1,7 @@
 defmodule EgregorosWeb.MastodonAPI.SearchController do
   use EgregorosWeb, :controller
 
+  alias Egregoros.Domain
   alias Egregoros.Federation.Actor
   alias Egregoros.Federation.WebFinger
   alias Egregoros.Handles
@@ -55,7 +56,7 @@ defmodule EgregorosWeb.MastodonAPI.SearchController do
         end
 
       {:ok, %{nickname: nickname, domain: domain}} ->
-        if domain == local_domain() do
+        if local_domain?(domain) do
           case Users.get_by_nickname(nickname) do
             nil -> {:error, :not_found}
             user -> {:ok, user}
@@ -74,15 +75,18 @@ defmodule EgregorosWeb.MastodonAPI.SearchController do
     end
   end
 
-  defp local_domain do
-    Endpoint.url()
-    |> URI.parse()
-    |> Map.get(:host)
-    |> case do
-      nil -> "localhost"
-      host -> host
-    end
+  defp local_domain?(domain) when is_binary(domain) do
+    domain = domain |> String.trim() |> String.downcase()
+
+    local_domains =
+      Endpoint.url()
+      |> URI.parse()
+      |> Domain.aliases_from_uri()
+
+    domain in local_domains
   end
+
+  defp local_domain?(_domain), do: false
 
   defp parse_limit(nil), do: 20
 

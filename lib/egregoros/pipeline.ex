@@ -1,5 +1,6 @@
 defmodule Egregoros.Pipeline do
   alias Egregoros.ActivityRegistry
+  alias Egregoros.Domain
   alias EgregorosWeb.Endpoint
 
   def ingest(activity, opts \\ []) when is_map(activity) do
@@ -56,14 +57,17 @@ defmodule Egregoros.Pipeline do
   defp extract_id(_activity), do: nil
 
   defp local_ap_id?(id) when is_binary(id) do
-    local_host =
+    local_domain =
       Endpoint.url()
       |> URI.parse()
-      |> Map.get(:host)
+      |> Domain.from_uri()
 
     case URI.parse(id) do
-      %URI{host: host} when is_binary(local_host) and local_host != "" and host == local_host ->
-        true
+      %URI{} = uri ->
+        case Domain.from_uri(uri) do
+          domain when is_binary(local_domain) and is_binary(domain) and domain == local_domain -> true
+          _ -> false
+        end
 
       _ ->
         false

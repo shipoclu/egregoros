@@ -201,6 +201,21 @@ defmodule EgregorosWeb.MastodonAPI.AccountsControllerTest do
     assert response["username"] == "alice"
   end
 
+  test "GET /api/v1/accounts/lookup treats a local acct with an explicit port as local", %{
+    conn: conn
+  } do
+    {:ok, user} = Users.create_local_user("alice")
+
+    uri = URI.parse(EgregorosWeb.Endpoint.url())
+    domain = "#{uri.host}:#{uri.port}"
+
+    conn = get(conn, "/api/v1/accounts/lookup", %{"acct" => "alice@#{domain}"})
+    response = json_response(conn, 200)
+
+    assert response["id"] == Integer.to_string(user.id)
+    assert response["username"] == "alice"
+  end
+
   test "GET /api/v1/accounts/lookup resolves a remote acct via WebFinger", %{conn: conn} do
     actor_url = "https://remote.example/users/bob"
 

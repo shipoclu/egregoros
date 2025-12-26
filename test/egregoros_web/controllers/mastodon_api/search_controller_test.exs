@@ -22,6 +22,23 @@ defmodule EgregorosWeb.MastodonAPI.SearchControllerTest do
            )
   end
 
+  test "GET /api/v2/search resolves local accounts when the query includes an explicit port", %{
+    conn: conn
+  } do
+    {:ok, alice} = Users.create_local_user("alice")
+
+    uri = URI.parse(EgregorosWeb.Endpoint.url())
+    domain = "#{uri.host}:#{uri.port}"
+
+    conn = get(conn, "/api/v2/search", %{"q" => "alice@#{domain}", "resolve" => "true"})
+    response = json_response(conn, 200)
+
+    assert Enum.any?(
+             response["accounts"],
+             &(&1["id"] == Integer.to_string(alice.id) and &1["username"] == "alice")
+           )
+  end
+
   test "GET /api/v2/search resolves remote accounts when resolve=true", %{conn: conn} do
     actor_url = "https://remote.example/users/bob"
 

@@ -1,6 +1,7 @@
 defmodule Egregoros.Publish do
   alias Egregoros.Activities.Create
   alias Egregoros.Activities.Note
+  alias Egregoros.Domain
   alias Egregoros.Federation.Actor
   alias Egregoros.Federation.WebFinger
   alias Egregoros.Objects
@@ -292,10 +293,17 @@ defmodule Egregoros.Publish do
 
       _ ->
         case URI.parse(actor_ap_id) do
-          %URI{host: host} when is_binary(host) and host != "" ->
+          %URI{} = uri ->
+            domain = Domain.from_uri(uri)
+
+            host =
+              case domain do
+                value when is_binary(value) and value != "" -> value
+                _ -> uri.host
+              end
+
             nickname =
-              actor_ap_id
-              |> URI.parse()
+              uri
               |> Map.get(:path)
               |> fallback_nickname()
 

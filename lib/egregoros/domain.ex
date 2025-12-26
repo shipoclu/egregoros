@@ -15,6 +15,22 @@ defmodule Egregoros.Domain do
 
   def from_uri(_uri), do: nil
 
+  def aliases_from_uri(%URI{} = uri) do
+    host =
+      case uri.host do
+        value when is_binary(value) and value != "" -> String.downcase(value)
+        _ -> nil
+      end
+
+    domain = from_uri(uri)
+
+    [host, domain]
+    |> Enum.filter(&(is_binary(&1) and &1 != ""))
+    |> Enum.uniq()
+  end
+
+  def aliases_from_uri(_uri), do: []
+
   defp non_default_port?("http", port) when is_integer(port), do: port != 80
   defp non_default_port?("https", port) when is_integer(port), do: port != 443
   defp non_default_port?(_scheme, port) when is_integer(port), do: true
