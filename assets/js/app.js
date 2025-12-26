@@ -720,6 +720,7 @@ const enableE2EEWithPasskey = async (section, button, csrfToken) => {
   setE2EEFeedback(section, "Creating passkey…", "info")
 
   const userHandle = utf8Bytes(`egregoros:user:${userId}`)
+  const prfSalt = randomBytes(32)
 
   const creationOptions = {
     challenge: randomBytes(32),
@@ -736,7 +737,7 @@ const enableE2EEWithPasskey = async (section, button, csrfToken) => {
       residentKey: "required",
       userVerification: "required",
     },
-    extensions: {hmacCreateSecret: true},
+    extensions: {hmacCreateSecret: true, prf: {eval: {first: prfSalt}}},
   }
 
   let created
@@ -750,25 +751,14 @@ const enableE2EEWithPasskey = async (section, button, csrfToken) => {
   }
 
   const createExt = created?.getClientExtensionResults?.() || {}
-  if (createExt.hmacCreateSecret !== true) {
-    setE2EEFeedback(
-      section,
-      "This passkey provider does not support PRF/hmac-secret, so it can’t be used for encrypted DM key recovery.",
-      "error"
-    )
-    button.disabled = false
-    return
-  }
-
   setE2EEFeedback(section, "Deriving recovery key from passkey…", "info")
 
-  const prfSalt = randomBytes(32)
   const assertionOptions = {
     challenge: randomBytes(32),
     rpId: window.location.hostname,
     allowCredentials: [{type: "public-key", id: created.rawId}],
     userVerification: "required",
-    extensions: {hmacGetSecret: {salt1: prfSalt}},
+    extensions: {hmacGetSecret: {salt1: prfSalt}, prf: {eval: {first: prfSalt}}},
   }
 
   let assertion
@@ -782,10 +772,15 @@ const enableE2EEWithPasskey = async (section, button, csrfToken) => {
   }
 
   const getExt = assertion?.getClientExtensionResults?.() || {}
-  const prfOutput = getExt.hmacGetSecret?.output1
+  const prfOutput = getExt.prf?.results?.first || getExt.hmacGetSecret?.output1
 
   if (!prfOutput) {
-    setE2EEFeedback(section, "Passkey did not return PRF output (unsupported).", "error")
+    console.error("passkey extension results", {createExt, getExt})
+    setE2EEFeedback(
+      section,
+      "This passkey provider does not support the WebAuthn PRF / hmac-secret extensions, so it can’t be used for encrypted DM key recovery. Try a platform passkey provider (iCloud Keychain / Google Password Manager) or use a recovery code instead.",
+      "error"
+    )
     button.disabled = false
     return
   }
