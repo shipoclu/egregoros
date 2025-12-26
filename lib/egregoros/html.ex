@@ -300,10 +300,37 @@ defmodule Egregoros.HTML do
 
   defp mention_profile_href(nickname, host)
        when is_binary(nickname) and is_binary(host) do
-    "https://" <> host <> "/@" <> nickname
+    host = host |> String.trim() |> String.downcase()
+
+    if host in local_domains() do
+      Endpoint.url() <> "/@" <> nickname
+    else
+      Endpoint.url() <> "/@" <> nickname <> "@" <> host
+    end
   end
 
   defp mention_profile_href(_nickname, _host), do: nil
+
+  defp local_domains do
+    case URI.parse(Endpoint.url()) do
+      %URI{host: host} when is_binary(host) and host != "" ->
+        host = String.downcase(host)
+
+        domains =
+          case URI.parse(Endpoint.url()) do
+            %URI{port: port} when is_integer(port) and port > 0 ->
+              [host, host <> ":" <> Integer.to_string(port)]
+
+            _ ->
+              [host]
+          end
+
+        Enum.uniq(domains)
+
+      _ ->
+        []
+    end
+  end
 
   defp anchor(href, label) when is_binary(href) and is_binary(label) do
     href = href |> escape_binary() |> IO.iodata_to_binary()

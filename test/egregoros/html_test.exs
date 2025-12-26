@@ -258,7 +258,7 @@ defmodule Egregoros.HTMLTest do
 
     test "linkifies remote @mentions in plain text" do
       safe = HTML.to_safe_html("hi @bob@example.com", format: :text)
-      assert safe =~ ~s(href="https://example.com/@bob")
+      assert safe =~ ~s(href="#{EgregorosWeb.Endpoint.url()}/@bob@example.com")
       assert safe =~ ">@bob@example.com</a>"
     end
 
