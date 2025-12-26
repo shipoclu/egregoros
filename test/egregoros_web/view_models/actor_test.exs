@@ -40,4 +40,19 @@ defmodule EgregorosWeb.ViewModels.ActorTest do
 
     assert %{avatar_url: "https://remote.example/media/avatar.png"} = Actor.card(remote.ap_id)
   end
+
+  test "remote actors include non-default ports in the handle" do
+    {:ok, remote} =
+      Users.create_user(%{
+        nickname: "bob",
+        ap_id: "https://remote.example:8443/users/bob",
+        inbox: "https://remote.example:8443/users/bob/inbox",
+        outbox: "https://remote.example:8443/users/bob/outbox",
+        public_key: "PUB",
+        private_key: nil,
+        local: false
+      })
+
+    assert %{handle: "@bob@remote.example:8443", nickname: "bob"} = Actor.card(remote.ap_id)
+  end
 end

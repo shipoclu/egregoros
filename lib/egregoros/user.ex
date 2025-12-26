@@ -3,6 +3,8 @@ defmodule Egregoros.User do
 
   import Ecto.Changeset
 
+  alias Egregoros.Domain
+
   @fields ~w(nickname domain ap_id inbox outbox public_key private_key local email password_hash name bio avatar_url banner_url)a
   @required_fields ~w(nickname ap_id inbox outbox public_key local)a
 
@@ -52,8 +54,14 @@ defmodule Egregoros.User do
 
       is_binary(ap_id = Ecto.Changeset.get_field(changeset, :ap_id)) ->
         case URI.parse(ap_id) do
-          %URI{host: host} when is_binary(host) and host != "" ->
-            put_change(changeset, :domain, host)
+          %URI{} = uri ->
+            case Domain.from_uri(uri) do
+              domain when is_binary(domain) and domain != "" ->
+                put_change(changeset, :domain, domain)
+
+              _ ->
+                changeset
+            end
 
           _ ->
             changeset

@@ -1,6 +1,7 @@
 defmodule EgregorosWeb.ViewModels.Actor do
   @moduledoc false
 
+  alias Egregoros.Domain
   alias Egregoros.User
   alias Egregoros.Users
   alias EgregorosWeb.URL
@@ -48,8 +49,14 @@ defmodule EgregorosWeb.ViewModels.Actor do
   def handle(%User{nickname: nickname}, ap_id)
       when is_binary(nickname) and nickname != "" and is_binary(ap_id) do
     case URI.parse(ap_id) do
-      %{host: host} when is_binary(host) and host != "" -> "@#{nickname}@#{host}"
-      _ -> "@" <> nickname
+      %URI{} = uri ->
+        case Domain.from_uri(uri) do
+          domain when is_binary(domain) and domain != "" -> "@#{nickname}@#{domain}"
+          _ -> "@" <> nickname
+        end
+
+      _ ->
+        "@" <> nickname
     end
   end
 

@@ -107,4 +107,19 @@ defmodule Egregoros.UsersTest do
 
     assert Enum.any?(results, &(&1.id == remote.id))
   end
+
+  test "create_user derives remote domain with non-default port from ap_id" do
+    {:ok, user} =
+      Users.create_user(%{
+        nickname: "bob",
+        ap_id: "https://remote.example:8443/users/bob",
+        inbox: "https://remote.example:8443/users/bob/inbox",
+        outbox: "https://remote.example:8443/users/bob/outbox",
+        public_key: "PUB",
+        private_key: nil,
+        local: false
+      })
+
+    assert user.domain == "remote.example:8443"
+  end
 end

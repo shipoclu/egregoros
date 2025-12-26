@@ -1,4 +1,5 @@
 defmodule Egregoros.Federation.Actor do
+  alias Egregoros.Domain
   alias Egregoros.HTTP
   alias Egregoros.Federation.SignedFetch
   alias Egregoros.SafeURL
@@ -136,7 +137,7 @@ defmodule Egregoros.Federation.Actor do
            :ok <- SafeURL.validate_http_url(outbox) do
         domain =
           case URI.parse(id) do
-            %URI{host: host} when is_binary(host) and host != "" -> host
+            %URI{} = uri -> Domain.from_uri(uri)
             _ -> nil
           end
 
