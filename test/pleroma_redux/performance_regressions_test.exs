@@ -130,4 +130,25 @@ defmodule PleromaRedux.PerformanceRegressionsTest do
     assert length(queries) <= 15
     assert length(rendered) == 3
   end
+
+  test "critical composite indexes exist" do
+    result =
+      Repo.query!(
+        "SELECT indexname FROM pg_indexes WHERE schemaname = 'public' AND tablename IN ('objects', 'relationships')",
+        []
+      )
+
+    index_names =
+      result.rows
+      |> Enum.map(&List.first/1)
+      |> MapSet.new()
+
+    for name <- [
+          "objects_type_id_index",
+          "objects_actor_type_id_index",
+          "relationships_object_type_index"
+        ] do
+      assert MapSet.member?(index_names, name)
+    end
+  end
 end
