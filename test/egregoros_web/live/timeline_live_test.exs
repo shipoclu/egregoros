@@ -83,7 +83,10 @@ defmodule EgregorosWeb.TimelineLiveTest do
   test "refresh helpers do not leak DMs via arbitrary toggle events", %{conn: conn, user: user} do
     {:ok, bob} = Users.create_local_user("bob")
     {:ok, _charlie} = Users.create_local_user("charlie")
-    {:ok, create} = Publish.post_note(bob, "@charlie really-secret-lv-leak-check", visibility: "direct")
+
+    {:ok, create} =
+      Publish.post_note(bob, "@charlie really-secret-lv-leak-check", visibility: "direct")
+
     dm_note = Objects.get_by_ap_id(create.object)
     assert dm_note
 

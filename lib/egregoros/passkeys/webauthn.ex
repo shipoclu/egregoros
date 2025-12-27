@@ -100,7 +100,8 @@ defmodule Egregoros.Passkeys.WebAuthn do
          {:ok, signature} <- fetch_b64_response(credential, "signature"),
          :ok <- verify_client_data(client_data_json, "webauthn.get", expected_challenge_b64),
          :ok <- verify_authenticator_data(authenticator_data, require_uv?),
-         :ok <- verify_signature(authenticator_data, client_data_json, signature, stored_public_key),
+         :ok <-
+           verify_signature(authenticator_data, client_data_json, signature, stored_public_key),
          {:ok, sign_count} <- parse_sign_count(authenticator_data) do
       {:ok, %{credential_id: raw_id, sign_count: sign_count}}
     else
@@ -131,7 +132,8 @@ defmodule Egregoros.Passkeys.WebAuthn do
          {:ok, rp_id_hash, flags, sign_count, rest} <- split_auth_data(auth_data),
          :ok <- verify_rp_id_hash(rp_id_hash),
          :ok <- verify_flags(flags, require_uv?: true, require_attested_data?: true),
-         {:ok, %{credential_id: credential_id, public_key: public_key}} <- parse_credential_data(rest) do
+         {:ok, %{credential_id: credential_id, public_key: public_key}} <-
+           parse_credential_data(rest) do
       {:ok, %{credential_id: credential_id, public_key: public_key, sign_count: sign_count}}
     else
       {:error, _} = error -> error
@@ -139,9 +141,7 @@ defmodule Egregoros.Passkeys.WebAuthn do
     end
   end
 
-  defp split_auth_data(
-         <<rp_id_hash::binary-size(32), flags::8, sign_count::32, rest::binary>>
-       ) do
+  defp split_auth_data(<<rp_id_hash::binary-size(32), flags::8, sign_count::32, rest::binary>>) do
     {:ok, rp_id_hash, flags, sign_count, rest}
   end
 
@@ -183,8 +183,10 @@ defmodule Egregoros.Passkeys.WebAuthn do
   defp verify_signature(_authenticator_data, _client_data_json, _signature, _public_key),
     do: {:error, :invalid_signature}
 
-  defp parse_sign_count(<<_rp_id_hash::binary-size(32), _flags::8, sign_count::32, _rest::binary>>),
-    do: {:ok, sign_count}
+  defp parse_sign_count(
+         <<_rp_id_hash::binary-size(32), _flags::8, sign_count::32, _rest::binary>>
+       ),
+       do: {:ok, sign_count}
 
   defp parse_sign_count(_), do: {:error, :invalid_assertion}
 
@@ -206,9 +208,7 @@ defmodule Egregoros.Passkeys.WebAuthn do
 
   defp verify_flags(_flags, _opts), do: {:error, :invalid_payload}
 
-  defp parse_credential_data(
-         <<_aaguid::binary-size(16), cred_len::16, rest::binary>>
-       )
+  defp parse_credential_data(<<_aaguid::binary-size(16), cred_len::16, rest::binary>>)
        when is_integer(cred_len) and cred_len > 0 do
     with true <- byte_size(rest) >= cred_len,
          <<credential_id::binary-size(cred_len), cose_key::binary>> <- rest,

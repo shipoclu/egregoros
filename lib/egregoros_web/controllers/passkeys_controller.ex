@@ -90,7 +90,8 @@ defmodule EgregorosWeb.PasskeysController do
     return_to = params |> Map.get("return_to", "") |> to_string()
 
     with %User{} = user <- Users.get_by_nickname(nickname),
-         credentials when is_list(credentials) and credentials != [] <- Passkeys.list_credentials(user) do
+         credentials when is_list(credentials) and credentials != [] <-
+           Passkeys.list_credentials(user) do
       challenge = :crypto.strong_rand_bytes(32)
       options = WebAuthn.authentication_options(credentials, challenge)
 

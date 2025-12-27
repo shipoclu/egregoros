@@ -21,4 +21,3 @@ defmodule Egregoros.Passkeys.Credential do
     |> unique_constraint(:credential_id)
   end
 end
-

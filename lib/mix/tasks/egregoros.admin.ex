@@ -53,4 +53,3 @@ defmodule Mix.Tasks.Egregoros.Admin do
     end
   end
 end
-

@@ -54,4 +54,3 @@ defmodule Egregoros.Federation.LikeObjectFetchTest do
     )
   end
 end
-

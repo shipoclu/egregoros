@@ -88,7 +88,8 @@ defmodule EgregorosWeb.PasskeysControllerTest do
     assert user = Users.get_by_nickname("bob")
     [credential] = Passkeys.list_credentials(user)
 
-    assert {:ok, _user} = authenticate_with_passkey(conn, user, credential, priv, return_to: "/settings")
+    assert {:ok, _user} =
+             authenticate_with_passkey(conn, user, credential, priv, return_to: "/settings")
   end
 
   defp authenticate_with_passkey(conn, user, credential, priv, opts \\ []) do
@@ -119,7 +120,10 @@ defmodule EgregorosWeb.PasskeysControllerTest do
     conn =
       conn
       |> recycle()
-      |> post("/passkeys/authentication/finish", Map.put(assertion_payload, "_csrf_token", csrf_token))
+      |> post(
+        "/passkeys/authentication/finish",
+        Map.put(assertion_payload, "_csrf_token", csrf_token)
+      )
 
     expected_return_to = Keyword.get(opts, :return_to, "/")
     assert %{"redirect_to" => ^expected_return_to} = json_response(conn, 200)

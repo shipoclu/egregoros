@@ -98,9 +98,15 @@ defmodule Egregoros.SafeURLTest do
   end
 
   test "validate_http_url_no_dns rejects localhost and private ip literals" do
-    assert {:error, :unsafe_url} == SafeURL.validate_http_url_no_dns("http://localhost/users/alice")
-    assert {:error, :unsafe_url} == SafeURL.validate_http_url_no_dns("http://127.0.0.1/users/alice")
-    assert {:error, :unsafe_url} == SafeURL.validate_http_url_no_dns("http://10.0.0.1/users/alice")
+    assert {:error, :unsafe_url} ==
+             SafeURL.validate_http_url_no_dns("http://localhost/users/alice")
+
+    assert {:error, :unsafe_url} ==
+             SafeURL.validate_http_url_no_dns("http://127.0.0.1/users/alice")
+
+    assert {:error, :unsafe_url} ==
+             SafeURL.validate_http_url_no_dns("http://10.0.0.1/users/alice")
+
     assert {:error, :unsafe_url} == SafeURL.validate_http_url_no_dns("http://[::1]/users/alice")
   end
 end

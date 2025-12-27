@@ -53,12 +53,18 @@ defmodule EgregorosWeb.InboxControllerTest do
       args: %{"activity" => create, "inbox_user_ap_id" => frank.ap_id}
     )
 
-    assert :ok = perform_job(IngestActivity, %{"activity" => create, "inbox_user_ap_id" => frank.ap_id})
+    assert :ok =
+             perform_job(IngestActivity, %{
+               "activity" => create,
+               "inbox_user_ap_id" => frank.ap_id
+             })
 
     assert Objects.get_by_ap_id(note["id"])
   end
 
-  test "POST /users/:nickname/inbox discards a Follow not targeting that inbox user", %{conn: conn} do
+  test "POST /users/:nickname/inbox discards a Follow not targeting that inbox user", %{
+    conn: conn
+  } do
     {:ok, frank} = Users.create_local_user("frank")
     {:ok, bob} = Users.create_local_user("bob")
 
@@ -101,7 +107,10 @@ defmodule EgregorosWeb.InboxControllerTest do
     )
 
     assert {:discard, :not_targeted} =
-             perform_job(IngestActivity, %{"activity" => follow, "inbox_user_ap_id" => frank.ap_id})
+             perform_job(IngestActivity, %{
+               "activity" => follow,
+               "inbox_user_ap_id" => frank.ap_id
+             })
 
     refute Objects.get_by_ap_id(follow["id"])
     refute Relationships.get_by_type_actor_object("Follow", follow["actor"], bob.ap_id)
@@ -158,8 +167,16 @@ defmodule EgregorosWeb.InboxControllerTest do
 
     assert response(conn, 202)
 
-    assert_enqueued(worker: IngestActivity, args: %{"activity" => create, "inbox_user_ap_id" => frank.ap_id})
-    assert :ok = perform_job(IngestActivity, %{"activity" => create, "inbox_user_ap_id" => frank.ap_id})
+    assert_enqueued(
+      worker: IngestActivity,
+      args: %{"activity" => create, "inbox_user_ap_id" => frank.ap_id}
+    )
+
+    assert :ok =
+             perform_job(IngestActivity, %{
+               "activity" => create,
+               "inbox_user_ap_id" => frank.ap_id
+             })
 
     object = Objects.get_by_ap_id(note["id"])
     assert object
@@ -217,8 +234,17 @@ defmodule EgregorosWeb.InboxControllerTest do
       |> post("/users/frank/inbox", body)
 
     assert response(conn, 202)
-    assert_enqueued(worker: IngestActivity, args: %{"activity" => create, "inbox_user_ap_id" => frank.ap_id})
-    assert :ok = perform_job(IngestActivity, %{"activity" => create, "inbox_user_ap_id" => frank.ap_id})
+
+    assert_enqueued(
+      worker: IngestActivity,
+      args: %{"activity" => create, "inbox_user_ap_id" => frank.ap_id}
+    )
+
+    assert :ok =
+             perform_job(IngestActivity, %{
+               "activity" => create,
+               "inbox_user_ap_id" => frank.ap_id
+             })
 
     assert Objects.get_by_ap_id(note["id"])
   end
@@ -264,8 +290,17 @@ defmodule EgregorosWeb.InboxControllerTest do
       |> post("/users/frank/inbox", create)
 
     assert response(conn, 202)
-    assert_enqueued(worker: IngestActivity, args: %{"activity" => create, "inbox_user_ap_id" => frank.ap_id})
-    assert :ok = perform_job(IngestActivity, %{"activity" => create, "inbox_user_ap_id" => frank.ap_id})
+
+    assert_enqueued(
+      worker: IngestActivity,
+      args: %{"activity" => create, "inbox_user_ap_id" => frank.ap_id}
+    )
+
+    assert :ok =
+             perform_job(IngestActivity, %{
+               "activity" => create,
+               "inbox_user_ap_id" => frank.ap_id
+             })
 
     assert Objects.get_by_ap_id(note["id"])
   end
@@ -346,8 +381,17 @@ defmodule EgregorosWeb.InboxControllerTest do
       |> post("/users/frank/inbox", body)
 
     assert response(conn, 202)
-    assert_enqueued(worker: IngestActivity, args: %{"activity" => create, "inbox_user_ap_id" => frank.ap_id})
-    assert :ok = perform_job(IngestActivity, %{"activity" => create, "inbox_user_ap_id" => frank.ap_id})
+
+    assert_enqueued(
+      worker: IngestActivity,
+      args: %{"activity" => create, "inbox_user_ap_id" => frank.ap_id}
+    )
+
+    assert :ok =
+             perform_job(IngestActivity, %{
+               "activity" => create,
+               "inbox_user_ap_id" => frank.ap_id
+             })
 
     assert Objects.get_by_ap_id(note["id"])
   end

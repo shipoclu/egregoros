@@ -116,7 +116,8 @@ defmodule Egregoros.Activities.Follow do
     end
   end
 
-  defp validate_inbox_target(%{"object" => object}, opts) when is_binary(object) and is_list(opts) do
+  defp validate_inbox_target(%{"object" => object}, opts)
+       when is_binary(object) and is_list(opts) do
     if Keyword.get(opts, :local, true) do
       :ok
     else

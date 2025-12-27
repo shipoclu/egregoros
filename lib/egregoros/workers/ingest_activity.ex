@@ -21,7 +21,10 @@ defmodule Egregoros.Workers.IngestActivity do
 
   defp maybe_put_inbox_user_ap_id(opts, inbox_user_ap_id) when is_binary(inbox_user_ap_id) do
     inbox_user_ap_id = String.trim(inbox_user_ap_id)
-    if inbox_user_ap_id == "", do: opts, else: Keyword.put(opts, :inbox_user_ap_id, inbox_user_ap_id)
+
+    if inbox_user_ap_id == "",
+      do: opts,
+      else: Keyword.put(opts, :inbox_user_ap_id, inbox_user_ap_id)
   end
 
   defp maybe_put_inbox_user_ap_id(opts, _inbox_user_ap_id), do: opts

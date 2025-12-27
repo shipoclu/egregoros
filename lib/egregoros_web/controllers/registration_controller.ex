@@ -18,6 +18,7 @@ defmodule EgregorosWeb.RegistrationController do
 
   def create(conn, %{"registration" => %{} = params}) do
     nickname = params |> Map.get("nickname", "") |> to_string() |> String.trim()
+
     email =
       params
       |> Map.get("email", "")
@@ -27,6 +28,7 @@ defmodule EgregorosWeb.RegistrationController do
         "" -> nil
         value -> value
       end
+
     password = params |> Map.get("password", "") |> to_string()
     return_to = params |> Map.get("return_to", "") |> to_string()
 

@@ -172,19 +172,23 @@ defmodule Egregoros.CBOR do
     encode_major_uint(major, byte_size(binary)) <> binary
   end
 
-  defp encode_major_uint(major, value) when is_integer(major) and is_integer(value) and value < 24 do
+  defp encode_major_uint(major, value)
+       when is_integer(major) and is_integer(value) and value < 24 do
     <<(major <<< 5) + value>>
   end
 
-  defp encode_major_uint(major, value) when is_integer(major) and is_integer(value) and value < 256 do
+  defp encode_major_uint(major, value)
+       when is_integer(major) and is_integer(value) and value < 256 do
     <<(major <<< 5) + 24, value>>
   end
 
-  defp encode_major_uint(major, value) when is_integer(major) and is_integer(value) and value < 65_536 do
+  defp encode_major_uint(major, value)
+       when is_integer(major) and is_integer(value) and value < 65_536 do
     <<(major <<< 5) + 25, value::16>>
   end
 
-  defp encode_major_uint(major, value) when is_integer(major) and is_integer(value) and value < 4_294_967_296 do
+  defp encode_major_uint(major, value)
+       when is_integer(major) and is_integer(value) and value < 4_294_967_296 do
     <<(major <<< 5) + 26, value::32>>
   end
 

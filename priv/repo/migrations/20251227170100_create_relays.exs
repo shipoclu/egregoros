@@ -11,4 +11,3 @@ defmodule Egregoros.Repo.Migrations.CreateRelays do
     create unique_index(:relays, [:ap_id])
   end
 end
-

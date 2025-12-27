@@ -27,4 +27,3 @@ defmodule Egregoros.Passkeys do
     |> Repo.update()
   end
 end
-
