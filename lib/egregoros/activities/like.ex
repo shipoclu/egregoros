@@ -13,9 +13,11 @@ defmodule Egregoros.Activities.Like do
   alias Egregoros.Relationships
   alias Egregoros.User
   alias Egregoros.Users
+  alias Egregoros.Workers.FetchThreadAncestors
   alias EgregorosWeb.Endpoint
 
   @public "https://www.w3.org/ns/activitystreams#Public"
+  @fetch_priority 9
 
   def type, do: "Like"
 
@@ -85,6 +87,8 @@ defmodule Egregoros.Activities.Like do
   end
 
   def side_effects(object, opts) do
+    maybe_fetch_liked_object(object, opts)
+
     _ =
       Relationships.upsert_relationship(%{
         type: object.type,
@@ -101,6 +105,36 @@ defmodule Egregoros.Activities.Like do
 
     :ok
   end
+
+  defp maybe_fetch_liked_object(%Object{object: liked_ap_id} = _like, opts)
+       when is_binary(liked_ap_id) and is_list(opts) do
+    if Keyword.get(opts, :local, true) do
+      :ok
+    else
+      liked_ap_id = String.trim(liked_ap_id)
+
+      cond do
+        liked_ap_id == "" ->
+          :ok
+
+        not String.starts_with?(liked_ap_id, ["http://", "https://"]) ->
+          :ok
+
+        Objects.get_by_ap_id(liked_ap_id) != nil ->
+          :ok
+
+        true ->
+          _ =
+            Oban.insert(
+              FetchThreadAncestors.new(%{"start_ap_id" => liked_ap_id}, priority: @fetch_priority)
+            )
+
+          :ok
+      end
+    end
+  end
+
+  defp maybe_fetch_liked_object(_like, _opts), do: :ok
 
   defp maybe_broadcast_notification(object) do
     with %{} = liked_object <- Objects.get_by_ap_id(object.object),
