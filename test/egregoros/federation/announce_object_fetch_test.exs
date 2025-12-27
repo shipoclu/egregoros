@@ -8,12 +8,15 @@ defmodule Egregoros.Federation.AnnounceObjectFetchTest do
 
   test "ingesting a remote Announce for an unknown object enqueues a low priority object+thread fetch" do
     announced_id = "https://remote.example/objects/announced-1"
+    relay_actor = "https://remote.example/users/relay"
+
+    Repo.insert!(%Egregoros.Relay{ap_id: relay_actor})
 
     announce =
       %{
         "id" => "https://remote.example/activities/announce/1",
         "type" => "Announce",
-        "actor" => "https://remote.example/users/relay",
+        "actor" => relay_actor,
         "object" => announced_id,
         "to" => [@public]
       }
@@ -29,6 +32,9 @@ defmodule Egregoros.Federation.AnnounceObjectFetchTest do
 
   test "remote Announce does not enqueue fetch when the announced object already exists" do
     announced_id = "https://remote.example/objects/announced-2"
+    relay_actor = "https://remote.example/users/relay"
+
+    Repo.insert!(%Egregoros.Relay{ap_id: relay_actor})
 
     note =
       %{
@@ -45,7 +51,7 @@ defmodule Egregoros.Federation.AnnounceObjectFetchTest do
       %{
         "id" => "https://remote.example/activities/announce/2",
         "type" => "Announce",
-        "actor" => "https://remote.example/users/relay",
+        "actor" => relay_actor,
         "object" => announced_id,
         "to" => [@public]
       }
@@ -60,12 +66,15 @@ defmodule Egregoros.Federation.AnnounceObjectFetchTest do
 
   test "remote Announce does not enqueue fetch when the announce isn't public" do
     announced_id = "https://remote.example/objects/announced-3"
+    relay_actor = "https://remote.example/users/relay"
+
+    Repo.insert!(%Egregoros.Relay{ap_id: relay_actor})
 
     announce =
       %{
         "id" => "https://remote.example/activities/announce/3",
         "type" => "Announce",
-        "actor" => "https://remote.example/users/relay",
+        "actor" => relay_actor,
         "object" => announced_id,
         "to" => ["https://remote.example/users/relay"]
       }

@@ -15,6 +15,18 @@ defmodule Egregoros.Relays do
     |> Repo.all()
   end
 
+  def subscribed?(ap_id) when is_binary(ap_id) do
+    ap_id = String.trim(ap_id)
+
+    if ap_id == "" do
+      false
+    else
+      Repo.exists?(from(r in Relay, where: r.ap_id == ^ap_id))
+    end
+  end
+
+  def subscribed?(_ap_id), do: false
+
   def subscribe(relay_ap_id) when is_binary(relay_ap_id) do
     relay_ap_id = String.trim(relay_ap_id)
 

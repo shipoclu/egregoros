@@ -11,6 +11,7 @@ defmodule Egregoros.Activities.Announce do
   alias Egregoros.Object
   alias Egregoros.Objects
   alias Egregoros.Pipeline
+  alias Egregoros.Relays
   alias Egregoros.Relationships
   alias Egregoros.Timeline
   alias Egregoros.User
@@ -124,6 +125,9 @@ defmodule Egregoros.Activities.Announce do
         announced_ap_id == "" ->
           :ok
 
+        not Relays.subscribed?(data["actor"]) ->
+          :ok
+
         not public_activity?(data) ->
           :ok
 
@@ -149,10 +153,11 @@ defmodule Egregoros.Activities.Announce do
   defp maybe_fetch_announced_object(_object, _opts), do: :ok
 
   defp public_activity?(%{} = data) do
-    data
-    |> Map.get("to", [])
-    |> List.wrap()
-    |> Enum.any?(&(&1 == @public))
+    recipients =
+      (data |> Map.get("to", []) |> List.wrap()) ++
+        (data |> Map.get("cc", []) |> List.wrap())
+
+    Enum.any?(recipients, &(&1 == @public))
   end
 
   defp public_activity?(_), do: false
