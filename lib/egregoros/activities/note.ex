@@ -6,6 +6,7 @@ defmodule Egregoros.Activities.Note do
   alias Egregoros.ActivityPub.ObjectValidators.Types.ObjectID
   alias Egregoros.ActivityPub.ObjectValidators.Types.Recipients
   alias Egregoros.ActivityPub.ObjectValidators.Types.DateTime, as: APDateTime
+  alias Egregoros.Federation.ThreadDiscovery
   alias Egregoros.Objects
   alias Egregoros.Timeline
   alias Egregoros.User
@@ -87,8 +88,9 @@ defmodule Egregoros.Activities.Note do
     |> Objects.upsert_object()
   end
 
-  def side_effects(object, _opts) do
+  def side_effects(object, opts) do
     Timeline.broadcast_post(object)
+    _ = ThreadDiscovery.enqueue(object, opts)
     :ok
   end
 
