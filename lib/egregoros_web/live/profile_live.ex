@@ -4,6 +4,7 @@ defmodule EgregorosWeb.ProfileLive do
   alias Egregoros.Activities.Follow
   alias Egregoros.Activities.Undo
   alias Egregoros.Interactions
+  alias Egregoros.HTML
   alias Egregoros.Media
   alias Egregoros.MediaStorage
   alias Egregoros.Notifications
@@ -55,12 +56,24 @@ defmodule EgregorosWeb.ProfileLive do
 
     reply_form = Phoenix.Component.to_form(default_reply_params(), as: :reply)
 
+    profile_bio_html =
+      case profile_user do
+        %User{} = user ->
+          user.bio
+          |> HTML.to_safe_html(format: if(user.local, do: :text, else: :html))
+          |> Phoenix.HTML.raw()
+
+        _ ->
+          nil
+      end
+
     {:ok,
      socket
      |> assign(
        current_user: current_user,
        profile_user: profile_user,
        profile_handle: profile_handle,
+       profile_bio_html: profile_bio_html,
        notifications_count: notifications_count(current_user),
        follow_relationship: follow_relationship,
        mention_suggestions: %{},
@@ -626,12 +639,13 @@ defmodule EgregorosWeb.ProfileLive do
                   </div>
                 </div>
 
-                <p
+                <div
                   :if={is_binary(@profile_user.bio) and @profile_user.bio != ""}
-                  class="mt-5 max-w-prose text-sm text-slate-700 dark:text-slate-200"
+                  data-role="profile-bio"
+                  class="mt-5 max-w-prose space-y-3 text-sm text-slate-700 dark:text-slate-200 [&_a]:underline [&_a]:decoration-slate-400/60 [&_a:hover]:decoration-slate-600 dark:[&_a]:decoration-slate-500/60 dark:[&_a:hover]:decoration-slate-200"
                 >
-                  {@profile_user.bio}
-                </p>
+                  {@profile_bio_html}
+                </div>
 
                 <div class="mt-6 grid grid-cols-3 gap-3 sm:max-w-md">
                   <.stat value={@posts_count} label="Posts" />

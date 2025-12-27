@@ -151,6 +151,26 @@ defmodule EgregorosWeb.ProfileLiveTest do
            )
   end
 
+  test "profile renders remote bios as sanitized html", %{conn: conn, viewer: viewer} do
+    {:ok, remote} =
+      Users.create_user(%{
+        nickname: "lebronjames",
+        ap_id: "https://remote.example/users/lebronjames",
+        inbox: "https://remote.example/users/lebronjames/inbox",
+        outbox: "https://remote.example/users/lebronjames/outbox",
+        public_key: "remote-key",
+        private_key: nil,
+        local: false,
+        bio: "<p>the <strong>king</strong></p><script>alert(1)</script>"
+      })
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: viewer.id})
+    {:ok, view, _html} = live(conn, "/@#{remote.nickname}@remote.example")
+
+    assert has_element?(view, "[data-role='profile-bio'] strong", "king")
+    refute has_element?(view, "[data-role='profile-bio'] script")
+  end
+
   test "profile posts support copying permalinks", %{
     conn: conn,
     viewer: viewer,
