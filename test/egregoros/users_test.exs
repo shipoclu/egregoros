@@ -49,9 +49,20 @@ defmodule Egregoros.UsersTest do
     assert String.starts_with?(user.private_key, "-----BEGIN PRIVATE KEY-----")
   end
 
-  test "create_local_user makes alice an admin" do
+  test "create_local_user does not grant admin based on nickname" do
     {:ok, user} = Users.create_local_user("alice")
+    assert user.admin == false
+  end
+
+  test "set_admin/2 updates the admin flag for local users" do
+    {:ok, user} = Users.create_local_user("alice")
+    assert user.admin == false
+
+    assert {:ok, user} = Users.set_admin(user, true)
     assert user.admin == true
+
+    assert {:ok, user} = Users.set_admin(user, false)
+    assert user.admin == false
   end
 
   test "get_or_create_local_user returns existing" do

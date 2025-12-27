@@ -36,8 +36,7 @@ defmodule Egregoros.Users do
       outbox: base <> "/outbox",
       public_key: public_key,
       private_key: private_key,
-      local: true,
-      admin: nickname == "alice"
+      local: true
     })
   end
 
@@ -73,7 +72,6 @@ defmodule Egregoros.Users do
           public_key: public_key,
           private_key: private_key,
           local: true,
-          admin: nickname == "alice",
           email: email,
           password_hash: Password.hash(password),
           name: Map.get(attrs, :name),
@@ -107,7 +105,6 @@ defmodule Egregoros.Users do
           public_key: public_key,
           private_key: private_key,
           local: true,
-          admin: nickname == "alice",
           email: email,
           password_hash: nil,
           name: Map.get(attrs, :name),
@@ -232,6 +229,15 @@ defmodule Egregoros.Users do
       _ -> {:error, :unauthorized}
     end
   end
+
+  def set_admin(%User{local: true} = user, admin) when is_boolean(admin) do
+    user
+    |> User.changeset(%{admin: admin})
+    |> Repo.update()
+  end
+
+  def set_admin(%User{}, _admin), do: {:error, :not_local}
+  def set_admin(_user, _admin), do: {:error, :invalid_user}
 
   def update_profile(%User{} = user, attrs) when is_map(attrs) do
     attrs =

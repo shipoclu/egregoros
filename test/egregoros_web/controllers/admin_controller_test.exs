@@ -23,6 +23,7 @@ defmodule EgregorosWeb.AdminControllerTest do
 
   test "GET /admin renders for admins", %{conn: conn} do
     {:ok, user} = Users.create_local_user("alice")
+    {:ok, user} = Users.set_admin(user, true)
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
 
     conn = get(conn, "/admin")
@@ -33,6 +34,7 @@ defmodule EgregorosWeb.AdminControllerTest do
 
   test "POST /admin/relays subscribes the internal actor to the relay", %{conn: conn} do
     {:ok, user} = Users.create_local_user("alice")
+    {:ok, user} = Users.set_admin(user, true)
     {:ok, internal} = InternalFetchActor.get_actor()
 
     relay_ap_id = "https://relay.example/actor"
