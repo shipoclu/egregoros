@@ -113,12 +113,14 @@ defmodule Egregoros.OAuth do
     end
   end
 
-  def exchange_code_for_token(%{
-        "grant_type" => "refresh_token",
-        "refresh_token" => refresh_token,
-        "client_id" => client_id,
-        "client_secret" => client_secret
-      } = params)
+  def exchange_code_for_token(
+        %{
+          "grant_type" => "refresh_token",
+          "refresh_token" => refresh_token,
+          "client_id" => client_id,
+          "client_secret" => client_secret
+        } = params
+      )
       when is_binary(refresh_token) and is_binary(client_id) and is_binary(client_secret) do
     refresh_token = String.trim(refresh_token)
 
@@ -157,7 +159,8 @@ defmodule Egregoros.OAuth do
 
     from(t in Token,
       where:
-        t.token == ^token and is_nil(t.revoked_at) and (is_nil(t.expires_at) or t.expires_at > ^now),
+        t.token == ^token and is_nil(t.revoked_at) and
+          (is_nil(t.expires_at) or t.expires_at > ^now),
       join: u in assoc(t, :user),
       preload: [user: u]
     )
@@ -283,11 +286,19 @@ defmodule Egregoros.OAuth do
   defp revoke_token_record_for_token(_application_id, _token), do: :ok
 
   defp access_token_ttl_seconds do
-    Application.get_env(:egregoros, :oauth_access_token_ttl_seconds, @default_access_token_ttl_seconds)
+    Application.get_env(
+      :egregoros,
+      :oauth_access_token_ttl_seconds,
+      @default_access_token_ttl_seconds
+    )
   end
 
   defp refresh_token_ttl_seconds do
-    Application.get_env(:egregoros, :oauth_refresh_token_ttl_seconds, @default_refresh_token_ttl_seconds)
+    Application.get_env(
+      :egregoros,
+      :oauth_refresh_token_ttl_seconds,
+      @default_refresh_token_ttl_seconds
+    )
   end
 
   defp parse_redirect_uris(nil), do: []

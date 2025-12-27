@@ -5,4 +5,3 @@ defmodule EgregorosWeb.PocoController do
     json(conn, %{"entry" => []})
   end
 end
-

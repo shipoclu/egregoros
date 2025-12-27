@@ -40,4 +40,3 @@ defmodule Egregoros.Bench.SeedTest do
     assert summary.objects.notes == notes
   end
 end
-

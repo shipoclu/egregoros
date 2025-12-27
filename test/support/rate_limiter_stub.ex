@@ -4,4 +4,3 @@ defmodule Egregoros.RateLimiter.Stub do
   @impl true
   def allow?(_bucket, _key, _limit, _interval_ms), do: :ok
 end
-

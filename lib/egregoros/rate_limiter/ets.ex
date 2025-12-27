@@ -115,4 +115,3 @@ defmodule Egregoros.RateLimiter.ETS do
     Process.send_after(self(), :cleanup, @cleanup_interval_ms)
   end
 end
-

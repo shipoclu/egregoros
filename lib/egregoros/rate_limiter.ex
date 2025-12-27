@@ -13,4 +13,3 @@ defmodule Egregoros.RateLimiter do
     Application.get_env(:egregoros, __MODULE__, Egregoros.RateLimiter.ETS)
   end
 end
-

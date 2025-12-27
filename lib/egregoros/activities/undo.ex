@@ -131,7 +131,8 @@ defmodule Egregoros.Activities.Undo do
         %Object{type: "Follow", object: ^inbox_user_ap_id} ->
           true
 
-        %Object{type: type, object: object_ap_id} when type in ["Like", "Announce", "EmojiReact"] ->
+        %Object{type: type, object: object_ap_id}
+        when type in ["Like", "Announce", "EmojiReact"] ->
           InboxTargeting.object_owned_by?(object_ap_id, inbox_user_ap_id)
 
         _ ->

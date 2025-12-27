@@ -92,4 +92,3 @@ defmodule Egregoros.InboxTargeting do
     |> String.trim()
   end
 end
-

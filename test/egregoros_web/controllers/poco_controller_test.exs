@@ -5,4 +5,3 @@ defmodule EgregorosWeb.PocoControllerTest do
     assert conn |> get("/poco") |> json_response(200) == %{"entry" => []}
   end
 end
-
