@@ -6,7 +6,7 @@ defmodule EgregorosWeb.InboxControllerTest do
   alias Egregoros.Workers.IngestActivity
 
   test "POST /users/:nickname/inbox ingests activity", %{conn: conn} do
-    {:ok, _user} = Users.create_local_user("frank")
+    {:ok, frank} = Users.create_local_user("frank")
     {public_key, private_key} = Egregoros.Keys.generate_rsa_keypair()
 
     {:ok, _} =
@@ -49,10 +49,10 @@ defmodule EgregorosWeb.InboxControllerTest do
     assert_enqueued(
       worker: IngestActivity,
       queue: "federation_incoming",
-      args: %{"activity" => create}
+      args: %{"activity" => create, "inbox_user_ap_id" => frank.ap_id}
     )
 
-    assert :ok = perform_job(IngestActivity, %{"activity" => create})
+    assert :ok = perform_job(IngestActivity, %{"activity" => create, "inbox_user_ap_id" => frank.ap_id})
 
     assert Objects.get_by_ap_id(note["id"])
   end
@@ -60,7 +60,7 @@ defmodule EgregorosWeb.InboxControllerTest do
   test "POST /users/:nickname/inbox accepts a Create with attachments and blank content", %{
     conn: conn
   } do
-    {:ok, _user} = Users.create_local_user("frank")
+    {:ok, frank} = Users.create_local_user("frank")
     {public_key, private_key} = Egregoros.Keys.generate_rsa_keypair()
 
     {:ok, _} =
@@ -108,8 +108,8 @@ defmodule EgregorosWeb.InboxControllerTest do
 
     assert response(conn, 202)
 
-    assert_enqueued(worker: IngestActivity, args: %{"activity" => create})
-    assert :ok = perform_job(IngestActivity, %{"activity" => create})
+    assert_enqueued(worker: IngestActivity, args: %{"activity" => create, "inbox_user_ap_id" => frank.ap_id})
+    assert :ok = perform_job(IngestActivity, %{"activity" => create, "inbox_user_ap_id" => frank.ap_id})
 
     object = Objects.get_by_ap_id(note["id"])
     assert object
@@ -121,7 +121,7 @@ defmodule EgregorosWeb.InboxControllerTest do
   end
 
   test "POST /users/:nickname/inbox accepts signature with digest and host", %{conn: conn} do
-    {:ok, _user} = Users.create_local_user("frank")
+    {:ok, frank} = Users.create_local_user("frank")
     {public_key, private_key} = Egregoros.Keys.generate_rsa_keypair()
 
     {:ok, _} =
@@ -167,14 +167,14 @@ defmodule EgregorosWeb.InboxControllerTest do
       |> post("/users/frank/inbox", body)
 
     assert response(conn, 202)
-    assert_enqueued(worker: IngestActivity, args: %{"activity" => create})
-    assert :ok = perform_job(IngestActivity, %{"activity" => create})
+    assert_enqueued(worker: IngestActivity, args: %{"activity" => create, "inbox_user_ap_id" => frank.ap_id})
+    assert :ok = perform_job(IngestActivity, %{"activity" => create, "inbox_user_ap_id" => frank.ap_id})
 
     assert Objects.get_by_ap_id(note["id"])
   end
 
   test "POST /users/:nickname/inbox accepts signature header without scheme prefix", %{conn: conn} do
-    {:ok, _user} = Users.create_local_user("frank")
+    {:ok, frank} = Users.create_local_user("frank")
     {public_key, private_key} = Egregoros.Keys.generate_rsa_keypair()
 
     {:ok, _} =
@@ -214,8 +214,8 @@ defmodule EgregorosWeb.InboxControllerTest do
       |> post("/users/frank/inbox", create)
 
     assert response(conn, 202)
-    assert_enqueued(worker: IngestActivity, args: %{"activity" => create})
-    assert :ok = perform_job(IngestActivity, %{"activity" => create})
+    assert_enqueued(worker: IngestActivity, args: %{"activity" => create, "inbox_user_ap_id" => frank.ap_id})
+    assert :ok = perform_job(IngestActivity, %{"activity" => create, "inbox_user_ap_id" => frank.ap_id})
 
     assert Objects.get_by_ap_id(note["id"])
   end
@@ -224,7 +224,7 @@ defmodule EgregorosWeb.InboxControllerTest do
        %{
          conn: conn
        } do
-    {:ok, _user} = Users.create_local_user("frank")
+    {:ok, frank} = Users.create_local_user("frank")
     {public_key, private_key} = Egregoros.Keys.generate_rsa_keypair()
 
     {:ok, _} =
@@ -296,8 +296,8 @@ defmodule EgregorosWeb.InboxControllerTest do
       |> post("/users/frank/inbox", body)
 
     assert response(conn, 202)
-    assert_enqueued(worker: IngestActivity, args: %{"activity" => create})
-    assert :ok = perform_job(IngestActivity, %{"activity" => create})
+    assert_enqueued(worker: IngestActivity, args: %{"activity" => create, "inbox_user_ap_id" => frank.ap_id})
+    assert :ok = perform_job(IngestActivity, %{"activity" => create, "inbox_user_ap_id" => frank.ap_id})
 
     assert Objects.get_by_ap_id(note["id"])
   end

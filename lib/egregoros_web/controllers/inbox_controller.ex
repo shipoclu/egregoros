@@ -7,9 +7,12 @@ defmodule EgregorosWeb.InboxController do
   alias Egregoros.Workers.IngestActivity
 
   def inbox(conn, %{"nickname" => nickname}) do
-    with %{} <- Users.get_by_nickname(nickname),
+    with %{ap_id: inbox_user_ap_id} <- Users.get_by_nickname(nickname),
          activity when is_map(activity) <- conn.body_params,
-         {:ok, _job} <- Oban.insert(IngestActivity.new(%{"activity" => activity})) do
+         {:ok, _job} <-
+           Oban.insert(
+             IngestActivity.new(%{"activity" => activity, "inbox_user_ap_id" => inbox_user_ap_id})
+           ) do
       send_resp(conn, 202, "")
     else
       nil -> send_resp(conn, 404, "Not Found")
