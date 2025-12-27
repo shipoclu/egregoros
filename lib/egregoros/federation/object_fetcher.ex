@@ -15,7 +15,7 @@ defmodule Egregoros.Federation.ObjectFetcher do
          true <- status in 200..299,
          {:ok, map} <- decode_json(body),
          :ok <- validate_id(map, ap_id),
-         {:ok, object} <- Pipeline.ingest(map, local: false) do
+         {:ok, object} <- Pipeline.ingest(map, local: false, thread_fetch: true) do
       {:ok, object}
     else
       false ->

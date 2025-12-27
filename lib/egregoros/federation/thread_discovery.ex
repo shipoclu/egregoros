@@ -11,17 +11,21 @@ defmodule Egregoros.Federation.ThreadDiscovery do
 
   def enqueue(%Object{type: "Note", ap_id: ap_id, data: %{} = data} = object, opts)
       when is_list(opts) do
-    parent_ap_id =
-      data
-      |> Map.get("inReplyTo")
-      |> in_reply_to_ap_id()
-
-    if should_enqueue?(object, parent_ap_id) do
-      args = %{"start_ap_id" => ap_id, "max_depth" => @default_max_depth}
-      _ = Oban.insert(FetchThreadAncestors.new(args))
+    if Keyword.get(opts, :thread_fetch, false) do
       :ok
     else
-      :ok
+      parent_ap_id =
+        data
+        |> Map.get("inReplyTo")
+        |> in_reply_to_ap_id()
+
+      if should_enqueue?(object, parent_ap_id) do
+        args = %{"start_ap_id" => ap_id, "max_depth" => @default_max_depth}
+        _ = Oban.insert(FetchThreadAncestors.new(args))
+        :ok
+      else
+        :ok
+      end
     end
   end
 

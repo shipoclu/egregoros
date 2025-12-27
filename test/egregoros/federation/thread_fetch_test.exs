@@ -74,4 +74,26 @@ defmodule Egregoros.Federation.ThreadFetchTest do
     ancestors = Objects.thread_ancestors(reply_object)
     assert Enum.any?(ancestors, &(&1.ap_id == parent_id))
   end
+
+  test "thread discovery does not enqueue jobs while fetching thread context" do
+    note_id = "https://remote.example/objects/reply-3"
+    parent_id = "https://remote.example/objects/parent-3"
+
+    reply =
+      %{
+        "id" => note_id,
+        "type" => "Note",
+        "attributedTo" => "https://remote.example/users/alice",
+        "content" => "Reply",
+        "inReplyTo" => parent_id,
+        "to" => ["https://www.w3.org/ns/activitystreams#Public"]
+      }
+
+    assert {:ok, _} = Pipeline.ingest(reply, local: false, thread_fetch: true)
+
+    refute_enqueued(
+      worker: FetchThreadAncestors,
+      args: %{"start_ap_id" => note_id}
+    )
+  end
 end
