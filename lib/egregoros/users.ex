@@ -79,6 +79,39 @@ defmodule Egregoros.Users do
     end
   end
 
+  def register_local_user_with_passkey(attrs) when is_map(attrs) do
+    nickname = attrs |> Map.get(:nickname, "") |> to_string() |> String.trim()
+
+    email =
+      attrs
+      |> Map.get(:email, nil)
+      |> normalize_optional_string()
+
+    cond do
+      nickname == "" ->
+        {:error, :invalid_nickname}
+
+      true ->
+        base = Endpoint.url() <> "/users/" <> nickname
+        {public_key, private_key} = Keys.generate_rsa_keypair()
+
+        create_user(%{
+          nickname: nickname,
+          ap_id: base,
+          inbox: base <> "/inbox",
+          outbox: base <> "/outbox",
+          public_key: public_key,
+          private_key: private_key,
+          local: true,
+          email: email,
+          password_hash: nil,
+          name: Map.get(attrs, :name),
+          bio: Map.get(attrs, :bio),
+          avatar_url: Map.get(attrs, :avatar_url)
+        })
+    end
+  end
+
   def get_or_create_local_user(nickname) when is_binary(nickname) do
     case get_by_nickname(nickname) do
       %User{} = user ->

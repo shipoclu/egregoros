@@ -75,6 +75,10 @@ defmodule EgregorosWeb.Router do
 
     get "/settings/e2ee", E2EEController, :show
     post "/settings/e2ee/passkey", E2EEController, :enable_passkey
+    post "/passkeys/registration/options", PasskeysController, :registration_options
+    post "/passkeys/registration/finish", PasskeysController, :registration_finish
+    post "/passkeys/authentication/options", PasskeysController, :authentication_options
+    post "/passkeys/authentication/finish", PasskeysController, :authentication_finish
   end
 
   scope "/", EgregorosWeb do
