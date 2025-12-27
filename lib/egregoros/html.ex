@@ -148,7 +148,8 @@ defmodule Egregoros.HTML do
     end)
   end
 
-  defp linkify_segment(segment, emoji_map, _mention_hrefs) when is_binary(segment) and is_map(emoji_map) do
+  defp linkify_segment(segment, emoji_map, _mention_hrefs)
+       when is_binary(segment) and is_map(emoji_map) do
     linkify_segment(segment, emoji_map, %{})
   end
 
@@ -169,7 +170,8 @@ defmodule Egregoros.HTML do
     end
   end
 
-  defp linkify_token(token, emoji_map, _mention_hrefs) when is_binary(token) and is_map(emoji_map) do
+  defp linkify_token(token, emoji_map, _mention_hrefs)
+       when is_binary(token) and is_map(emoji_map) do
     linkify_token(token, emoji_map, %{})
   end
 
@@ -200,7 +202,8 @@ defmodule Egregoros.HTML do
     end
   end
 
-  defp linkify_inline(token, emoji_map, _mention_hrefs) when is_binary(token) and is_map(emoji_map) do
+  defp linkify_inline(token, emoji_map, _mention_hrefs)
+       when is_binary(token) and is_map(emoji_map) do
     linkify_inline(token, emoji_map, %{})
   end
 
