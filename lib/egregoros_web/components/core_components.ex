@@ -157,6 +157,68 @@ defmodule EgregorosWeb.CoreComponents do
   end
 
   @doc """
+  Renders an icon-only button with consistent sizing and focus styles.
+
+  Use `label` to provide an accessible name (`aria-label`) for icon buttons.
+  """
+  attr :rest, :global,
+    include:
+      ~w(href navigate patch method download disabled phx-click phx-disable-with phx-target data-role)
+
+  attr :label, :string, required: true
+  attr :class, :any, default: nil
+  attr :type, :string, default: nil
+  attr :variant, :string, values: ~w(surface overlay), default: "surface"
+  attr :size, :string, values: ~w(sm md lg), default: "md"
+
+  slot :inner_block, required: true
+
+  def icon_button(%{rest: rest} = assigns) do
+    link? = rest[:href] || rest[:navigate] || rest[:patch]
+
+    base_classes = [
+      "inline-flex cursor-pointer items-center justify-center transition",
+      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2",
+      "disabled:pointer-events-none disabled:opacity-50 dark:focus-visible:ring-offset-slate-900"
+    ]
+
+    size_classes =
+      case assigns.size do
+        "sm" -> "h-8 w-8 rounded-xl"
+        "lg" -> "h-12 w-12 rounded-2xl"
+        _ -> "h-10 w-10 rounded-2xl"
+      end
+
+    variant_classes =
+      case assigns.variant do
+        "overlay" ->
+          "bg-white/10 text-white hover:bg-white/20 focus-visible:ring-white/60"
+
+        _ ->
+          "text-slate-500 hover:bg-slate-900/5 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
+      end
+
+    assigns =
+      assigns
+      |> assign(:button_type, if(link?, do: nil, else: assigns.type || "button"))
+      |> assign(:button_class, [base_classes, size_classes, variant_classes, assigns.class])
+
+    if link? do
+      ~H"""
+      <.link class={@button_class} aria-label={@label} {@rest}>
+        {render_slot(@inner_block)}
+      </.link>
+      """
+    else
+      ~H"""
+      <button type={@button_type} aria-label={@label} class={@button_class} {@rest}>
+        {render_slot(@inner_block)}
+      </button>
+      """
+    end
+  end
+
+  @doc """
   Renders an emoji picker for composer-like forms.
 
   This component is purely client-side via the `EmojiPicker` LiveView hook.

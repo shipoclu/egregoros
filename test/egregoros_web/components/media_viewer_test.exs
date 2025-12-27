@@ -17,6 +17,7 @@ defmodule EgregorosWeb.MediaViewerTest do
         open: true
       })
 
-    assert html =~ ~r/<button[^>]*data-role="media-viewer-close"[^>]*class="[^"]*\bz-20\b/
+    assert html =~
+             ~r/<button(?=[^>]*data-role="media-viewer-close")(?=[^>]*\bz-20\b)[^>]*>/
   end
 end

@@ -57,15 +57,14 @@ defmodule EgregorosWeb.ReplyModal do
             </p>
           </div>
 
-          <button
-            type="button"
+          <.icon_button
             data-role="reply-modal-close"
             phx-click={close_js(@id, @close_event)}
-            class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-slate-500 transition hover:bg-slate-900/5 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
-            aria-label="Close reply composer"
+            label="Close reply composer"
+            class="shrink-0"
           >
             <.icon name="hero-x-mark" class="size-5" />
-          </button>
+          </.icon_button>
         </div>
 
         <Composer.composer_form

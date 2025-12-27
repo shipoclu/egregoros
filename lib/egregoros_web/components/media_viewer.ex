@@ -37,41 +37,41 @@ defmodule EgregorosWeb.MediaViewer do
         phx-click-away={JS.dispatch("egregoros:media-close", to: "#media-viewer")}
         class="relative w-full max-w-4xl overflow-hidden rounded-3xl bg-black shadow-2xl"
       >
-        <button
-          type="button"
+        <.icon_button
           data-role="media-viewer-prev"
           phx-click={JS.dispatch("egregoros:media-prev", to: "#media-viewer")}
+          label="Previous media"
+          variant="overlay"
           class={[
-            "absolute left-4 top-1/2 z-20 -translate-y-1/2 inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-white transition hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60",
+            "absolute left-4 top-1/2 z-20 -translate-y-1/2",
             @item_count < 2 && "hidden"
           ]}
-          aria-label="Previous media"
         >
           <.icon name="hero-chevron-left" class="size-5" />
-        </button>
+        </.icon_button>
 
-        <button
-          type="button"
+        <.icon_button
           data-role="media-viewer-close"
           phx-click={JS.dispatch("egregoros:media-close", to: "#media-viewer")}
-          class="absolute right-4 top-4 z-20 inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-white transition hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
-          aria-label="Close media viewer"
+          label="Close media viewer"
+          variant="overlay"
+          class="absolute right-4 top-4 z-20"
         >
           <.icon name="hero-x-mark" class="size-5" />
-        </button>
+        </.icon_button>
 
-        <button
-          type="button"
+        <.icon_button
           data-role="media-viewer-next"
           phx-click={JS.dispatch("egregoros:media-next", to: "#media-viewer")}
+          label="Next media"
+          variant="overlay"
           class={[
-            "absolute right-4 top-1/2 z-20 -translate-y-1/2 inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-white transition hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60",
+            "absolute right-4 top-1/2 z-20 -translate-y-1/2",
             @item_count < 2 && "hidden"
           ]}
-          aria-label="Next media"
         >
           <.icon name="hero-chevron-right" class="size-5" />
-        </button>
+        </.icon_button>
 
         <div data-role="media-viewer-slides" class="relative">
           <div

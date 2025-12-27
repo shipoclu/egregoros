@@ -66,6 +66,53 @@ defmodule EgregorosWeb.CoreComponentsTest do
     assert html =~ "cursor-pointer"
   end
 
+  test "icon_button defaults to type button and renders an aria-label" do
+    html =
+      render_component(&CoreComponents.icon_button/1, %{
+        rest: %{},
+        label: "Close",
+        variant: "surface",
+        size: "md",
+        type: nil,
+        class: nil,
+        inner_block: slot_text("X")
+      })
+
+    assert html =~ ~s(type="button")
+    assert html =~ ~s(aria-label="Close")
+  end
+
+  test "icon_button advertises clickability with a pointer cursor" do
+    html =
+      render_component(&CoreComponents.icon_button/1, %{
+        rest: %{},
+        label: "Menu",
+        variant: "surface",
+        size: "md",
+        type: nil,
+        class: nil,
+        inner_block: slot_text("…")
+      })
+
+    assert html =~ "cursor-pointer"
+  end
+
+  test "icon_button renders overlay styling when requested" do
+    html =
+      render_component(&CoreComponents.icon_button/1, %{
+        rest: %{},
+        label: "Close",
+        variant: "overlay",
+        size: "md",
+        type: nil,
+        class: nil,
+        inner_block: slot_text("X")
+      })
+
+    assert html =~ "bg-white/10"
+    assert html =~ "focus-visible:ring-white/60"
+  end
+
   test "card wraps content and exposes a stable data role" do
     html =
       render_component(
