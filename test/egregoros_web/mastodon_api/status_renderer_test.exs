@@ -4,6 +4,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusRendererTest do
   alias Egregoros.Objects
   alias Egregoros.Relationships
   alias Egregoros.Pipeline
+  alias Egregoros.Publish
   alias Egregoros.TestSupport.Fixtures
   alias Egregoros.Users
   alias EgregorosWeb.Endpoint
@@ -30,22 +31,13 @@ defmodule EgregorosWeb.MastodonAPI.StatusRendererTest do
     refute rendered["content"] =~ "<script"
   end
 
-  test "escapes local content as text" do
-    {:ok, object} =
-      Objects.create_object(%{
-        ap_id: "https://local.example/objects/2",
-        type: "Note",
-        actor: "https://local.example/users/alice",
-        local: true,
-        data: %{
-          "id" => "https://local.example/objects/2",
-          "type" => "Note",
-          "actor" => "https://local.example/users/alice",
-          "content" => "<script>alert(1)</script>"
-        }
-      })
+  test "escapes local user input while still producing HTML content" do
+    {:ok, user} = Users.create_local_user("alice")
 
-    rendered = StatusRenderer.render_status(object)
+    assert {:ok, create} = Publish.post_note(user, "<script>alert(1)</script>")
+    note = Objects.get_by_ap_id(create.object)
+
+    rendered = StatusRenderer.render_status(note)
 
     assert rendered["content"] =~ "&lt;script&gt;alert(1)&lt;/script&gt;"
     refute rendered["content"] =~ "<script"
@@ -58,6 +50,8 @@ defmodule EgregorosWeb.MastodonAPI.StatusRendererTest do
     note = Objects.get_by_ap_id(create.object)
 
     rendered = StatusRenderer.render_status(note)
+
+    assert rendered["content"] =~ "href=\"#{Endpoint.url()}/@lain@localtesting.pleroma.lol\""
 
     assert [%{"url" => url} = mention] =
              rendered["mentions"]

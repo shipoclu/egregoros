@@ -329,15 +329,10 @@ defmodule EgregorosWeb.NotificationsLive do
       %{type: "Note"} = object ->
         raw = object.data |> Map.get("content", "") |> to_string()
         emojis = CustomEmojis.from_object(object)
-
-        format =
-          case Map.get(object, :local) do
-            false -> :html
-            _ -> :text
-          end
+        ap_tags = Map.get(object.data, "tag", [])
 
         raw
-        |> HTML.to_safe_html(format: format, emojis: emojis)
+        |> HTML.to_safe_html(format: :html, emojis: emojis, ap_tags: ap_tags)
         |> Phoenix.HTML.raw()
 
       _ ->

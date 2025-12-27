@@ -489,15 +489,10 @@ defmodule EgregorosWeb.StatusCard do
   defp post_content_html(%{data: %{} = data} = object) do
     raw = Map.get(data, "content", "")
     emojis = CustomEmojis.from_object(object)
-
-    format =
-      case Map.get(object, :local) do
-        false -> :html
-        _ -> :text
-      end
+    ap_tags = Map.get(data, "tag", [])
 
     raw
-    |> HTML.to_safe_html(format: format, emojis: emojis)
+    |> HTML.to_safe_html(format: :html, emojis: emojis, ap_tags: ap_tags)
     |> Phoenix.HTML.raw()
   end
 

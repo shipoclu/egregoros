@@ -337,14 +337,9 @@ defmodule EgregorosWeb.MastodonAPI.StatusRenderer do
 
   defp content(%Object{} = object) do
     raw = Map.get(object.data, "content", "")
+    ap_tags = Map.get(object.data, "tag", [])
 
-    format =
-      case object.local do
-        false -> :html
-        _ -> :text
-      end
-
-    HTML.to_safe_html(raw, format: format)
+    HTML.to_safe_html(raw, format: :html, ap_tags: ap_tags)
   end
 
   defp content(_), do: ""

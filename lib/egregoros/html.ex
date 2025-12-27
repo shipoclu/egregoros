@@ -4,6 +4,8 @@ defmodule Egregoros.HTML do
   @default_scrubber Egregoros.HTML.Scrubber.Default
 
   alias EgregorosWeb.Endpoint
+  alias EgregorosWeb.ProfilePaths
+  alias EgregorosWeb.URL
 
   defguardp valid_codepoint(code)
             when is_integer(code) and code >= 0 and code <= 0x10FFFF and
@@ -26,28 +28,32 @@ defmodule Egregoros.HTML do
     format = Keyword.get(opts, :format, :html)
     emojis = Keyword.get(opts, :emojis, [])
     mention_hrefs = Keyword.get(opts, :mention_hrefs, %{})
+    ap_tags = Keyword.get(opts, :ap_tags, [])
     emoji_map = emoji_map(emojis)
     trimmed = String.trim(content)
 
-    cond do
-      trimmed == "" ->
-        ""
+    rendered =
+      cond do
+        trimmed == "" ->
+          ""
 
-      format == :text ->
-        trimmed
-        |> text_to_html(emoji_map, mention_hrefs)
-        |> sanitize()
+        format == :text ->
+          trimmed
+          |> text_to_html(emoji_map, mention_hrefs)
+          |> sanitize()
 
-      format == :html and looks_like_html?(trimmed) ->
-        trimmed
-        |> emojify_html(emoji_map)
-        |> sanitize()
+        format == :html and looks_like_html?(trimmed) ->
+          trimmed
+          |> emojify_html(emoji_map)
+          |> sanitize()
 
-      true ->
-        trimmed
-        |> text_to_html(emoji_map, mention_hrefs)
-        |> sanitize()
-    end
+        true ->
+          trimmed
+          |> text_to_html(emoji_map, mention_hrefs)
+          |> sanitize()
+      end
+
+    rewrite_mention_links(rendered, ap_tags)
   end
 
   def to_safe_html(_content, _opts), do: ""
@@ -436,4 +442,41 @@ defmodule Egregoros.HTML do
     value
     |> Plug.HTML.html_escape_to_iodata()
   end
+
+  defp rewrite_mention_links(html, tags) when is_binary(html) and is_list(tags) do
+    tags
+    |> Enum.reduce(html, fn
+      %{"type" => "Mention", "href" => href, "name" => name}, acc
+      when is_binary(href) and href != "" and is_binary(name) and name != "" ->
+        case ProfilePaths.profile_path(name) do
+          profile_path when is_binary(profile_path) and profile_path != "" ->
+            profile_url = URL.absolute(profile_path)
+
+            if is_binary(profile_url) and profile_url != "" do
+              replace_href(acc, href, profile_url)
+            else
+              acc
+            end
+
+          _ ->
+            acc
+        end
+
+      _other, acc ->
+        acc
+    end)
+  end
+
+  defp rewrite_mention_links(html, _tags) when is_binary(html), do: html
+
+  defp replace_href(html, old_href, new_href) when is_binary(html) do
+    old_escaped = old_href |> escape_binary() |> IO.iodata_to_binary()
+    new_escaped = new_href |> escape_binary() |> IO.iodata_to_binary()
+
+    html
+    |> String.replace("href=\"#{old_escaped}\"", "href=\"#{new_escaped}\"")
+    |> String.replace("href='#{old_escaped}'", "href='#{new_escaped}'")
+  end
+
+  defp replace_href(html, _old_href, _new_href) when is_binary(html), do: html
 end

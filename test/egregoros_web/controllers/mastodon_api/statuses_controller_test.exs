@@ -20,7 +20,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusesControllerTest do
     assert response["account"]["username"] == "local"
 
     [object] = Objects.list_notes()
-    assert object.data["content"] == "Hello API"
+    assert object.data["content"] == "<p>Hello API</p>"
   end
 
   test "POST /api/v1/statuses supports replies via in_reply_to_id", %{conn: conn} do
@@ -51,7 +51,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusesControllerTest do
     assert response["in_reply_to_id"] == Integer.to_string(parent.id)
 
     [reply, _parent] = Objects.list_notes()
-    assert reply.data["content"] == "Reply post"
+    assert reply.data["content"] == "<p>Reply post</p>"
     assert reply.data["inReplyTo"] == parent.ap_id
   end
 
