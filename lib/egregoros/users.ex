@@ -36,16 +36,19 @@ defmodule Egregoros.Users do
       outbox: base <> "/outbox",
       public_key: public_key,
       private_key: private_key,
-      local: true
+      local: true,
+      admin: nickname == "alice"
     })
   end
 
   def register_local_user(attrs) when is_map(attrs) do
     nickname = attrs |> Map.get(:nickname, "") |> to_string() |> String.trim()
+
     email =
       attrs
       |> Map.get(:email, nil)
       |> normalize_optional_string()
+
     password = attrs |> Map.get(:password, "") |> to_string()
 
     cond do
@@ -70,6 +73,7 @@ defmodule Egregoros.Users do
           public_key: public_key,
           private_key: private_key,
           local: true,
+          admin: nickname == "alice",
           email: email,
           password_hash: Password.hash(password),
           name: Map.get(attrs, :name),
@@ -103,6 +107,7 @@ defmodule Egregoros.Users do
           public_key: public_key,
           private_key: private_key,
           local: true,
+          admin: nickname == "alice",
           email: email,
           password_hash: nil,
           name: Map.get(attrs, :name),
@@ -229,7 +234,10 @@ defmodule Egregoros.Users do
   end
 
   def update_profile(%User{} = user, attrs) when is_map(attrs) do
-    attrs = normalize_optional_email(attrs)
+    attrs =
+      attrs
+      |> normalize_optional_email()
+      |> drop_privilege_escalation_keys()
 
     user
     |> User.changeset(attrs)
@@ -295,6 +303,14 @@ defmodule Egregoros.Users do
   end
 
   defp normalize_optional_email(attrs), do: attrs
+
+  defp drop_privilege_escalation_keys(%{} = attrs) do
+    attrs
+    |> Map.delete("admin")
+    |> Map.delete(:admin)
+  end
+
+  defp drop_privilege_escalation_keys(attrs), do: attrs
 
   defp normalize_optional_string(nil), do: nil
 

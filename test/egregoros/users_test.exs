@@ -41,11 +41,17 @@ defmodule Egregoros.UsersTest do
 
     assert user.local == true
     assert user.nickname == "bob"
+    assert user.admin == false
     assert user.ap_id == EgregorosWeb.Endpoint.url() <> "/users/bob"
     assert user.inbox == user.ap_id <> "/inbox"
     assert user.outbox == user.ap_id <> "/outbox"
     assert String.starts_with?(user.public_key, "-----BEGIN PUBLIC KEY-----")
     assert String.starts_with?(user.private_key, "-----BEGIN PRIVATE KEY-----")
+  end
+
+  test "create_local_user makes alice an admin" do
+    {:ok, user} = Users.create_local_user("alice")
+    assert user.admin == true
   end
 
   test "get_or_create_local_user returns existing" do

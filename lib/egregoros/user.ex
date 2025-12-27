@@ -5,7 +5,7 @@ defmodule Egregoros.User do
 
   alias Egregoros.Domain
 
-  @fields ~w(nickname domain ap_id inbox outbox public_key private_key local email password_hash name bio avatar_url banner_url)a
+  @fields ~w(nickname domain ap_id inbox outbox public_key private_key local admin email password_hash name bio avatar_url banner_url)a
   @required_fields ~w(nickname ap_id inbox outbox public_key local)a
 
   schema "users" do
@@ -17,6 +17,7 @@ defmodule Egregoros.User do
     field :public_key, :string
     field :private_key, :string
     field :local, :boolean, default: true
+    field :admin, :boolean, default: false
     field :email, :string
     field :password_hash, :string
     field :name, :string
