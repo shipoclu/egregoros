@@ -2,6 +2,7 @@ defmodule EgregorosWeb.InboxControllerTest do
   use EgregorosWeb.ConnCase, async: true
 
   alias Egregoros.Objects
+  alias Egregoros.Relationships
   alias Egregoros.Users
   alias Egregoros.Workers.IngestActivity
 
@@ -55,6 +56,55 @@ defmodule EgregorosWeb.InboxControllerTest do
     assert :ok = perform_job(IngestActivity, %{"activity" => create, "inbox_user_ap_id" => frank.ap_id})
 
     assert Objects.get_by_ap_id(note["id"])
+  end
+
+  test "POST /users/:nickname/inbox discards a Follow not targeting that inbox user", %{conn: conn} do
+    {:ok, frank} = Users.create_local_user("frank")
+    {:ok, bob} = Users.create_local_user("bob")
+
+    {public_key, private_key} = Egregoros.Keys.generate_rsa_keypair()
+
+    {:ok, _} =
+      Users.create_user(%{
+        nickname: "alice",
+        ap_id: "https://remote.example/users/alice",
+        inbox: "https://remote.example/users/alice/inbox",
+        outbox: "https://remote.example/users/alice/outbox",
+        public_key: public_key,
+        private_key: private_key,
+        local: false
+      })
+
+    follow = %{
+      "id" => "https://remote.example/activities/follow/1",
+      "type" => "Follow",
+      "actor" => "https://remote.example/users/alice",
+      "object" => bob.ap_id
+    }
+
+    conn =
+      conn
+      |> sign_request(
+        "post",
+        "/users/frank/inbox",
+        private_key,
+        "https://remote.example/users/alice#main-key"
+      )
+      |> post("/users/frank/inbox", follow)
+
+    assert response(conn, 202)
+
+    assert_enqueued(
+      worker: IngestActivity,
+      queue: "federation_incoming",
+      args: %{"activity" => follow, "inbox_user_ap_id" => frank.ap_id}
+    )
+
+    assert {:discard, :not_targeted} =
+             perform_job(IngestActivity, %{"activity" => follow, "inbox_user_ap_id" => frank.ap_id})
+
+    refute Objects.get_by_ap_id(follow["id"])
+    refute Relationships.get_by_type_actor_object("Follow", follow["actor"], bob.ap_id)
   end
 
   test "POST /users/:nickname/inbox accepts a Create with attachments and blank content", %{

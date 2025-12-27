@@ -60,9 +60,11 @@ defmodule Egregoros.Activities.Follow do
   end
 
   def ingest(activity, opts) do
-    activity
-    |> to_object_attrs(opts)
-    |> Objects.upsert_object()
+    with :ok <- validate_inbox_target(activity, opts) do
+      activity
+      |> to_object_attrs(opts)
+      |> Objects.upsert_object()
+    end
   end
 
   def side_effects(object, opts) do
@@ -113,6 +115,22 @@ defmodule Egregoros.Activities.Follow do
       _ -> :ok
     end
   end
+
+  defp validate_inbox_target(%{"object" => object}, opts) when is_binary(object) and is_list(opts) do
+    if Keyword.get(opts, :local, true) do
+      :ok
+    else
+      case Keyword.get(opts, :inbox_user_ap_id) do
+        inbox_user_ap_id when is_binary(inbox_user_ap_id) and inbox_user_ap_id != "" ->
+          if object == inbox_user_ap_id, do: :ok, else: {:error, :not_targeted}
+
+        _ ->
+          :ok
+      end
+    end
+  end
+
+  defp validate_inbox_target(_activity, _opts), do: :ok
 
   defp to_object_attrs(activity, opts) do
     %{
