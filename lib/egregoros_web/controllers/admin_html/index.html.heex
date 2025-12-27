@@ -1,0 +1,67 @@
+<Layouts.app flash={@flash} current_user={@current_user}>
+  <AppShell.app_shell
+    id="admin-shell"
+    nav_id="admin-nav"
+    main_id="admin-main"
+    active={:admin}
+    current_user={@current_user}
+    notifications_count={@notifications_count}
+  >
+    <section class="rounded-3xl border border-white/80 bg-white/80 p-8 shadow-xl shadow-slate-200/40 backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/70 dark:shadow-slate-900/40">
+      <header class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 class="font-display text-2xl text-slate-900 dark:text-slate-100">
+            Admin settings
+          </h2>
+          <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
+            Manage instance-wide features like ActivityPub relays.
+          </p>
+        </div>
+      </header>
+
+      <div class="mt-8 space-y-6">
+        <div>
+          <h3 class="text-sm font-semibold uppercase tracking-[0.25em] text-slate-500 dark:text-slate-400">
+            Relays
+          </h3>
+          <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">
+            Subscribe to ActivityPub relays by following their actor.
+          </p>
+
+          <.form for={@form} action={~p"/admin/relays"} class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+            <.input
+              type="url"
+              field={@form[:ap_id]}
+              label="Relay actor URL"
+              placeholder="https://relay.example/actor"
+              class="flex-1"
+            />
+
+            <.button type="submit" class="sm:w-44">Subscribe</.button>
+          </.form>
+        </div>
+
+        <div :if={@relays != []} class="rounded-2xl border border-slate-200 bg-white/70 p-4 dark:border-slate-700 dark:bg-slate-950/30">
+          <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500 dark:text-slate-400">
+            Subscribed relays
+          </p>
+
+          <ul class="mt-3 space-y-2">
+            <li :for={relay <- @relays} class="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
+              <p class="truncate text-sm text-slate-700 dark:text-slate-200">
+                {relay.ap_id}
+              </p>
+            </li>
+          </ul>
+        </div>
+
+        <div :if={@relays == []} class="rounded-2xl border border-dashed border-slate-300 bg-white/50 p-6 text-center dark:border-slate-700 dark:bg-slate-950/20">
+          <p class="text-sm text-slate-600 dark:text-slate-300">
+            No relays subscribed yet.
+          </p>
+        </div>
+      </div>
+    </section>
+  </AppShell.app_shell>
+</Layouts.app>
+

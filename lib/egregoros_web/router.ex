@@ -19,6 +19,10 @@ defmodule EgregorosWeb.Router do
     plug :put_secure_browser_headers
   end
 
+  pipeline :admin do
+    plug EgregorosWeb.Plugs.RequireAdmin
+  end
+
   pipeline :api do
     plug :accepts, ["json"]
   end
@@ -68,6 +72,13 @@ defmodule EgregorosWeb.Router do
     live "/@:nickname/followers", RelationshipsLive, :followers
     live "/@:nickname/following", RelationshipsLive, :following
     live "/@:nickname/:uuid", StatusLive
+  end
+
+  scope "/", EgregorosWeb do
+    pipe_through [:browser, :admin]
+
+    get "/admin", AdminController, :index
+    post "/admin/relays", AdminController, :create_relay
   end
 
   scope "/", EgregorosWeb do

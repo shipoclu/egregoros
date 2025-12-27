@@ -16,6 +16,7 @@ defmodule EgregorosWeb.AppShell do
       :bookmarks,
       :profile,
       :settings,
+      :admin,
       :login,
       :register
     ],
@@ -150,6 +151,15 @@ defmodule EgregorosWeb.AppShell do
                     icon="hero-cog-6-tooth"
                     label="Settings"
                     navigate={~p"/settings"}
+                  />
+
+                  <.nav_link
+                    :if={Map.get(@current_user, :admin) == true}
+                    role="nav-admin"
+                    active={@active == :admin}
+                    icon="hero-shield-check"
+                    label="Admin"
+                    navigate={~p"/admin"}
                   />
                 <% else %>
                   <.nav_link
