@@ -125,6 +125,9 @@ defmodule EgregorosWeb.MastodonAPI.StreamingController do
       %Token{user: %User{} = user} = oauth_token ->
         {:ok, user, oauth_token}
 
+      %Token{} = oauth_token ->
+        {:ok, nil, oauth_token}
+
       _ ->
         {:error, :unauthorized}
     end

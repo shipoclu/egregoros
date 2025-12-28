@@ -110,4 +110,29 @@ defmodule EgregorosWeb.MastodonAPI.StreamingControllerTest do
     assert Plug.Conn.get_resp_header(conn, "sec-websocket-protocol") == [token.token]
     assert conn.state == :upgraded
   end
+
+  test "GET /api/v1/streaming upgrades for public stream with an app token", %{conn: conn} do
+    {:ok, app} =
+      OAuth.create_application(%{
+        "client_name" => "Ivory for iOS",
+        "redirect_uris" => "com.tapbots.Ivory.23600:/request_token/39A4ABC7-48F1-4DBC-906A-4D2D249C3440",
+        "scopes" => "read"
+      })
+
+    {:ok, token} =
+      OAuth.exchange_code_for_token(%{
+        "grant_type" => "client_credentials",
+        "client_id" => app.client_id,
+        "client_secret" => app.client_secret,
+        "scope" => "read"
+      })
+
+    conn =
+      conn
+      |> with_websocket_headers(protocol: token.token)
+      |> get("/api/v1/streaming?stream=public")
+
+    assert Plug.Conn.get_resp_header(conn, "sec-websocket-protocol") == [token.token]
+    assert conn.state == :upgraded
+  end
 end
