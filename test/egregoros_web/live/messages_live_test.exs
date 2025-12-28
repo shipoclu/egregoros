@@ -3,6 +3,7 @@ defmodule EgregorosWeb.MessagesLiveTest do
 
   import Phoenix.LiveViewTest
 
+  alias Egregoros.DirectMessages
   alias Egregoros.Publish
   alias Egregoros.Users
 
@@ -38,5 +39,45 @@ defmodule EgregorosWeb.MessagesLiveTest do
 
     assert has_element?(view, "article", "hi bob")
   end
-end
 
+  test "sending an encrypted DM stores the payload and uses a placeholder body", %{
+    conn: conn,
+    alice: alice,
+    bob: bob
+  } do
+    conn = Plug.Test.init_test_session(conn, %{user_id: alice.id})
+    {:ok, view, _html} = live(conn, "/messages")
+
+    payload = %{
+      "version" => 1,
+      "alg" => "ECDH-P256+HKDF-SHA256+AES-256-GCM",
+      "sender" => %{"ap_id" => alice.ap_id, "kid" => "e2ee-alice"},
+      "recipient" => %{"ap_id" => bob.ap_id, "kid" => "e2ee-bob"},
+      "nonce" => "nonce",
+      "salt" => "salt",
+      "aad" => %{
+        "sender_ap_id" => alice.ap_id,
+        "recipient_ap_id" => bob.ap_id,
+        "sender_kid" => "e2ee-alice",
+        "recipient_kid" => "e2ee-bob"
+      },
+      "ciphertext" => "ciphertext"
+    }
+
+    view
+    |> form("#dm-form",
+      dm: %{
+        recipient: "@#{bob.nickname}",
+        content: "this-should-not-be-stored",
+        e2ee_dm: Jason.encode!(payload)
+      }
+    )
+    |> render_submit()
+
+    assert has_element?(view, "article", "Encrypted message")
+    refute has_element?(view, "article", "this-should-not-be-stored")
+
+    [dm] = DirectMessages.list_for_user(alice, limit: 1)
+    assert dm.data["egregoros:e2ee_dm"] == payload
+  end
+end

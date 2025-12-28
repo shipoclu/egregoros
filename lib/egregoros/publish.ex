@@ -26,6 +26,7 @@ defmodule Egregoros.Publish do
     spoiler_text = Keyword.get(opts, :spoiler_text)
     sensitive = Keyword.get(opts, :sensitive)
     language = Keyword.get(opts, :language)
+    e2ee_dm = Keyword.get(opts, :e2ee_dm)
 
     cond do
       content == "" and attachments == [] ->
@@ -69,6 +70,7 @@ defmodule Egregoros.Publish do
           |> maybe_put_summary(spoiler_text)
           |> maybe_put_sensitive(sensitive)
           |> maybe_put_language(language)
+          |> maybe_put_e2ee_dm(e2ee_dm)
 
         create = Create.build(user, note)
 
@@ -178,6 +180,16 @@ defmodule Egregoros.Publish do
   end
 
   defp maybe_put_language(note, _value), do: note
+
+  defp maybe_put_e2ee_dm(note, %{} = payload) when is_map(note) do
+    if map_size(payload) == 0 do
+      note
+    else
+      Map.put(note, "egregoros:e2ee_dm", payload)
+    end
+  end
+
+  defp maybe_put_e2ee_dm(note, _payload), do: note
 
   defp resolve_mentions(content, actor_ap_id)
        when is_binary(content) and is_binary(actor_ap_id) do

@@ -31,7 +31,8 @@ defmodule EgregorosWeb.MessagesLive do
      |> assign(
        current_user: current_user,
        notifications_count: notifications_count(current_user),
-       dm_form: Phoenix.Component.to_form(%{"recipient" => "", "content" => ""}, as: :dm),
+       dm_form:
+         Phoenix.Component.to_form(%{"recipient" => "", "content" => "", "e2ee_dm" => ""}, as: :dm),
        dm_cursor: cursor(messages),
        dm_end?: length(messages) < @page_size
      )
@@ -92,6 +93,7 @@ defmodule EgregorosWeb.MessagesLive do
   def handle_event("send_dm", %{"dm" => %{} = params}, socket) do
     recipient = params |> Map.get("recipient", "") |> to_string() |> String.trim()
     body = params |> Map.get("content", "") |> to_string() |> String.trim()
+    e2ee_dm = params |> Map.get("e2ee_dm", "") |> to_string() |> String.trim()
 
     cond do
       not match?(%User{}, socket.assigns.current_user) ->
@@ -104,9 +106,9 @@ defmodule EgregorosWeb.MessagesLive do
         {:noreply, put_flash(socket, :error, "Message can't be empty.")}
 
       true ->
-        content = normalize_dm_content(recipient, body)
+        {content, opts} = prepare_dm(recipient, body, e2ee_dm)
 
-        case Publish.post_note(socket.assigns.current_user, content, visibility: "direct") do
+        case Publish.post_note(socket.assigns.current_user, content, opts) do
           {:ok, create} ->
             note = Objects.get_by_ap_id(create.object)
 
@@ -114,7 +116,11 @@ defmodule EgregorosWeb.MessagesLive do
               socket
               |> put_flash(:info, "Message sent.")
               |> assign(
-                dm_form: Phoenix.Component.to_form(%{"recipient" => recipient, "content" => ""}, as: :dm)
+                dm_form:
+                  Phoenix.Component.to_form(
+                    %{"recipient" => recipient, "content" => "", "e2ee_dm" => ""},
+                    as: :dm
+                  )
               )
 
             if note do
@@ -157,7 +163,22 @@ defmodule EgregorosWeb.MessagesLive do
 
           <%= if @current_user do %>
             <.card class="p-6">
-              <.form for={@dm_form} id="dm-form" phx-submit="send_dm" class="space-y-4">
+              <.form
+                for={@dm_form}
+                id="dm-form"
+                phx-submit="send_dm"
+                class="space-y-4"
+              >
+                <input
+                  type="text"
+                  name="dm[e2ee_dm]"
+                  value={@dm_form.params["e2ee_dm"] || ""}
+                  data-role="dm-e2ee-payload"
+                  class="hidden"
+                  aria-hidden="true"
+                  tabindex="-1"
+                />
+
                 <div class="space-y-2">
                   <label class="block text-sm font-semibold text-slate-700 dark:text-slate-200">
                     To
@@ -272,6 +293,20 @@ defmodule EgregorosWeb.MessagesLive do
       body
     else
       "@" <> recipient <> " " <> body
+    end
+  end
+
+  defp prepare_dm(recipient, body, e2ee_dm) when is_binary(recipient) and is_binary(body) do
+    e2ee_dm = if is_binary(e2ee_dm), do: String.trim(e2ee_dm), else: ""
+
+    with true <- e2ee_dm != "",
+         {:ok, %{} = payload} <- Jason.decode(e2ee_dm) do
+      content = normalize_dm_content(recipient, "Encrypted message")
+      {content, visibility: "direct", e2ee_dm: payload}
+    else
+      _ ->
+        content = normalize_dm_content(recipient, body)
+        {content, visibility: "direct"}
     end
   end
 
