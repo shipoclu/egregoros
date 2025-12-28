@@ -157,6 +157,27 @@ defmodule EgregorosWeb.TimelineLiveTest do
     refute has_element?(view, "[data-role='mention-suggestion']")
   end
 
+  test "reply modal stays open after selecting a target", %{conn: conn, user: user} do
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/")
+
+    {:ok, create} = Publish.post_note(user, "Hello")
+    note = Objects.get_by_ap_id(create.object)
+    assert note
+
+    refute has_element?(view, "#reply-modal[data-state='open']")
+    assert has_element?(view, "#reply-modal.hidden")
+
+    _html =
+      render_hook(view, "open_reply_modal", %{
+        "in_reply_to" => note.ap_id,
+        "actor_handle" => "@alice"
+      })
+
+    assert has_element?(view, "#reply-modal[data-state='open']")
+    refute has_element?(view, "#reply-modal.hidden")
+  end
+
   test "timeline renders custom emojis in remote actor display names", %{conn: conn, user: _user} do
     {:ok, remote} =
       Users.create_user(%{
