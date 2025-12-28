@@ -86,6 +86,22 @@ defmodule Egregoros.Relationships do
     |> Repo.all()
   end
 
+  def list_by_type_actor(type, actor_ap_id, opts \\ [])
+
+  def list_by_type_actor(type, actor_ap_id, opts)
+      when is_binary(type) and is_binary(actor_ap_id) and is_list(opts) do
+    limit = opts |> Keyword.get(:limit, 40) |> normalize_limit()
+    max_id = Keyword.get(opts, :max_id)
+
+    from(r in Relationship,
+      where: r.type == ^type and r.actor == ^actor_ap_id,
+      order_by: [desc: r.id],
+      limit: ^limit
+    )
+    |> maybe_where_max_id(max_id)
+    |> Repo.all()
+  end
+
   def count_by_type_objects(type, object_ap_ids)
       when is_binary(type) and is_list(object_ap_ids) do
     object_ap_ids = normalize_ap_ids(object_ap_ids)

@@ -125,6 +125,10 @@ defmodule EgregorosWeb.Router do
     pipe_through [:api, :api_auth, :oauth_write]
 
     patch "/accounts/update_credentials", AccountsController, :update_credentials
+    post "/accounts/:id/block", AccountsController, :block
+    post "/accounts/:id/unblock", AccountsController, :unblock
+    post "/accounts/:id/mute", AccountsController, :mute
+    post "/accounts/:id/unmute", AccountsController, :unmute
     post "/markers", MarkersController, :create
     post "/media", MediaController, :create
     put "/media/:id", MediaController, :update
@@ -156,8 +160,8 @@ defmodule EgregorosWeb.Router do
     get "/lists", EmptyListController, :index
     get "/bookmarks", EmptyListController, :index
     get "/favourites", EmptyListController, :index
-    get "/blocks", EmptyListController, :index
-    get "/mutes", EmptyListController, :index
+    get "/blocks", BlocksController, :index
+    get "/mutes", MutesController, :index
     get "/follow_requests", EmptyListController, :index
     get "/markers", MarkersController, :index
     get "/statuses/:id/favourited_by", StatusesController, :favourited_by

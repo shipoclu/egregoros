@@ -402,6 +402,115 @@ defmodule EgregorosWeb.MastodonAPI.AccountsControllerTest do
     assert Relationships.get_by_type_actor_object("Follow", user.ap_id, target.ap_id) == nil
   end
 
+  test "POST /api/v1/accounts/:id/block creates a block relationship and removes follows", %{
+    conn: conn
+  } do
+    {:ok, user} = Users.create_local_user("local")
+    {:ok, target} = Users.create_local_user("blocked")
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, user} end)
+
+    {:ok, _follow_1} =
+      Pipeline.ingest(
+        %{
+          "id" => "https://example.com/activities/follow/1",
+          "type" => "Follow",
+          "actor" => user.ap_id,
+          "object" => target.ap_id
+        },
+        local: true
+      )
+
+    {:ok, _follow_2} =
+      Pipeline.ingest(
+        %{
+          "id" => "https://example.com/activities/follow/2",
+          "type" => "Follow",
+          "actor" => target.ap_id,
+          "object" => user.ap_id
+        },
+        local: true
+      )
+
+    assert Relationships.get_by_type_actor_object("Follow", user.ap_id, target.ap_id)
+    assert Relationships.get_by_type_actor_object("Follow", target.ap_id, user.ap_id)
+
+    conn = post(conn, "/api/v1/accounts/#{target.id}/block")
+    response = json_response(conn, 200)
+
+    assert response["id"] == Integer.to_string(target.id)
+    assert response["blocking"] == true
+    assert Relationships.get_by_type_actor_object("Block", user.ap_id, target.ap_id)
+    assert Relationships.get_by_type_actor_object("Follow", user.ap_id, target.ap_id) == nil
+    assert Relationships.get_by_type_actor_object("Follow", target.ap_id, user.ap_id) == nil
+  end
+
+  test "POST /api/v1/accounts/:id/unblock removes the block relationship", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("local")
+    {:ok, target} = Users.create_local_user("blocked")
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, user} end)
+
+    {:ok, _} =
+      Relationships.upsert_relationship(%{
+        type: "Block",
+        actor: user.ap_id,
+        object: target.ap_id,
+        activity_ap_id: "https://example.com/activities/block/1"
+      })
+
+    assert Relationships.get_by_type_actor_object("Block", user.ap_id, target.ap_id)
+
+    conn = post(conn, "/api/v1/accounts/#{target.id}/unblock")
+    response = json_response(conn, 200)
+
+    assert response["id"] == Integer.to_string(target.id)
+    assert response["blocking"] == false
+    assert Relationships.get_by_type_actor_object("Block", user.ap_id, target.ap_id) == nil
+  end
+
+  test "POST /api/v1/accounts/:id/mute creates a mute relationship", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("local")
+    {:ok, target} = Users.create_local_user("muted")
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, user} end)
+
+    conn = post(conn, "/api/v1/accounts/#{target.id}/mute")
+    response = json_response(conn, 200)
+
+    assert response["id"] == Integer.to_string(target.id)
+    assert response["muting"] == true
+    assert Relationships.get_by_type_actor_object("Mute", user.ap_id, target.ap_id)
+  end
+
+  test "POST /api/v1/accounts/:id/unmute removes the mute relationship", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("local")
+    {:ok, target} = Users.create_local_user("muted")
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, user} end)
+
+    {:ok, _} =
+      Relationships.upsert_relationship(%{
+        type: "Mute",
+        actor: user.ap_id,
+        object: target.ap_id,
+        activity_ap_id: "https://example.com/activities/mute/1"
+      })
+
+    assert Relationships.get_by_type_actor_object("Mute", user.ap_id, target.ap_id)
+
+    conn = post(conn, "/api/v1/accounts/#{target.id}/unmute")
+    response = json_response(conn, 200)
+
+    assert response["id"] == Integer.to_string(target.id)
+    assert response["muting"] == false
+    assert Relationships.get_by_type_actor_object("Mute", user.ap_id, target.ap_id) == nil
+  end
+
   test "GET /api/v1/accounts/relationships returns relationship objects", %{conn: conn} do
     {:ok, user} = Users.create_local_user("local")
     {:ok, target_1} = Users.create_local_user("alice")

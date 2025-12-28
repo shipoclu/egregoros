@@ -174,4 +174,75 @@ defmodule EgregorosWeb.MastodonAPI.TimelinesControllerTest do
     assert length(response) == 1
     assert Enum.at(response, 0)["content"] == "<p>First home post</p>"
   end
+
+  test "GET /api/v1/timelines/home does not include posts from muted accounts", %{conn: conn} do
+    {:ok, alice} = Users.create_local_user("alice")
+    {:ok, bob} = Users.create_local_user("bob")
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, 2, fn _conn -> {:ok, bob} end)
+
+    {:ok, _follow} =
+      Pipeline.ingest(
+        %{
+          "id" => "https://example.com/activities/follow/3",
+          "type" => "Follow",
+          "actor" => bob.ap_id,
+          "object" => alice.ap_id
+        },
+        local: true
+      )
+
+    {:ok, _} = Publish.post_note(alice, "Muted post")
+
+    conn = get(conn, "/api/v1/timelines/home")
+    response = json_response(conn, 200)
+    assert Enum.any?(response, &(&1["content"] == "<p>Muted post</p>"))
+
+    {:ok, _} =
+      Egregoros.Relationships.upsert_relationship(%{
+        type: "Mute",
+        actor: bob.ap_id,
+        object: alice.ap_id,
+        activity_ap_id: "https://example.com/activities/mute/2"
+      })
+
+    conn = get(conn, "/api/v1/timelines/home")
+    response = json_response(conn, 200)
+    refute Enum.any?(response, &(&1["content"] == "<p>Muted post</p>"))
+  end
+
+  test "GET /api/v1/timelines/home does not include direct messages from blocked accounts", %{
+    conn: conn
+  } do
+    {:ok, alice} = Users.create_local_user("alice")
+    {:ok, bob} = Users.create_local_user("bob")
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, 2, fn _conn -> {:ok, bob} end)
+
+    {:ok, _} = Publish.post_note(alice, "@bob Secret DM", visibility: "direct")
+
+    conn = get(conn, "/api/v1/timelines/home")
+    response = json_response(conn, 200)
+    assert Enum.any?(response, fn status ->
+             status["visibility"] == "direct" and
+               is_binary(status["content"]) and
+               String.contains?(status["content"], "Secret DM")
+           end)
+
+    {:ok, _} =
+      Egregoros.Relationships.upsert_relationship(%{
+        type: "Block",
+        actor: bob.ap_id,
+        object: alice.ap_id,
+        activity_ap_id: "https://example.com/activities/block/2"
+      })
+
+    conn = get(conn, "/api/v1/timelines/home")
+    response = json_response(conn, 200)
+    refute Enum.any?(response, fn status ->
+             is_binary(status["content"]) and String.contains?(status["content"], "Secret DM")
+           end)
+  end
 end

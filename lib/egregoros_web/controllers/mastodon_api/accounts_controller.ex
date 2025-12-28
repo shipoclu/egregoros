@@ -187,6 +187,71 @@ defmodule EgregorosWeb.MastodonAPI.AccountsController do
     end
   end
 
+  def block(conn, %{"id" => id}) do
+    actor = conn.assigns.current_user
+
+    with %{} = target <- Users.get(id),
+         true <- target.ap_id != actor.ap_id,
+         {:ok, _} <-
+           Relationships.upsert_relationship(%{
+             type: "Block",
+             actor: actor.ap_id,
+             object: target.ap_id,
+             activity_ap_id: nil
+           }) do
+      Relationships.delete_by_type_actor_object("Follow", actor.ap_id, target.ap_id)
+      Relationships.delete_by_type_actor_object("Follow", target.ap_id, actor.ap_id)
+
+      json(conn, RelationshipRenderer.render_relationship(actor, target))
+    else
+      nil -> send_resp(conn, 404, "Not Found")
+      false -> send_resp(conn, 422, "Unprocessable Entity")
+      {:error, _} -> send_resp(conn, 422, "Unprocessable Entity")
+    end
+  end
+
+  def unblock(conn, %{"id" => id}) do
+    actor = conn.assigns.current_user
+
+    with %{} = target <- Users.get(id) do
+      Relationships.delete_by_type_actor_object("Block", actor.ap_id, target.ap_id)
+      json(conn, RelationshipRenderer.render_relationship(actor, target))
+    else
+      nil -> send_resp(conn, 404, "Not Found")
+    end
+  end
+
+  def mute(conn, %{"id" => id}) do
+    actor = conn.assigns.current_user
+
+    with %{} = target <- Users.get(id),
+         true <- target.ap_id != actor.ap_id,
+         {:ok, _} <-
+           Relationships.upsert_relationship(%{
+             type: "Mute",
+             actor: actor.ap_id,
+             object: target.ap_id,
+             activity_ap_id: nil
+           }) do
+      json(conn, RelationshipRenderer.render_relationship(actor, target))
+    else
+      nil -> send_resp(conn, 404, "Not Found")
+      false -> send_resp(conn, 422, "Unprocessable Entity")
+      {:error, _} -> send_resp(conn, 422, "Unprocessable Entity")
+    end
+  end
+
+  def unmute(conn, %{"id" => id}) do
+    actor = conn.assigns.current_user
+
+    with %{} = target <- Users.get(id) do
+      Relationships.delete_by_type_actor_object("Mute", actor.ap_id, target.ap_id)
+      json(conn, RelationshipRenderer.render_relationship(actor, target))
+    else
+      nil -> send_resp(conn, 404, "Not Found")
+    end
+  end
+
   defp pinned_only?(params) when is_map(params) do
     case Map.get(params, "pinned") do
       true -> true

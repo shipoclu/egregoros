@@ -301,6 +301,12 @@ defmodule Egregoros.Objects do
     max_id = Keyword.get(opts, :max_id)
     since_id = Keyword.get(opts, :since_id)
 
+    ignored_actor_subquery =
+      from(r in Relationship,
+        where: r.actor == ^actor_ap_id and r.type in ["Block", "Mute"],
+        select: r.object
+      )
+
     followed_subquery =
       from(r in Relationship,
         where: r.type == "Follow" and r.actor == ^actor_ap_id,
@@ -310,6 +316,7 @@ defmodule Egregoros.Objects do
     from(o in Object,
       where:
         o.type == "Note" and
+          o.actor not in subquery(ignored_actor_subquery) and
           (o.actor == ^actor_ap_id or
              o.actor in subquery(followed_subquery) or
              fragment("? @> ?", o.data, ^%{"to" => [actor_ap_id]}) or
@@ -332,6 +339,12 @@ defmodule Egregoros.Objects do
     max_id = Keyword.get(opts, :max_id)
     since_id = Keyword.get(opts, :since_id)
 
+    ignored_actor_subquery =
+      from(r in Relationship,
+        where: r.actor == ^actor_ap_id and r.type in ["Block", "Mute"],
+        select: r.object
+      )
+
     followed_subquery =
       from(r in Relationship,
         where: r.type == "Follow" and r.actor == ^actor_ap_id,
@@ -341,6 +354,7 @@ defmodule Egregoros.Objects do
     from(o in Object,
       where:
         o.type in ^@status_types and
+          o.actor not in subquery(ignored_actor_subquery) and
           (o.actor == ^actor_ap_id or
              o.actor in subquery(followed_subquery) or
              fragment("? @> ?", o.data, ^%{"to" => [actor_ap_id]}) or

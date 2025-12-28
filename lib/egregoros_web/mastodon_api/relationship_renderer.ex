@@ -9,6 +9,15 @@ defmodule EgregorosWeb.MastodonAPI.RelationshipRenderer do
     followed_by? =
       Relationships.get_by_type_actor_object("Follow", target.ap_id, actor.ap_id) != nil
 
+    blocking? =
+      Relationships.get_by_type_actor_object("Block", actor.ap_id, target.ap_id) != nil
+
+    blocked_by? =
+      Relationships.get_by_type_actor_object("Block", target.ap_id, actor.ap_id) != nil
+
+    muting? =
+      Relationships.get_by_type_actor_object("Mute", actor.ap_id, target.ap_id) != nil
+
     %{
       "id" => Integer.to_string(target.id),
       "following" => following?,
@@ -16,9 +25,9 @@ defmodule EgregorosWeb.MastodonAPI.RelationshipRenderer do
       "notifying" => false,
       "languages" => [],
       "followed_by" => followed_by?,
-      "blocking" => false,
-      "blocked_by" => false,
-      "muting" => false,
+      "blocking" => blocking?,
+      "blocked_by" => blocked_by?,
+      "muting" => muting?,
       "muting_notifications" => false,
       "requested" => false,
       "domain_blocking" => false,
