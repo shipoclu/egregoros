@@ -77,6 +77,7 @@ defmodule EgregorosWeb.ProfileLive do
        notifications_count: notifications_count(current_user),
        follow_relationship: follow_relationship,
        mention_suggestions: %{},
+       reply_modal_open?: false,
        reply_to_ap_id: nil,
        reply_to_handle: nil,
        reply_form: reply_form,
@@ -156,6 +157,7 @@ defmodule EgregorosWeb.ProfileLive do
       socket
       |> cancel_all_uploads(:reply_media)
       |> assign(
+        reply_modal_open?: true,
         reply_to_ap_id: in_reply_to,
         reply_to_handle: actor_handle,
         reply_form: Phoenix.Component.to_form(default_reply_params(), as: :reply),
@@ -176,6 +178,7 @@ defmodule EgregorosWeb.ProfileLive do
       socket
       |> cancel_all_uploads(:reply_media)
       |> assign(
+        reply_modal_open?: false,
         reply_to_ap_id: nil,
         reply_to_handle: nil,
         reply_form: Phoenix.Component.to_form(default_reply_params(), as: :reply),
@@ -314,6 +317,7 @@ defmodule EgregorosWeb.ProfileLive do
                        socket
                        |> put_flash(:info, "Reply posted.")
                        |> assign(
+                         reply_modal_open?: false,
                          reply_to_ap_id: nil,
                          reply_to_handle: nil,
                          reply_form:
@@ -735,6 +739,7 @@ defmodule EgregorosWeb.ProfileLive do
         mention_suggestions={@mention_suggestions}
         options_open?={@reply_options_open?}
         cw_open?={@reply_cw_open?}
+        open={@reply_modal_open?}
       />
 
       <MediaViewer.media_viewer

@@ -6,6 +6,7 @@ defmodule EgregorosWeb.ReplyModal do
   attr :id, :string, default: "reply-modal"
   attr :form_id, :string, default: "reply-modal-form"
   attr :id_prefix, :string, default: "reply-modal"
+  attr :open, :boolean, default: false
 
   attr :form, :any, required: true
   attr :upload, :any, required: true
@@ -30,12 +31,15 @@ defmodule EgregorosWeb.ReplyModal do
     <div
       id={@id}
       data-role="reply-modal"
-      data-state="closed"
+      data-state={if @open, do: "open", else: "closed"}
       role="dialog"
       aria-modal="true"
-      aria-hidden="true"
+      aria-hidden={if @open, do: "false", else: "true"}
       phx-hook="ReplyModal"
-      class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/60 p-4 backdrop-blur"
+      class={[
+        "fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur",
+        !@open && "hidden"
+      ]}
     >
       <.focus_wrap
         id={"#{@id}-dialog"}
