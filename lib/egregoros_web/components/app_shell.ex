@@ -13,6 +13,7 @@ defmodule EgregorosWeb.AppShell do
       :timeline,
       :search,
       :notifications,
+      :messages,
       :bookmarks,
       :profile,
       :settings,
@@ -130,6 +131,14 @@ defmodule EgregorosWeb.AppShell do
                   </.nav_link>
 
                   <.nav_link
+                    role="nav-messages"
+                    active={@active == :messages}
+                    icon="hero-chat-bubble-left-right"
+                    label="Messages"
+                    navigate={~p"/messages"}
+                  />
+
+                  <.nav_link
                     role="nav-bookmarks"
                     active={@active == :bookmarks}
                     icon="hero-bookmark"
@@ -234,6 +243,14 @@ defmodule EgregorosWeb.AppShell do
               label="Notifications"
               navigate={~p"/notifications"}
               badge={@notifications_count}
+            />
+
+            <.bottom_nav_link
+              role="nav-messages"
+              active={@active == :messages}
+              icon="hero-chat-bubble-left-right"
+              label="Messages"
+              navigate={~p"/messages"}
             />
 
             <.bottom_nav_link

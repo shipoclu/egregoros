@@ -66,6 +66,7 @@ defmodule EgregorosWeb.Router do
     live "/search", SearchLive
     live "/tags/:tag", TagLive
     live "/notifications", NotificationsLive
+    live "/messages", MessagesLive
     live "/bookmarks", BookmarksLive, :bookmarks
     live "/favourites", BookmarksLive, :favourites
     live "/@:nickname", ProfileLive
