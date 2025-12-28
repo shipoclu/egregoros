@@ -13,6 +13,7 @@ defmodule EgregorosWeb.ViewModels.Actor do
       nickname: nil,
       handle: "@unknown",
       avatar_url: nil,
+      emojis: [],
       local?: false
     }
   end
@@ -26,6 +27,7 @@ defmodule EgregorosWeb.ViewModels.Actor do
           nickname: user.nickname,
           handle: handle(user, ap_id),
           avatar_url: URL.absolute(user.avatar_url, user.ap_id),
+          emojis: Map.get(user, :emojis, []),
           local?: user.local
         }
 
@@ -36,6 +38,7 @@ defmodule EgregorosWeb.ViewModels.Actor do
           nickname: nil,
           handle: ap_id,
           avatar_url: nil,
+          emojis: [],
           local?: false
         }
     end

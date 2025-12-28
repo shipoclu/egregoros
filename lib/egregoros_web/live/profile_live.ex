@@ -602,7 +602,10 @@ defmodule EgregorosWeb.ProfileLive do
                       data-role="profile-name"
                       class="truncate font-display text-2xl text-slate-900 dark:text-slate-100"
                     >
-                      {@profile_user.name || @profile_user.nickname}
+                      {emoji_inline(
+                        @profile_user.name || @profile_user.nickname,
+                        @profile_user.emojis
+                      )}
                     </h2>
                     <p
                       data-role="profile-handle"

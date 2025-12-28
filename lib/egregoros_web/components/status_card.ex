@@ -39,7 +39,10 @@ defmodule EgregorosWeb.StatusCard do
                   data-role="post-actor-name"
                   class="truncate font-semibold text-slate-900 group-hover:text-violet-600 dark:text-white dark:group-hover:text-violet-400"
                 >
-                  {@entry.actor.display_name}
+                  {emoji_inline(
+                    Map.get(@entry.actor, :display_name) || Map.get(@entry.actor, "display_name"),
+                    Map.get(@entry.actor, :emojis) || Map.get(@entry.actor, "emojis") || []
+                  )}
                 </p>
                 <div class="mt-0.5 flex flex-wrap items-center gap-2">
                   <span
@@ -71,7 +74,10 @@ defmodule EgregorosWeb.StatusCard do
                 data-role="post-actor-name"
                 class="truncate font-semibold text-slate-900 dark:text-white"
               >
-                {@entry.actor.display_name}
+                {emoji_inline(
+                  Map.get(@entry.actor, :display_name) || Map.get(@entry.actor, "display_name"),
+                  Map.get(@entry.actor, :emojis) || Map.get(@entry.actor, "emojis") || []
+                )}
               </p>
               <div class="mt-0.5 flex flex-wrap items-center gap-2">
                 <span

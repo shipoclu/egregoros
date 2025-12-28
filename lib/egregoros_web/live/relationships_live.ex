@@ -204,7 +204,7 @@ defmodule EgregorosWeb.RelationshipsLive do
 
                     <div class="min-w-0 flex-1">
                       <p class="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
-                        {actor.display_name}
+                        {emoji_inline(actor.display_name, Map.get(actor, :emojis, []))}
                       </p>
                       <p class="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">
                         {actor.handle}

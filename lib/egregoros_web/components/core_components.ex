@@ -16,6 +16,7 @@ defmodule EgregorosWeb.CoreComponents do
   use Phoenix.Component
   use Gettext, backend: EgregorosWeb.Gettext
 
+  alias Egregoros.HTML
   alias Phoenix.LiveView.JS
 
   @doc """
@@ -940,6 +941,22 @@ defmodule EgregorosWeb.CoreComponents do
   """
   def translate_errors(errors, field) when is_list(errors) do
     for {^field, {msg, opts}} <- errors, do: translate_error({msg, opts})
+  end
+
+  @doc """
+  Renders inline text with custom emoji shortcodes replaced by safe `<img>` tags.
+  """
+  def emoji_inline(text, emojis \\ []) do
+    text =
+      text
+      |> case do
+        nil -> ""
+        value -> to_string(value)
+      end
+      |> String.trim()
+
+    HTML.to_safe_inline_html(text, emojis: List.wrap(emojis))
+    |> Phoenix.HTML.raw()
   end
 
   defp avatar_initial(name) when is_binary(name) do

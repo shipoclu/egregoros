@@ -35,6 +35,7 @@ defmodule EgregorosWeb.MentionAutocomplete do
       display_name: user.name || user.nickname || user.ap_id,
       handle: ActorVM.handle(user, user.ap_id),
       avatar_url: URL.absolute(user.avatar_url, user.ap_id),
+      emojis: Map.get(user, :emojis, []),
       local?: user.local
     }
   end

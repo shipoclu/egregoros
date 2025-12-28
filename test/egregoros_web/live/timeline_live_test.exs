@@ -157,6 +157,41 @@ defmodule EgregorosWeb.TimelineLiveTest do
     refute has_element?(view, "[data-role='mention-suggestion']")
   end
 
+  test "timeline renders custom emojis in remote actor display names", %{conn: conn, user: _user} do
+    {:ok, remote} =
+      Users.create_user(%{
+        nickname: "xaetacore",
+        ap_id: "https://neondystopia.world/users/xaetacore",
+        inbox: "https://neondystopia.world/users/xaetacore/inbox",
+        outbox: "https://neondystopia.world/users/xaetacore/outbox",
+        public_key: "remote-key",
+        private_key: nil,
+        local: false,
+        name: ":linux: XaetaCore",
+        emojis: [
+          %{"shortcode" => "linux", "url" => "https://neondystopia.world/emoji/linux.png"}
+        ]
+      })
+
+    assert {:ok, _} =
+             Pipeline.ingest(
+               %{
+                 "id" => "https://neondystopia.world/objects/1",
+                 "type" => "Note",
+                 "actor" => remote.ap_id,
+                 "content" => "Hello from xaeta",
+                 "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+                 "cc" => []
+               },
+               local: false
+             )
+
+    {:ok, view, _html} = live(conn, "/")
+
+    assert has_element?(view, "[data-role='post-actor-name']", "XaetaCore")
+    assert has_element?(view, "[data-role='post-actor-name'] img.emoji[alt=':linux:']")
+  end
+
   test "compose options panel can be persisted via ui_options_open param", %{
     conn: conn,
     user: user

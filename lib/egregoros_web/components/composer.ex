@@ -172,9 +172,9 @@ defmodule EgregorosWeb.Composer do
 
                   <div class="min-w-0 flex-1">
                     <p class="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
-                      {to_string(
-                        Map.get(suggestion, :display_name) || Map.get(suggestion, "display_name") ||
-                          ""
+                      {emoji_inline(
+                        Map.get(suggestion, :display_name) || Map.get(suggestion, "display_name"),
+                        Map.get(suggestion, :emojis) || Map.get(suggestion, "emojis") || []
                       )}
                     </p>
                     <p class="truncate text-xs text-slate-500 dark:text-slate-400">

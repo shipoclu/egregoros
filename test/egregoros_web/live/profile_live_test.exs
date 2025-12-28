@@ -171,6 +171,31 @@ defmodule EgregorosWeb.ProfileLiveTest do
     refute has_element?(view, "[data-role='profile-bio'] script")
   end
 
+  test "profile renders custom emojis in remote display names", %{conn: conn, viewer: viewer} do
+    {:ok, remote} =
+      Users.create_user(%{
+        nickname: "xaetacore",
+        ap_id: "https://neondystopia.world/users/xaetacore",
+        inbox: "https://neondystopia.world/users/xaetacore/inbox",
+        outbox: "https://neondystopia.world/users/xaetacore/outbox",
+        public_key: "remote-key",
+        private_key: nil,
+        local: false,
+        name: ":linux: XaetaCore :420:",
+        emojis: [
+          %{"shortcode" => "linux", "url" => "https://neondystopia.world/emoji/linux.png"},
+          %{"shortcode" => "420", "url" => "https://neondystopia.world/emoji/420.png"}
+        ]
+      })
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: viewer.id})
+    {:ok, view, _html} = live(conn, "/@#{remote.nickname}@neondystopia.world")
+
+    assert has_element?(view, "[data-role='profile-name']", "XaetaCore")
+    assert has_element?(view, "[data-role='profile-name'] img.emoji[alt=':linux:']")
+    assert has_element?(view, "[data-role='profile-name'] img.emoji[alt=':420:']")
+  end
+
   test "profile posts support copying permalinks", %{
     conn: conn,
     viewer: viewer,
