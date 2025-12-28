@@ -406,4 +406,29 @@ defmodule Egregoros.HTMLTest do
       assert safe =~ ":shrug:"
     end
   end
+
+  describe "to_safe_inline_html/2" do
+    test "renders emoji shortcodes as inline img tags" do
+      safe =
+        HTML.to_safe_inline_html(":shrug: hi",
+          emojis: [%{shortcode: "shrug", url: "https://cdn.example/shrug.png"}]
+        )
+
+      assert safe =~ "<img"
+      assert safe =~ "src=\"https://cdn.example/shrug.png\""
+      assert safe =~ "alt=\":shrug:\""
+      assert safe =~ "hi"
+      refute safe =~ "<p>"
+    end
+
+    test "does not render custom emojis with unsafe urls" do
+      safe =
+        HTML.to_safe_inline_html(":shrug: hi",
+          emojis: [%{shortcode: "shrug", url: "javascript:alert(1)"}]
+        )
+
+      refute safe =~ "<img"
+      assert safe =~ ":shrug:"
+    end
+  end
 end

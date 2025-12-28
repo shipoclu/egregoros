@@ -78,6 +78,27 @@ defmodule Egregoros.HTML do
 
   def to_safe_html(_content, _opts), do: ""
 
+  def to_safe_inline_html(content, opts \\ [])
+
+  def to_safe_inline_html(nil, _opts), do: ""
+
+  def to_safe_inline_html(content, opts) when is_binary(content) and is_list(opts) do
+    emojis = Keyword.get(opts, :emojis, [])
+    emoji_map = emoji_map(emojis)
+    trimmed = String.trim(content)
+
+    if trimmed == "" do
+      ""
+    else
+      trimmed
+      |> html_unescape()
+      |> escape_html()
+      |> emojify_html(emoji_map)
+    end
+  end
+
+  def to_safe_inline_html(_content, _opts), do: ""
+
   defp looks_like_html?(content) when is_binary(content) do
     String.contains?(content, "<") and String.contains?(content, ">")
   end
