@@ -1,4 +1,5 @@
 defmodule Egregoros.Federation.Actor do
+  alias Egregoros.CustomEmojis
   alias Egregoros.Domain
   alias Egregoros.HTTP
   alias Egregoros.Federation.SignedFetch
@@ -165,6 +166,7 @@ defmodule Egregoros.Federation.Actor do
           |> maybe_put_string(:name, Map.get(actor, "name"))
           |> maybe_put_string(:bio, Map.get(actor, "summary"))
           |> maybe_put_icon(actor, id)
+          |> maybe_put_emojis(actor, id)
 
         {:ok, attrs}
       end
@@ -211,6 +213,47 @@ defmodule Egregoros.Federation.Actor do
   end
 
   defp maybe_put_icon(attrs, _actor, _actor_id), do: attrs
+
+  defp maybe_put_emojis(attrs, actor, actor_id) when is_map(attrs) and is_map(actor) do
+    emojis =
+      actor
+      |> Map.get("tag", [])
+      |> CustomEmojis.from_activity_tags()
+      |> Enum.map(fn
+        %{shortcode: shortcode, url: url} ->
+          %{shortcode: shortcode, url: resolve_url(url, actor_id)}
+
+        %{"shortcode" => shortcode, "url" => url} ->
+          %{"shortcode" => shortcode, "url" => resolve_url(url, actor_id)}
+
+        other ->
+          other
+      end)
+      |> Enum.filter(fn
+        %{shortcode: shortcode, url: url} when is_binary(shortcode) and is_binary(url) ->
+          shortcode = String.trim(shortcode)
+          url = String.trim(url)
+
+          shortcode != "" and url != "" and SafeURL.validate_http_url_no_dns(url) == :ok
+
+        %{"shortcode" => shortcode, "url" => url} when is_binary(shortcode) and is_binary(url) ->
+          shortcode = String.trim(shortcode)
+          url = String.trim(url)
+
+          shortcode != "" and url != "" and SafeURL.validate_http_url_no_dns(url) == :ok
+
+        _ ->
+          false
+      end)
+
+    if emojis == [] do
+      attrs
+    else
+      Map.put(attrs, :emojis, emojis)
+    end
+  end
+
+  defp maybe_put_emojis(attrs, _actor, _actor_id), do: attrs
 
   defp icon_url(%{} = actor, actor_id) when is_binary(actor_id) do
     actor

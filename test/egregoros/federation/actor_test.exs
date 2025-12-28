@@ -52,6 +52,47 @@ defmodule Egregoros.Federation.ActorTest do
     assert Users.get_by_ap_id(actor_url)
   end
 
+  test "fetch_and_store stores custom emoji tags for display names" do
+    actor_url = "https://remote.example/users/alice"
+    {public_key, _private_key} = Keys.generate_rsa_keypair()
+
+    expect(Egregoros.HTTP.Mock, :get, fn _url, _headers ->
+      {:ok,
+       %{
+         status: 200,
+         body: %{
+           "id" => actor_url,
+           "type" => "Person",
+           "preferredUsername" => "alice",
+           "name" => ":linux: Alice",
+           "tag" => [
+             %{
+               "type" => "Emoji",
+               "name" => ":linux:",
+               "icon" => %{"url" => "https://remote.example/emoji/linux.png"}
+             }
+           ],
+           "inbox" => actor_url <> "/inbox",
+           "outbox" => actor_url <> "/outbox",
+           "publicKey" => %{
+             "id" => actor_url <> "#main-key",
+             "owner" => actor_url,
+             "publicKeyPem" => public_key
+           }
+         },
+         headers: []
+       }}
+    end)
+
+    assert {:ok, user} = Actor.fetch_and_store(actor_url)
+    assert is_list(Map.get(user, :emojis))
+
+    assert %{shortcode: "linux", url: "https://remote.example/emoji/linux.png"} in Map.get(
+             user,
+             :emojis
+           )
+  end
+
   test "fetch_and_store preserves existing profile fields when refetched actors omit them" do
     actor_url = "https://remote.example/users/alice"
     {public_key, _private_key} = Keys.generate_rsa_keypair()
