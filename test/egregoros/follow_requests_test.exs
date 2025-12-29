@@ -104,4 +104,35 @@ defmodule Egregoros.FollowRequestsTest do
 
     assert activity_ap_id == follow_object.ap_id
   end
+
+  test "rejecting a follow request removes the pending relationship" do
+    {:ok, alice} = Users.create_local_user("alice")
+
+    {:ok, bob} =
+      Users.create_user(%{
+        nickname: "bob",
+        ap_id: "https://remote.example/users/bob",
+        inbox: "https://remote.example/users/bob/inbox",
+        outbox: "https://remote.example/users/bob/outbox",
+        public_key: "remote-key",
+        private_key: nil,
+        local: false
+      })
+
+    {:ok, follow_object} = Pipeline.ingest(Follow.build(alice, bob), local: true)
+
+    assert Relationships.get_by_type_actor_object("FollowRequest", alice.ap_id, bob.ap_id)
+
+    reject = %{
+      "id" => "https://remote.example/activities/reject/1",
+      "type" => "Reject",
+      "actor" => bob.ap_id,
+      "object" => follow_object.data
+    }
+
+    assert {:ok, _} = Pipeline.ingest(reject, local: false)
+
+    assert Relationships.get_by_type_actor_object("FollowRequest", alice.ap_id, bob.ap_id) == nil
+    assert Relationships.get_by_type_actor_object("Follow", alice.ap_id, bob.ap_id) == nil
+  end
 end
