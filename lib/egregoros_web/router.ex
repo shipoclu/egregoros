@@ -62,6 +62,7 @@ defmodule EgregorosWeb.Router do
     post "/settings/password", SettingsController, :update_password
     post "/logout", RegistrationController, :logout
 
+    live "/settings/privacy", PrivacyLive
     live "/", TimelineLive
     live "/search", SearchLive
     live "/tags/:tag", TagLive
