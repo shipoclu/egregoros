@@ -86,8 +86,27 @@ defmodule Egregoros.SafeURL do
   defp private_ip?({100, second, _, _}) when second in 64..127, do: true
   defp private_ip?({_, _, _, _}), do: false
 
+  defp private_ip?({0, 0, 0, 0, 0, 0, 0, 0}), do: true
   defp private_ip?({0, 0, 0, 0, 0, 0, 0, 1}), do: true
+
+  defp private_ip?({0, 0, 0, 0, 0, 65535, a, b}) when is_integer(a) and is_integer(b) do
+    private_ip?(ipv4_from_v6_tail(a, b))
+  end
+
+  defp private_ip?({0, 0, 0, 0, 0, 0, a, b}) when is_integer(a) and is_integer(b) do
+    private_ip?(ipv4_from_v6_tail(a, b))
+  end
+
   defp private_ip?({first, _, _, _, _, _, _, _}) when (first &&& 0xFE00) == 0xFC00, do: true
   defp private_ip?({first, _, _, _, _, _, _, _}) when (first &&& 0xFFC0) == 0xFE80, do: true
   defp private_ip?({_, _, _, _, _, _, _, _}), do: false
+
+  defp ipv4_from_v6_tail(a, b) when is_integer(a) and is_integer(b) do
+    {
+      (a >>> 8) &&& 0xFF,
+      a &&& 0xFF,
+      (b >>> 8) &&& 0xFF,
+      b &&& 0xFF
+    }
+  end
 end
