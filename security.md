@@ -18,7 +18,7 @@ This file tracks known security gaps and their remediation status.
 - [x] **Harden remote actor fetches** (used in signature verification and discovery):
   - [x] Reject non-HTTP(S) schemes and missing hosts.
   - [x] Block loopback / private IP literals.
-  - [ ] Block IPv4-mapped IPv6 private IPs (e.g. `http://[::ffff:127.0.0.1]/`) and treat them as IPv4 for private-range checks.
+  - [x] Block IPv4-mapped IPv6 private IPs (e.g. `http://[::ffff:127.0.0.1]/`) and treat them as IPv4 for private-range checks.
   - [x] Block private IPs via DNS resolution (basic DNS rebinding mitigation).
   - [x] Disable redirects (temporary; re-validate redirect targets if re-enabled).
   - [x] Apply request receive timeout.
@@ -52,13 +52,13 @@ This file tracks known security gaps and their remediation status.
   - [x] Enforce inbox targeting / addressing for Accept/Undo/Delete.
 - [x] **Rate limiting / throttling**: per-IP/per-actor throttles on inbox and expensive federation fetches.
   - [x] Apply rate limiting to `POST /users/:nickname/inbox` (pre-signature-verification).
-  - [ ] Ensure pre-signature inbox throttling keys on IP (not unverified `keyId` domains) to prevent bypass and ETS key explosion.
+  - [x] Ensure pre-signature inbox throttling keys on IP (not unverified `keyId` domains) to prevent bypass and ETS key explosion.
   - [x] Apply rate limiting to outgoing `SignedFetch` requests.
 
 ## Medium priority (web session hardening)
-- [ ] **Session fixation resistance**: renew session on login/registration.
-- [ ] **Logout should drop the session** (not just clear values).
-- [ ] **Secure cookie flags**: ensure session cookie is `secure` in production (and review other cookie flags).
+- [x] **Session fixation resistance**: renew session on login/registration.
+- [x] **Logout should drop the session** (not just clear values).
+- [x] **Secure cookie flags**: ensure session cookie is `secure` in production (and review other cookie flags).
 
 ## Low priority (signature strictness / compatibility)
 - [ ] **Stricter signature requirements**: optionally require `digest` to be present and covered by the signature on inbox POSTs (balance compatibility vs security).
