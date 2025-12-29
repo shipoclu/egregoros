@@ -326,23 +326,27 @@ defmodule EgregorosWeb.TimelineLiveTest do
     assert has_element?(view, "[data-role='timeline-current']", "public")
   end
 
-  test "compose sheet can be opened and closed", %{conn: conn, user: user} do
+  test "compose sheet open/close controls are client-only", %{conn: conn, user: user} do
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     {:ok, view, _html} = live(conn, "/")
 
-    assert has_element?(view, "#compose-overlay[data-state='closed']")
+    open_html =
+      view
+      |> element("button[data-role='compose-open']")
+      |> render()
 
-    view
-    |> element("button[data-role='compose-open']")
-    |> render_click()
+    assert open_html =~ "remove_class"
+    assert open_html =~ "#compose-panel"
+    refute open_html =~ "open_compose"
 
-    assert has_element?(view, "#compose-overlay[data-state='open']")
+    close_html =
+      view
+      |> element("button[data-role='compose-close']")
+      |> render()
 
-    view
-    |> element("button[data-role='compose-close']")
-    |> render_click()
-
-    assert has_element?(view, "#compose-overlay[data-state='closed']")
+    assert close_html =~ "add_class"
+    assert close_html =~ "#compose-overlay"
+    refute close_html =~ "close_compose"
   end
 
   test "public timeline sanitizes remote html content", %{conn: conn} do

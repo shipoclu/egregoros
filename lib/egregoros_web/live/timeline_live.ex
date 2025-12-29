@@ -184,14 +184,6 @@ defmodule EgregorosWeb.TimelineLive do
     {:noreply, assign(socket, mention_suggestions: mention_suggestions)}
   end
 
-  def handle_event("open_compose", _params, socket) do
-    {:noreply, assign(socket, compose_open?: true)}
-  end
-
-  def handle_event("close_compose", _params, socket) do
-    {:noreply, assign(socket, compose_open?: false)}
-  end
-
   def handle_event("toggle_compose_cw", _params, socket) do
     if socket.assigns.compose_cw_open? do
       post_params =
@@ -711,7 +703,7 @@ defmodule EgregorosWeb.TimelineLive do
               <button
                 type="button"
                 data-role="compose-close"
-                phx-click={close_compose_js() |> JS.push("close_compose")}
+                phx-click={close_compose_js()}
                 class="inline-flex h-9 w-9 items-center justify-center rounded-2xl text-slate-500 transition hover:bg-slate-900/5 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
                 aria-label="Close composer"
               >
@@ -878,7 +870,7 @@ defmodule EgregorosWeb.TimelineLive do
             "fixed inset-0 z-40 bg-slate-950/50 backdrop-blur-sm lg:hidden",
             !@compose_open? && "hidden"
           ]}
-          phx-click={close_compose_js() |> JS.push("close_compose")}
+          phx-click={close_compose_js()}
           aria-hidden={!@compose_open?}
         >
         </div>
@@ -889,7 +881,7 @@ defmodule EgregorosWeb.TimelineLive do
           id="compose-open-button"
           data-role="compose-open"
           data-state={if @compose_open?, do: "hidden", else: "visible"}
-          phx-click={open_compose_js() |> JS.push("open_compose")}
+          phx-click={open_compose_js()}
           class={[
             "fixed bottom-24 right-6 z-40 inline-flex h-14 w-14 items-center justify-center rounded-full bg-slate-900 text-white shadow-xl shadow-slate-900/30 transition hover:-translate-y-0.5 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white lg:hidden",
             @compose_open? && "hidden"
