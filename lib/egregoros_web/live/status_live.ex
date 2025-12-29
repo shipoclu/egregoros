@@ -498,10 +498,20 @@ defmodule EgregorosWeb.StatusLive do
                 class={if @reply_open?, do: nil, else: "hidden"}
               >
                 <:extra_fields>
-                  <div class="flex items-center justify-between gap-3">
-                    <p class="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
-                      Reply
-                    </p>
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                      <p class="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
+                        Reply
+                      </p>
+
+                      <p
+                        :if={@status}
+                        data-role="reply-target-handle"
+                        class="mt-2 truncate text-sm font-semibold text-slate-800 dark:text-slate-100"
+                      >
+                        Replying to {@status.actor.handle}
+                      </p>
+                    </div>
                     <button
                       type="button"
                       data-role="reply-close"

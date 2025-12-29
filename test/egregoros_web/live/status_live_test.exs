@@ -220,6 +220,16 @@ defmodule EgregorosWeb.StatusLiveTest do
            )
   end
 
+  test "reply composer shows who is being replied to", %{conn: conn, user: user} do
+    assert {:ok, parent} = Pipeline.ingest(Note.build(user, "Parent post"), local: true)
+    uuid = uuid_from_ap_id(parent.ap_id)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}?reply=true")
+
+    assert has_element?(view, "[data-role='reply-target-handle']", "@alice")
+  end
+
   test "replying rejects content longer than 5000 characters", %{conn: conn, user: user} do
     assert {:ok, parent} = Pipeline.ingest(Note.build(user, "Parent post"), local: true)
     uuid = uuid_from_ap_id(parent.ap_id)
