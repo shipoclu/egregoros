@@ -186,6 +186,14 @@ a.mention-link:hover {
   display: none;
 }
 
+[data-role="notifications-list"]:not([data-filter="requests"]) [data-role="follow-requests"] {
+  display: none;
+}
+
+[data-role="notifications-list"][data-filter="requests"] [data-role="notifications-stream"] {
+  display: none;
+}
+
 [data-role="notifications-list"][data-filter="likes"] [data-role="notification"]:not([data-type="Like"]) {
   display: none;
 }

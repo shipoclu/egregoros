@@ -6,6 +6,7 @@ defmodule EgregorosWeb.NotificationsLiveTest do
   alias Egregoros.Activities.Follow
   alias Egregoros.Notifications
   alias Egregoros.Pipeline
+  alias Egregoros.Relationships
   alias Egregoros.Users
 
   setup do
@@ -78,5 +79,36 @@ defmodule EgregorosWeb.NotificationsLiveTest do
     |> render_click()
 
     assert has_element?(view, "#notifications-list[data-filter='follows']")
+  end
+
+  test "follow requests can be accepted from the notifications screen", %{
+    conn: conn,
+    user: user,
+    actor: actor
+  } do
+    {:ok, user} = Users.update_profile(user, %{locked: true})
+
+    assert {:ok, follow_object} = Pipeline.ingest(Follow.build(actor, user), local: true)
+
+    assert %{id: relationship_id, activity_ap_id: activity_ap_id} =
+             Relationships.get_by_type_actor_object("FollowRequest", actor.ap_id, user.ap_id)
+
+    assert activity_ap_id == follow_object.ap_id
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/notifications")
+
+    view
+    |> element("button[data-role='notifications-filter'][data-filter='requests']")
+    |> render_click()
+
+    assert has_element?(view, "#follow-request-#{relationship_id}")
+
+    view
+    |> element("button[data-role='follow-request-accept'][phx-value-id='#{relationship_id}']")
+    |> render_click()
+
+    assert Relationships.get_by_type_actor_object("FollowRequest", actor.ap_id, user.ap_id) == nil
+    assert Relationships.get_by_type_actor_object("Follow", actor.ap_id, user.ap_id)
   end
 end

@@ -1,10 +1,15 @@
 defmodule EgregorosWeb.NotificationsLive do
   use EgregorosWeb, :live_view
 
+  alias Egregoros.Activities.Accept
+  alias Egregoros.Activities.Reject
   alias Egregoros.CustomEmojis
   alias Egregoros.HTML
   alias Egregoros.Notifications
+  alias Egregoros.Object
   alias Egregoros.Objects
+  alias Egregoros.Pipeline
+  alias Egregoros.Relationships
   alias Egregoros.User
   alias Egregoros.Users
   alias EgregorosWeb.ViewModels.Actor, as: ActorVM
@@ -24,6 +29,7 @@ defmodule EgregorosWeb.NotificationsLive do
     end
 
     notifications = list_notifications(current_user, limit: @page_size)
+    follow_requests = list_follow_requests(current_user, limit: @page_size)
 
     {:ok,
      socket
@@ -32,7 +38,8 @@ defmodule EgregorosWeb.NotificationsLive do
        notifications_count: notifications_count(current_user),
        notifications_filter: "all",
        notifications_cursor: notifications_cursor(notifications),
-       notifications_end?: length(notifications) < @page_size
+       notifications_end?: length(notifications) < @page_size,
+       follow_requests: decorate_follow_requests(follow_requests)
      )
      |> stream(:notifications, decorate_notifications(notifications),
        dom_id: &notification_dom_id/1
@@ -98,10 +105,56 @@ defmodule EgregorosWeb.NotificationsLive do
   def handle_event("set_notifications_filter", %{"filter" => filter}, socket) do
     filter = filter |> to_string() |> String.trim()
 
-    if filter in ~w(all follows likes reposts mentions reactions) do
+    if filter in ~w(all follows requests likes reposts mentions reactions) do
       {:noreply, assign(socket, notifications_filter: filter)}
     else
       {:noreply, socket}
+    end
+  end
+
+  def handle_event("follow_request_accept", %{"id" => id}, socket) do
+    with %User{} = current_user <- socket.assigns.current_user,
+         {relationship_id, ""} <- Integer.parse(to_string(id)),
+         %{type: "FollowRequest", object: object_ap_id, activity_ap_id: follow_ap_id} <-
+           Relationships.get(relationship_id),
+         true <- object_ap_id == current_user.ap_id,
+         follow_ap_id when is_binary(follow_ap_id) and follow_ap_id != "" <- follow_ap_id,
+         %Object{type: "Follow"} = follow_object <- Objects.get_by_ap_id(follow_ap_id),
+         {:ok, _accept_object} <-
+           Pipeline.ingest(Accept.build(current_user, follow_object), local: true) do
+      {:noreply,
+       socket
+       |> put_flash(:info, "Follow request accepted.")
+       |> assign(
+         follow_requests:
+           decorate_follow_requests(list_follow_requests(current_user, limit: @page_size))
+       )}
+    else
+      _ ->
+        {:noreply, socket}
+    end
+  end
+
+  def handle_event("follow_request_reject", %{"id" => id}, socket) do
+    with %User{} = current_user <- socket.assigns.current_user,
+         {relationship_id, ""} <- Integer.parse(to_string(id)),
+         %{type: "FollowRequest", object: object_ap_id, activity_ap_id: follow_ap_id} <-
+           Relationships.get(relationship_id),
+         true <- object_ap_id == current_user.ap_id,
+         follow_ap_id when is_binary(follow_ap_id) and follow_ap_id != "" <- follow_ap_id,
+         %Object{type: "Follow"} = follow_object <- Objects.get_by_ap_id(follow_ap_id),
+         {:ok, _reject_object} <-
+           Pipeline.ingest(Reject.build(current_user, follow_object), local: true) do
+      {:noreply,
+       socket
+       |> put_flash(:info, "Follow request rejected.")
+       |> assign(
+         follow_requests:
+           decorate_follow_requests(list_follow_requests(current_user, limit: @page_size))
+       )}
+    else
+      _ ->
+        {:noreply, socket}
     end
   end
 
@@ -144,6 +197,12 @@ defmodule EgregorosWeb.NotificationsLive do
                 icon="hero-user-plus"
               />
               <.filter_button
+                filter="requests"
+                current={@notifications_filter}
+                label="Requests"
+                icon="hero-user-circle"
+              />
+              <.filter_button
                 filter="likes"
                 current={@notifications_filter}
                 label="Likes"
@@ -175,17 +234,42 @@ defmodule EgregorosWeb.NotificationsLive do
               id="notifications-list"
               data-role="notifications-list"
               data-filter={@notifications_filter}
-              phx-update="stream"
               class="space-y-4"
             >
-              <div
-                id="notifications-empty"
-                class="hidden only:block rounded-3xl border border-slate-200/80 bg-white/70 p-6 text-sm text-slate-600 shadow-sm shadow-slate-200/20 dark:border-slate-700/70 dark:bg-slate-950/50 dark:text-slate-300 dark:shadow-slate-900/30"
-              >
-                No notifications yet.
+              <div data-role="follow-requests" class="space-y-4">
+                <div
+                  id="follow-requests-empty"
+                  class="hidden only:block rounded-3xl border border-slate-200/80 bg-white/70 p-6 text-sm text-slate-600 shadow-sm shadow-slate-200/20 dark:border-slate-700/70 dark:bg-slate-950/50 dark:text-slate-300 dark:shadow-slate-900/30"
+                >
+                  No follow requests yet.
+                </div>
+
+                <.follow_request_item
+                  :for={entry <- @follow_requests}
+                  id={"follow-request-#{entry.relationship.id}"}
+                  entry={entry}
+                />
               </div>
 
-              <.notification_item :for={{id, entry} <- @streams.notifications} id={id} entry={entry} />
+              <div
+                id="notifications-stream"
+                data-role="notifications-stream"
+                phx-update="stream"
+                class="space-y-4"
+              >
+                <div
+                  id="notifications-empty"
+                  class="hidden only:block rounded-3xl border border-slate-200/80 bg-white/70 p-6 text-sm text-slate-600 shadow-sm shadow-slate-200/20 dark:border-slate-700/70 dark:bg-slate-950/50 dark:text-slate-300 dark:shadow-slate-900/30"
+                >
+                  No notifications yet.
+                </div>
+
+                <.notification_item
+                  :for={{id, entry} <- @streams.notifications}
+                  id={id}
+                  entry={entry}
+                />
+              </div>
             </div>
 
             <div :if={!@notifications_end?} class="flex justify-center py-2">
@@ -251,6 +335,56 @@ defmodule EgregorosWeb.NotificationsLive do
   attr :id, :string, required: true
   attr :entry, :map, required: true
 
+  defp follow_request_item(assigns) do
+    ~H"""
+    <article
+      id={@id}
+      data-role="follow-request"
+      class="rounded-3xl border border-white/80 bg-white/80 p-6 shadow-lg shadow-slate-200/30 backdrop-blur transition hover:-translate-y-0.5 hover:shadow-xl dark:border-slate-700/60 dark:bg-slate-900/70 dark:shadow-slate-900/50 motion-safe:animate-rise"
+    >
+      <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div class="flex items-start gap-4">
+          <.avatar size="sm" name={@entry.actor.display_name} src={@entry.actor.avatar_url} />
+
+          <div class="min-w-0">
+            <p class="text-sm font-semibold text-slate-900 dark:text-slate-100">
+              {@entry.actor.display_name}
+            </p>
+            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              {@entry.actor.handle}
+            </p>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-end gap-2">
+          <.button
+            type="button"
+            size="sm"
+            data-role="follow-request-accept"
+            phx-click="follow_request_accept"
+            phx-value-id={@entry.relationship.id}
+            phx-disable-with="Accepting..."
+          >
+            Accept
+          </.button>
+
+          <.button
+            type="button"
+            size="sm"
+            variant="secondary"
+            data-role="follow-request-reject"
+            phx-click="follow_request_reject"
+            phx-value-id={@entry.relationship.id}
+            phx-disable-with="Rejecting..."
+          >
+            Reject
+          </.button>
+        </div>
+      </div>
+    </article>
+    """
+  end
+
   defp notification_item(assigns) do
     ~H"""
     <article
@@ -302,8 +436,29 @@ defmodule EgregorosWeb.NotificationsLive do
     Notifications.list_for_user(user, opts)
   end
 
+  defp list_follow_requests(nil, _opts), do: []
+
+  defp list_follow_requests(%User{} = user, opts) when is_list(opts) do
+    limit =
+      opts
+      |> Keyword.get(:limit, @page_size)
+      |> max(1)
+      |> min(80)
+
+    Relationships.list_by_type_object("FollowRequest", user.ap_id, limit)
+  end
+
   defp decorate_notifications(notifications) when is_list(notifications) do
     Enum.map(notifications, &decorate_notification/1)
+  end
+
+  defp decorate_follow_requests(relationships) when is_list(relationships) do
+    Enum.map(relationships, fn relationship ->
+      %{
+        relationship: relationship,
+        actor: ActorVM.card(relationship.actor)
+      }
+    end)
   end
 
   defp decorate_notification(%{type: type} = notification) when is_binary(type) do
@@ -335,7 +490,8 @@ defmodule EgregorosWeb.NotificationsLive do
           {"hero-face-smile", message, note_preview(notification.object)}
 
         "Note" ->
-          {"hero-at-symbol", "#{actor.display_name} mentioned you", note_preview(notification.ap_id)}
+          {"hero-at-symbol", "#{actor.display_name} mentioned you",
+           note_preview(notification.ap_id)}
 
         _ ->
           {"hero-bell", "#{actor.display_name} sent activity", nil}
