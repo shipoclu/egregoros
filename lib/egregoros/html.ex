@@ -514,8 +514,12 @@ defmodule Egregoros.HTML do
             profile_url = URL.absolute(profile_path)
 
             if is_binary(profile_url) and profile_url != "" do
-              acc
-              |> replace_href(href, profile_url)
+              mention_candidate_hrefs(href, name)
+              |> Enum.reduce(acc, fn candidate_href, html ->
+                html
+                |> add_anchor_class_for_href(candidate_href, "mention-link")
+                |> replace_href(candidate_href, profile_url)
+              end)
               |> add_anchor_class_for_href(profile_url, "mention-link")
             else
               acc
@@ -531,6 +535,137 @@ defmodule Egregoros.HTML do
   end
 
   defp rewrite_mention_links(html, _tags) when is_binary(html), do: html
+
+  defp mention_candidate_hrefs(href, name) when is_binary(href) and is_binary(name) do
+    href = href |> String.trim()
+
+    sources =
+      []
+      |> add_mention_source_from_name(name)
+      |> add_mention_source_from_href(href)
+
+    candidates =
+      sources
+      |> Enum.reduce(href_variants(href), fn {nickname, host}, acc ->
+        acc ++ mention_profile_href_variants(nickname, host, href)
+      end)
+
+    candidates
+    |> Enum.reject(&(&1 in [nil, ""]))
+    |> Enum.uniq()
+  end
+
+  defp mention_candidate_hrefs(href, _name) when is_binary(href),
+    do: href_variants(String.trim(href))
+
+  defp mention_candidate_hrefs(_href, _name), do: []
+
+  defp add_mention_source_from_name(sources, name) when is_list(sources) and is_binary(name) do
+    handle = name |> to_string() |> String.trim() |> String.trim_leading("@")
+
+    case Egregoros.Mentions.parse(handle) do
+      {:ok, nickname, host}
+      when is_binary(nickname) and nickname != "" and is_binary(host) and host != "" ->
+        [{nickname, host} | sources]
+
+      _ ->
+        sources
+    end
+  end
+
+  defp add_mention_source_from_name(sources, _name) when is_list(sources), do: sources
+
+  defp add_mention_source_from_href(sources, href) when is_list(sources) and is_binary(href) do
+    with %URI{host: host, path: path} = uri <- URI.parse(href),
+         true <- is_binary(host) and host != "",
+         nickname when is_binary(nickname) and nickname != "" <-
+           mention_nickname_from_uri_path(path),
+         host <- mention_host_from_uri(uri) do
+      [{nickname, host} | sources]
+    else
+      _ -> sources
+    end
+  end
+
+  defp add_mention_source_from_href(sources, _href) when is_list(sources), do: sources
+
+  defp mention_nickname_from_uri_path(path) when is_binary(path) do
+    path
+    |> String.trim("/")
+    |> String.split("/", trim: true)
+    |> List.last()
+    |> case do
+      nil -> ""
+      segment -> segment |> String.trim() |> String.trim_leading("@")
+    end
+  end
+
+  defp mention_nickname_from_uri_path(_path), do: ""
+
+  defp mention_host_from_uri(%URI{host: host, port: port}) when is_binary(host) do
+    cond do
+      is_integer(port) and port > 0 and port not in [80, 443] ->
+        host <> ":" <> Integer.to_string(port)
+
+      true ->
+        host
+    end
+  end
+
+  defp mention_host_from_uri(_uri), do: ""
+
+  defp mention_profile_href_variants(nickname, host, href)
+       when is_binary(nickname) and nickname != "" and is_binary(host) and host != "" and
+              is_binary(href) do
+    encoded =
+      nickname
+      |> String.trim()
+      |> URI.encode(&URI.char_unreserved?/1)
+
+    nickname_variants = [nickname, encoded] |> Enum.reject(&(&1 == "")) |> Enum.uniq()
+
+    scheme_variants =
+      case URI.parse(href) do
+        %URI{scheme: scheme} when scheme in ["http", "https"] -> [scheme, "https", "http"]
+        _ -> ["https", "http"]
+      end
+      |> Enum.uniq()
+
+    Enum.flat_map(scheme_variants, fn scheme ->
+      base = scheme <> "://" <> host
+
+      Enum.flat_map(nickname_variants, fn nick ->
+        [
+          base <> "/@" <> nick,
+          base <> "/users/" <> nick
+        ]
+        |> Enum.flat_map(&href_variants/1)
+      end)
+    end)
+  end
+
+  defp mention_profile_href_variants(_nickname, _host, _href), do: []
+
+  defp href_variants(href) when is_binary(href) do
+    href = String.trim(href)
+
+    if href == "" do
+      []
+    else
+      trimmed = String.trim_trailing(href, "/")
+
+      variants =
+        if trimmed != href do
+          [href, trimmed]
+        else
+          [href, href <> "/"]
+        end
+
+      variants |> Enum.reject(&(&1 == "")) |> Enum.uniq()
+    end
+  end
+
+  defp href_variants(_href), do: []
 
   defp replace_href(html, old_href, new_href) when is_binary(html) do
     old_escaped = old_href |> escape_binary() |> IO.iodata_to_binary()

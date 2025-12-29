@@ -291,6 +291,30 @@ defmodule Egregoros.HTMLTest do
                ~r/<a[^>]*href="#{Regex.escape(href)}"[^>]*class="mention-link"[^>]*>@bob@example\.com<\/a>/
     end
 
+    test "rewrites mention links in ActivityPub html when tag href differs from content href" do
+      html =
+        "<span class=\"h-card\">" <>
+          "<a class=\"u-url mention\" href=\"https://toot.cat/@Aaron_Davis\" rel=\"ugc\">" <>
+          "@<span>Aaron_Davis</span></a>" <>
+          "</span>"
+
+      tags = [
+        %{
+          "type" => "Mention",
+          "href" => "https://toot.cat/users/Aaron_Davis",
+          "name" => "@Aaron_Davis@toot.cat"
+        }
+      ]
+
+      safe = HTML.to_safe_html(html, format: :html, ap_tags: tags)
+      expected_href = "#{EgregorosWeb.Endpoint.url()}/@Aaron_Davis@toot.cat"
+
+      href = Regex.escape(expected_href)
+
+      assert safe =~
+               ~r/<a[^>]*(?:href="#{href}"[^>]*class="[^"]*mention-link[^"]*"|class="[^"]*mention-link[^"]*"[^>]*href="#{href}")/
+    end
+
     test "does not linkify email addresses" do
       safe = HTML.to_safe_html("contact alice@example.com", format: :text)
       refute safe =~ "<a "
