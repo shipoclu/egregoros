@@ -144,6 +144,37 @@ defmodule EgregorosWeb.StatusCardTest do
     assert html =~ "alt=\":shrug:\""
   end
 
+  test "styles links inside post bodies" do
+    html =
+      render_component(&StatusCard.status_card/1, %{
+        id: "post-1",
+        current_user: %{id: 1},
+        entry: %{
+          object: %{
+            id: 1,
+            inserted_at: ~U[2025-01-01 00:00:00Z],
+            local: true,
+            data: %{"content" => "Check this out https://example.com"}
+          },
+          actor: %{
+            display_name: "Alice",
+            handle: "@alice",
+            avatar_url: nil
+          },
+          attachments: [],
+          liked?: false,
+          likes_count: 0,
+          reposted?: false,
+          reposts_count: 0,
+          reactions: %{}
+        }
+      })
+
+    assert html =~ ~s(href="https://example.com")
+    assert html =~ ~s(data-role="post-content")
+    assert html =~ "[&amp;_a]:underline"
+  end
+
   test "renders video attachments with a video tag" do
     html =
       render_component(&StatusCard.status_card/1, %{

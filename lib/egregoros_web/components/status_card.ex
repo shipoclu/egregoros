@@ -350,7 +350,7 @@ defmodule EgregorosWeb.StatusCard do
       data-current-user-ap-id={current_user_ap_id}
       phx-hook={if is_binary(e2ee_payload), do: "E2EEDMMessage", else: nil}
       class={[
-        "mt-4 text-base leading-relaxed text-slate-700 dark:text-slate-200",
+        "mt-4 break-words text-base leading-relaxed text-slate-700 dark:text-slate-200 [&_a]:font-medium [&_a]:text-violet-600 [&_a]:underline [&_a]:underline-offset-2 [&_a:hover]:text-violet-700 dark:[&_a]:text-violet-300 dark:[&_a:hover]:text-violet-200",
         is_binary(e2ee_payload) && "whitespace-pre-wrap",
         collapsible_content && "relative max-h-64 overflow-hidden"
       ]}
