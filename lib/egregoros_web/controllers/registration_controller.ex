@@ -63,6 +63,7 @@ defmodule EgregorosWeb.RegistrationController do
 
             conn
             |> put_session(:user_id, user.id)
+            |> configure_session(renew: true)
             |> redirect(to: redirect_to)
 
           {:error, :invalid_password} ->
@@ -83,6 +84,7 @@ defmodule EgregorosWeb.RegistrationController do
   def logout(conn, _params) do
     conn
     |> clear_session()
+    |> configure_session(drop: true)
     |> redirect(to: ~p"/")
   end
 

@@ -8,7 +8,8 @@ defmodule EgregorosWeb.Endpoint do
     store: :cookie,
     key: "_egregoros_key",
     signing_salt: "4JqvCM51",
-    same_site: "Lax"
+    same_site: "Lax",
+    secure: Application.compile_env(:egregoros, :secure_cookies, false)
   ]
 
   socket "/live", Phoenix.LiveView.Socket,

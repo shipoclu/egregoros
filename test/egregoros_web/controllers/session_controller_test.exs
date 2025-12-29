@@ -28,6 +28,7 @@ defmodule EgregorosWeb.SessionControllerTest do
       })
 
     assert redirected_to(conn) == "/"
+    assert conn.private[:plug_session_info] == :renew
     assert get_session(conn, :user_id) == user.id
   end
 
@@ -51,6 +52,7 @@ defmodule EgregorosWeb.SessionControllerTest do
       })
 
     assert redirected_to(conn) == "/settings"
+    assert conn.private[:plug_session_info] == :renew
     assert get_session(conn, :user_id) == user.id
   end
 
@@ -87,6 +89,7 @@ defmodule EgregorosWeb.SessionControllerTest do
       |> post("/logout", %{"_csrf_token" => csrf_token})
 
     assert redirected_to(conn) == "/"
+    assert conn.private[:plug_session_info] == :drop
     assert get_session(conn, :user_id) == nil
   end
 end
