@@ -34,7 +34,7 @@ defmodule EgregorosWeb.StatusLive do
           nil
       end
 
-    reply_open? = truthy?(Map.get(params, "reply"))
+    reply_modal_open? = truthy?(Map.get(params, "reply")) and not is_nil(current_user)
     reply_form = Phoenix.Component.to_form(default_reply_params(), as: :reply)
 
     {status_entry, ancestor_entries, descendant_entries} =
@@ -55,6 +55,20 @@ defmodule EgregorosWeb.StatusLive do
           {nil, [], []}
       end
 
+    reply_to_ap_id =
+      if reply_modal_open? and status_entry do
+        status_entry.object.ap_id
+      else
+        nil
+      end
+
+    reply_to_handle =
+      if reply_modal_open? and status_entry do
+        status_entry.actor.handle
+      else
+        nil
+      end
+
     socket =
       socket
       |> assign(
@@ -65,7 +79,9 @@ defmodule EgregorosWeb.StatusLive do
         status: status_entry,
         ancestors: ancestor_entries,
         descendants: descendant_entries,
-        reply_open?: reply_open?,
+        reply_modal_open?: reply_modal_open?,
+        reply_to_ap_id: reply_to_ap_id,
+        reply_to_handle: reply_to_handle,
         reply_form: reply_form,
         reply_media_alt: %{},
         reply_options_open?: false,
@@ -228,12 +244,45 @@ defmodule EgregorosWeb.StatusLive do
     end
   end
 
-  def handle_event("open_reply", _params, socket) do
-    {:noreply, assign(socket, reply_open?: true)}
+  def handle_event("open_reply_modal", %{"in_reply_to" => in_reply_to} = params, socket) do
+    in_reply_to = in_reply_to |> to_string() |> String.trim()
+    actor_handle = params |> Map.get("actor_handle", "") |> to_string() |> String.trim()
+
+    socket =
+      socket
+      |> cancel_all_uploads(:reply_media)
+      |> assign(
+        reply_modal_open?: true,
+        reply_to_ap_id: in_reply_to,
+        reply_to_handle: actor_handle,
+        reply_form: Phoenix.Component.to_form(default_reply_params(), as: :reply),
+        reply_media_alt: %{},
+        reply_options_open?: false,
+        reply_cw_open?: false
+      )
+
+    {:noreply, socket}
   end
 
-  def handle_event("close_reply", _params, socket) do
-    {:noreply, assign(socket, reply_open?: false)}
+  def handle_event("open_reply_modal", _params, socket) do
+    {:noreply, socket}
+  end
+
+  def handle_event("close_reply_modal", _params, socket) do
+    socket =
+      socket
+      |> cancel_all_uploads(:reply_media)
+      |> assign(
+        reply_modal_open?: false,
+        reply_to_ap_id: nil,
+        reply_to_handle: nil,
+        reply_form: Phoenix.Component.to_form(default_reply_params(), as: :reply),
+        reply_media_alt: %{},
+        reply_options_open?: false,
+        reply_cw_open?: false
+      )
+
+    {:noreply, socket}
   end
 
   def handle_event("toggle_reply_cw", _params, socket) do
@@ -275,8 +324,8 @@ defmodule EgregorosWeb.StatusLive do
         reply_params |> Map.get("spoiler_text", "") |> to_string() |> String.trim() != ""
 
     with %User{} = user <- socket.assigns.current_user,
-         %{object: %{ap_id: in_reply_to}} <- socket.assigns.status,
-         true <- is_binary(in_reply_to) and in_reply_to != "" do
+         in_reply_to when is_binary(in_reply_to) <- socket.assigns.reply_to_ap_id,
+         true <- String.trim(in_reply_to) != "" do
       upload = socket.assigns.uploads.reply_media
 
       cond do
@@ -285,7 +334,7 @@ defmodule EgregorosWeb.StatusLive do
            socket
            |> put_flash(:error, "Wait for attachments to finish uploading.")
            |> assign(
-             reply_open?: true,
+             reply_modal_open?: true,
              reply_form: Phoenix.Component.to_form(reply_params, as: :reply),
              reply_media_alt: media_alt,
              reply_options_open?: reply_options_open?,
@@ -297,7 +346,7 @@ defmodule EgregorosWeb.StatusLive do
            socket
            |> put_flash(:error, "Remove invalid attachments before posting.")
            |> assign(
-             reply_open?: true,
+             reply_modal_open?: true,
              reply_form: Phoenix.Component.to_form(reply_params, as: :reply),
              reply_media_alt: media_alt,
              reply_options_open?: reply_options_open?,
@@ -330,7 +379,7 @@ defmodule EgregorosWeb.StatusLive do
                socket
                |> put_flash(:error, "Could not upload attachment.")
                |> assign(
-                 reply_open?: true,
+                 reply_modal_open?: true,
                  reply_form: Phoenix.Component.to_form(reply_params, as: :reply),
                  reply_media_alt: media_alt,
                  reply_options_open?: reply_options_open?,
@@ -347,28 +396,27 @@ defmodule EgregorosWeb.StatusLive do
                      language: language
                    ) do
                 {:ok, _create} ->
-                  note = socket.assigns.status.object
-
-                  descendants = decorate_descendants(note, user)
-
                   {:noreply,
                    socket
                    |> put_flash(:info, "Reply posted.")
+                   |> refresh_thread()
                    |> assign(
-                     descendants: descendants,
+                     reply_modal_open?: false,
+                     reply_to_ap_id: nil,
+                     reply_to_handle: nil,
                      reply_form: Phoenix.Component.to_form(default_reply_params(), as: :reply),
-                     reply_open?: false,
                      reply_media_alt: %{},
                      reply_options_open?: false,
                      reply_cw_open?: false
-                   )}
+                   )
+                   |> push_event("reply_modal_close", %{})}
 
                 {:error, :too_long} ->
                   {:noreply,
                    socket
                    |> put_flash(:error, "Reply is too long.")
                    |> assign(
-                     reply_open?: true,
+                     reply_modal_open?: true,
                      reply_form: Phoenix.Component.to_form(reply_params, as: :reply),
                      reply_media_alt: media_alt,
                      reply_options_open?: reply_options_open?,
@@ -380,7 +428,7 @@ defmodule EgregorosWeb.StatusLive do
                    socket
                    |> put_flash(:error, "Reply can't be empty.")
                    |> assign(
-                     reply_open?: true,
+                     reply_modal_open?: true,
                      reply_form: Phoenix.Component.to_form(reply_params, as: :reply),
                      reply_media_alt: media_alt,
                      reply_options_open?: reply_options_open?,
@@ -392,7 +440,7 @@ defmodule EgregorosWeb.StatusLive do
                    socket
                    |> put_flash(:error, "Could not post reply.")
                    |> assign(
-                     reply_open?: true,
+                     reply_modal_open?: true,
                      reply_form: Phoenix.Component.to_form(reply_params, as: :reply),
                      reply_media_alt: media_alt,
                      reply_options_open?: reply_options_open?,
@@ -457,6 +505,7 @@ defmodule EgregorosWeb.StatusLive do
                   id={"post-#{entry.object.id}"}
                   entry={entry}
                   current_user={@current_user}
+                  reply_mode={:modal}
                 />
               </div>
 
@@ -465,6 +514,7 @@ defmodule EgregorosWeb.StatusLive do
                   id={"post-#{@status.object.id}"}
                   entry={@status}
                   current_user={@current_user}
+                  reply_mode={:modal}
                 />
               </div>
 
@@ -499,76 +549,11 @@ defmodule EgregorosWeb.StatusLive do
                     id={"post-#{entry.object.id}"}
                     entry={entry}
                     current_user={@current_user}
+                    reply_mode={:modal}
                   />
                 </div>
               </div>
             </div>
-
-            <section
-              :if={@current_user}
-              class="rounded-3xl border border-white/80 bg-white/80 p-6 shadow-lg shadow-slate-200/20 backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/70 dark:shadow-slate-900/40"
-            >
-              <Composer.composer_form
-                id="reply-form"
-                id_prefix="reply"
-                form={@reply_form}
-                upload={@uploads.reply_media}
-                media_alt={@reply_media_alt}
-                mention_suggestions={Map.get(@mention_suggestions, "reply", [])}
-                param_prefix="reply"
-                max_chars={reply_max_chars()}
-                options_open?={@reply_options_open?}
-                cw_open?={@reply_cw_open?}
-                change_event="reply_change"
-                submit_event="create_reply"
-                cancel_event="cancel_reply_media"
-                toggle_cw_event="toggle_reply_cw"
-                submit_label="Reply"
-                data-state={if @reply_open?, do: "open", else: "closed"}
-                class={if @reply_open?, do: nil, else: "hidden"}
-              >
-                <:extra_fields>
-                  <div class="flex items-start justify-between gap-3">
-                    <div class="min-w-0">
-                      <p class="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
-                        Reply
-                      </p>
-
-                      <p
-                        :if={@status}
-                        data-role="reply-target-handle"
-                        class="mt-2 truncate text-sm font-semibold text-slate-800 dark:text-slate-100"
-                      >
-                        Replying to {@status.actor.handle}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      data-role="reply-close"
-                      phx-click={close_reply_js() |> JS.push("close_reply")}
-                      class="inline-flex h-9 w-9 items-center justify-center rounded-2xl text-slate-500 transition hover:bg-slate-900/5 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
-                      aria-label="Close reply composer"
-                    >
-                      <.icon name="hero-x-mark" class="size-4" />
-                    </button>
-                  </div>
-                </:extra_fields>
-              </Composer.composer_form>
-
-              <button
-                type="button"
-                id="reply-open-button"
-                data-role="reply-open"
-                data-state={if @reply_open?, do: "hidden", else: "visible"}
-                phx-click={open_reply_js() |> JS.push("open_reply")}
-                class={[
-                  "mt-4 inline-flex w-full items-center justify-center gap-2 rounded-full border border-slate-200/80 bg-white/70 px-6 py-3 text-sm font-semibold text-slate-700 shadow-sm shadow-slate-200/20 transition hover:-translate-y-0.5 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:shadow-slate-900/40 dark:hover:bg-slate-950",
-                  @reply_open? && "hidden"
-                ]}
-              >
-                <.icon name="hero-chat-bubble-left-right" class="size-5" /> Write a reply
-              </button>
-            </section>
           </section>
         <% else %>
           <section class="rounded-3xl border border-slate-200/80 bg-white/70 p-8 text-center shadow-sm shadow-slate-200/20 dark:border-slate-700/70 dark:bg-slate-950/50 dark:shadow-slate-900/30">
@@ -587,6 +572,19 @@ defmodule EgregorosWeb.StatusLive do
           </section>
         <% end %>
       </AppShell.app_shell>
+
+      <ReplyModal.reply_modal
+        :if={@current_user}
+        form={@reply_form}
+        upload={@uploads.reply_media}
+        media_alt={@reply_media_alt}
+        reply_to_handle={@reply_to_handle}
+        mention_suggestions={@mention_suggestions}
+        max_chars={reply_max_chars()}
+        options_open?={@reply_options_open?}
+        cw_open?={@reply_cw_open?}
+        open={@reply_modal_open?}
+      />
 
       <MediaViewer.media_viewer
         viewer={%{items: [], index: 0}}
@@ -719,6 +717,18 @@ defmodule EgregorosWeb.StatusLive do
 
   defp upload_has_errors?(_upload), do: false
 
+  defp cancel_all_uploads(socket, upload_name) when is_atom(upload_name) do
+    case socket.assigns.uploads |> Map.get(upload_name) do
+      %{entries: entries} when is_list(entries) ->
+        Enum.reduce(entries, socket, fn entry, socket ->
+          cancel_upload(socket, upload_name, entry.ref)
+        end)
+
+      _ ->
+        socket
+    end
+  end
+
   defp refresh_thread(socket) do
     current_user = socket.assigns.current_user
 
@@ -811,18 +821,6 @@ defmodule EgregorosWeb.StatusLive do
       "true" -> true
       _ -> false
     end
-  end
-
-  defp open_reply_js(js \\ %JS{}) do
-    js
-    |> JS.remove_class("hidden", to: "#reply-form")
-    |> JS.add_class("hidden", to: "#reply-open-button")
-  end
-
-  defp close_reply_js(js \\ %JS{}) do
-    js
-    |> JS.add_class("hidden", to: "#reply-form")
-    |> JS.remove_class("hidden", to: "#reply-open-button")
   end
 
   defp timeline_href(%{id: _}), do: ~p"/?timeline=home"

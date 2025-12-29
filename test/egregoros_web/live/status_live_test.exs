@@ -47,7 +47,7 @@ defmodule EgregorosWeb.StatusLiveTest do
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     {:ok, view, _html} = live(conn, "/@alice/#{uuid}?reply=true")
 
-    _html = render_hook(view, "mention_search", %{"q" => "bo", "scope" => "reply"})
+    _html = render_hook(view, "mention_search", %{"q" => "bo", "scope" => "reply-modal"})
     assert has_element?(view, "[data-role='mention-suggestion']", "@bob")
   end
 
@@ -155,7 +155,7 @@ defmodule EgregorosWeb.StatusLiveTest do
     assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}?reply=true")
 
     view
-    |> form("#reply-form", reply: %{content: "A reply"})
+    |> form("#reply-modal-form", reply: %{content: "A reply"})
     |> render_submit()
 
     assert has_element?(view, "article", "A reply")
@@ -182,7 +182,7 @@ defmodule EgregorosWeb.StatusLiveTest do
     assert {:ok, view, _html} = live(conn, "/@bob@remote.example/#{remote_parent.id}?reply=true")
 
     view
-    |> form("#reply-form", reply: %{content: "Remote reply"})
+    |> form("#reply-modal-form", reply: %{content: "Remote reply"})
     |> render_submit()
 
     assert has_element?(view, "article", "Remote reply")
@@ -207,7 +207,7 @@ defmodule EgregorosWeb.StatusLiveTest do
     assert has_element?(view, "button[data-role='compose-submit'][disabled]")
 
     view
-    |> form("#reply-form", reply: %{content: "hello"})
+    |> form("#reply-modal-form", reply: %{content: "hello"})
     |> render_change()
 
     assert has_element?(view, "[data-role='compose-char-counter']", "4995")
@@ -221,11 +221,11 @@ defmodule EgregorosWeb.StatusLiveTest do
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}?reply=true")
 
-    assert has_element?(view, "#reply-form [data-role='compose-emoji-picker']")
+    assert has_element?(view, "#reply-modal-form [data-role='compose-emoji-picker']")
 
     assert has_element?(
              view,
-             "#reply-form [data-role='compose-emoji-option'][data-emoji='😀']"
+             "#reply-modal-form [data-role='compose-emoji-option'][data-emoji='😀']"
            )
   end
 
@@ -236,7 +236,22 @@ defmodule EgregorosWeb.StatusLiveTest do
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}?reply=true")
 
-    assert has_element?(view, "[data-role='reply-target-handle']", "@alice")
+    assert has_element?(view, "[data-role='reply-modal-target']", "Replying to @alice")
+  end
+
+  test "status cards render modal reply controls when signed in", %{conn: conn, user: user} do
+    assert {:ok, note} = Pipeline.ingest(Note.build(user, "Replyable"), local: true)
+    uuid = uuid_from_ap_id(note.ap_id)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}")
+
+    assert has_element?(
+             view,
+             "button[data-role='reply'][phx-value-in_reply_to][phx-value-actor_handle]"
+           )
+
+    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='closed']")
   end
 
   test "replying rejects content longer than 5000 characters", %{conn: conn, user: user} do
@@ -249,7 +264,7 @@ defmodule EgregorosWeb.StatusLiveTest do
     too_long = String.duplicate("a", 5001)
 
     view
-    |> form("#reply-form", reply: %{content: too_long})
+    |> form("#reply-modal-form", reply: %{content: too_long})
     |> render_submit()
 
     assert render(view) =~ "Reply is too long."
@@ -267,7 +282,7 @@ defmodule EgregorosWeb.StatusLiveTest do
     content = File.read!(fixture_path)
 
     upload =
-      file_input(view, "#reply-form", :reply_media, [
+      file_input(view, "#reply-modal-form", :reply_media, [
         %{
           last_modified: 1_694_171_879_000,
           name: "photo.png",
@@ -287,7 +302,7 @@ defmodule EgregorosWeb.StatusLiveTest do
     assert render_upload(upload, "photo.png") =~ "100%"
 
     view
-    |> form("#reply-form", reply: %{content: "Reply with media"})
+    |> form("#reply-modal-form", reply: %{content: "Reply with media"})
     |> render_submit()
 
     [reply] = Objects.list_replies_to(parent.ap_id, limit: 1)
@@ -303,7 +318,7 @@ defmodule EgregorosWeb.StatusLiveTest do
     assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}?reply=true")
 
     upload =
-      file_input(view, "#reply-form", :reply_media, [
+      file_input(view, "#reply-modal-form", :reply_media, [
         %{
           last_modified: 1_694_171_879_000,
           name: "clip.mp4",
@@ -327,7 +342,7 @@ defmodule EgregorosWeb.StatusLiveTest do
     assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}?reply=true")
 
     upload =
-      file_input(view, "#reply-form", :reply_media, [
+      file_input(view, "#reply-modal-form", :reply_media, [
         %{
           last_modified: 1_694_171_879_000,
           name: "clip.ogg",
@@ -476,7 +491,7 @@ defmodule EgregorosWeb.StatusLiveTest do
     refute close_html =~ "close_media"
   end
 
-  test "signed-in users can open and close the reply composer and changes persist", %{
+  test "signed-in users can open and close the reply modal and changes reset", %{
     conn: conn,
     user: user
   } do
@@ -486,26 +501,26 @@ defmodule EgregorosWeb.StatusLiveTest do
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}")
 
-    assert has_element?(view, "#reply-form[data-state='closed']")
+    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='closed']")
+
+    _html =
+      render_hook(view, "open_reply_modal", %{
+        "in_reply_to" => note.ap_id,
+        "actor_handle" => "@alice"
+      })
+
+    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='open']")
 
     view
-    |> element("button[data-role='reply-open']")
-    |> render_click()
-
-    assert has_element?(view, "#reply-form[data-state='open']")
-
-    view
-    |> form("#reply-form", reply: %{content: "Typing..."})
+    |> form("#reply-modal-form", reply: %{content: "Typing..."})
     |> render_change()
 
     assert render(view) =~ "Typing..."
 
-    view
-    |> element("button[data-role='reply-close']")
-    |> render_click()
+    _html = render_hook(view, "close_reply_modal", %{})
 
-    assert has_element?(view, "button[data-role='reply-open']")
-    assert has_element?(view, "#reply-form[data-state='closed']")
+    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='closed']")
+    refute render(view) =~ "Typing..."
   end
 
   test "signed-in users can remove reply uploads before posting", %{conn: conn, user: user} do
@@ -513,17 +528,13 @@ defmodule EgregorosWeb.StatusLiveTest do
     uuid = uuid_from_ap_id(note.ap_id)
 
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
-    assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}")
-
-    view
-    |> element("button[data-role='reply-open']")
-    |> render_click()
+    assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}?reply=true")
 
     fixture_path = Fixtures.path!("DSCN0010.png")
     content = File.read!(fixture_path)
 
     upload =
-      file_input(view, "#reply-form", :reply_media, [
+      file_input(view, "#reply-modal-form", :reply_media, [
         %{
           last_modified: 1_694_171_879_000,
           name: "photo.png",
@@ -554,7 +565,7 @@ defmodule EgregorosWeb.StatusLiveTest do
     content = File.read!(fixture_path)
 
     upload =
-      file_input(view, "#reply-form", :reply_media, [
+      file_input(view, "#reply-modal-form", :reply_media, [
         %{
           last_modified: 1_694_171_879_000,
           name: "photo.png",
@@ -566,7 +577,7 @@ defmodule EgregorosWeb.StatusLiveTest do
     assert render_upload(upload, "photo.png", 10) =~ "10%"
 
     view
-    |> form("#reply-form", reply: %{content: "Reply while uploading"})
+    |> form("#reply-modal-form", reply: %{content: "Reply while uploading"})
     |> render_submit()
 
     assert render(view) =~ "Wait for attachments to finish uploading."
@@ -583,7 +594,7 @@ defmodule EgregorosWeb.StatusLiveTest do
     content = File.read!(fixture_path)
 
     upload =
-      file_input(view, "#reply-form", :reply_media, [
+      file_input(view, "#reply-modal-form", :reply_media, [
         %{
           last_modified: 1_694_171_879_000,
           name: "photo.png",
@@ -601,7 +612,7 @@ defmodule EgregorosWeb.StatusLiveTest do
     assert render_upload(upload, "photo.png") =~ "100%"
 
     view
-    |> form("#reply-form", reply: %{content: "Reply with media"})
+    |> form("#reply-modal-form", reply: %{content: "Reply with media"})
     |> render_submit()
 
     assert render(view) =~ "Could not upload attachment."
@@ -615,7 +626,7 @@ defmodule EgregorosWeb.StatusLiveTest do
     assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}?reply=true")
 
     view
-    |> form("#reply-form", reply: %{content: ""})
+    |> form("#reply-modal-form", reply: %{content: ""})
     |> render_submit()
 
     assert render(view) =~ "Reply can&#39;t be empty."
