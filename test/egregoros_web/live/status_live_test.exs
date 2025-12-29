@@ -138,6 +138,15 @@ defmodule EgregorosWeb.StatusLiveTest do
     assert has_element?(view, "[data-role='thread-descendant'][data-depth='2']", "Child")
   end
 
+  test "renders an empty replies state when the thread has no replies", %{conn: conn, user: user} do
+    assert {:ok, note} = Pipeline.ingest(Note.build(user, "Lonely post"), local: true)
+    uuid = uuid_from_ap_id(note.ap_id)
+
+    assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}")
+
+    assert has_element?(view, "[data-role='thread-replies-empty']", "No replies yet.")
+  end
+
   test "signed-in users can reply from the status page", %{conn: conn, user: user} do
     assert {:ok, parent} = Pipeline.ingest(Note.build(user, "Parent post"), local: true)
     uuid = uuid_from_ap_id(parent.ap_id)

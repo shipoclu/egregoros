@@ -441,13 +441,24 @@ defmodule EgregorosWeb.StatusLive do
               </div>
             </div>
 
-            <div class="space-y-4" data-role="status-thread">
-              <StatusCard.status_card
-                :for={entry <- @ancestors}
-                id={"post-#{entry.object.id}"}
-                entry={entry}
-                current_user={@current_user}
-              />
+            <div class="space-y-6" data-role="status-thread">
+              <div :if={@ancestors != []} data-role="thread-ancestors" class="space-y-4">
+                <div class="flex items-center justify-between gap-3 px-1">
+                  <p class="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
+                    Context
+                  </p>
+                  <span class="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                    {length(@ancestors)}
+                  </span>
+                </div>
+
+                <StatusCard.status_card
+                  :for={entry <- @ancestors}
+                  id={"post-#{entry.object.id}"}
+                  entry={entry}
+                  current_user={@current_user}
+                />
+              </div>
 
               <div class="rounded-3xl ring-2 ring-slate-900/10 dark:ring-white/10">
                 <StatusCard.status_card
@@ -457,20 +468,39 @@ defmodule EgregorosWeb.StatusLive do
                 />
               </div>
 
-              <div
-                :for={%{entry: entry, depth: depth} <- @descendants}
-                data-role="thread-descendant"
-                data-depth={depth}
-                style={"margin-left: #{thread_indent(depth)}px"}
-                class={[
-                  depth > 1 && "border-l border-slate-200/60 pl-4 dark:border-slate-700/60"
-                ]}
-              >
-                <StatusCard.status_card
-                  id={"post-#{entry.object.id}"}
-                  entry={entry}
-                  current_user={@current_user}
-                />
+              <div data-role="thread-replies" class="space-y-4">
+                <div class="flex items-center justify-between gap-3 px-1">
+                  <p class="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
+                    Replies
+                  </p>
+                  <span class="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                    {length(@descendants)}
+                  </span>
+                </div>
+
+                <div
+                  :if={@descendants == []}
+                  data-role="thread-replies-empty"
+                  class="rounded-3xl border border-slate-200/80 bg-white/70 p-6 text-sm text-slate-600 shadow-sm shadow-slate-200/20 dark:border-slate-700/70 dark:bg-slate-950/50 dark:text-slate-300 dark:shadow-slate-900/30"
+                >
+                  No replies yet.
+                </div>
+
+                <div
+                  :for={%{entry: entry, depth: depth} <- @descendants}
+                  data-role="thread-descendant"
+                  data-depth={depth}
+                  style={"margin-left: #{thread_indent(depth)}px"}
+                  class={[
+                    depth > 1 && "border-l border-slate-200/60 pl-4 dark:border-slate-700/60"
+                  ]}
+                >
+                  <StatusCard.status_card
+                    id={"post-#{entry.object.id}"}
+                    entry={entry}
+                    current_user={@current_user}
+                  />
+                </div>
               </div>
             </div>
 
