@@ -223,7 +223,7 @@ defmodule EgregorosWeb.MastodonAPI.StreamingSocket do
   end
 
   defp deliver_public_status?(%Object{type: type} = object) when type in ~w(Note Announce) do
-    Objects.publicly_visible?(object)
+    Objects.publicly_listed?(object)
   end
 
   defp deliver_public_status?(_object), do: false

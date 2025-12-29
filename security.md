@@ -33,7 +33,7 @@ This file tracks known security gaps and their remediation status.
 - [x] **Prevent DM/private leakage into public surfaces**: ensure public timelines, tag pages, search, profiles, and public permalinks only show statuses visible to the viewer.
 - [x] **Prevent DM/private exfiltration via write endpoints**: require `Objects.visible_to?/2` for Mastodon write actions that return statuses (favourite/unfavourite, reblog/unreblog).
 - [x] **Prevent DM/private probing via ancillary endpoints**: require `Objects.visible_to?/2` for `favourited_by`, `reblogged_by`, and Pleroma emoji reaction endpoints.
-- [ ] **Unlisted semantics**: ensure “unlisted” statuses do **not** appear on public timelines/streams (they should still be publicly fetchable by ID).
+- [x] **Unlisted semantics**: ensure “unlisted” statuses do **not** appear on public timelines/streams (they should still be publicly fetchable by ID).
 - [ ] **Recipient field completeness**: ensure visibility checks consider `bto`/`bcc`/`audience` where relevant (and stay consistent with inbox targeting rules).
 - [ ] **Private upload access control**: avoid serving DM/private attachments from `Plug.Static` without authorization checks (URLs should not be world-readable if leaked).
 

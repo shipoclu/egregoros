@@ -182,6 +182,29 @@ defmodule EgregorosWeb.MastodonAPI.StreamingSocketTest do
     assert {:ok, ^state} = StreamingSocket.handle_info({:post_created, note}, state)
   end
 
+  test "does not deliver unlisted statuses to the public stream" do
+    {:ok, state} = StreamingSocket.init(%{streams: ["public"], current_user: nil})
+    public = "https://www.w3.org/ns/activitystreams#Public"
+
+    assert {:ok, note} =
+             Objects.create_object(%{
+               ap_id: "https://remote.example/objects/unlisted-public-stream",
+               type: "Note",
+               actor: "https://remote.example/users/alice",
+               local: false,
+               data: %{
+                 "id" => "https://remote.example/objects/unlisted-public-stream",
+                 "type" => "Note",
+                 "attributedTo" => "https://remote.example/users/alice",
+                 "to" => ["https://remote.example/users/alice/followers"],
+                 "cc" => [public],
+                 "content" => "<p>Unlisted</p>"
+               }
+             })
+
+    assert {:ok, ^state} = StreamingSocket.handle_info({:post_created, note}, state)
+  end
+
   test "does not deliver non-visible messages to the user stream" do
     {:ok, user} = Users.create_local_user("alice")
     {:ok, followed} = Users.create_user(remote_user_attrs("bob@example.com"))

@@ -149,7 +149,7 @@ defmodule Egregoros.Objects do
       order_by: [desc: o.id],
       limit: ^limit
     )
-    |> where_publicly_visible()
+    |> where_publicly_listed()
     |> maybe_where_max_id(max_id)
     |> maybe_where_since_id(since_id)
     |> Repo.all()
@@ -226,7 +226,7 @@ defmodule Egregoros.Objects do
       order_by: [desc: o.id],
       limit: ^limit
     )
-    |> where_publicly_visible()
+    |> where_publicly_listed()
     |> maybe_where_max_id(max_id)
     |> maybe_where_since_id(since_id)
     |> Repo.all()
@@ -239,6 +239,13 @@ defmodule Egregoros.Objects do
   end
 
   def publicly_visible?(_object), do: false
+
+  def publicly_listed?(%Object{data: %{} = data}) do
+    to = data |> Map.get("to", []) |> List.wrap()
+    @as_public in to
+  end
+
+  def publicly_listed?(_object), do: false
 
   def visible_to?(%Object{} = object, nil), do: publicly_visible?(object)
 
@@ -262,6 +269,13 @@ defmodule Egregoros.Objects do
       where:
         fragment("? @> ?", o.data, ^%{"to" => [@as_public]}) or
           fragment("? @> ?", o.data, ^%{"cc" => [@as_public]})
+    )
+  end
+
+  defp where_publicly_listed(query) do
+    from(o in query,
+      where:
+        fragment("? @> ?", o.data, ^%{"to" => [@as_public]})
     )
   end
 

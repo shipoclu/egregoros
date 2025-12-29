@@ -58,6 +58,47 @@ defmodule Egregoros.ObjectsTest do
     assert Enum.all?(notes, &(&1.type == "Note"))
   end
 
+  test "list_public_statuses excludes unlisted statuses" do
+    public = "https://www.w3.org/ns/activitystreams#Public"
+    followers = "https://remote.example/users/alice/followers"
+
+    assert {:ok, %Object{} = listed} =
+             Objects.create_object(%{
+               ap_id: "https://remote.example/objects/listed-1",
+               type: "Note",
+               actor: "https://remote.example/users/alice",
+               local: false,
+               data: %{
+                 "id" => "https://remote.example/objects/listed-1",
+                 "type" => "Note",
+                 "actor" => "https://remote.example/users/alice",
+                 "to" => [public],
+                 "cc" => [],
+                 "content" => "Listed"
+               }
+             })
+
+    assert {:ok, %Object{} = unlisted} =
+             Objects.create_object(%{
+               ap_id: "https://remote.example/objects/unlisted-1",
+               type: "Note",
+               actor: "https://remote.example/users/alice",
+               local: false,
+               data: %{
+                 "id" => "https://remote.example/objects/unlisted-1",
+                 "type" => "Note",
+                 "actor" => "https://remote.example/users/alice",
+                 "to" => [followers],
+                 "cc" => [public],
+                 "content" => "Unlisted"
+               }
+             })
+
+    statuses = Objects.list_public_statuses()
+    assert Enum.any?(statuses, &(&1.id == listed.id))
+    refute Enum.any?(statuses, &(&1.id == unlisted.id))
+  end
+
   test "get_by_type_actor_object returns the latest matching object without raising" do
     like_1 = Map.put(@like_attrs, :ap_id, "https://example.com/activities/like/latest/1")
     like_2 = Map.put(@like_attrs, :ap_id, "https://example.com/activities/like/latest/2")

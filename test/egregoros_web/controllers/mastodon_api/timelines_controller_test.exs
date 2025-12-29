@@ -23,12 +23,14 @@ defmodule EgregorosWeb.MastodonAPI.TimelinesControllerTest do
 
     {:ok, _} = Publish.post_note(user, "Hello public")
     {:ok, _} = Publish.post_note(user, "Secret DM", visibility: "direct")
+    {:ok, _} = Publish.post_note(user, "Unlisted post", visibility: "unlisted")
 
     conn = get(conn, "/api/v1/timelines/public")
     response = json_response(conn, 200)
 
     assert Enum.any?(response, &(&1["content"] == "<p>Hello public</p>"))
     refute Enum.any?(response, &(&1["content"] == "<p>Secret DM</p>"))
+    refute Enum.any?(response, &(&1["content"] == "<p>Unlisted post</p>"))
   end
 
   test "GET /api/v1/timelines/public includes reblog statuses", %{conn: conn} do
