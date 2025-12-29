@@ -86,7 +86,7 @@ defmodule EgregorosWeb.MastodonAPI.AccountRenderer do
       "avatar_static" => avatar_url,
       "header" => "",
       "header_static" => "",
-      "locked" => false,
+      "locked" => user.locked,
       "bot" => false,
       "discoverable" => true,
       "group" => false,

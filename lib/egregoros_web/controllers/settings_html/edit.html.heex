@@ -76,7 +76,13 @@
               placeholder="alice@example.com"
             />
 
-            <.button type="submit" variant="secondary" class="w-full">Update email</.button>
+            <.input
+              type="checkbox"
+              field={@account_form[:locked]}
+              label="Require follow requests (locked account)"
+            />
+
+            <.button type="submit" variant="secondary" class="w-full">Update account</.button>
           </.form>
         </section>
 

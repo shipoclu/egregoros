@@ -158,7 +158,8 @@ defmodule Egregoros.Federation.Actor do
           outbox: outbox,
           public_key: public_key,
           private_key: nil,
-          local: false
+          local: false,
+          locked: locked?(actor)
         }
 
         attrs =
@@ -254,6 +255,18 @@ defmodule Egregoros.Federation.Actor do
   end
 
   defp maybe_put_emojis(attrs, _actor, _actor_id), do: attrs
+
+  defp locked?(actor) when is_map(actor) do
+    case Map.get(actor, "manuallyApprovesFollowers") do
+      true -> true
+      "true" -> true
+      false -> false
+      "false" -> false
+      _ -> false
+    end
+  end
+
+  defp locked?(_actor), do: false
 
   defp icon_url(%{} = actor, actor_id) when is_binary(actor_id) do
     actor

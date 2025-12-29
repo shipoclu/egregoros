@@ -28,7 +28,8 @@ defmodule EgregorosWeb.ActorControllerTest do
       Users.update_profile(user, %{
         "name" => "Dana Example",
         "bio" => "Hello federation",
-        "avatar_url" => "https://cdn.example/dana.png"
+        "avatar_url" => "https://cdn.example/dana.png",
+        "locked" => true
       })
 
     conn = get(conn, "/users/dana")
@@ -38,6 +39,7 @@ defmodule EgregorosWeb.ActorControllerTest do
     assert decoded["name"] == "Dana Example"
     assert decoded["summary"] == "Hello federation"
     assert decoded["icon"]["url"] == "https://cdn.example/dana.png"
+    assert decoded["manuallyApprovesFollowers"] == true
   end
 
   test "GET /users/:nickname renders uploaded avatar paths as absolute urls", %{conn: conn} do

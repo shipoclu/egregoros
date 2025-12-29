@@ -32,6 +32,7 @@ defmodule EgregorosWeb.ActorController do
       "outbox" => user.outbox,
       "followers" => user.ap_id <> "/followers",
       "following" => user.ap_id <> "/following",
+      "manuallyApprovesFollowers" => user.locked,
       "publicKey" => %{
         "id" => user.ap_id <> "#main-key",
         "owner" => user.ap_id,

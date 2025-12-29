@@ -30,7 +30,14 @@ defmodule EgregorosWeb.SettingsController do
 
         render(conn, :edit,
           profile_form: profile_form,
-          account_form: Phoenix.Component.to_form(%{"email" => user.email || ""}, as: :account),
+          account_form:
+            Phoenix.Component.to_form(
+              %{
+                "email" => user.email || "",
+                "locked" => user.locked
+              },
+              as: :account
+            ),
           password_form: password_form,
           e2ee_key: E2EE.get_active_key(user),
           notifications_count: notifications_count(user),
@@ -74,9 +81,13 @@ defmodule EgregorosWeb.SettingsController do
 
   def update_account(conn, %{"account" => %{} = params}) do
     with %User{} = user <- conn.assigns.current_user,
-         {:ok, _user} <- Users.update_profile(user, %{"email" => Map.get(params, "email")}) do
+         {:ok, _user} <-
+           Users.update_profile(user, %{
+             "email" => Map.get(params, "email"),
+             "locked" => Map.get(params, "locked")
+           }) do
       conn
-      |> put_flash(:info, "Email updated.")
+      |> put_flash(:info, "Account updated.")
       |> redirect(to: ~p"/settings")
     else
       nil ->
@@ -86,7 +97,7 @@ defmodule EgregorosWeb.SettingsController do
 
       {:error, _} ->
         conn
-        |> put_flash(:error, "Could not update email.")
+        |> put_flash(:error, "Could not update account.")
         |> put_status(:unprocessable_entity)
         |> edit(%{})
     end

@@ -103,13 +103,16 @@ defmodule EgregorosWeb.SettingsControllerTest do
     conn =
       conn
       |> Plug.Test.init_test_session(%{user_id: user.id})
-      |> post("/settings/account", %{"account" => %{"email" => "alice2@example.com"}})
+      |> post("/settings/account", %{
+        "account" => %{"email" => "alice2@example.com", "locked" => "true"}
+      })
 
     assert redirected_to(conn) == "/settings"
-    assert Phoenix.Flash.get(conn.assigns.flash, :info) == "Email updated."
+    assert Phoenix.Flash.get(conn.assigns.flash, :info) == "Account updated."
 
     updated = Users.get(user.id)
     assert updated.email == "alice2@example.com"
+    assert updated.locked == true
 
     conn =
       Phoenix.ConnTest.build_conn()

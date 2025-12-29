@@ -59,6 +59,15 @@ defmodule EgregorosWeb.MastodonAPI.AccountRendererTest do
     assert rendered["url"] == EgregorosWeb.Endpoint.url() <> "/@alice"
   end
 
+  test "renders locked as true when the user requires follow requests" do
+    {:ok, user} = Users.create_local_user("alice")
+    {:ok, user} = Users.update_profile(user, %{locked: true})
+
+    rendered = AccountRenderer.render_account(user)
+
+    assert rendered["locked"] == true
+  end
+
   test "renders remote account url as a local profile url" do
     {:ok, user} =
       Users.create_user(%{
