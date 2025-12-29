@@ -8,7 +8,7 @@ defmodule Egregoros.Auth.BearerToken do
   alias Egregoros.User
 
   def access_token(conn) do
-    bearer_token(conn) || access_token_param(conn)
+    bearer_token(conn)
   end
 
   @impl true
@@ -38,9 +38,4 @@ defmodule Egregoros.Auth.BearerToken do
     end
   end
 
-  defp access_token_param(%Plug.Conn{params: %{"access_token" => token}}) when is_binary(token) do
-    String.trim(token)
-  end
-
-  defp access_token_param(_conn), do: nil
 end

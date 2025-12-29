@@ -41,7 +41,7 @@ This file tracks known security gaps and their remediation status.
 - [x] **Enforce OAuth scopes** for Mastodon API endpoints (coarse `read`/`write`/`follow`).
 - [x] **Token lifecycle**: token expiry / refresh tokens / revocation endpoint (and tests).
 - [ ] **Token storage hardening**: avoid storing OAuth access/refresh tokens in plaintext in the DB (hash tokens and/or store only a digest).
-- [ ] **Avoid access tokens in query params**: prefer header-only bearer tokens (query params leak into logs/referrers).
+- [x] **Avoid access tokens in query params**: prefer header-only bearer tokens (query params leak into logs/referrers). (Exception: streaming uses its own access_token handling.)
 
 ## Medium priority (inbox abuse controls)
 - [x] **Inbox addressing checks**: optionally require incoming activities to be addressed to this instance/user (e.g. `to`/`cc` includes followers/shared inbox), to reduce DB pollution.

@@ -42,4 +42,33 @@ defmodule Egregoros.Auth.BearerTokenTest do
     assert {:ok, resolved} = BearerToken.current_user(conn)
     assert resolved.id == user.id
   end
+
+  test "current_user ignores access_token query param" do
+    {:ok, user} = Users.create_local_user("alice")
+
+    {:ok, app} =
+      OAuth.create_application(%{
+        "client_name" => "Husky",
+        "redirect_uris" => "urn:ietf:wg:oauth:2.0:oob",
+        "scopes" => "read"
+      })
+
+    {:ok, auth_code} =
+      OAuth.create_authorization_code(app, user, "urn:ietf:wg:oauth:2.0:oob", "read")
+
+    {:ok, token} =
+      OAuth.exchange_code_for_token(%{
+        "grant_type" => "authorization_code",
+        "code" => auth_code.code,
+        "client_id" => app.client_id,
+        "client_secret" => app.client_secret,
+        "redirect_uri" => "urn:ietf:wg:oauth:2.0:oob"
+      })
+
+    conn =
+      conn(:get, "/api/v1/accounts/verify_credentials?access_token=#{token.token}")
+      |> fetch_query_params()
+
+    assert {:error, :unauthorized} = BearerToken.current_user(conn)
+  end
 end
