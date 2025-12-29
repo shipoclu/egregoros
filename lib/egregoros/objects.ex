@@ -7,6 +7,7 @@ defmodule Egregoros.Objects do
   alias Egregoros.Repo
 
   @as_public "https://www.w3.org/ns/activitystreams#Public"
+  @recipient_fields ~w(to cc bto bcc audience)
 
   def create_object(attrs) do
     %Object{}
@@ -235,7 +236,8 @@ defmodule Egregoros.Objects do
   def publicly_visible?(%Object{data: %{} = data}) do
     to = data |> Map.get("to", []) |> List.wrap()
     cc = data |> Map.get("cc", []) |> List.wrap()
-    @as_public in to or @as_public in cc
+    audience = data |> Map.get("audience", []) |> List.wrap()
+    @as_public in to or @as_public in cc or @as_public in audience
   end
 
   def publicly_visible?(_object), do: false
@@ -280,9 +282,23 @@ defmodule Egregoros.Objects do
   end
 
   defp recipient?(%Object{data: %{} = data}, recipient) when is_binary(recipient) do
-    to = data |> Map.get("to", []) |> List.wrap()
-    cc = data |> Map.get("cc", []) |> List.wrap()
-    recipient in to or recipient in cc
+    recipient = String.trim(recipient)
+
+    if recipient == "" do
+      false
+    else
+      Enum.any?(@recipient_fields, fn field ->
+        data
+        |> Map.get(field)
+        |> List.wrap()
+        |> Enum.any?(fn
+          %{"id" => id} when is_binary(id) -> String.trim(id) == recipient
+          %{id: id} when is_binary(id) -> String.trim(id) == recipient
+          id when is_binary(id) -> String.trim(id) == recipient
+          _ -> false
+        end)
+      end)
+    end
   end
 
   defp recipient?(_object, _recipient), do: false
@@ -334,7 +350,10 @@ defmodule Egregoros.Objects do
           (o.actor == ^actor_ap_id or
              o.actor in subquery(followed_subquery) or
              fragment("? @> ?", o.data, ^%{"to" => [actor_ap_id]}) or
-             fragment("? @> ?", o.data, ^%{"cc" => [actor_ap_id]})),
+             fragment("? @> ?", o.data, ^%{"cc" => [actor_ap_id]}) or
+             fragment("? @> ?", o.data, ^%{"bto" => [actor_ap_id]}) or
+             fragment("? @> ?", o.data, ^%{"bcc" => [actor_ap_id]}) or
+             fragment("? @> ?", o.data, ^%{"audience" => [actor_ap_id]})),
       order_by: [desc: o.id],
       limit: ^limit
     )
@@ -372,7 +391,10 @@ defmodule Egregoros.Objects do
           (o.actor == ^actor_ap_id or
              o.actor in subquery(followed_subquery) or
              fragment("? @> ?", o.data, ^%{"to" => [actor_ap_id]}) or
-             fragment("? @> ?", o.data, ^%{"cc" => [actor_ap_id]})),
+             fragment("? @> ?", o.data, ^%{"cc" => [actor_ap_id]}) or
+             fragment("? @> ?", o.data, ^%{"bto" => [actor_ap_id]}) or
+             fragment("? @> ?", o.data, ^%{"bcc" => [actor_ap_id]}) or
+             fragment("? @> ?", o.data, ^%{"audience" => [actor_ap_id]})),
       order_by: [desc: o.id],
       limit: ^limit
     )
@@ -389,8 +411,12 @@ defmodule Egregoros.Objects do
         o.actor == ^user_ap_id or
           fragment("? @> ?", o.data, ^%{"to" => [@as_public]}) or
           fragment("? @> ?", o.data, ^%{"cc" => [@as_public]}) or
+          fragment("? @> ?", o.data, ^%{"audience" => [@as_public]}) or
           fragment("? @> ?", o.data, ^%{"to" => [user_ap_id]}) or
-          fragment("? @> ?", o.data, ^%{"cc" => [user_ap_id]})
+          fragment("? @> ?", o.data, ^%{"cc" => [user_ap_id]}) or
+          fragment("? @> ?", o.data, ^%{"bto" => [user_ap_id]}) or
+          fragment("? @> ?", o.data, ^%{"bcc" => [user_ap_id]}) or
+          fragment("? @> ?", o.data, ^%{"audience" => [user_ap_id]})
       )
 
     visibility_dynamic =

@@ -223,6 +223,50 @@ defmodule Egregoros.ObjectsTest do
     assert Enum.any?(Objects.list_home_notes(bob.ap_id), &(&1.id == dm.id))
   end
 
+  test "list_home_notes includes direct messages addressed via bto/bcc/audience" do
+    {:ok, bob} = Users.create_local_user("bob")
+
+    assert {:ok, %Object{} = dm_bcc} =
+             Objects.create_object(%{
+               ap_id: "https://remote.example/objects/dm-bcc-1",
+               type: "Note",
+               actor: "https://remote.example/users/carol",
+               object: nil,
+               local: false,
+               data: %{
+                 "id" => "https://remote.example/objects/dm-bcc-1",
+                 "type" => "Note",
+                 "actor" => "https://remote.example/users/carol",
+                 "to" => [],
+                 "cc" => [],
+                 "bcc" => [bob.ap_id],
+                 "content" => "secret"
+               }
+             })
+
+    assert {:ok, %Object{} = dm_audience} =
+             Objects.create_object(%{
+               ap_id: "https://remote.example/objects/dm-audience-1",
+               type: "Note",
+               actor: "https://remote.example/users/carol",
+               object: nil,
+               local: false,
+               data: %{
+                 "id" => "https://remote.example/objects/dm-audience-1",
+                 "type" => "Note",
+                 "actor" => "https://remote.example/users/carol",
+                 "to" => [],
+                 "cc" => [],
+                 "audience" => [bob.ap_id],
+                 "content" => "secret"
+               }
+             })
+
+    notes = Objects.list_home_notes(bob.ap_id)
+    assert Enum.any?(notes, &(&1.id == dm_bcc.id))
+    assert Enum.any?(notes, &(&1.id == dm_audience.id))
+  end
+
   test "list_home_statuses includes direct messages addressed to the user" do
     {:ok, bob} = Users.create_local_user("bob")
     dm_ap_id = "https://remote.example/objects/dm-2"
@@ -245,6 +289,30 @@ defmodule Egregoros.ObjectsTest do
              })
 
     assert Enum.any?(Objects.list_home_statuses(bob.ap_id), &(&1.id == dm.id))
+  end
+
+  test "visible_to?/2 treats bto/bcc/audience as recipients" do
+    {:ok, bob} = Users.create_local_user("bob")
+
+    assert {:ok, %Object{} = dm} =
+             Objects.create_object(%{
+               ap_id: "https://remote.example/objects/dm-recipient-1",
+               type: "Note",
+               actor: "https://remote.example/users/carol",
+               object: nil,
+               local: false,
+               data: %{
+                 "id" => "https://remote.example/objects/dm-recipient-1",
+                 "type" => "Note",
+                 "actor" => "https://remote.example/users/carol",
+                 "to" => [],
+                 "cc" => [],
+                 "bto" => [bob.ap_id],
+                 "content" => "secret"
+               }
+             })
+
+    assert Objects.visible_to?(dm, bob)
   end
 
   test "search_notes finds notes by content or summary" do
