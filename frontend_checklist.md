@@ -109,7 +109,7 @@ This is a **web UI** checklist for Egregoros. Items are ordered roughly by depen
 | Following list page | DONE | Dedicated page exists (`/@:nickname/following`) with load-more pagination + follow/unfollow buttons. |
 | Follow requests (locked accounts) | DONE | Accept/deny UI lives in Notifications → “Requests”. |
 | Blocks / mutes | DONE | Block/mute buttons exist on profile pages; management screen is available at `/settings/privacy`. |
-| Relationship badges (follows you, mutuals) | TODO | Optional but useful. |
+| Relationship badges (follows you, mutuals) | DONE | Profile header shows “Follows you” and “Mutual” badges. |
 | Profile fields (custom metadata) | TODO | Common on Mastodon/Pleroma. |
 | Profile header image | DONE | Local users can upload a header image in Settings; profile renders it when `banner_url` is present. |
 
