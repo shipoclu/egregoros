@@ -107,7 +107,7 @@ This is a **web UI** checklist for Egregoros. Items are ordered roughly by depen
 | Remote follow by handle | DONE | Present as a “follow remote” workflow. |
 | Followers list page | DONE | Dedicated page exists (`/@:nickname/followers`) with load-more pagination + follow/unfollow buttons. |
 | Following list page | DONE | Dedicated page exists (`/@:nickname/following`) with load-more pagination + follow/unfollow buttons. |
-| Follow requests (locked accounts) | TODO | Accept/deny UI. |
+| Follow requests (locked accounts) | DONE | Accept/deny UI lives in Notifications → “Requests”. |
 | Blocks / mutes | PARTIAL | Block/mute buttons exist on profile pages; still missing a dedicated management screen/list. |
 | Relationship badges (follows you, mutuals) | TODO | Optional but useful. |
 | Profile fields (custom metadata) | TODO | Common on Mastodon/Pleroma. |
@@ -117,10 +117,10 @@ This is a **web UI** checklist for Egregoros. Items are ordered roughly by depen
 | Feature | Status | Notes |
 |---|---:|---|
 | Notifications list | DONE | `/notifications` |
-| Notification types coverage | PARTIAL | Follow/like/repost/mention/emoji reactions covered; still missing follow requests, polls, reports, etc. |
+| Notification types coverage | PARTIAL | Follow/like/repost/mention/emoji reactions covered; still missing polls, reports, etc. |
 | Live updates for notifications | DONE | Notifications stream into the list while connected. |
 | Mark as read / unread | TODO | |
-| Notification filtering (mentions only, follows only, etc.) | PARTIAL | Filters cover all/follows/likes/reposts/mentions/reactions; still missing richer filtering options. |
+| Notification filtering (mentions only, follows only, etc.) | PARTIAL | Filters cover all/follows/requests/likes/reposts/mentions/reactions; still missing richer filtering options. |
 
 ### Search & discovery
 | Feature | Status | Notes |
