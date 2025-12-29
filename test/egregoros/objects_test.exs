@@ -83,15 +83,26 @@ defmodule Egregoros.ObjectsTest do
     bob_ap_id = "https://remote.example/users/bob"
     carol_ap_id = "https://remote.example/users/carol"
 
-    assert {:ok, %Object{}} =
+    {:ok, follow_object} =
+      Pipeline.ingest(
+        %{
+          "id" => "https://local.example/activities/follow/1",
+          "type" => "Follow",
+          "actor" => alice.ap_id,
+          "object" => bob_ap_id
+        },
+        local: true
+      )
+
+    assert {:ok, _} =
              Pipeline.ingest(
                %{
-                 "id" => "https://local.example/activities/follow/1",
-                 "type" => "Follow",
-                 "actor" => alice.ap_id,
-                 "object" => bob_ap_id
+                 "id" => "https://remote.example/activities/accept/1",
+                 "type" => "Accept",
+                 "actor" => bob_ap_id,
+                 "object" => follow_object.data
                },
-               local: true
+               local: false
              )
 
     assert {:ok, %Object{}} =

@@ -64,6 +64,15 @@ defmodule EgregorosWeb.FollowCollectionControllerTest do
     follow_2 = %{follow | "id" => "http://localhost:4000/activities/follow/following-2"}
     assert {:ok, _} = Pipeline.ingest(follow_2, local: true)
 
+    accept = %{
+      "id" => "https://remote.example/activities/accept/following-2",
+      "type" => "Accept",
+      "actor" => remote.ap_id,
+      "object" => follow_2
+    }
+
+    assert {:ok, _} = Pipeline.ingest(accept, local: false)
+
     conn = get(conn, "/users/alice-following/following")
     assert conn.status == 200
 
