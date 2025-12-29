@@ -48,7 +48,12 @@ defmodule Egregoros.HTML do
     format = Keyword.get(opts, :format, :html)
     emojis = Keyword.get(opts, :emojis, [])
     mention_hrefs = Keyword.get(opts, :mention_hrefs, %{})
-    ap_tags = Keyword.get(opts, :ap_tags, [])
+
+    ap_tags =
+      opts
+      |> Keyword.get(:ap_tags, [])
+      |> List.wrap()
+
     emoji_map = emoji_map(emojis)
     trimmed = String.trim(content)
 
@@ -509,7 +514,7 @@ defmodule Egregoros.HTML do
     |> Enum.reduce(html, fn
       %{"type" => "Mention", "href" => href, "name" => name}, acc
       when is_binary(href) and href != "" and is_binary(name) and name != "" ->
-        case ProfilePaths.profile_path(name) do
+        case mention_profile_path(href, name) do
           profile_path when is_binary(profile_path) and profile_path != "" ->
             profile_url = URL.absolute(profile_path)
 
@@ -535,6 +540,97 @@ defmodule Egregoros.HTML do
   end
 
   defp rewrite_mention_links(html, _tags) when is_binary(html), do: html
+
+  defp mention_profile_path(href, name) when is_binary(href) and is_binary(name) do
+    local_domains = local_domains()
+
+    handle =
+      name
+      |> String.trim()
+      |> String.trim_leading("@")
+
+    case Egregoros.Mentions.parse(handle) do
+      {:ok, nickname, host} ->
+        host = normalize_mention_host(host) || mention_host_from_href(href)
+
+        nickname
+        |> mention_handle_for_profile(host, local_domains)
+        |> ProfilePaths.profile_path()
+
+      :error ->
+        ProfilePaths.profile_path(name) ||
+          mention_profile_path_from_href(href, local_domains)
+    end
+  end
+
+  defp mention_profile_path(_href, _name), do: nil
+
+  defp mention_handle_for_profile(nickname, host, local_domains)
+       when is_binary(nickname) and nickname != "" and is_list(local_domains) do
+    host = normalize_mention_host(host)
+
+    cond do
+      is_binary(host) and host != "" and host in local_domains ->
+        "@" <> nickname
+
+      is_binary(host) and host != "" ->
+        "@" <> nickname <> "@" <> host
+
+      true ->
+        "@" <> nickname
+    end
+  end
+
+  defp mention_handle_for_profile(nickname, _host, _local_domains) when is_binary(nickname),
+    do: "@" <> nickname
+
+  defp mention_host_from_href(href) when is_binary(href) do
+    href = String.trim(href)
+
+    with %URI{host: host} = uri <- URI.parse(href),
+         true <- is_binary(host) and host != "" do
+      uri
+      |> mention_host_from_uri()
+      |> normalize_mention_host()
+    else
+      _ -> nil
+    end
+  end
+
+  defp mention_host_from_href(_href), do: nil
+
+  defp mention_profile_path_from_href(href, local_domains)
+       when is_binary(href) and is_list(local_domains) do
+    href = String.trim(href)
+
+    with %URI{host: host, path: path} = uri <- URI.parse(href),
+         true <- is_binary(host) and host != "" do
+      nickname = mention_nickname_from_uri_path(path)
+
+      host =
+        uri
+        |> mention_host_from_uri()
+        |> normalize_mention_host()
+
+      cond do
+        nickname == "" ->
+          nil
+
+        is_binary(host) and host != "" and host in local_domains ->
+          ProfilePaths.profile_path("@" <> nickname)
+
+        is_binary(host) and host != "" ->
+          ProfilePaths.profile_path("@" <> nickname <> "@" <> host)
+
+        true ->
+          ProfilePaths.profile_path("@" <> nickname)
+      end
+    else
+      _ -> nil
+    end
+  end
+
+  defp mention_profile_path_from_href(_href, _local_domains), do: nil
 
   defp mention_candidate_hrefs(href, name) when is_binary(href) and is_binary(name) do
     href = href |> String.trim()

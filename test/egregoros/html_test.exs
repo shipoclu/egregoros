@@ -461,6 +461,42 @@ defmodule Egregoros.HTMLTest do
       assert safe =~
                ~r/<a[^>]*href="#{Regex.escape(href)}"[^>]*class="mention-link"[^>]*>@bob<\/a>/
     end
+
+    test "styles mention links in html input when mention tag is a map" do
+      safe =
+        HTML.to_safe_html("<p>hi <a href=\"https://remote.example/users/bob\">@bob</a></p>",
+          format: :html,
+          ap_tags: %{
+            "type" => "Mention",
+            "href" => "https://remote.example/users/bob",
+            "name" => "@bob@remote.example"
+          }
+        )
+
+      href = "#{EgregorosWeb.Endpoint.url()}/@bob@remote.example"
+
+      assert safe =~
+               ~r/<a[^>]*href="#{Regex.escape(href)}"[^>]*class="mention-link"[^>]*>@bob<\/a>/
+    end
+
+    test "rewrites mention links when tag name does not include the domain" do
+      safe =
+        HTML.to_safe_html("<p>hi <a href=\"https://remote.example/users/bob\">@bob</a></p>",
+          format: :html,
+          ap_tags: [
+            %{
+              "type" => "Mention",
+              "href" => "https://remote.example/users/bob",
+              "name" => "@bob"
+            }
+          ]
+        )
+
+      href = "#{EgregorosWeb.Endpoint.url()}/@bob@remote.example"
+
+      assert safe =~
+               ~r/<a[^>]*href="#{Regex.escape(href)}"[^>]*class="mention-link"[^>]*>@bob<\/a>/
+    end
   end
 
   describe "to_safe_inline_html/2" do
