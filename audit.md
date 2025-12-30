@@ -34,7 +34,7 @@ This is a short follow-up pass focused on **maintainability / DRY**, plus a quic
 
 ### LOW (new)
 
-- **Reply target visibility is not enforced in Mastodon create flow**: `StatusesController.resolve_in_reply_to/1` resolves `in_reply_to_id` to an `ap_id` without checking `Objects.visible_to?/2` for the posting user.
+- [x] **Reply target visibility is enforced in Mastodon create flow**: `StatusesController.resolve_in_reply_to/2` now checks `Objects.visible_to?/2` for the posting user before accepting `in_reply_to_id`.
   - This is likely not exploitable for content disclosure (the client already needs the ID), but it can create “phantom” replies to objects the poster cannot view.
   - Code: `lib/egregoros_web/controllers/mastodon_api/statuses_controller.ex`.
 
