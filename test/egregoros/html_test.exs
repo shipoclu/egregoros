@@ -37,6 +37,17 @@ defmodule Egregoros.HTMLTest do
       refute scrubbed =~ "javascript:"
     end
 
+    test "does not turn encoded colons in href attributes into javascript: schemes" do
+      html = "<a href=\"javascript&amp;#x3A;alert(1)\">x</a>"
+
+      scrubbed = HTML.sanitize(html)
+
+      assert scrubbed =~ ">x<"
+      refute scrubbed =~ "javascript:"
+      refute scrubbed =~ "javascript&#x3A;"
+      refute scrubbed =~ "javascript&#58;"
+    end
+
     test "adds safe rel attributes to links" do
       html = "<a href=\"https://example.com\">x</a>"
 

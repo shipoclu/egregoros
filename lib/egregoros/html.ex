@@ -35,7 +35,7 @@ defmodule Egregoros.HTML do
         _ -> escape_html(html)
       end
 
-    String.replace(content, "&amp;", "&")
+    unescape_amp_in_text_nodes(content)
   end
 
   def sanitize(_, _), do: ""
@@ -169,6 +169,49 @@ defmodule Egregoros.HTML do
         _ -> "&#x" <> hex <> ";"
       end
     end)
+  end
+
+  defp unescape_amp_in_text_nodes(html) when is_binary(html) do
+    html
+    |> do_unescape_amp_in_text_nodes(:text, nil, [])
+    |> Enum.reverse()
+    |> IO.iodata_to_binary()
+  end
+
+  defp unescape_amp_in_text_nodes(_html), do: ""
+
+  defp do_unescape_amp_in_text_nodes(<<>>, _mode, _quote, acc), do: acc
+
+  defp do_unescape_amp_in_text_nodes(<<"&amp;", rest::binary>>, :text, quote, acc) do
+    do_unescape_amp_in_text_nodes(rest, :text, quote, ["&" | acc])
+  end
+
+  defp do_unescape_amp_in_text_nodes(<<"<", rest::binary>>, :text, _quote, acc) do
+    do_unescape_amp_in_text_nodes(rest, :tag, nil, ["<" | acc])
+  end
+
+  defp do_unescape_amp_in_text_nodes(<<">", rest::binary>>, :tag, nil, acc) do
+    do_unescape_amp_in_text_nodes(rest, :text, nil, [">" | acc])
+  end
+
+  defp do_unescape_amp_in_text_nodes(<<"\"", rest::binary>>, :tag, nil, acc) do
+    do_unescape_amp_in_text_nodes(rest, :tag, ?", ["\"" | acc])
+  end
+
+  defp do_unescape_amp_in_text_nodes(<<"\"", rest::binary>>, :tag, ?", acc) do
+    do_unescape_amp_in_text_nodes(rest, :tag, nil, ["\"" | acc])
+  end
+
+  defp do_unescape_amp_in_text_nodes(<<"'", rest::binary>>, :tag, nil, acc) do
+    do_unescape_amp_in_text_nodes(rest, :tag, ?', ["'" | acc])
+  end
+
+  defp do_unescape_amp_in_text_nodes(<<"'", rest::binary>>, :tag, ?', acc) do
+    do_unescape_amp_in_text_nodes(rest, :tag, nil, ["'" | acc])
+  end
+
+  defp do_unescape_amp_in_text_nodes(<<char::utf8, rest::binary>>, mode, quote, acc) do
+    do_unescape_amp_in_text_nodes(rest, mode, quote, [<<char::utf8>> | acc])
   end
 
   defp linkify_text(text, emoji_map, mention_hrefs)
