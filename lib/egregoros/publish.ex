@@ -10,6 +10,7 @@ defmodule Egregoros.Publish do
   alias Egregoros.Pipeline
   alias Egregoros.User
   alias Egregoros.Users
+  alias EgregorosWeb.URL
 
   @as_public "https://www.w3.org/ns/activitystreams#Public"
   @max_note_chars 5000
@@ -46,6 +47,7 @@ defmodule Egregoros.Publish do
 
         mention_recipient_ids = Enum.map(mentions, & &1.ap_id)
         mention_tags = Enum.map(mentions, &mention_tag/1)
+        hashtag_tags = hashtag_tags(content)
 
         mention_hrefs =
           mentions
@@ -66,7 +68,7 @@ defmodule Egregoros.Publish do
           |> maybe_put_attachments(attachments)
           |> maybe_put_in_reply_to(in_reply_to)
           |> maybe_put_visibility(visibility, user.ap_id, mention_recipient_ids)
-          |> maybe_put_tags(mention_tags)
+          |> maybe_put_tags(mention_tags ++ hashtag_tags)
           |> maybe_put_summary(spoiler_text)
           |> maybe_put_sensitive(sensitive)
           |> maybe_put_language(language)
@@ -303,6 +305,45 @@ defmodule Egregoros.Publish do
   end
 
   defp mention_tag(_mention), do: nil
+
+  defp hashtag_tags(content) when is_binary(content) do
+    content
+    |> extract_hashtags()
+    |> Enum.map(fn tag ->
+      %{
+        "type" => "Hashtag",
+        "name" => "#" <> tag,
+        "href" => URL.absolute("/tags/" <> tag)
+      }
+    end)
+  end
+
+  defp hashtag_tags(_content), do: []
+
+  defp extract_hashtags(content) when is_binary(content) do
+    Regex.scan(~r/(?:^|[^\p{L}\p{N}_])#([\p{L}\p{N}_][\p{L}\p{N}_-]{0,63})/u, content)
+    |> Enum.map(fn
+      [_full, tag] -> normalize_hashtag(tag)
+      _ -> ""
+    end)
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.uniq()
+  end
+
+  defp extract_hashtags(_content), do: []
+
+  defp normalize_hashtag(tag) when is_binary(tag) do
+    tag = tag |> String.trim() |> String.trim_leading("#") |> String.downcase()
+    if valid_hashtag?(tag), do: tag, else: ""
+  end
+
+  defp normalize_hashtag(_tag), do: ""
+
+  defp valid_hashtag?(tag) when is_binary(tag) do
+    Regex.match?(~r/^[\p{L}\p{N}_][\p{L}\p{N}_-]{0,63}$/u, tag)
+  end
+
+  defp valid_hashtag?(_tag), do: false
 
   defp mention_name_for_ap_id(actor_ap_id, local_domains)
        when is_binary(actor_ap_id) and is_list(local_domains) do

@@ -50,6 +50,7 @@ defmodule Egregoros.Activities.Note do
     note =
       note
       |> normalize_actor()
+      |> normalize_tags()
       |> Map.put_new("content", "")
       |> trim_content()
 
@@ -166,6 +167,42 @@ defmodule Egregoros.Activities.Note do
   end
 
   defp normalize_actor(note), do: note
+
+  defp normalize_tags(%{"tag" => tags} = note) do
+    tags =
+      tags
+      |> List.wrap()
+      |> Enum.map(&normalize_tag/1)
+
+    Map.put(note, "tag", tags)
+  end
+
+  defp normalize_tags(note), do: note
+
+  defp normalize_tag(%{"type" => "Hashtag"} = tag) do
+    name =
+      tag
+      |> Map.get("name", "")
+      |> to_string()
+      |> String.trim()
+      |> String.trim(":")
+      |> String.trim_leading("#")
+      |> String.downcase()
+
+    if valid_hashtag?(name) do
+      Map.put(tag, "name", "#" <> name)
+    else
+      tag
+    end
+  end
+
+  defp normalize_tag(tag), do: tag
+
+  defp valid_hashtag?(tag) when is_binary(tag) do
+    Regex.match?(~r/^[\p{L}\p{N}_][\p{L}\p{N}_-]{0,63}$/u, tag)
+  end
+
+  defp valid_hashtag?(_tag), do: false
 
   defp trim_content(%{"content" => content} = note) when is_binary(content) do
     Map.put(note, "content", String.trim(content))
