@@ -95,8 +95,8 @@ This is a short follow-up pass focused on **maintainability / DRY**, plus a quic
 
 ## Consistency / DRY opportunities (non-security)
 
-- **Visibility rules are duplicated across layers** (publishing, query filters, streaming filters). Consider centralizing visibility classification to avoid mismatches (e.g. “unlisted in public timeline”).
-  - Code: `lib/egregoros/publish.ex`, `lib/egregoros/objects.ex`, `lib/egregoros_web/mastodon_api/streaming_socket.ex`
+- [x] **Visibility rules are duplicated across layers**: visibility classification is centralized in `Egregoros.Objects` (helpers + query builders) and reused by timeline + streaming.
+  - Code: `lib/egregoros/objects.ex`, `lib/egregoros/timeline.ex`, `lib/egregoros_web/mastodon_api/streaming_socket.ex`
 - [x] **Repeated LiveView upload helpers**: centralized upload cancellation in `EgregorosWeb.Live.Uploads.cancel_all/2`.
   - Code: `lib/egregoros_web/live/uploads.ex`.
 
@@ -164,8 +164,9 @@ No new “drop everything” issues found beyond the items already tracked in `s
 
 ## Architectural follow-ups
 
-- **Inbox context propagation** (also a security hardening enabler):
-  - Pass `inbox_user_ap_id` through `IngestActivity` → `Pipeline.ingest/2` so validators/activities can make policy decisions without relying on global heuristics.
+- [x] **Inbox context propagation** (also a security hardening enabler):
+  - `inbox_user_ap_id` is propagated into ingestion and used by `InboxTargeting` checks to reduce DB pollution.
+  - Code: `lib/egregoros/inbox_targeting.ex`.
 
 - **Object “upsert” semantics**:
   - `Objects.upsert_object/1` is effectively “insert or return existing” and does not merge/replace data when a conflict occurs.
