@@ -181,10 +181,11 @@ defmodule Egregoros.OAuth do
 
   def get_token(token) when is_binary(token) do
     now = DateTime.utc_now()
+    token_digest = digest_token(token)
 
     from(t in Token,
       where:
-        t.token == ^token and is_nil(t.revoked_at) and
+        t.token == ^token_digest and is_nil(t.revoked_at) and
           (is_nil(t.expires_at) or t.expires_at > ^now),
       left_join: u in assoc(t, :user),
       preload: [user: u]
@@ -234,10 +235,13 @@ defmodule Egregoros.OAuth do
           nil
       end
 
+    raw_token = generate_token(48)
+    raw_refresh_token = generate_token(48)
+
     %Token{}
     |> Token.changeset(%{
-      token: generate_token(48),
-      refresh_token: generate_token(48),
+      token: digest_token(raw_token),
+      refresh_token: digest_token(raw_refresh_token),
       scopes: scopes,
       user_id: user_id,
       application_id: application.id,
@@ -245,6 +249,13 @@ defmodule Egregoros.OAuth do
       refresh_expires_at: refresh_expires_at
     })
     |> Repo.insert()
+    |> case do
+      {:ok, %Token{} = token} ->
+        {:ok, %{token | token: raw_token, refresh_token: raw_refresh_token}}
+
+      {:error, _} = error ->
+        error
+    end
   end
 
   defp create_token(%OAuthApplication{} = application, nil, scopes) when is_binary(scopes) do
@@ -267,10 +278,13 @@ defmodule Egregoros.OAuth do
           nil
       end
 
+    raw_token = generate_token(48)
+    raw_refresh_token = generate_token(48)
+
     %Token{}
     |> Token.changeset(%{
-      token: generate_token(48),
-      refresh_token: generate_token(48),
+      token: digest_token(raw_token),
+      refresh_token: digest_token(raw_refresh_token),
       scopes: scopes,
       user_id: nil,
       application_id: application.id,
@@ -278,14 +292,22 @@ defmodule Egregoros.OAuth do
       refresh_expires_at: refresh_expires_at
     })
     |> Repo.insert()
+    |> case do
+      {:ok, %Token{} = token} ->
+        {:ok, %{token | token: raw_token, refresh_token: raw_refresh_token}}
+
+      {:error, _} = error ->
+        error
+    end
   end
 
   defp get_token_by_refresh_token(refresh_token) when is_binary(refresh_token) do
     now = DateTime.utc_now()
+    refresh_token_digest = digest_token(refresh_token)
 
     from(t in Token,
       where:
-        t.refresh_token == ^refresh_token and is_nil(t.revoked_at) and
+        t.refresh_token == ^refresh_token_digest and is_nil(t.revoked_at) and
           (is_nil(t.refresh_expires_at) or t.refresh_expires_at > ^now)
     )
     |> Repo.one()
@@ -322,7 +344,8 @@ defmodule Egregoros.OAuth do
     end
   end
 
-  defp validate_redirect_uri_param(%OAuthApplication{} = application, params) when is_map(params) do
+  defp validate_redirect_uri_param(%OAuthApplication{} = application, params)
+       when is_map(params) do
     case Map.get(params, "redirect_uri") do
       redirect_uri when is_binary(redirect_uri) ->
         redirect_uri = String.trim(redirect_uri)
@@ -366,11 +389,12 @@ defmodule Egregoros.OAuth do
   defp revoke_token_record_for_token(application_id, token)
        when is_integer(application_id) and application_id > 0 and is_binary(token) do
     now = DateTime.utc_now()
+    token_digest = digest_token(token)
 
     from(t in Token,
       where:
         t.application_id == ^application_id and is_nil(t.revoked_at) and
-          (t.token == ^token or t.refresh_token == ^token)
+          (t.token == ^token_digest or t.refresh_token == ^token_digest)
     )
     |> Repo.update_all(set: [revoked_at: now])
   end
@@ -415,5 +439,13 @@ defmodule Egregoros.OAuth do
     bytes
     |> :crypto.strong_rand_bytes()
     |> Base.url_encode64(padding: false)
+  end
+
+  defp digest_token(token) when is_binary(token) do
+    token = String.trim(token)
+
+    :sha256
+    |> :crypto.hash(token)
+    |> Base.encode16(case: :lower)
   end
 end
