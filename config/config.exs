@@ -25,8 +25,13 @@ config :egregoros, Egregoros.Auth, Egregoros.Auth.BearerToken
 config :egregoros, Egregoros.AuthZ, Egregoros.AuthZ.OAuthScopes
 config :egregoros, Egregoros.Discovery, Egregoros.Discovery.DNS
 config :egregoros, Egregoros.HTTP, Egregoros.HTTP.Req
+config :egregoros, Egregoros.DNS, Egregoros.DNS.Cached
 config :egregoros, Egregoros.AvatarStorage, Egregoros.AvatarStorage.Local
 config :egregoros, Egregoros.MediaStorage, Egregoros.MediaStorage.Local
+
+config :egregoros, Egregoros.DNS.Cached,
+  resolver: Egregoros.DNS.Inet,
+  ttl_ms: 60_000
 
 config :egregoros, :password_iterations, 200_000
 

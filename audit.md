@@ -154,9 +154,9 @@ No new “drop everything” issues found beyond the items already tracked in `s
   - A GIN `jsonb_path_ops` index on status `data` helps the common `@>` predicates, but some `jsonb_exists` patterns may still be slow at scale.
   - Consider further indexes (path-specific), or a normalized “recipient” table/materialized columns.
 
-- **DNS lookups are synchronous and uncached**:
-  - `Egregoros.SafeURL` calls `Egregoros.DNS.Inet.lookup_ips/1` on every validation. This is correct for SSRF protection but can become a throughput limiter.
-  - Consider putting caching behind the `Egregoros.DNS` behaviour (ETS + TTL), so it remains swappable.
+- [x] **DNS lookups are synchronous and uncached**:
+  - Added `Egregoros.DNS.Cached` (ETS + TTL) and configured `Egregoros.DNS` to use it by default.
+  - Code: `lib/egregoros/dns/cached.ex`, `config/config.exs`.
 
 - **Synchronous remote resolution during posting**:
   - `Egregoros.Publish.post_note/3` resolves remote mentions via WebFinger + actor fetch inline. This makes posting latency depend on remote servers.
