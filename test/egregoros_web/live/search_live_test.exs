@@ -7,6 +7,7 @@ defmodule EgregorosWeb.SearchLiveTest do
   alias Egregoros.Activities.Note
   alias Egregoros.Objects
   alias Egregoros.Pipeline
+  alias Egregoros.Publish
   alias Egregoros.Users
 
   test "searching by query lists matching accounts", %{conn: conn} do
@@ -53,7 +54,7 @@ defmodule EgregorosWeb.SearchLiveTest do
 
   test "searching for a hashtag shows a tag quick link", %{conn: conn} do
     {:ok, user} = Users.create_local_user("alice")
-    assert {:ok, _} = Pipeline.ingest(Note.build(user, "Hello #elixir"), local: true)
+    assert {:ok, _} = Publish.post_note(user, "Hello #elixir")
 
     {:ok, view, _html} = live(conn, "/search?q=%23elixir")
 
@@ -63,7 +64,7 @@ defmodule EgregorosWeb.SearchLiveTest do
 
   test "searching without # still suggests a matching tag", %{conn: conn} do
     {:ok, user} = Users.create_local_user("alice")
-    assert {:ok, _} = Pipeline.ingest(Note.build(user, "Hello #elixir"), local: true)
+    assert {:ok, _} = Publish.post_note(user, "Hello #elixir")
 
     {:ok, view, _html} = live(conn, "/search?q=elixir")
 

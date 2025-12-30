@@ -225,6 +225,18 @@ defmodule EgregorosWeb.MastodonAPI.TimelinesControllerTest do
     refute Enum.any?(response, &(&1["content"] =~ "Remote"))
   end
 
+  test "GET /api/v1/timelines/tag/:hashtag does not treat HTML entities as hashtags", %{
+    conn: conn
+  } do
+    {:ok, user} = Users.create_local_user("local")
+    assert {:ok, _} = Publish.post_note(user, "and when it's filled with ads")
+
+    conn = get(conn, "/api/v1/timelines/tag/39")
+    response = json_response(conn, 200)
+
+    assert response == []
+  end
+
   test "GET /api/v1/timelines/home returns latest statuses", %{conn: conn} do
     {:ok, user} = Users.create_local_user("local")
 

@@ -22,6 +22,17 @@ defmodule EgregorosWeb.MastodonAPI.TrendsControllerTest do
     assert Enum.any?(response, &(&1["name"] == "linux"))
   end
 
+  test "GET /api/v1/trends/tags does not treat HTML entities as hashtags", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("local")
+    assert {:ok, _} = Publish.post_note(user, "and when it's filled with ads")
+
+    conn = get(conn, "/api/v1/trends/tags")
+    response = json_response(conn, 200)
+
+    assert is_list(response)
+    refute Enum.any?(response, &(&1["name"] == "39"))
+  end
+
   test "GET /api/v1/trends/statuses returns a list", %{conn: conn} do
     {:ok, user} = Users.create_local_user("local")
     assert {:ok, _} = Publish.post_note(user, "Hello trends")

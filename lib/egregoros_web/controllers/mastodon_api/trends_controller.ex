@@ -64,13 +64,7 @@ defmodule EgregorosWeb.MastodonAPI.TrendsController do
   defp count_hashtags(object, acc) do
     actor = Map.get(object, :actor)
 
-    hashtags =
-      object
-      |> hashtags_from_activity_tags()
-      |> case do
-        [] -> hashtags_from_content(object)
-        tags -> tags
-      end
+    hashtags = hashtags_from_activity_tags(object)
 
     Enum.reduce(hashtags, acc, fn hashtag, counts ->
       Map.update(
@@ -102,24 +96,6 @@ defmodule EgregorosWeb.MastodonAPI.TrendsController do
 
   defp hashtags_from_activity_tags(_object), do: []
 
-  defp hashtags_from_content(%{data: %{} = data}) do
-    content =
-      data
-      |> Map.get("content", "")
-      |> to_string()
-      |> strip_html()
-
-    Regex.scan(~r/#([\p{L}\p{N}_][\p{L}\p{N}_-]{0,63})/u, content)
-    |> Enum.map(fn
-      [_full, name] -> normalize_hashtag(name)
-      _ -> ""
-    end)
-    |> Enum.reject(&(&1 == ""))
-    |> Enum.uniq()
-  end
-
-  defp hashtags_from_content(_object), do: []
-
   defp normalize_hashtag(name) when is_binary(name) do
     name
     |> String.trim()
@@ -128,12 +104,6 @@ defmodule EgregorosWeb.MastodonAPI.TrendsController do
   end
 
   defp normalize_hashtag(_name), do: ""
-
-  defp strip_html(text) when is_binary(text) do
-    Regex.replace(~r/<[^>]*>/, text, " ")
-  end
-
-  defp strip_html(_text), do: ""
 
   defp today_unix_day do
     Date.utc_today()

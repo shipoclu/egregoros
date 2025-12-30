@@ -163,6 +163,7 @@ defmodule Egregoros.Objects do
       tag
       |> String.trim()
       |> String.trim_leading("#")
+      |> String.downcase()
 
     if tag == "" do
       []
@@ -170,17 +171,15 @@ defmodule Egregoros.Objects do
       limit = opts |> Keyword.get(:limit, 20) |> normalize_limit()
       max_id = Keyword.get(opts, :max_id)
       since_id = Keyword.get(opts, :since_id)
-
-      pattern = "%#" <> tag <> "%"
+      tag_name = "#" <> tag
 
       from(o in Object,
-        where:
-          o.type == "Note" and
-            fragment("?->>'content' ILIKE ?", o.data, ^pattern),
+        where: o.type == "Note",
         order_by: [desc: o.id],
         limit: ^limit
       )
       |> where_publicly_visible()
+      |> where_hashtag_tag(tag_name)
       |> maybe_where_max_id(max_id)
       |> maybe_where_since_id(since_id)
       |> Repo.all()
@@ -254,6 +253,7 @@ defmodule Egregoros.Objects do
       tag
       |> String.trim()
       |> String.trim_leading("#")
+      |> String.downcase()
 
     if tag == "" do
       []
@@ -264,8 +264,7 @@ defmodule Egregoros.Objects do
       local_only? = Keyword.get(opts, :local, false) == true
       remote_only? = Keyword.get(opts, :remote, false) == true
       only_media? = Keyword.get(opts, :only_media, false) == true
-
-      pattern = "%#" <> tag <> "%"
+      tag_name = "#" <> tag
 
       from(o in Object,
         where: o.type in ^@status_types,
@@ -274,7 +273,7 @@ defmodule Egregoros.Objects do
       )
       |> where_announces_have_object()
       |> where_publicly_listed()
-      |> where_hashtag_pattern(pattern)
+      |> where_hashtag_tag_with_reblog(tag_name)
       |> maybe_where_origin(local_only?, remote_only?)
       |> maybe_where_only_media_with_reblog(only_media?)
       |> maybe_where_max_id(max_id)
@@ -413,15 +412,28 @@ defmodule Egregoros.Objects do
 
   defp followers_visible?(_object, _user_ap_id), do: false
 
-  defp where_hashtag_pattern(query, pattern) when is_binary(pattern) do
-    from([o, reblog] in query,
-      where:
-        (o.type == "Note" and fragment("?->>'content' ILIKE ?", o.data, ^pattern)) or
-          (o.type == "Announce" and fragment("?->>'content' ILIKE ?", reblog.data, ^pattern))
+  defp where_hashtag_tag(query, name) when is_binary(name) and name != "" do
+    match = [%{"type" => "Hashtag", "name" => name}]
+
+    from(o in query,
+      where: fragment("coalesce(?->'tag', '[]'::jsonb) @> ?", o.data, ^match)
     )
   end
 
-  defp where_hashtag_pattern(query, _pattern), do: query
+  defp where_hashtag_tag(query, _name), do: query
+
+  defp where_hashtag_tag_with_reblog(query, name) when is_binary(name) and name != "" do
+    match = [%{"type" => "Hashtag", "name" => name}]
+
+    from([o, reblog] in query,
+      where:
+        (o.type == "Note" and fragment("coalesce(?->'tag', '[]'::jsonb) @> ?", o.data, ^match)) or
+          (o.type == "Announce" and
+             fragment("coalesce(?->'tag', '[]'::jsonb) @> ?", reblog.data, ^match))
+    )
+  end
+
+  defp where_hashtag_tag_with_reblog(query, _name), do: query
 
   def list_home_notes(actor_ap_id) when is_binary(actor_ap_id) do
     list_home_notes(actor_ap_id, limit: 20)

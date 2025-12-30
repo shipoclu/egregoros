@@ -3,15 +3,15 @@ defmodule EgregorosWeb.TagLiveTest do
 
   import Phoenix.LiveViewTest
 
-  alias Egregoros.Activities.Note
   alias Egregoros.Objects
-  alias Egregoros.Pipeline
+  alias Egregoros.Publish
   alias Egregoros.Users
 
   setup do
     {:ok, user} = Users.create_local_user("alice")
 
-    assert {:ok, note} = Pipeline.ingest(Note.build(user, "Hello #elixir"), local: true)
+    {:ok, create} = Publish.post_note(user, "Hello #elixir")
+    note = Objects.get_by_ap_id(create.object)
 
     %{user: user, note: note}
   end
@@ -24,13 +24,7 @@ defmodule EgregorosWeb.TagLiveTest do
   end
 
   test "tag pages do not include direct messages", %{conn: conn, user: user} do
-    dm =
-      user
-      |> Note.build("Secret #elixir")
-      |> Map.put("to", [])
-      |> Map.put("cc", [])
-
-    assert {:ok, _} = Pipeline.ingest(dm, local: true)
+    assert {:ok, _} = Publish.post_note(user, "Secret #elixir", visibility: "direct")
 
     assert {:ok, view, _html} = live(conn, "/tags/elixir")
 
@@ -105,7 +99,7 @@ defmodule EgregorosWeb.TagLiveTest do
 
   test "tag pages can load more posts", %{conn: conn, user: user} do
     for idx <- 1..25 do
-      assert {:ok, _note} = Pipeline.ingest(Note.build(user, "Post #{idx} #elixir"), local: true)
+      assert {:ok, _} = Publish.post_note(user, "Post #{idx} #elixir")
     end
 
     notes = Objects.list_notes_by_hashtag("elixir", limit: 40)
