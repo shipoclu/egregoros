@@ -5,12 +5,14 @@ defmodule Egregoros.TimelineTest do
   alias Egregoros.Timeline
 
   test "ingesting a note broadcasts to the timeline" do
-    Timeline.subscribe()
+    Timeline.subscribe_public()
 
     note = %{
       "id" => "https://remote.example/objects/stream-1",
       "type" => "Note",
       "attributedTo" => "https://remote.example/users/alice",
+      "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+      "cc" => ["https://remote.example/users/alice/followers"],
       "content" => "Remote hello"
     }
 

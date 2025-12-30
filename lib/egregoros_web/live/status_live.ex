@@ -20,15 +20,19 @@ defmodule EgregorosWeb.StatusLive do
 
   @impl true
   def mount(%{"nickname" => nickname, "uuid" => uuid} = params, session, socket) do
-    if connected?(socket) do
-      Timeline.subscribe()
-    end
-
     current_user =
       case Map.get(session, "user_id") do
         nil -> nil
         id -> Users.get(id)
       end
+
+    if connected?(socket) do
+      Phoenix.PubSub.subscribe(Egregoros.PubSub, Timeline.public_topic())
+
+      if match?(%User{}, current_user) do
+        Phoenix.PubSub.subscribe(Egregoros.PubSub, Timeline.user_topic(current_user.ap_id))
+      end
+    end
 
     object =
       case object_for_uuid_param(uuid) do

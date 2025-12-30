@@ -6,7 +6,7 @@ defmodule Egregoros.TimelinePubSubTest do
   alias Egregoros.Timeline
   alias Egregoros.Users
 
-  test "broadcasts announces to the timeline topic" do
+  test "broadcasts announces to the public timeline topic" do
     {:ok, alice} = Users.create_local_user("alice")
     {:ok, bob} = Users.create_local_user("bob")
 
@@ -15,7 +15,7 @@ defmodule Egregoros.TimelinePubSubTest do
     bob_ap_id = bob.ap_id
     object_ap_id = create.object
 
-    Timeline.subscribe()
+    Timeline.subscribe_public()
 
     {:ok, _announce} =
       Pipeline.ingest(

@@ -69,7 +69,7 @@ defmodule EgregorosWeb.MastodonAPI.StreamingSocketTest do
                }
              })
 
-    assert {:push, {:text, payload}, ^state} =
+    assert {:push, {:text, payload}, _state} =
              StreamingSocket.handle_info({:post_created, note}, state)
 
     assert %{"event" => "update", "payload" => status_payload, "stream" => ["user"]} =
@@ -97,7 +97,7 @@ defmodule EgregorosWeb.MastodonAPI.StreamingSocketTest do
                }
              })
 
-    assert {:ok, ^state} = StreamingSocket.handle_info({:post_created, note}, state)
+    assert {:ok, _state} = StreamingSocket.handle_info({:post_created, note}, state)
   end
 
   test "delivers direct messages to the user stream even when the actor is not followed" do
@@ -120,7 +120,7 @@ defmodule EgregorosWeb.MastodonAPI.StreamingSocketTest do
                }
              })
 
-    assert {:push, {:text, payload}, ^state} =
+    assert {:push, {:text, payload}, _state} =
              StreamingSocket.handle_info({:post_created, note}, state)
 
     assert %{"event" => "update", "payload" => status_payload, "stream" => ["user"]} =
@@ -150,7 +150,7 @@ defmodule EgregorosWeb.MastodonAPI.StreamingSocketTest do
                }
              })
 
-    assert {:push, {:text, payload}, ^state} =
+    assert {:push, {:text, payload}, _state} =
              StreamingSocket.handle_info({:post_created, note}, state)
 
     assert %{"event" => "update", "payload" => status_payload, "stream" => ["public"]} =
@@ -179,7 +179,7 @@ defmodule EgregorosWeb.MastodonAPI.StreamingSocketTest do
                }
              })
 
-    assert {:ok, ^state} = StreamingSocket.handle_info({:post_created, note}, state)
+    assert {:ok, _state} = StreamingSocket.handle_info({:post_created, note}, state)
   end
 
   test "does not deliver unlisted statuses to the public stream" do
@@ -202,7 +202,7 @@ defmodule EgregorosWeb.MastodonAPI.StreamingSocketTest do
                }
              })
 
-    assert {:ok, ^state} = StreamingSocket.handle_info({:post_created, note}, state)
+    assert {:ok, _state} = StreamingSocket.handle_info({:post_created, note}, state)
   end
 
   test "does not deliver non-visible messages to the user stream" do
@@ -235,7 +235,7 @@ defmodule EgregorosWeb.MastodonAPI.StreamingSocketTest do
                }
              })
 
-    assert {:ok, ^state} = StreamingSocket.handle_info({:post_created, note}, state)
+    assert {:ok, _state} = StreamingSocket.handle_info({:post_created, note}, state)
   end
 
   test "delivers notifications for signed-in user streams" do
@@ -256,7 +256,7 @@ defmodule EgregorosWeb.MastodonAPI.StreamingSocketTest do
 
     {:ok, state} = StreamingSocket.init(%{streams: ["user"], current_user: user})
 
-    assert {:push, {:text, payload}, ^state} =
+    assert {:push, {:text, payload}, _state} =
              StreamingSocket.handle_info({:notification_created, like}, state)
 
     assert %{"event" => "notification", "payload" => notification_payload, "stream" => ["user"]} =
@@ -269,7 +269,7 @@ defmodule EgregorosWeb.MastodonAPI.StreamingSocketTest do
   test "handle_in returns an error when subscribing to user streams without a current user" do
     {:ok, state} = StreamingSocket.init(%{streams: [], current_user: nil})
 
-    assert {:push, {:text, reply}, ^state} =
+    assert {:push, {:text, reply}, _state} =
              StreamingSocket.handle_in(
                {Jason.encode!(%{"type" => "subscribe", "stream" => "user"}), opcode: :text},
                state

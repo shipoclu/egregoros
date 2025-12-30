@@ -12,6 +12,7 @@ defmodule EgregorosWeb.MastodonAPI.StreamingSocket do
   alias EgregorosWeb.MastodonAPI.StreamingStreams
 
   @heartbeat_interval_ms 30_000
+  @seen_ap_id_limit 500
 
   @impl true
   def init(state) when is_map(state) do
@@ -26,8 +27,10 @@ defmodule EgregorosWeb.MastodonAPI.StreamingSocket do
       state
       |> Map.put(:streams, streams)
       |> Map.put_new(:home_actor_ids, MapSet.new())
-      |> Map.put_new(:timeline_subscribed, false)
+      |> Map.put_new(:timeline_public_subscribed, false)
+      |> Map.put_new(:timeline_user_subscribed, false)
       |> Map.put_new(:notifications_subscribed, false)
+      |> Map.put_new(:seen_ap_ids, {MapSet.new(), :queue.new()})
       |> sync_subscriptions()
       |> schedule_heartbeat()
 
@@ -54,13 +57,19 @@ defmodule EgregorosWeb.MastodonAPI.StreamingSocket do
 
   @impl true
   def handle_info({:post_created, %Object{} = object}, state) when is_map(state) do
-    case streams_for_status(object, state) do
-      [] ->
+    case remember_seen_ap_id(state, object.ap_id) do
+      {:skip, state} ->
         {:ok, state}
 
-      streams ->
-        status_json = render_status_json(object, state)
-        push_stream_events("update", status_json, streams, state)
+      {:ok, state} ->
+        case streams_for_status(object, state) do
+          [] ->
+            {:ok, state}
+
+          streams ->
+            status_json = render_status_json(object, state)
+            push_stream_events("update", status_json, streams, state)
+        end
     end
   end
 
@@ -140,23 +149,40 @@ defmodule EgregorosWeb.MastodonAPI.StreamingSocket do
 
   defp sync_subscriptions(%{streams: %MapSet{} = streams} = state) do
     state
-    |> maybe_subscribe_timeline(streams)
+    |> maybe_subscribe_timeline_public(streams)
+    |> maybe_subscribe_timeline_user(streams)
     |> maybe_subscribe_notifications(streams)
-    |> maybe_unsubscribe_timeline(streams)
+    |> maybe_unsubscribe_timeline_public(streams)
+    |> maybe_unsubscribe_timeline_user(streams)
     |> maybe_unsubscribe_notifications(streams)
     |> maybe_put_home_actor_ids(streams)
   end
 
-  defp maybe_subscribe_timeline(%{timeline_subscribed: true} = state, _streams), do: state
+  defp maybe_subscribe_timeline_public(%{timeline_public_subscribed: true} = state, _streams),
+    do: state
 
-  defp maybe_subscribe_timeline(state, streams) do
-    if Enum.any?(streams, &(&1 in StreamingStreams.timeline_streams())) do
-      Timeline.subscribe()
-      Map.put(state, :timeline_subscribed, true)
+  defp maybe_subscribe_timeline_public(state, streams) do
+    if Enum.any?(streams, &(&1 in ["public", "public:local"])) do
+      Phoenix.PubSub.subscribe(Egregoros.PubSub, Timeline.public_topic())
+      Map.put(state, :timeline_public_subscribed, true)
     else
       state
     end
   end
+
+  defp maybe_subscribe_timeline_user(%{timeline_user_subscribed: true} = state, _streams),
+    do: state
+
+  defp maybe_subscribe_timeline_user(%{current_user: %User{} = user} = state, streams) do
+    if MapSet.member?(streams, "user") do
+      Phoenix.PubSub.subscribe(Egregoros.PubSub, Timeline.user_topic(user.ap_id))
+      Map.put(state, :timeline_user_subscribed, true)
+    else
+      state
+    end
+  end
+
+  defp maybe_subscribe_timeline_user(state, _streams), do: state
 
   defp maybe_subscribe_notifications(%{notifications_subscribed: true} = state, _streams),
     do: state
@@ -172,16 +198,31 @@ defmodule EgregorosWeb.MastodonAPI.StreamingSocket do
 
   defp maybe_subscribe_notifications(state, _streams), do: state
 
-  defp maybe_unsubscribe_timeline(%{timeline_subscribed: false} = state, _streams), do: state
+  defp maybe_unsubscribe_timeline_public(%{timeline_public_subscribed: false} = state, _streams),
+    do: state
 
-  defp maybe_unsubscribe_timeline(state, streams) do
-    if Enum.any?(streams, &(&1 in StreamingStreams.timeline_streams())) do
+  defp maybe_unsubscribe_timeline_public(state, streams) do
+    if Enum.any?(streams, &(&1 in ["public", "public:local"])) do
       state
     else
-      Phoenix.PubSub.unsubscribe(Egregoros.PubSub, "timeline")
-      Map.put(state, :timeline_subscribed, false)
+      Phoenix.PubSub.unsubscribe(Egregoros.PubSub, Timeline.public_topic())
+      Map.put(state, :timeline_public_subscribed, false)
     end
   end
+
+  defp maybe_unsubscribe_timeline_user(%{timeline_user_subscribed: false} = state, _streams),
+    do: state
+
+  defp maybe_unsubscribe_timeline_user(%{current_user: %User{} = user} = state, streams) do
+    if MapSet.member?(streams, "user") do
+      state
+    else
+      Phoenix.PubSub.unsubscribe(Egregoros.PubSub, Timeline.user_topic(user.ap_id))
+      Map.put(state, :timeline_user_subscribed, false)
+    end
+  end
+
+  defp maybe_unsubscribe_timeline_user(state, _streams), do: state
 
   defp maybe_unsubscribe_notifications(%{notifications_subscribed: false} = state, _streams),
     do: state
@@ -302,4 +343,33 @@ defmodule EgregorosWeb.MastodonAPI.StreamingSocket do
     _ = Process.send_after(self(), :heartbeat, @heartbeat_interval_ms)
     state
   end
+
+  defp remember_seen_ap_id(state, ap_id) when is_map(state) and is_binary(ap_id) do
+    ap_id = String.trim(ap_id)
+
+    if ap_id == "" do
+      {:ok, state}
+    else
+      {seen_set, queue} = Map.get(state, :seen_ap_ids, {MapSet.new(), :queue.new()})
+
+      if MapSet.member?(seen_set, ap_id) do
+        {:skip, state}
+      else
+        queue = :queue.in(ap_id, queue)
+        seen_set = MapSet.put(seen_set, ap_id)
+
+        {seen_set, queue} =
+          if :queue.len(queue) > @seen_ap_id_limit do
+            {{:value, old}, queue} = :queue.out(queue)
+            {MapSet.delete(seen_set, old), queue}
+          else
+            {seen_set, queue}
+          end
+
+        {:ok, Map.put(state, :seen_ap_ids, {seen_set, queue})}
+      end
+    end
+  end
+
+  defp remember_seen_ap_id(state, _ap_id) when is_map(state), do: {:ok, state}
 end

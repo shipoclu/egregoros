@@ -17,10 +17,6 @@ defmodule EgregorosWeb.TimelineLive do
   @page_size 20
   @impl true
   def mount(params, session, socket) do
-    if connected?(socket) do
-      Timeline.subscribe()
-    end
-
     current_user =
       case Map.get(session, "user_id") do
         nil -> nil
@@ -28,6 +24,12 @@ defmodule EgregorosWeb.TimelineLive do
       end
 
     timeline = timeline_from_params(params, current_user)
+
+    timeline_topics = timeline_topics(timeline, current_user)
+
+    if connected?(socket) do
+      subscribe_topics(timeline_topics)
+    end
 
     form = Phoenix.Component.to_form(default_post_params(), as: :post)
     reply_form = Phoenix.Component.to_form(default_post_params(), as: :reply)
@@ -54,6 +56,7 @@ defmodule EgregorosWeb.TimelineLive do
         error: nil,
         pending_posts: [],
         timeline_at_top?: true,
+        timeline_topics: timeline_topics,
         form: form,
         media_alt: %{},
         posts_cursor: posts_cursor(posts),
@@ -119,6 +122,13 @@ defmodule EgregorosWeb.TimelineLive do
       if timeline == socket.assigns.timeline do
         socket
       else
+        timeline_topics = timeline_topics(timeline, socket.assigns.current_user)
+
+        if connected?(socket) do
+          unsubscribe_topics(socket.assigns.timeline_topics || [])
+          subscribe_topics(timeline_topics)
+        end
+
         posts = list_timeline_posts(timeline, socket.assigns.current_user, limit: @page_size)
 
         socket
@@ -127,7 +137,8 @@ defmodule EgregorosWeb.TimelineLive do
           pending_posts: [],
           timeline_at_top?: true,
           posts_cursor: posts_cursor(posts),
-          posts_end?: length(posts) < @page_size
+          posts_end?: length(posts) < @page_size,
+          timeline_topics: timeline_topics
         )
         |> stream(:posts, StatusVM.decorate_many(posts, socket.assigns.current_user),
           reset: true,
@@ -966,6 +977,22 @@ defmodule EgregorosWeb.TimelineLive do
   defp timeline_from_params(%{"timeline" => "home"}, %User{}), do: :home
   defp timeline_from_params(_params, %User{}), do: :home
   defp timeline_from_params(_params, _user), do: :public
+
+  defp timeline_topics(:public, _user), do: [Timeline.public_topic()]
+  defp timeline_topics(:home, %User{} = user), do: [Timeline.user_topic(user.ap_id)]
+  defp timeline_topics(_timeline, _user), do: [Timeline.public_topic()]
+
+  defp subscribe_topics(topics) when is_list(topics) do
+    Enum.each(topics, &Phoenix.PubSub.subscribe(Egregoros.PubSub, &1))
+  end
+
+  defp subscribe_topics(_topics), do: :ok
+
+  defp unsubscribe_topics(topics) when is_list(topics) do
+    Enum.each(topics, &Phoenix.PubSub.unsubscribe(Egregoros.PubSub, &1))
+  end
+
+  defp unsubscribe_topics(_topics), do: :ok
 
   defp open_compose_js(js \\ %JS{}) do
     js

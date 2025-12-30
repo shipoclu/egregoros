@@ -21,7 +21,7 @@ defmodule EgregorosWeb.MessagesLive do
       end
 
     if connected?(socket) and match?(%User{}, current_user) do
-      Timeline.subscribe()
+      Phoenix.PubSub.subscribe(Egregoros.PubSub, Timeline.user_topic(current_user.ap_id))
     end
 
     messages = DirectMessages.list_for_user(current_user, limit: @page_size)
