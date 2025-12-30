@@ -38,14 +38,17 @@ defmodule EgregorosWeb.OAuthController do
               nil
           end
 
-        json(conn, %{
-          "access_token" => token.token,
-          "refresh_token" => token.refresh_token,
-          "token_type" => "Bearer",
-          "scope" => token.scopes,
-          "created_at" => DateTime.to_unix(token.inserted_at),
-          "expires_in" => expires_in
-        })
+        response =
+          %{
+            "access_token" => token.token,
+            "refresh_token" => token.refresh_token,
+            "token_type" => "Bearer",
+            "scope" => token.scopes,
+            "created_at" => DateTime.to_unix(token.inserted_at)
+          }
+          |> maybe_put("expires_in", expires_in)
+
+        json(conn, response)
 
       {:error, reason} ->
         conn
@@ -183,6 +186,10 @@ defmodule EgregorosWeb.OAuthController do
   defp maybe_put(map, _key, nil), do: map
 
   defp maybe_put(map, key, value) when is_map(map) and is_binary(key) and is_binary(value) do
+    Map.put(map, key, value)
+  end
+
+  defp maybe_put(map, key, value) when is_map(map) and is_binary(key) and is_integer(value) do
     Map.put(map, key, value)
   end
 

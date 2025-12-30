@@ -9,7 +9,7 @@ defmodule Egregoros.OAuth do
   alias Egregoros.User
 
   @default_code_ttl_seconds 600
-  @default_access_token_ttl_seconds 7_200
+  @default_access_token_ttl_seconds nil
   @default_refresh_token_ttl_seconds 31_536_000
 
   def create_application(attrs) when is_map(attrs) do
