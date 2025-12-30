@@ -10,7 +10,7 @@ defmodule Egregoros.Relationship do
     field :activity_ap_id, :string
     field :emoji_url, :string
 
-    timestamps(type: :utc_datetime)
+    timestamps(type: :utc_datetime_usec)
   end
 
   def changeset(relationship, attrs) do
