@@ -353,6 +353,24 @@ defmodule Egregoros.ObjectsTest do
                local: true
              })
 
+    assert {:ok, %Object{} = audience_note} =
+             Objects.create_object(%{
+               ap_id: "https://local.example/objects/search-audience-1",
+               type: "Note",
+               actor: "https://local.example/users/alice",
+               object: nil,
+               data: %{
+                 "id" => "https://local.example/objects/search-audience-1",
+                 "type" => "Note",
+                 "actor" => "https://local.example/users/alice",
+                 "to" => [],
+                 "cc" => [],
+                 "audience" => [public],
+                 "content" => "hello from audience"
+               },
+               local: true
+             })
+
     assert {:ok, %Object{}} =
              Objects.create_object(%{
                ap_id: "https://local.example/objects/search-3",
@@ -389,6 +407,7 @@ defmodule Egregoros.ObjectsTest do
     assert Enum.all?(results, &(&1.type == "Note"))
     assert Enum.any?(results, &(&1.id == content_note.id))
     assert Enum.any?(results, &(&1.id == summary_note.id))
+    assert Enum.any?(results, &(&1.id == audience_note.id))
   end
 
   test "search_notes ignores blank queries" do

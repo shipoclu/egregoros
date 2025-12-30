@@ -130,6 +130,37 @@ defmodule EgregorosWeb.MastodonAPI.StreamingSocketTest do
     assert %{"id" => _id} = Jason.decode!(status_payload)
   end
 
+  test "delivers direct messages addressed via bto/bcc/audience to the user stream" do
+    {:ok, user} = Users.create_local_user("alice")
+    {:ok, state} = StreamingSocket.init(%{streams: ["user"], current_user: user})
+
+    assert {:ok, note} =
+             Objects.create_object(%{
+               ap_id: "https://remote.example/objects/direct-bcc",
+               type: "Note",
+               actor: "https://remote.example/users/stranger",
+               local: false,
+               data: %{
+                 "id" => "https://remote.example/objects/direct-bcc",
+                 "type" => "Note",
+                 "attributedTo" => "https://remote.example/users/stranger",
+                 "to" => [],
+                 "cc" => [],
+                 "bcc" => [user.ap_id],
+                 "content" => "<p>Secret</p>"
+               }
+             })
+
+    assert {:push, {:text, payload}, _state} =
+             StreamingSocket.handle_info({:post_created, note}, state)
+
+    assert %{"event" => "update", "payload" => status_payload, "stream" => ["user"]} =
+             Jason.decode!(payload)
+
+    assert is_binary(status_payload)
+    assert %{"id" => _id} = Jason.decode!(status_payload)
+  end
+
   test "delivers public timeline updates without a current user" do
     {:ok, state} = StreamingSocket.init(%{streams: ["public"], current_user: nil})
     public = "https://www.w3.org/ns/activitystreams#Public"

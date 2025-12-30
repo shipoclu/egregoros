@@ -289,10 +289,26 @@ defmodule EgregorosWeb.MastodonAPI.StreamingSocket do
 
   defp deliver_user_status?(_object, _state), do: false
 
+  @recipient_fields ~w(to cc bto bcc audience)
+
   defp recipient?(%Object{data: %{} = data}, user_ap_id) when is_binary(user_ap_id) do
-    to = data |> Map.get("to", []) |> List.wrap()
-    cc = data |> Map.get("cc", []) |> List.wrap()
-    user_ap_id in to or user_ap_id in cc
+    user_ap_id = String.trim(user_ap_id)
+
+    if user_ap_id == "" do
+      false
+    else
+      Enum.any?(@recipient_fields, fn field ->
+        data
+        |> Map.get(field)
+        |> List.wrap()
+        |> Enum.any?(fn
+          %{"id" => id} when is_binary(id) -> String.trim(id) == user_ap_id
+          %{id: id} when is_binary(id) -> String.trim(id) == user_ap_id
+          id when is_binary(id) -> String.trim(id) == user_ap_id
+          _ -> false
+        end)
+      end)
+    end
   end
 
   defp recipient?(_object, _user_ap_id), do: false

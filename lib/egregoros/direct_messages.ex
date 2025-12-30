@@ -19,9 +19,13 @@ defmodule Egregoros.DirectMessages do
       where:
         o.type == "Note" and
           (o.actor == ^user_ap_id or fragment("? @> ?", o.data, ^%{"to" => [user_ap_id]}) or
-             fragment("? @> ?", o.data, ^%{"cc" => [user_ap_id]})) and
+             fragment("? @> ?", o.data, ^%{"cc" => [user_ap_id]}) or
+             fragment("? @> ?", o.data, ^%{"bto" => [user_ap_id]}) or
+             fragment("? @> ?", o.data, ^%{"bcc" => [user_ap_id]}) or
+             fragment("? @> ?", o.data, ^%{"audience" => [user_ap_id]})) and
           not fragment("? @> ?", o.data, ^%{"to" => [@as_public]}) and
           not fragment("? @> ?", o.data, ^%{"cc" => [@as_public]}) and
+          not fragment("? @> ?", o.data, ^%{"audience" => [@as_public]}) and
           not fragment("jsonb_exists((?->'to'), (? || '/followers'))", o.data, o.actor) and
           not fragment("jsonb_exists((?->'cc'), (? || '/followers'))", o.data, o.actor),
       order_by: [desc: o.id],
@@ -37,10 +41,12 @@ defmodule Egregoros.DirectMessages do
   def direct?(%Object{actor: actor, data: %{} = data}) when is_binary(actor) do
     to = data |> Map.get("to", []) |> List.wrap()
     cc = data |> Map.get("cc", []) |> List.wrap()
+    audience = data |> Map.get("audience", []) |> List.wrap()
 
     followers = actor <> "/followers"
 
-    not (@as_public in to or @as_public in cc or followers in to or followers in cc)
+    not (@as_public in to or @as_public in cc or @as_public in audience or followers in to or
+           followers in cc)
   end
 
   def direct?(_object), do: false

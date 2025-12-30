@@ -270,7 +270,8 @@ defmodule Egregoros.Objects do
     from(o in query,
       where:
         fragment("? @> ?", o.data, ^%{"to" => [@as_public]}) or
-          fragment("? @> ?", o.data, ^%{"cc" => [@as_public]})
+          fragment("? @> ?", o.data, ^%{"cc" => [@as_public]}) or
+          fragment("? @> ?", o.data, ^%{"audience" => [@as_public]})
     )
   end
 

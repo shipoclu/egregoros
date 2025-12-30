@@ -1032,51 +1032,53 @@ defmodule EgregorosWeb.TimelineLive do
 
   defp include_post?(%{type: "Note"} = post, :home, %User{} = user, home_actor_ids)
        when is_list(home_actor_ids) do
-    actor = Map.get(post, :actor)
-    data = Map.get(post, :data, %{}) |> Map.new()
-    to = data |> Map.get("to", []) |> List.wrap()
-    cc = data |> Map.get("cc", []) |> List.wrap()
-
     cond do
-      actor == user.ap_id ->
+      not Objects.visible_to?(post, user) ->
+        false
+
+      post.actor == user.ap_id ->
         true
 
-      user.ap_id in to or user.ap_id in cc ->
+      is_binary(post.actor) and post.actor in home_actor_ids ->
         true
 
-      is_binary(actor) and actor in home_actor_ids ->
-        home_visible?(post, user)
+      addressed_to_user?(post, user.ap_id) ->
+        true
 
       true ->
         false
     end
   end
 
-  defp include_post?(%{type: "Note"} = post, _timeline, _user, _home_actor_ids) do
-    Objects.publicly_visible?(post)
+  defp include_post?(%{type: "Note"} = post, :public, _user, _home_actor_ids) do
+    Objects.publicly_listed?(post)
   end
 
   defp include_post?(_post, _timeline, _user, _home_actor_ids), do: false
 
-  defp home_visible?(%{actor: actor, data: %{} = data} = post, %User{} = user)
-       when is_binary(actor) do
-    if actor == user.ap_id do
-      true
-    else
-      to = data |> Map.get("to", []) |> List.wrap()
-      cc = data |> Map.get("cc", []) |> List.wrap()
-      followers = actor <> "/followers"
+  @recipient_fields ~w(to cc bto bcc audience)
 
-      cond do
-        Objects.publicly_visible?(post) -> true
-        user.ap_id in to or user.ap_id in cc -> true
-        followers in to or followers in cc -> true
-        true -> false
-      end
+  defp addressed_to_user?(%{data: %{} = data}, user_ap_id) when is_binary(user_ap_id) do
+    user_ap_id = String.trim(user_ap_id)
+
+    if user_ap_id == "" do
+      false
+    else
+      Enum.any?(@recipient_fields, fn field ->
+        data
+        |> Map.get(field)
+        |> List.wrap()
+        |> Enum.any?(fn
+          %{"id" => id} when is_binary(id) -> String.trim(id) == user_ap_id
+          %{id: id} when is_binary(id) -> String.trim(id) == user_ap_id
+          id when is_binary(id) -> String.trim(id) == user_ap_id
+          _ -> false
+        end)
+      end)
     end
   end
 
-  defp home_visible?(_post, _user), do: false
+  defp addressed_to_user?(_post, _user_ap_id), do: false
 
   defp home_actor_ids(nil), do: []
 

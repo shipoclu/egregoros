@@ -80,6 +80,29 @@ defmodule EgregorosWeb.TimelineLiveTest do
     assert has_element?(view, "article", "Secret DM")
   end
 
+  test "home timeline streams direct messages addressed via bto/bcc/audience", %{conn: conn} do
+    {:ok, bob} = Users.create_local_user("bob")
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: bob.id})
+    {:ok, view, _html} = live(conn, "/")
+
+    refute has_element?(view, "article", "bcc-secret")
+
+    note = %{
+      "id" => "https://remote.example/objects/dm-bcc-live",
+      "type" => "Note",
+      "attributedTo" => "https://remote.example/users/stranger",
+      "to" => [],
+      "cc" => [],
+      "bcc" => [bob.ap_id],
+      "content" => "<p>bcc-secret</p>"
+    }
+
+    assert {:ok, _object} = Pipeline.ingest(note, local: false)
+
+    assert has_element?(view, "article", "bcc-secret")
+  end
+
   test "refresh helpers do not leak DMs via arbitrary toggle events", %{conn: conn, user: user} do
     {:ok, bob} = Users.create_local_user("bob")
     {:ok, _charlie} = Users.create_local_user("charlie")
