@@ -44,8 +44,8 @@ This is a short follow-up pass focused on **maintainability / DRY**, plus a quic
   - Code: `lib/egregoros_web/param.ex`.
 - [x] **Activity modules repeat common helpers** (`parse_datetime/1`, `maybe_put/3`, and related small normalizers) across `Egregoros.Activities.*` modules.
   - Centralized `parse_datetime/1` + `maybe_put/3` in `Egregoros.Activities.Helpers`.
-- **`safe_return_to/1` is duplicated** in session/registration controllers; could be shared.
-  - Code: `lib/egregoros_web/controllers/session_controller.ex`, `lib/egregoros_web/controllers/registration_controller.ex`.
+- [x] **`safe_return_to/1` is duplicated** in session/registration controllers; centralized in `EgregorosWeb.ReturnTo.safe_return_to/1`.
+  - Code: `lib/egregoros_web/return_to.ex`.
 - **`fallback_username/1` is duplicated** across renderers/controllers; consider centralizing to avoid subtle differences in parsing.
   - Code: `StatusesController`, `StatusRenderer`, `NotificationRenderer`.
 - **OAuth token fields are digests but named like raw tokens**: `oauth_tokens.token` and `oauth_tokens.refresh_token` store digests, but the field names don’t make that obvious.
