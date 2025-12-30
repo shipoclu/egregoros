@@ -198,6 +198,7 @@ defmodule EgregorosWeb.Router do
   scope "/api/v1", EgregorosWeb.MastodonAPI do
     pipe_through [:api, :api_optional_auth]
 
+    get "/tags/:name", TagsController, :show
     get "/statuses/:id", StatusesController, :show
     get "/statuses/:id/context", StatusesController, :context
   end
