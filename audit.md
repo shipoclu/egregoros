@@ -4,6 +4,19 @@ This is a follow-up audit of **Egregoros** (Postgres + Elixir/OTP + Phoenix/Live
 
 If you’re looking for the ongoing checklist of known security gaps, see `security.md`.
 
+## Status update (2025-12-30)
+
+Since the 2025-12-29 audit, the following items have been addressed:
+
+- [x] Fixed IPv4-mapped IPv6 private IP detection in `Egregoros.SafeURL`.
+- [x] Inbox pre-signature rate limiting no longer keys on unverified `keyId` domains.
+- [x] Session hardening: renew on login/registration, drop on logout, production cookie flags reviewed.
+- [x] Audience-scoped PubSub delivery to reduce DM/private blast radius.
+- [x] Visibility semantics aligned across layers, including `bto`/`bcc`/`audience` handling.
+- [x] “Unlisted” no longer appears on public timelines/streams.
+- [x] OAuth token storage hardened and query-param bearer tokens removed (except streaming).
+- [x] Attachments with unsafe media URLs are filtered from UI/Mastodon status rendering.
+
 ## Security / privacy (new findings)
 
 ### CRITICAL

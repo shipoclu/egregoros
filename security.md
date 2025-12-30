@@ -13,6 +13,7 @@ This file tracks known security gaps and their remediation status.
 ## Medium priority (web UI hardening)
 - [x] **CSRF-safe logout**: use POST logout behind CSRF protection (prevents third-party logout CSRF).
 - [x] **Avoid unsafe share links**: do not render share/copy links for remote objects with non-HTTP(S) IDs (prevents `javascript:`/`data:` link injection).
+- [x] **Filter unsafe media URLs before rendering**: drop attachments with unsafe `href` URLs (e.g. private IPs, `javascript:`/`data:`), both in the LiveView UI and in Mastodon API status rendering.
 
 ## High priority (SSRF / DoS)
 - [x] **Harden remote actor fetches** (used in signature verification and discovery):
