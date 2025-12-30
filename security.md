@@ -35,12 +35,12 @@ This file tracks known security gaps and their remediation status.
 - [x] **Prevent DM/private probing via ancillary endpoints**: require `Objects.visible_to?/2` for `favourited_by`, `reblogged_by`, and Pleroma emoji reaction endpoints.
 - [x] **Unlisted semantics**: ensure “unlisted” statuses do **not** appear on public timelines/streams (they should still be publicly fetchable by ID).
 - [x] **Recipient field completeness**: ensure visibility checks consider `bto`/`bcc`/`audience` where relevant (and stay consistent with inbox targeting rules).
-- [ ] **Private upload access control**: avoid serving DM/private attachments from `Plug.Static` without authorization checks (URLs should not be world-readable if leaked).
+- [x] **Private upload access control**: avoid serving DM/private attachments from `Plug.Static` without authorization checks (URLs should not be world-readable if leaked).
 
 ## Medium priority (authz)
 - [x] **Enforce OAuth scopes** for Mastodon API endpoints (coarse `read`/`write`/`follow`).
 - [x] **Token lifecycle**: token expiry / refresh tokens / revocation endpoint (and tests).
-- [ ] **Token storage hardening**: avoid storing OAuth access/refresh tokens in plaintext in the DB (hash tokens and/or store only a digest).
+- [x] **Token storage hardening**: avoid storing OAuth access/refresh tokens in plaintext in the DB (hash tokens and/or store only a digest).
 - [x] **Avoid access tokens in query params**: prefer header-only bearer tokens (query params leak into logs/referrers). (Exception: streaming uses its own access_token handling.)
 
 ## Medium priority (inbox abuse controls)
