@@ -67,6 +67,26 @@ defmodule EgregorosWeb.MastodonAPI.InstanceController do
     json(conn, activity)
   end
 
+  def rules(conn, _params) do
+    json(conn, [])
+  end
+
+  def extended_description(conn, _params) do
+    json(conn, simple_content_payload(""))
+  end
+
+  def privacy_policy(conn, _params) do
+    json(conn, simple_content_payload(""))
+  end
+
+  def terms_of_service(conn, _params) do
+    json(conn, simple_content_payload(""))
+  end
+
+  def languages(conn, _params) do
+    json(conn, [%{"code" => "en", "name" => "English"}])
+  end
+
   def show_v2(conn, _params) do
     base_url = Endpoint.url()
     host = URI.parse(base_url).host || "localhost"
@@ -152,6 +172,13 @@ defmodule EgregorosWeb.MastodonAPI.InstanceController do
       "audio/wav",
       "application/ogg"
     ]
+  end
+
+  defp simple_content_payload(content) when is_binary(content) do
+    %{
+      "updated_at" => nil,
+      "content" => content
+    }
   end
 
   defp count_local_statuses(%DateTime{} = start_dt, %DateTime{} = end_dt) do

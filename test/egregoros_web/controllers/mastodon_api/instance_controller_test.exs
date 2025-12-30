@@ -43,4 +43,37 @@ defmodule EgregorosWeb.MastodonAPI.InstanceControllerTest do
       assert is_binary(item["registrations"])
     end)
   end
+
+  test "GET /api/v1/instance/rules returns a list", %{conn: conn} do
+    conn = get(conn, "/api/v1/instance/rules")
+    response = json_response(conn, 200)
+    assert is_list(response)
+  end
+
+  test "GET /api/v1/instance/extended_description returns an extended description", %{conn: conn} do
+    conn = get(conn, "/api/v1/instance/extended_description")
+    response = json_response(conn, 200)
+    assert is_map(response)
+    assert Map.has_key?(response, "content")
+  end
+
+  test "GET /api/v1/instance/privacy_policy returns a privacy policy", %{conn: conn} do
+    conn = get(conn, "/api/v1/instance/privacy_policy")
+    response = json_response(conn, 200)
+    assert is_map(response)
+    assert Map.has_key?(response, "content")
+  end
+
+  test "GET /api/v1/instance/terms_of_service returns terms of service", %{conn: conn} do
+    conn = get(conn, "/api/v1/instance/terms_of_service")
+    response = json_response(conn, 200)
+    assert is_map(response)
+    assert Map.has_key?(response, "content")
+  end
+
+  test "GET /api/v1/instance/languages returns a list of languages", %{conn: conn} do
+    conn = get(conn, "/api/v1/instance/languages")
+    response = json_response(conn, 200)
+    assert is_list(response)
+  end
 end
