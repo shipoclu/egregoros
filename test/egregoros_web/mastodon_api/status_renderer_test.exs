@@ -316,6 +316,32 @@ defmodule EgregorosWeb.MastodonAPI.StatusRendererTest do
     assert preview == url
   end
 
+  test "does not render a reblog when the announced object is missing" do
+    {:ok, alice} = Users.create_local_user("alice")
+
+    {:ok, announce} =
+      Objects.create_object(%{
+        ap_id: "https://remote.example/activities/announce/missing",
+        type: "Announce",
+        actor: alice.ap_id,
+        object: "https://remote.example/objects/missing",
+        local: false,
+        data: %{
+          "id" => "https://remote.example/activities/announce/missing",
+          "type" => "Announce",
+          "actor" => alice.ap_id,
+          "object" => "https://remote.example/objects/missing",
+          "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+          "cc" => []
+        }
+      })
+
+    rendered = StatusRenderer.render_status(announce)
+
+    assert rendered["content"] == ""
+    assert rendered["reblog"] == nil
+  end
+
   test "renders emoji reactions with :me when current_user reacted" do
     {:ok, alice} = Users.create_local_user("alice")
 

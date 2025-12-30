@@ -79,6 +79,34 @@ defmodule EgregorosWeb.MastodonAPI.TimelinesControllerTest do
     refute Enum.any?(response, &(&1["content"] == "<p>Local post</p>"))
   end
 
+  test "GET /api/v1/timelines/public does not include reblogs with missing objects", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("local")
+    {:ok, _} = Publish.post_note(user, "Local post")
+
+    {:ok, announce} =
+      Egregoros.Objects.create_object(%{
+        ap_id: "https://remote.example/activities/announce/missing",
+        type: "Announce",
+        actor: "https://remote.example/users/alice",
+        object: "https://remote.example/objects/missing",
+        local: false,
+        data: %{
+          "id" => "https://remote.example/activities/announce/missing",
+          "type" => "Announce",
+          "actor" => "https://remote.example/users/alice",
+          "object" => "https://remote.example/objects/missing",
+          "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+          "cc" => []
+        }
+      })
+
+    conn = get(conn, "/api/v1/timelines/public")
+    response = json_response(conn, 200)
+
+    assert Enum.any?(response, &(&1["content"] == "<p>Local post</p>"))
+    refute Enum.any?(response, &(&1["id"] == Integer.to_string(announce.id)))
+  end
+
   test "GET /api/v1/timelines/public includes reblog statuses", %{conn: conn} do
     {:ok, alice} = Users.create_local_user("alice")
     {:ok, bob} = Users.create_local_user("bob")
@@ -157,6 +185,48 @@ defmodule EgregorosWeb.MastodonAPI.TimelinesControllerTest do
     assert length(response) == 2
     assert Enum.at(response, 0)["content"] == "<p>Second home post</p>"
     assert Enum.at(response, 1)["content"] == "<p>First home post</p>"
+  end
+
+  test "GET /api/v1/timelines/home does not include reblogs with missing objects", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("local")
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, user} end)
+
+    remote_actor = "https://remote.example/users/alice"
+
+    assert {:ok, _follow} =
+             Pipeline.ingest(
+               %{
+                 "id" => "https://remote.example/activities/follow/1",
+                 "type" => "Follow",
+                 "actor" => user.ap_id,
+                 "object" => remote_actor
+               },
+               local: true
+             )
+
+    {:ok, announce} =
+      Egregoros.Objects.create_object(%{
+        ap_id: "https://remote.example/activities/announce/missing-home",
+        type: "Announce",
+        actor: remote_actor,
+        object: "https://remote.example/objects/missing-home",
+        local: false,
+        data: %{
+          "id" => "https://remote.example/activities/announce/missing-home",
+          "type" => "Announce",
+          "actor" => remote_actor,
+          "object" => "https://remote.example/objects/missing-home",
+          "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+          "cc" => []
+        }
+      })
+
+    conn = get(conn, "/api/v1/timelines/home")
+    response = json_response(conn, 200)
+
+    refute Enum.any?(response, &(&1["id"] == Integer.to_string(announce.id)))
   end
 
   test "GET /api/v1/timelines/home includes reblog statuses by the current user", %{conn: conn} do

@@ -217,6 +217,14 @@ defmodule Egregoros.Objects do
 
   @status_types ~w(Note Announce)
 
+  defp where_announces_have_object(query) do
+    from(o in query,
+      left_join: reblog in Object,
+      on: reblog.ap_id == o.object,
+      where: o.type != "Announce" or not is_nil(reblog.id)
+    )
+  end
+
   def list_public_statuses(opts \\ []) when is_list(opts) do
     limit = opts |> Keyword.get(:limit, 20) |> normalize_limit()
     max_id = Keyword.get(opts, :max_id)
@@ -230,6 +238,7 @@ defmodule Egregoros.Objects do
       order_by: [desc: o.id],
       limit: ^limit
     )
+    |> where_announces_have_object()
     |> where_publicly_listed()
     |> maybe_where_origin(local_only?, remote_only?)
     |> maybe_where_only_media(only_media?)
@@ -426,6 +435,7 @@ defmodule Egregoros.Objects do
       order_by: [desc: o.id],
       limit: ^limit
     )
+    |> where_announces_have_object()
     |> where_visible_to_home(actor_ap_id)
     |> maybe_where_max_id(max_id)
     |> maybe_where_since_id(since_id)
@@ -548,6 +558,7 @@ defmodule Egregoros.Objects do
       order_by: [desc: o.id],
       limit: ^limit
     )
+    |> where_announces_have_object()
     |> maybe_where_max_id(max_id)
     |> maybe_where_since_id(since_id)
     |> Repo.all()
@@ -566,6 +577,7 @@ defmodule Egregoros.Objects do
       order_by: [desc: o.id],
       limit: ^limit
     )
+    |> where_announces_have_object()
     |> where_publicly_visible()
     |> maybe_where_max_id(max_id)
     |> maybe_where_since_id(since_id)
