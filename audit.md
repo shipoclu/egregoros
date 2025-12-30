@@ -97,8 +97,8 @@ This is a short follow-up pass focused on **maintainability / DRY**, plus a quic
 
 - **Visibility rules are duplicated across layers** (publishing, query filters, streaming filters). Consider centralizing visibility classification to avoid mismatches (e.g. “unlisted in public timeline”).
   - Code: `lib/egregoros/publish.ex`, `lib/egregoros/objects.ex`, `lib/egregoros_web/mastodon_api/streaming_socket.ex`
-- **Repeated LiveView upload helpers**: `cancel_all_uploads/2` is duplicated across multiple LiveViews; consider a shared helper/module or component.
-  - Code: `lib/egregoros_web/live/timeline_live.ex`, `lib/egregoros_web/live/status_live.ex`, `lib/egregoros_web/live/profile_live.ex`, `lib/egregoros_web/live/search_live.ex`, `lib/egregoros_web/live/tag_live.ex`
+- [x] **Repeated LiveView upload helpers**: centralized upload cancellation in `EgregorosWeb.Live.Uploads.cancel_all/2`.
+  - Code: `lib/egregoros_web/live/uploads.ex`.
 
 ---
 
