@@ -46,8 +46,8 @@ This is a short follow-up pass focused on **maintainability / DRY**, plus a quic
   - Centralized `parse_datetime/1` + `maybe_put/3` in `Egregoros.Activities.Helpers`.
 - [x] **`safe_return_to/1` is duplicated** in session/registration controllers; centralized in `EgregorosWeb.ReturnTo.safe_return_to/1`.
   - Code: `lib/egregoros_web/return_to.ex`.
-- **`fallback_username/1` is duplicated** across renderers/controllers; consider centralizing to avoid subtle differences in parsing.
-  - Code: `StatusesController`, `StatusRenderer`, `NotificationRenderer`.
+- [x] **`fallback_username/1` is duplicated** across renderers/controllers; centralized in `EgregorosWeb.MastodonAPI.Fallback.fallback_username/1`.
+  - Code: `lib/egregoros_web/mastodon_api/fallback.ex`.
 - **OAuth token fields are digests but named like raw tokens**: `oauth_tokens.token` and `oauth_tokens.refresh_token` store digests, but the field names don’t make that obvious.
   - This is correct security-wise, but it’s easy to accidentally misuse/log. Consider renaming the DB columns or clearly documenting the invariant.
   - Code: `lib/egregoros/oauth.ex`, `lib/egregoros/oauth/token.ex`.
