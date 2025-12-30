@@ -82,4 +82,10 @@ defmodule EgregorosWeb.MastodonAPI.InstanceControllerTest do
     response = json_response(conn, 200)
     assert is_map(response)
   end
+
+  test "GET /api/v1/instance/domain_blocks returns a list", %{conn: conn} do
+    conn = get(conn, "/api/v1/instance/domain_blocks")
+    response = json_response(conn, 200)
+    assert is_list(response)
+  end
 end
