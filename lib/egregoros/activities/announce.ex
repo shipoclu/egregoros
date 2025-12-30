@@ -12,7 +12,6 @@ defmodule Egregoros.Activities.Announce do
   alias Egregoros.Object
   alias Egregoros.Objects
   alias Egregoros.Pipeline
-  alias Egregoros.Relays
   alias Egregoros.Relationships
   alias Egregoros.Timeline
   alias Egregoros.User
@@ -141,7 +140,7 @@ defmodule Egregoros.Activities.Announce do
 
   defp validate_inbox_target(_activity, _opts), do: :ok
 
-  defp maybe_fetch_announced_object(%Object{object: announced_ap_id, data: %{} = data}, opts)
+  defp maybe_fetch_announced_object(%Object{object: announced_ap_id, data: %{}}, opts)
        when is_binary(announced_ap_id) and is_list(opts) do
     if Keyword.get(opts, :local, true) do
       :ok
@@ -150,12 +149,6 @@ defmodule Egregoros.Activities.Announce do
 
       cond do
         announced_ap_id == "" ->
-          :ok
-
-        not Relays.subscribed?(data["actor"]) ->
-          :ok
-
-        not public_activity?(data) ->
           :ok
 
         not String.starts_with?(announced_ap_id, ["http://", "https://"]) ->
@@ -178,16 +171,6 @@ defmodule Egregoros.Activities.Announce do
   end
 
   defp maybe_fetch_announced_object(_object, _opts), do: :ok
-
-  defp public_activity?(%{} = data) do
-    recipients =
-      (data |> Map.get("to", []) |> List.wrap()) ++
-        (data |> Map.get("cc", []) |> List.wrap())
-
-    Enum.any?(recipients, &(&1 == @public))
-  end
-
-  defp public_activity?(_), do: false
 
   defp maybe_broadcast_notification(object) do
     with %{} = announced_object <- Objects.get_by_ap_id(object.object),

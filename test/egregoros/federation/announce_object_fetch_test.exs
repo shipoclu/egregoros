@@ -4,21 +4,15 @@ defmodule Egregoros.Federation.AnnounceObjectFetchTest do
   alias Egregoros.Pipeline
   alias Egregoros.Workers.FetchThreadAncestors
 
-  @public "https://www.w3.org/ns/activitystreams#Public"
-
   test "ingesting a remote Announce for an unknown object enqueues a low priority object+thread fetch" do
     announced_id = "https://remote.example/objects/announced-1"
-    relay_actor = "https://remote.example/users/relay"
-
-    Repo.insert!(%Egregoros.Relay{ap_id: relay_actor})
 
     announce =
       %{
         "id" => "https://remote.example/activities/announce/1",
         "type" => "Announce",
-        "actor" => relay_actor,
-        "object" => announced_id,
-        "to" => [@public]
+        "actor" => "https://remote.example/users/alice",
+        "object" => announced_id
       }
 
     assert {:ok, _} = Pipeline.ingest(announce, local: false)
@@ -32,9 +26,6 @@ defmodule Egregoros.Federation.AnnounceObjectFetchTest do
 
   test "remote Announce does not enqueue fetch when the announced object already exists" do
     announced_id = "https://remote.example/objects/announced-2"
-    relay_actor = "https://remote.example/users/relay"
-
-    Repo.insert!(%Egregoros.Relay{ap_id: relay_actor})
 
     note =
       %{
@@ -42,7 +33,7 @@ defmodule Egregoros.Federation.AnnounceObjectFetchTest do
         "type" => "Note",
         "attributedTo" => "https://remote.example/users/alice",
         "content" => "hello",
-        "to" => [@public]
+        "to" => ["https://www.w3.org/ns/activitystreams#Public"]
       }
 
     assert {:ok, _} = Pipeline.ingest(note, local: false)
@@ -51,9 +42,8 @@ defmodule Egregoros.Federation.AnnounceObjectFetchTest do
       %{
         "id" => "https://remote.example/activities/announce/2",
         "type" => "Announce",
-        "actor" => relay_actor,
-        "object" => announced_id,
-        "to" => [@public]
+        "actor" => "https://remote.example/users/bob",
+        "object" => announced_id
       }
 
     assert {:ok, _} = Pipeline.ingest(announce, local: false)
@@ -64,26 +54,24 @@ defmodule Egregoros.Federation.AnnounceObjectFetchTest do
     )
   end
 
-  test "remote Announce does not enqueue fetch when the announce isn't public" do
+  test "remote Announce enqueues fetch even when the announce isn't public" do
     announced_id = "https://remote.example/objects/announced-3"
-    relay_actor = "https://remote.example/users/relay"
-
-    Repo.insert!(%Egregoros.Relay{ap_id: relay_actor})
 
     announce =
       %{
         "id" => "https://remote.example/activities/announce/3",
         "type" => "Announce",
-        "actor" => relay_actor,
+        "actor" => "https://remote.example/users/alice",
         "object" => announced_id,
-        "to" => ["https://remote.example/users/relay"]
+        "to" => ["https://remote.example/users/alice"]
       }
 
     assert {:ok, _} = Pipeline.ingest(announce, local: false)
 
-    refute_enqueued(
+    assert_enqueued(
       worker: FetchThreadAncestors,
-      args: %{"start_ap_id" => announced_id}
+      args: %{"start_ap_id" => announced_id},
+      priority: 9
     )
   end
 end
