@@ -191,6 +191,77 @@ defmodule EgregorosWeb.MastodonAPI.StreamingSocketTest do
     assert %{"id" => _id} = Jason.decode!(status_payload)
   end
 
+  test "does not deliver announce updates when the reblogged object is missing" do
+    {:ok, state} = StreamingSocket.init(%{streams: ["public"], current_user: nil})
+    public = "https://www.w3.org/ns/activitystreams#Public"
+
+    assert {:ok, announce} =
+             Objects.create_object(%{
+               ap_id: "https://remote.example/activities/announce/missing",
+               type: "Announce",
+               actor: "https://remote.example/users/alice",
+               object: "https://remote.example/objects/missing",
+               local: false,
+               data: %{
+                 "id" => "https://remote.example/activities/announce/missing",
+                 "type" => "Announce",
+                 "actor" => "https://remote.example/users/alice",
+                 "object" => "https://remote.example/objects/missing",
+                 "to" => [public],
+                 "cc" => []
+               }
+             })
+
+    assert {:ok, _state} = StreamingSocket.handle_info({:post_created, announce}, state)
+  end
+
+  test "delivers announce updates when the reblogged object exists" do
+    {:ok, state} = StreamingSocket.init(%{streams: ["public"], current_user: nil})
+    public = "https://www.w3.org/ns/activitystreams#Public"
+    announced_id = "https://remote.example/objects/announced"
+
+    assert {:ok, _note} =
+             Objects.create_object(%{
+               ap_id: announced_id,
+               type: "Note",
+               actor: "https://remote.example/users/bob",
+               local: false,
+               data: %{
+                 "id" => announced_id,
+                 "type" => "Note",
+                 "attributedTo" => "https://remote.example/users/bob",
+                 "to" => [public],
+                 "cc" => ["https://remote.example/users/bob/followers"],
+                 "content" => "<p>Hello</p>"
+               }
+             })
+
+    assert {:ok, announce} =
+             Objects.create_object(%{
+               ap_id: "https://remote.example/activities/announce/ready",
+               type: "Announce",
+               actor: "https://remote.example/users/alice",
+               object: announced_id,
+               local: false,
+               data: %{
+                 "id" => "https://remote.example/activities/announce/ready",
+                 "type" => "Announce",
+                 "actor" => "https://remote.example/users/alice",
+                 "object" => announced_id,
+                 "to" => [public],
+                 "cc" => []
+               }
+             })
+
+    assert {:push, {:text, payload}, _state} =
+             StreamingSocket.handle_info({:post_created, announce}, state)
+
+    assert %{"event" => "update", "payload" => status_payload, "stream" => ["public"]} =
+             Jason.decode!(payload)
+
+    assert %{"reblog" => %{"id" => _id}} = Jason.decode!(status_payload)
+  end
+
   test "does not deliver direct messages to the public stream" do
     {:ok, state} = StreamingSocket.init(%{streams: ["public"], current_user: nil})
 

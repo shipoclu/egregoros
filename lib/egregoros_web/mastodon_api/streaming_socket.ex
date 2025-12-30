@@ -56,21 +56,22 @@ defmodule EgregorosWeb.MastodonAPI.StreamingSocket do
   end
 
   @impl true
-  def handle_info({:post_created, %Object{} = object}, state) when is_map(state) do
-    case remember_seen_ap_id(state, object.ap_id) do
-      {:skip, state} ->
-        {:ok, state}
+  def handle_info({:post_created, %Object{type: "Announce"} = object}, state) when is_map(state) do
+    announced_ap_id =
+      case object.object do
+        value when is_binary(value) -> String.trim(value)
+        _ -> ""
+      end
 
-      {:ok, state} ->
-        case streams_for_status(object, state) do
-          [] ->
-            {:ok, state}
-
-          streams ->
-            status_json = render_status_json(object, state)
-            push_stream_events("update", status_json, streams, state)
-        end
+    if announced_ap_id != "" and Objects.get_by_ap_id(announced_ap_id) == nil do
+      {:ok, state}
+    else
+      handle_post_created(object, state)
     end
+  end
+
+  def handle_info({:post_created, %Object{} = object}, state) when is_map(state) do
+    handle_post_created(object, state)
   end
 
   @impl true
@@ -94,6 +95,23 @@ defmodule EgregorosWeb.MastodonAPI.StreamingSocket do
 
   def handle_info(_message, state) when is_map(state) do
     {:ok, state}
+  end
+
+  defp handle_post_created(%Object{} = object, state) when is_map(state) do
+    case remember_seen_ap_id(state, object.ap_id) do
+      {:skip, state} ->
+        {:ok, state}
+
+      {:ok, state} ->
+        case streams_for_status(object, state) do
+          [] ->
+            {:ok, state}
+
+          streams ->
+            status_json = render_status_json(object, state)
+            push_stream_events("update", status_json, streams, state)
+        end
+    end
   end
 
   defp handle_client_event(%{"type" => "subscribe", "stream" => stream}, state)
