@@ -40,8 +40,8 @@ This is a short follow-up pass focused on **maintainability / DRY**, plus a quic
 
 ### Maintainability / DRY opportunities (new)
 
-- **Duplicate `truthy?/1` helpers** across LiveViews and controllers; consider centralizing a small helper (e.g. `EgregorosWeb.Param.truthy?/1`) to keep semantics consistent.
-  - Code: multiple `*_live.ex` and `TimelinesController`.
+- [x] **Duplicate `truthy?/1` helpers** across LiveViews and controllers were centralized in `EgregorosWeb.Param.truthy?/1`.
+  - Code: `lib/egregoros_web/param.ex`.
 - **Activity modules repeat common helpers** (`parse_datetime/1`, `maybe_put/3`, and related small normalizers) across `Egregoros.Activities.*` modules.
   - Consider a tiny shared helper module (e.g. `Egregoros.Activities.Helpers`) so each activity module stays “one file per activity type” but avoids copy/paste drift.
 - **`safe_return_to/1` is duplicated** in session/registration controllers; could be shared.
