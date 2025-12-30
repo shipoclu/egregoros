@@ -11,6 +11,7 @@ defmodule EgregorosWeb.SearchLive do
   alias Egregoros.Relationships
   alias Egregoros.User
   alias Egregoros.Users
+  alias EgregorosWeb.Live.Uploads, as: LiveUploads
   alias EgregorosWeb.MentionAutocomplete
   alias EgregorosWeb.ProfilePaths
   alias EgregorosWeb.URL
@@ -155,7 +156,7 @@ defmodule EgregorosWeb.SearchLive do
 
         socket =
           socket
-          |> cancel_all_uploads(:reply_media)
+          |> LiveUploads.cancel_all(:reply_media)
           |> assign(
             reply_modal_open?: true,
             reply_to_ap_id: in_reply_to,
@@ -176,7 +177,7 @@ defmodule EgregorosWeb.SearchLive do
   def handle_event("close_reply_modal", _params, socket) do
     socket =
       socket
-      |> cancel_all_uploads(:reply_media)
+      |> LiveUploads.cancel_all(:reply_media)
       |> assign(
         reply_modal_open?: false,
         reply_to_ap_id: nil,
@@ -780,18 +781,6 @@ defmodule EgregorosWeb.SearchLive do
   end
 
   defp valid_hashtag?(_tag), do: false
-
-  defp cancel_all_uploads(socket, upload_name) when is_atom(upload_name) do
-    case socket.assigns.uploads |> Map.get(upload_name) do
-      %{entries: entries} when is_list(entries) ->
-        Enum.reduce(entries, socket, fn entry, socket ->
-          cancel_upload(socket, upload_name, entry.ref)
-        end)
-
-      _ ->
-        socket
-    end
-  end
 
   defp parse_query(query) when is_binary(query) do
     query = String.trim(query)
