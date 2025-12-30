@@ -170,7 +170,11 @@ defmodule EgregorosWeb.MastodonAPI.AccountsController do
   def unfollow(conn, %{"id" => id}) do
     with %{} = target <- Users.get(id),
          %{} = relationship <-
-           Relationships.get_by_type_actor_object("Follow", conn.assigns.current_user.ap_id, target.ap_id) ||
+           Relationships.get_by_type_actor_object(
+             "Follow",
+             conn.assigns.current_user.ap_id,
+             target.ap_id
+           ) ||
              Relationships.get_by_type_actor_object(
                "FollowRequest",
                conn.assigns.current_user.ap_id,
@@ -180,7 +184,9 @@ defmodule EgregorosWeb.MastodonAPI.AccountsController do
          when is_binary(follow_activity_ap_id) and follow_activity_ap_id != "" <-
            follow_ap_id(relationship, conn.assigns.current_user, target),
          {:ok, _undo} <-
-           Pipeline.ingest(Undo.build(conn.assigns.current_user, follow_activity_ap_id), local: true) do
+           Pipeline.ingest(Undo.build(conn.assigns.current_user, follow_activity_ap_id),
+             local: true
+           ) do
       json(conn, RelationshipRenderer.render_relationship(conn.assigns.current_user, target))
     else
       nil -> send_resp(conn, 404, "Not Found")

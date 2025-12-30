@@ -103,9 +103,9 @@ defmodule Egregoros.SafeURL do
 
   defp ipv4_from_v6_tail(a, b) when is_integer(a) and is_integer(b) do
     {
-      (a >>> 8) &&& 0xFF,
+      a >>> 8 &&& 0xFF,
       a &&& 0xFF,
-      (b >>> 8) &&& 0xFF,
+      b >>> 8 &&& 0xFF,
       b &&& 0xFF
     }
   end

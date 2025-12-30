@@ -105,7 +105,8 @@ defmodule Egregoros.Activities.Accept do
               activity_ap_id: activity_ap_id
             })
 
-          _ = Relationships.delete_by_type_actor_object("FollowRequest", actor_ap_id, target_ap_id)
+          _ =
+            Relationships.delete_by_type_actor_object("FollowRequest", actor_ap_id, target_ap_id)
         end
 
         :ok

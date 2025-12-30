@@ -227,6 +227,7 @@ defmodule EgregorosWeb.MastodonAPI.TimelinesControllerTest do
 
     conn = get(conn, "/api/v1/timelines/home")
     response = json_response(conn, 200)
+
     assert Enum.any?(response, fn status ->
              status["visibility"] == "direct" and
                is_binary(status["content"]) and
@@ -243,6 +244,7 @@ defmodule EgregorosWeb.MastodonAPI.TimelinesControllerTest do
 
     conn = get(conn, "/api/v1/timelines/home")
     response = json_response(conn, 200)
+
     refute Enum.any?(response, fn status ->
              is_binary(status["content"]) and String.contains?(status["content"], "Secret DM")
            end)

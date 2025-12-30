@@ -7,4 +7,3 @@ defmodule Egregoros.Repo.Migrations.MakeRelationshipActivityApIdNullable do
     end
   end
 end
-

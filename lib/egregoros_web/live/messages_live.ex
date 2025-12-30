@@ -32,11 +32,15 @@ defmodule EgregorosWeb.MessagesLive do
        current_user: current_user,
        notifications_count: notifications_count(current_user),
        dm_form:
-         Phoenix.Component.to_form(%{"recipient" => "", "content" => "", "e2ee_dm" => ""}, as: :dm),
+         Phoenix.Component.to_form(%{"recipient" => "", "content" => "", "e2ee_dm" => ""},
+           as: :dm
+         ),
        dm_cursor: cursor(messages),
        dm_end?: length(messages) < @page_size
      )
-     |> stream(:messages, StatusVM.decorate_many(messages, current_user), dom_id: &message_dom_id/1)}
+     |> stream(:messages, StatusVM.decorate_many(messages, current_user),
+       dom_id: &message_dom_id/1
+     )}
   end
 
   @impl true
@@ -80,7 +84,8 @@ defmodule EgregorosWeb.MessagesLive do
             new_cursor = cursor(messages)
             dm_end? = length(messages) < @page_size
 
-            Enum.reduce(StatusVM.decorate_many(messages, current_user), socket, fn entry, socket ->
+            Enum.reduce(StatusVM.decorate_many(messages, current_user), socket, fn entry,
+                                                                                   socket ->
               stream_insert(socket, :messages, entry, at: -1)
             end)
             |> assign(dm_cursor: new_cursor, dm_end?: dm_end?)
@@ -124,7 +129,11 @@ defmodule EgregorosWeb.MessagesLive do
               )
 
             if note do
-              {:noreply, stream_insert(socket, :messages, StatusVM.decorate(note, socket.assigns.current_user), at: 0)}
+              {:noreply,
+               stream_insert(
+                 socket,
+                 :messages,
+                 StatusVM.decorate(note, socket.assigns.current_user), at: 0)}
             else
               {:noreply, socket}
             end

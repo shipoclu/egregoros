@@ -20,7 +20,11 @@ defmodule EgregorosWeb.MessagesLiveTest do
     assert has_element?(view, "[data-role='messages-auth-required']")
   end
 
-  test "lists direct messages visible to the signed-in user", %{conn: conn, alice: alice, bob: bob} do
+  test "lists direct messages visible to the signed-in user", %{
+    conn: conn,
+    alice: alice,
+    bob: bob
+  } do
     {:ok, _} = Publish.post_note(bob, "@alice Secret DM", visibility: "direct")
 
     conn = Plug.Test.init_test_session(conn, %{user_id: alice.id})

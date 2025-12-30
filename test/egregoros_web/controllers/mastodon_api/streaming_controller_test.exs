@@ -115,7 +115,8 @@ defmodule EgregorosWeb.MastodonAPI.StreamingControllerTest do
     {:ok, app} =
       OAuth.create_application(%{
         "client_name" => "Ivory for iOS",
-        "redirect_uris" => "com.tapbots.Ivory.23600:/request_token/39A4ABC7-48F1-4DBC-906A-4D2D249C3440",
+        "redirect_uris" =>
+          "com.tapbots.Ivory.23600:/request_token/39A4ABC7-48F1-4DBC-906A-4D2D249C3440",
         "scopes" => "read"
       })
 

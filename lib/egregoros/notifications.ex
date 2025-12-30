@@ -47,7 +47,8 @@ defmodule Egregoros.Notifications do
     interaction_predicate =
       dynamic(
         [a],
-        a.type in ^interaction_types and a.object in subquery(note_ap_ids) and a.actor != ^user.ap_id
+        a.type in ^interaction_types and a.object in subquery(note_ap_ids) and
+          a.actor != ^user.ap_id
       )
 
     mention_predicate =
@@ -61,8 +62,7 @@ defmodule Egregoros.Notifications do
     predicate = dynamic([a], ^follow_predicate or ^interaction_predicate or ^mention_predicate)
 
     from(a in Object,
-      where:
-        ^predicate,
+      where: ^predicate,
       order_by: [desc: a.id],
       limit: ^limit
     )

@@ -39,4 +39,3 @@ defmodule EgregorosWeb.MastodonAPI.BlocksController do
     |> json(accounts)
   end
 end
-

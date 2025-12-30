@@ -31,4 +31,3 @@ defmodule EgregorosWeb.Plugs.RateLimitInboxTest do
     refute conn.halted
   end
 end
-

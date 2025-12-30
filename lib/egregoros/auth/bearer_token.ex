@@ -37,5 +37,4 @@ defmodule Egregoros.Auth.BearerToken do
       _ -> nil
     end
   end
-
 end

@@ -46,4 +46,3 @@ defmodule EgregorosWeb.MastodonAPI.BlocksMutesControllerTest do
     assert Enum.any?(response, &(&1["id"] == Integer.to_string(muted.id)))
   end
 end
-

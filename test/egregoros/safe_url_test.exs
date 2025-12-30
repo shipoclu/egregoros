@@ -49,8 +49,13 @@ defmodule Egregoros.SafeURLTest do
 
   test "rejects IPv4-embedded IPv6 loopback/private literals" do
     assert {:error, :unsafe_url} == SafeURL.validate_http_url("http://[::127.0.0.1]/users/alice")
-    assert {:error, :unsafe_url} == SafeURL.validate_http_url("http://[::ffff:127.0.0.1]/users/alice")
-    assert {:error, :unsafe_url} == SafeURL.validate_http_url("http://[::ffff:10.0.0.1]/users/alice")
+
+    assert {:error, :unsafe_url} ==
+             SafeURL.validate_http_url("http://[::ffff:127.0.0.1]/users/alice")
+
+    assert {:error, :unsafe_url} ==
+             SafeURL.validate_http_url("http://[::ffff:10.0.0.1]/users/alice")
+
     assert :ok == SafeURL.validate_http_url("http://[::ffff:8.8.8.8]/users/alice")
   end
 

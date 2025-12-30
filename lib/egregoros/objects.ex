@@ -276,8 +276,7 @@ defmodule Egregoros.Objects do
 
   defp where_publicly_listed(query) do
     from(o in query,
-      where:
-        fragment("? @> ?", o.data, ^%{"to" => [@as_public]})
+      where: fragment("? @> ?", o.data, ^%{"to" => [@as_public]})
     )
   end
 

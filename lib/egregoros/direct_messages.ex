@@ -84,4 +84,3 @@ defmodule Egregoros.DirectMessages do
 
   defp normalize_id(_), do: nil
 end
-

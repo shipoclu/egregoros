@@ -39,4 +39,3 @@ defmodule EgregorosWeb.MastodonAPI.MutesController do
     |> json(accounts)
   end
 end
-

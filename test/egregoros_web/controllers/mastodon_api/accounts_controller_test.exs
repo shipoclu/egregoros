@@ -362,8 +362,14 @@ defmodule EgregorosWeb.MastodonAPI.AccountsControllerTest do
     assert response["following"] == false
     assert response["requested"] == true
 
-    assert Egregoros.Relationships.get_by_type_actor_object("Follow", user.ap_id, target.ap_id) == nil
-    assert Egregoros.Relationships.get_by_type_actor_object("FollowRequest", user.ap_id, target.ap_id)
+    assert Egregoros.Relationships.get_by_type_actor_object("Follow", user.ap_id, target.ap_id) ==
+             nil
+
+    assert Egregoros.Relationships.get_by_type_actor_object(
+             "FollowRequest",
+             user.ap_id,
+             target.ap_id
+           )
   end
 
   test "POST /api/v1/accounts/:id/unfollow creates undo activity", %{conn: conn} do
@@ -422,7 +428,11 @@ defmodule EgregorosWeb.MastodonAPI.AccountsControllerTest do
         local: true
       )
 
-    assert Egregoros.Relationships.get_by_type_actor_object("FollowRequest", user.ap_id, target.ap_id)
+    assert Egregoros.Relationships.get_by_type_actor_object(
+             "FollowRequest",
+             user.ap_id,
+             target.ap_id
+           )
 
     conn = post(conn, "/api/v1/accounts/#{target.id}/unfollow")
     response = json_response(conn, 200)
@@ -430,7 +440,12 @@ defmodule EgregorosWeb.MastodonAPI.AccountsControllerTest do
     assert response["following"] == false
     assert response["requested"] == false
     assert Egregoros.Objects.get_by_type_actor_object("Undo", user.ap_id, follow.ap_id)
-    assert Egregoros.Relationships.get_by_type_actor_object("FollowRequest", user.ap_id, target.ap_id) == nil
+
+    assert Egregoros.Relationships.get_by_type_actor_object(
+             "FollowRequest",
+             user.ap_id,
+             target.ap_id
+           ) == nil
   end
 
   test "POST /api/v1/accounts/:id/unfollow undoes the latest follow relationship", %{conn: conn} do
