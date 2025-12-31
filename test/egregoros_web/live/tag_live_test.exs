@@ -16,11 +16,32 @@ defmodule EgregorosWeb.TagLiveTest do
     %{user: user, note: note}
   end
 
+  test "signed-out tag pages use the public timeline href", %{conn: conn} do
+    assert {:ok, view, _html} = live(conn, "/tags/elixir")
+
+    assert has_element?(view, "a[href='/?timeline=public']", "Timeline")
+    refute has_element?(view, "button[data-role='like']")
+  end
+
+  test "signed-in tag pages use the home timeline href", %{conn: conn, user: user} do
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    assert {:ok, view, _html} = live(conn, "/tags/elixir")
+
+    assert has_element?(view, "a[href='/?timeline=home']", "Timeline")
+  end
+
   test "tag pages list matching posts", %{conn: conn} do
     assert {:ok, view, _html} = live(conn, "/tags/elixir")
 
     assert has_element?(view, "[data-role='tag-title']", "#elixir")
     assert has_element?(view, "article", "Hello #elixir")
+  end
+
+  test "tag pages show an empty state when there are no matching posts", %{conn: conn} do
+    assert {:ok, view, _html} = live(conn, "/tags/missing")
+
+    assert has_element?(view, "[data-role='tag-title']", "#missing")
+    assert has_element?(view, "div", "No posts yet.")
   end
 
   test "tag pages do not include direct messages", %{conn: conn, user: user} do
@@ -95,6 +116,57 @@ defmodule EgregorosWeb.TagLiveTest do
 
     assert Objects.get(note.id) == nil
     refute has_element?(view, "#post-#{note.id}")
+  end
+
+  test "signed-in users can bookmark posts from tag pages", %{conn: conn, user: user, note: note} do
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    assert {:ok, view, _html} = live(conn, "/tags/elixir")
+
+    refute has_element?(view, "#post-#{note.id} button[data-role='bookmark']", "Unbookmark")
+
+    view
+    |> element("#post-#{note.id} button[data-role='bookmark']")
+    |> render_click()
+
+    assert has_element?(view, "#post-#{note.id} button[data-role='bookmark']", "Unbookmark")
+  end
+
+  test "reply modal can be opened from a tag page and replies can be posted", %{
+    conn: conn,
+    user: user,
+    note: note
+  } do
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    assert {:ok, view, _html} = live(conn, "/tags/elixir")
+
+    refute has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='open']")
+
+    view
+    |> element("#post-#{note.id} button[data-role='reply']")
+    |> render_click()
+
+    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='open']")
+
+    view
+    |> form("#reply-modal-form", reply: %{content: "A reply"})
+    |> render_submit()
+
+    [reply] = Objects.list_replies_to(note.ap_id, limit: 1)
+    assert reply.data["inReplyTo"] == note.ap_id
+  end
+
+  test "reply composer mention autocomplete suggests users", %{conn: conn, user: user, note: note} do
+    {:ok, _} = Users.create_local_user("bob")
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    assert {:ok, view, _html} = live(conn, "/tags/elixir")
+
+    view
+    |> element("#post-#{note.id} button[data-role='reply']")
+    |> render_click()
+
+    _html = render_hook(view, "mention_search", %{"q" => "bo", "scope" => "reply-modal"})
+    assert has_element?(view, "[data-role='mention-suggestion']", "@bob")
   end
 
   test "tag pages can load more posts", %{conn: conn, user: user} do

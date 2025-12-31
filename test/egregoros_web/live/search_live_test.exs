@@ -8,7 +8,31 @@ defmodule EgregorosWeb.SearchLiveTest do
   alias Egregoros.Objects
   alias Egregoros.Pipeline
   alias Egregoros.Publish
+  alias Egregoros.Relationships
   alias Egregoros.Users
+
+  test "empty search shows guidance copy", %{conn: conn} do
+    {:ok, view, _html} = live(conn, "/search")
+
+    assert has_element?(view, "[data-role='search-results']", "Type a query")
+    refute has_element?(view, "[data-role='search-post-results']")
+  end
+
+  test "search form patches to the canonical query url", %{conn: conn} do
+    {:ok, view, _html} = live(conn, "/search")
+
+    view
+    |> form("#search-form", search: %{q: "bo"})
+    |> render_submit()
+
+    assert_patch(view, "/search?q=bo")
+
+    view
+    |> form("#search-form", search: %{q: ""})
+    |> render_submit()
+
+    assert_patch(view, "/search")
+  end
 
   test "searching by query lists matching accounts", %{conn: conn} do
     {:ok, _} = Users.create_local_user("alice")
@@ -72,6 +96,53 @@ defmodule EgregorosWeb.SearchLiveTest do
     assert has_element?(view, "[data-role='search-tag-link'][href='/tags/elixir']", "#elixir")
   end
 
+  test "search does not suggest tags for remote handles", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("alice")
+    assert {:ok, _} = Publish.post_note(user, "Hello #bob")
+
+    {:ok, view, _html} = live(conn, "/search?q=bob@remote.example")
+
+    assert has_element?(view, "[data-role='remote-follow']")
+    refute has_element?(view, "[data-role='search-tag-results']")
+  end
+
+  test "signed-out users are prompted to login before following remote handles", %{conn: conn} do
+    {:ok, view, _html} = live(conn, "/search?q=bob@remote.example")
+
+    assert has_element?(view, "[data-role='remote-follow']", "Login to follow")
+    refute has_element?(view, "button[data-role='remote-follow-button']")
+  end
+
+  test "search renders a remote-follow already-following state", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("alice")
+
+    {:ok, remote} =
+      Users.create_user(%{
+        nickname: "bob",
+        domain: "remote.example",
+        ap_id: "https://remote.example/users/bob",
+        inbox: "https://remote.example/users/bob/inbox",
+        outbox: "https://remote.example/users/bob/outbox",
+        public_key: "remote-key",
+        private_key: nil,
+        local: false
+      })
+
+    {:ok, _} =
+      Relationships.upsert_relationship(%{
+        type: "Follow",
+        actor: user.ap_id,
+        object: remote.ap_id,
+        activity_ap_id: nil
+      })
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/search?q=bob@remote.example")
+
+    assert has_element?(view, "[data-role='remote-follow']", "You are following")
+    refute has_element?(view, "button[data-role='remote-follow-button']")
+  end
+
   test "reply buttons dispatch reply modal events without navigation", %{conn: conn} do
     {:ok, user} = Users.create_local_user("alice")
     assert {:ok, _} = Pipeline.ingest(Note.build(user, "Reply target"), local: true)
@@ -110,6 +181,39 @@ defmodule EgregorosWeb.SearchLiveTest do
 
     [reply] = Objects.list_replies_to(parent.ap_id, limit: 1)
     assert reply.data["inReplyTo"] == parent.ap_id
+  end
+
+  test "search shows a no-results state for accounts and posts", %{conn: conn} do
+    {:ok, view, _html} = live(conn, "/search?q=nomatch")
+
+    assert has_element?(view, "[data-role='search-results']", "No matching accounts")
+    assert has_element?(view, "[data-role='search-post-results']")
+    assert has_element?(view, "[data-role='search-post-results']", "No matching posts")
+  end
+
+  test "signed-in users can like and bookmark posts from search results", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("alice")
+    assert {:ok, _note} = Pipeline.ingest(Note.build(user, "Hello from search"), local: true)
+    [note] = Objects.list_notes()
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/search?q=hello")
+
+    refute has_element?(view, "#search-post-#{note.id} button[data-role='like']", "Unlike")
+
+    view
+    |> element("#search-post-#{note.id} button[data-role='like']")
+    |> render_click()
+
+    assert has_element?(view, "#search-post-#{note.id} button[data-role='like']", "Unlike")
+
+    refute has_element?(view, "#search-post-#{note.id} button[data-role='bookmark']", "Unbookmark")
+
+    view
+    |> element("#search-post-#{note.id} button[data-role='bookmark']")
+    |> render_click()
+
+    assert has_element?(view, "#search-post-#{note.id} button[data-role='bookmark']", "Unbookmark")
   end
 
   test "logged-in users can follow remote accounts by handle", %{conn: conn} do
