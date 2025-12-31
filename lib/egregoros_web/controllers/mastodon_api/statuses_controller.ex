@@ -224,6 +224,38 @@ defmodule EgregorosWeb.MastodonAPI.StatusesController do
     end
   end
 
+  def bookmark(conn, %{"id" => id}) do
+    with %{} = object <- Objects.get(id),
+         %{} = user <- conn.assigns.current_user,
+         true <- Objects.visible_to?(object, user) do
+      case Relationships.upsert_relationship(%{
+             type: "Bookmark",
+             actor: user.ap_id,
+             object: object.ap_id
+           }) do
+        {:ok, _} -> json(conn, StatusRenderer.render_status(object, user))
+        {:error, _} -> send_resp(conn, 422, "Unprocessable Entity")
+      end
+    else
+      nil -> send_resp(conn, 404, "Not Found")
+      false -> send_resp(conn, 404, "Not Found")
+      {:error, _} -> send_resp(conn, 422, "Unprocessable Entity")
+    end
+  end
+
+  def unbookmark(conn, %{"id" => id}) do
+    with %{} = object <- Objects.get(id),
+         %{} = user <- conn.assigns.current_user,
+         true <- Objects.visible_to?(object, user) do
+      _ = Relationships.delete_by_type_actor_object("Bookmark", user.ap_id, object.ap_id)
+      json(conn, StatusRenderer.render_status(object, user))
+    else
+      nil -> send_resp(conn, 404, "Not Found")
+      false -> send_resp(conn, 404, "Not Found")
+      {:error, _} -> send_resp(conn, 422, "Unprocessable Entity")
+    end
+  end
+
   def reblog(conn, %{"id" => id}) do
     with %{} = object <- Objects.get(id),
          %{} = user <- conn.assigns.current_user,

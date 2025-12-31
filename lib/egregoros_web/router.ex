@@ -138,6 +138,8 @@ defmodule EgregorosWeb.Router do
     delete "/statuses/:id", StatusesController, :delete
     post "/statuses/:id/favourite", StatusesController, :favourite
     post "/statuses/:id/unfavourite", StatusesController, :unfavourite
+    post "/statuses/:id/bookmark", StatusesController, :bookmark
+    post "/statuses/:id/unbookmark", StatusesController, :unbookmark
     post "/statuses/:id/reblog", StatusesController, :reblog
     post "/statuses/:id/unreblog", StatusesController, :unreblog
   end
@@ -162,8 +164,8 @@ defmodule EgregorosWeb.Router do
     get "/preferences", PreferencesController, :show
     get "/filters", EmptyListController, :index
     get "/lists", EmptyListController, :index
-    get "/bookmarks", EmptyListController, :index
-    get "/favourites", EmptyListController, :index
+    get "/bookmarks", BookmarksController, :index
+    get "/favourites", FavouritesController, :index
     get "/blocks", BlocksController, :index
     get "/mutes", MutesController, :index
     get "/follow_requests", FollowRequestsController, :index

@@ -11,8 +11,6 @@ defmodule EgregorosWeb.MastodonAPI.EmptyListEndpointsTest do
     paths = [
       "/api/v1/filters",
       "/api/v1/lists",
-      "/api/v1/bookmarks",
-      "/api/v1/favourites",
       "/api/v1/blocks",
       "/api/v1/mutes",
       "/api/v1/followed_tags"

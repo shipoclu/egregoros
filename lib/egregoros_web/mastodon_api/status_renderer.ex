@@ -89,7 +89,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusRenderer do
     me_relationships =
       case current_user do
         %User{ap_id: ap_id} when is_binary(ap_id) ->
-          Relationships.list_by_types_actor_objects(["Like", "Announce"], ap_id, object_ap_ids)
+          Relationships.list_by_types_actor_objects(["Like", "Announce", "Bookmark"], ap_id, object_ap_ids)
 
         _ ->
           MapSet.new()
@@ -139,6 +139,10 @@ defmodule EgregorosWeb.MastodonAPI.StatusRenderer do
       match?(%User{}, ctx.current_user) and
         MapSet.member?(ctx.me_relationships, {"Announce", object.ap_id})
 
+    bookmarked =
+      match?(%User{}, ctx.current_user) and
+        MapSet.member?(ctx.me_relationships, {"Bookmark", object.ap_id})
+
     {in_reply_to_id, in_reply_to_account_id} = in_reply_to(object)
 
     %{
@@ -161,7 +165,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusRenderer do
       "favourited" => favourited,
       "reblogged" => reblogged,
       "muted" => false,
-      "bookmarked" => false,
+      "bookmarked" => bookmarked,
       "pinned" => false,
       "in_reply_to_id" => in_reply_to_id,
       "in_reply_to_account_id" => in_reply_to_account_id,
@@ -177,6 +181,10 @@ defmodule EgregorosWeb.MastodonAPI.StatusRenderer do
 
   defp render_reblog(%Object{} = announce, ctx) do
     account = account_from_actor(announce.actor, ctx)
+
+    bookmarked =
+      match?(%User{}, ctx.current_user) and
+        MapSet.member?(ctx.me_relationships, {"Bookmark", announce.ap_id})
 
     reblog =
       case announce.object do
@@ -213,7 +221,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusRenderer do
       "favourited" => if(is_map(reblog), do: Map.get(reblog, "favourited", false), else: false),
       "reblogged" => if(is_map(reblog), do: Map.get(reblog, "reblogged", false), else: false),
       "muted" => false,
-      "bookmarked" => false,
+      "bookmarked" => bookmarked,
       "pinned" => false,
       "in_reply_to_id" => nil,
       "in_reply_to_account_id" => nil,

@@ -4,6 +4,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusesControllerTest do
   alias Egregoros.Objects
   alias Egregoros.Pipeline
   alias Egregoros.Publish
+  alias Egregoros.Relationships
   alias Egregoros.Users
   alias EgregorosWeb.Endpoint
 
@@ -281,6 +282,71 @@ defmodule EgregorosWeb.MastodonAPI.StatusesControllerTest do
     assert json_response(conn, 200)
 
     assert Objects.get_by_type_actor_object("Undo", user.ap_id, like_object.ap_id)
+  end
+
+  test "POST /api/v1/statuses/:id/bookmark creates a bookmark", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("local")
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, user} end)
+
+    {:ok, _} =
+      Pipeline.ingest(
+        %{
+          "id" => "https://example.com/objects/bookmark-1",
+          "type" => "Note",
+          "actor" => "https://example.com/users/alice",
+          "content" => "Hello bookmark",
+          "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+          "cc" => ["https://example.com/users/alice/followers"]
+        },
+        local: false
+      )
+
+    [object] = Objects.list_notes()
+
+    conn = post(conn, "/api/v1/statuses/#{object.id}/bookmark")
+    response = json_response(conn, 200)
+
+    assert response["id"] == Integer.to_string(object.id)
+    assert response["bookmarked"] == true
+
+    assert Relationships.get_by_type_actor_object("Bookmark", user.ap_id, object.ap_id)
+  end
+
+  test "POST /api/v1/statuses/:id/unbookmark removes a bookmark", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("local")
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, user} end)
+
+    {:ok, note} =
+      Pipeline.ingest(
+        %{
+          "id" => "https://example.com/objects/bookmark-2",
+          "type" => "Note",
+          "actor" => "https://example.com/users/alice",
+          "content" => "Hello bookmark 2",
+          "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+          "cc" => ["https://example.com/users/alice/followers"]
+        },
+        local: false
+      )
+
+    assert {:ok, _} =
+             Relationships.upsert_relationship(%{
+               type: "Bookmark",
+               actor: user.ap_id,
+               object: note.ap_id
+             })
+
+    conn = post(conn, "/api/v1/statuses/#{note.id}/unbookmark")
+    response = json_response(conn, 200)
+
+    assert response["id"] == Integer.to_string(note.id)
+    assert response["bookmarked"] == false
+
+    refute Relationships.get_by_type_actor_object("Bookmark", user.ap_id, note.ap_id)
   end
 
   test "POST /api/v1/statuses/:id/reblog creates an announce", %{conn: conn} do
