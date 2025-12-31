@@ -413,4 +413,399 @@ defmodule Egregoros.ObjectsTest do
   test "search_notes ignores blank queries" do
     assert [] == Objects.search_notes(" ")
   end
+
+  test "upsert_object/2 can replace existing records when asked" do
+    ap_id = "https://example.com/objects/replace-1"
+
+    assert {:ok, %Object{} = object} =
+             Objects.create_object(%{
+               ap_id: ap_id,
+               type: "Note",
+               data: %{"type" => "Note", "content" => "old"}
+             })
+
+    assert {:ok, %Object{} = replaced} =
+             Objects.upsert_object(%{ap_id: ap_id, type: "Note", data: %{"content" => "new"}},
+               conflict: :replace
+             )
+
+    assert replaced.id == object.id
+    assert replaced.data["content"] == "new"
+  end
+
+  test "upsert_object/2 refuses to replace when the type mismatches" do
+    ap_id = "https://example.com/objects/replace-2"
+
+    assert {:ok, %Object{} = object} =
+             Objects.create_object(%{
+               ap_id: ap_id,
+               type: "Note",
+               data: %{"type" => "Note", "content" => "old"}
+             })
+
+    assert {:error, %Ecto.Changeset{}} =
+             Objects.upsert_object(%{ap_id: ap_id, type: "Like", data: %{"type" => "Like"}},
+               conflict: :replace
+             )
+
+    assert Objects.get(object.id).type == "Note"
+  end
+
+  test "upsert_object/2 ignores unknown conflict modes and returns the existing record" do
+    ap_id = "https://example.com/objects/replace-3"
+
+    assert {:ok, %Object{} = object} =
+             Objects.create_object(%{
+               ap_id: ap_id,
+               type: "Note",
+               data: %{"type" => "Note", "content" => "old"}
+             })
+
+    assert {:ok, %Object{} = returned} =
+             Objects.upsert_object(%{ap_id: ap_id, type: "Note", data: %{"content" => "new"}},
+               conflict: :unknown
+             )
+
+    assert returned.id == object.id
+    assert Objects.get(object.id).data["content"] == "old"
+  end
+
+  test "upsert_object/2 falls back to default options for invalid opts" do
+    assert {:ok, %Object{} = object} = Objects.upsert_object(@note_attrs, :not_a_list)
+    assert object.ap_id == @note_attrs.ap_id
+  end
+
+  test "list_by_ap_ids filters blanks and returns matching objects" do
+    assert {:ok, %Object{} = one} = Objects.create_object(@note_attrs)
+
+    assert {:ok, %Object{} = two} =
+             Objects.create_object(%{
+               ap_id: "https://example.com/objects/2",
+               type: "Note",
+               actor: "https://example.com/users/alice",
+               data: %{"type" => "Note", "content" => "two"}
+             })
+
+    results =
+      Objects.list_by_ap_ids([
+        nil,
+        "",
+        "   ",
+        @note_attrs.ap_id,
+        "  https://example.com/objects/2  ",
+        "https://example.com/objects/missing"
+      ])
+
+    assert Enum.map(results, & &1.id) |> Enum.sort() == Enum.sort([one.id, two.id])
+  end
+
+  test "list_public_notes only returns notes that are publicly listed" do
+    public = "https://www.w3.org/ns/activitystreams#Public"
+    followers = "https://remote.example/users/alice/followers"
+
+    assert {:ok, %Object{} = listed} =
+             Objects.create_object(%{
+               ap_id: "https://remote.example/objects/public-listed-1",
+               type: "Note",
+               actor: "https://remote.example/users/alice",
+               local: false,
+               data: %{
+                 "id" => "https://remote.example/objects/public-listed-1",
+                 "type" => "Note",
+                 "actor" => "https://remote.example/users/alice",
+                 "to" => [public],
+                 "cc" => [],
+                 "content" => "Listed"
+               }
+             })
+
+    assert {:ok, %Object{} = unlisted} =
+             Objects.create_object(%{
+               ap_id: "https://remote.example/objects/public-unlisted-1",
+               type: "Note",
+               actor: "https://remote.example/users/alice",
+               local: false,
+               data: %{
+                 "id" => "https://remote.example/objects/public-unlisted-1",
+                 "type" => "Note",
+                 "actor" => "https://remote.example/users/alice",
+                 "to" => [followers],
+                 "cc" => [public],
+                 "content" => "Unlisted"
+               }
+             })
+
+    assert Enum.any?(Objects.list_public_notes(), &(&1.id == listed.id))
+    refute Enum.any?(Objects.list_public_notes(10), &(&1.id == unlisted.id))
+  end
+
+  test "list_notes_by_hashtag reads ActivityPub tag data instead of parsing text" do
+    public = "https://www.w3.org/ns/activitystreams#Public"
+
+    assert {:ok, %Object{} = with_tag} =
+             Objects.create_object(%{
+               ap_id: "https://local.example/objects/tagged-1",
+               type: "Note",
+               actor: "https://local.example/users/alice",
+               local: true,
+               data: %{
+                 "id" => "https://local.example/objects/tagged-1",
+                 "type" => "Note",
+                 "actor" => "https://local.example/users/alice",
+                 "to" => [public],
+                 "cc" => [],
+                 "content" => "not #parsed",
+                 "tag" => [%{"type" => "Hashtag", "name" => "#elixir"}]
+               }
+             })
+
+    assert {:ok, %Object{} = without_tag} =
+             Objects.create_object(%{
+               ap_id: "https://local.example/objects/not-tagged-1",
+               type: "Note",
+               actor: "https://local.example/users/alice",
+               local: true,
+               data: %{
+                 "id" => "https://local.example/objects/not-tagged-1",
+                 "type" => "Note",
+                 "actor" => "https://local.example/users/alice",
+                 "to" => [public],
+                 "cc" => [],
+                 "content" => "#elixir but no tag field"
+               }
+             })
+
+    assert Enum.any?(Objects.list_notes_by_hashtag("elixir"), &(&1.id == with_tag.id))
+    refute Enum.any?(Objects.list_notes_by_hashtag("elixir"), &(&1.id == without_tag.id))
+    assert Objects.list_notes_by_hashtag("   ") == []
+  end
+
+  test "list_public_statuses supports filtering to posts with media including reblogs" do
+    public = "https://www.w3.org/ns/activitystreams#Public"
+
+    assert {:ok, %Object{} = media_note} =
+             Objects.create_object(%{
+               ap_id: "https://remote.example/objects/media-note-1",
+               type: "Note",
+               actor: "https://remote.example/users/alice",
+               local: false,
+               data: %{
+                 "id" => "https://remote.example/objects/media-note-1",
+                 "type" => "Note",
+                 "actor" => "https://remote.example/users/alice",
+                 "to" => [public],
+                 "cc" => [],
+                 "content" => "With media",
+                 "attachment" => [%{"mediaType" => "image/png", "url" => [%{"href" => "https://cdn.example/x.png"}]}]
+               }
+             })
+
+    assert {:ok, %Object{} = no_media_note} =
+             Objects.create_object(%{
+               ap_id: "https://remote.example/objects/no-media-note-1",
+               type: "Note",
+               actor: "https://remote.example/users/alice",
+               local: false,
+               data: %{
+                 "id" => "https://remote.example/objects/no-media-note-1",
+                 "type" => "Note",
+                 "actor" => "https://remote.example/users/alice",
+                 "to" => [public],
+                 "cc" => [],
+                 "content" => "No media"
+               }
+             })
+
+    assert {:ok, %Object{} = announce} =
+             Objects.create_object(%{
+               ap_id: "https://remote.example/activities/announce-media-1",
+               type: "Announce",
+               actor: "https://remote.example/users/bob",
+               object: media_note.ap_id,
+               local: false,
+               data: %{
+                 "id" => "https://remote.example/activities/announce-media-1",
+                 "type" => "Announce",
+                 "actor" => "https://remote.example/users/bob",
+                 "object" => media_note.ap_id,
+                 "to" => [public],
+                 "cc" => []
+               }
+             })
+
+    media_only = Objects.list_public_statuses(only_media: true)
+
+    assert Enum.any?(media_only, &(&1.id == media_note.id))
+    refute Enum.any?(media_only, &(&1.id == no_media_note.id))
+    assert Enum.any?(media_only, &(&1.id == announce.id))
+  end
+
+  test "visible_to?/2 treats recipient maps as recipients and supports followers-only visibility" do
+    {:ok, viewer} = Users.create_local_user("viewer")
+
+    actor_ap_id = "https://remote.example/users/author"
+
+    assert {:ok, %Object{} = dm_string} =
+             Objects.create_object(%{
+               ap_id: "https://remote.example/objects/dm-recipient-map-1",
+               type: "Note",
+               actor: actor_ap_id,
+               object: nil,
+               local: false,
+               data: %{
+                 "id" => "https://remote.example/objects/dm-recipient-map-1",
+                 "type" => "Note",
+                 "actor" => actor_ap_id,
+                 "to" => [%{"id" => viewer.ap_id}],
+                 "cc" => [],
+                 "content" => "secret"
+               }
+             })
+
+    assert Objects.visible_to?(dm_string, viewer.ap_id)
+
+    assert {:ok, %Object{} = dm_atom} =
+             Objects.create_object(%{
+               ap_id: "https://remote.example/objects/dm-recipient-map-2",
+               type: "Note",
+               actor: actor_ap_id,
+               object: nil,
+               local: false,
+               data: %{
+                 "id" => "https://remote.example/objects/dm-recipient-map-2",
+                 "type" => "Note",
+                 "actor" => actor_ap_id,
+                 "to" => [%{id: viewer.ap_id}],
+                 "cc" => [],
+                 "content" => "secret"
+               }
+             })
+
+    assert Objects.visible_to?(dm_atom, viewer)
+
+    followers_collection = actor_ap_id <> "/followers"
+
+    assert {:ok, %Object{} = followers_only} =
+             Objects.create_object(%{
+               ap_id: "https://remote.example/objects/followers-only-1",
+               type: "Note",
+               actor: actor_ap_id,
+               object: nil,
+               local: false,
+               data: %{
+                 "id" => "https://remote.example/objects/followers-only-1",
+                 "type" => "Note",
+                 "actor" => actor_ap_id,
+                 "to" => [followers_collection],
+                 "cc" => [],
+                 "content" => "followers only"
+               }
+             })
+
+    refute Objects.visible_to?(followers_only, viewer)
+
+    {:ok, follow_object} =
+      Pipeline.ingest(
+        %{
+          "id" => "https://local.example/activities/follow/2",
+          "type" => "Follow",
+          "actor" => viewer.ap_id,
+          "object" => actor_ap_id
+        },
+        local: true
+      )
+
+    assert {:ok, _} =
+             Pipeline.ingest(
+               %{
+                 "id" => "https://remote.example/activities/accept/2",
+                 "type" => "Accept",
+                 "actor" => actor_ap_id,
+                 "object" => follow_object.data
+               },
+               local: false
+             )
+
+    assert Objects.visible_to?(followers_only, viewer.ap_id)
+  end
+
+  test "thread helpers handle map-shaped inReplyTo and list replies with default opts" do
+    root_ap_id = "https://remote.example/objects/thread-root-1"
+
+    assert {:ok, %Object{} = root} =
+             Objects.create_object(%{
+               ap_id: root_ap_id,
+               type: "Note",
+               actor: "https://remote.example/users/alice",
+               local: false,
+               data: %{
+                 "id" => root_ap_id,
+                 "type" => "Note",
+                 "actor" => "https://remote.example/users/alice",
+                 "content" => "Root"
+               }
+             })
+
+    assert {:ok, %Object{} = reply} =
+             Objects.create_object(%{
+               ap_id: "https://remote.example/objects/thread-reply-1",
+               type: "Note",
+               actor: "https://remote.example/users/alice",
+               local: false,
+               data: %{
+                 "id" => "https://remote.example/objects/thread-reply-1",
+                 "type" => "Note",
+                 "actor" => "https://remote.example/users/alice",
+                 "inReplyTo" => %{"id" => root.ap_id},
+                 "content" => "Reply"
+               }
+             })
+
+    assert Objects.thread_ancestors(reply, 10) |> Enum.map(& &1.id) == [root.id]
+
+    assert {:ok, %Object{} = reply_string} =
+             Objects.create_object(%{
+               ap_id: "https://remote.example/objects/thread-reply-2",
+               type: "Note",
+               actor: "https://remote.example/users/alice",
+               local: false,
+               data: %{
+                 "id" => "https://remote.example/objects/thread-reply-2",
+                 "type" => "Note",
+                 "actor" => "https://remote.example/users/alice",
+                 "inReplyTo" => root.ap_id,
+                 "content" => "Reply 2"
+               }
+             })
+
+    assert Enum.any?(Objects.list_replies_to(root.ap_id), &(&1.id == reply_string.id))
+    assert Objects.thread_ancestors(nil, 10) == []
+    assert Objects.thread_descendants(nil, 10) == []
+  end
+
+  test "creates and counts create activities by actor" do
+    actor = "https://example.com/users/alice"
+
+    assert {:ok, %Object{} = create} =
+             Objects.create_object(%{
+               ap_id: "https://example.com/activities/create/1",
+               type: "Create",
+               actor: actor,
+               local: true,
+               data: %{
+                 "id" => "https://example.com/activities/create/1",
+                 "type" => "Create",
+                 "actor" => actor,
+                 "to" => ["https://www.w3.org/ns/activitystreams#Public"]
+               }
+             })
+
+    assert Enum.any?(Objects.list_creates_by_actor(actor), &(&1.id == create.id))
+    assert Enum.any?(Objects.list_public_creates_by_actor(actor), &(&1.id == create.id))
+    assert Objects.count_creates_by_actor(actor) == 1
+    assert Objects.count_public_creates_by_actor(actor) == 1
+    assert Objects.search_notes(:not_a_binary, limit: 5) == []
+    refute Objects.publicly_visible?(:not_an_object)
+    refute Objects.publicly_listed?(:not_an_object)
+  end
 end

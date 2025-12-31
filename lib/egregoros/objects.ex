@@ -248,7 +248,7 @@ defmodule Egregoros.Objects do
     |> where_announces_have_object()
     |> where_publicly_listed()
     |> maybe_where_origin(local_only?, remote_only?)
-    |> maybe_where_only_media(only_media?)
+    |> maybe_where_only_media_with_reblog(only_media?)
     |> maybe_where_max_id(max_id)
     |> maybe_where_since_id(since_id)
     |> Repo.all()
@@ -349,19 +349,6 @@ defmodule Egregoros.Objects do
   end
 
   defp maybe_where_origin(query, _local_only?, _remote_only?), do: query
-
-  defp maybe_where_only_media(query, true) do
-    from(o in query,
-      where:
-        fragment(
-          "jsonb_typeof(?->'attachment') = 'array' AND jsonb_array_length(?->'attachment') > 0",
-          o.data,
-          o.data
-        )
-    )
-  end
-
-  defp maybe_where_only_media(query, _only_media?), do: query
 
   defp maybe_where_only_media_with_reblog(query, true) do
     from([o, reblog] in query,
