@@ -11,8 +11,8 @@ Notes:
 
 - [ ] **Ingest `Update` activities**
   - [x] Apply **actor profile updates** (`Person`) safely (no cross-actor updates).
-  - [ ] Apply **object edits** (`Note`) where compatible (edit history + visibility rules).
-  - [ ] Decide/implement **object upsert semantics** for Updates (currently “insert-or-return existing”).
+  - [x] Apply **object edits** (`Note`) where compatible (edit history + visibility rules).
+  - [x] Decide/implement **object upsert semantics** for Updates (currently “insert-or-return existing”).
 - [ ] Ingest `Move` activities (account migration).
 - [ ] Implement/verify `Update`/`Delete` constraints for **impersonation safety** (e.g. Update actor must match updated actor id).
 - [ ] Improve “fetch-on-demand” ingestion contexts so internally-fetched activities aren’t rejected as “not targeted”.
