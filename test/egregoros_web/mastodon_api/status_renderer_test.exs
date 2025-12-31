@@ -651,6 +651,8 @@ defmodule EgregorosWeb.MastodonAPI.StatusRendererTest do
       emojis
       card
       poll
+      quote
+      quote_approval
       application
       filtered
     ) do
