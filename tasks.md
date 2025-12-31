@@ -10,7 +10,7 @@ Notes:
 ## Federation core (ActivityPub)
 
 - [ ] **Ingest `Update` activities**
-  - [ ] Apply **actor profile updates** (`Person`) safely (no cross-actor updates).
+  - [x] Apply **actor profile updates** (`Person`) safely (no cross-actor updates).
   - [ ] Apply **object edits** (`Note`) where compatible (edit history + visibility rules).
   - [ ] Decide/implement **object upsert semantics** for Updates (currently “insert-or-return existing”).
 - [ ] Ingest `Move` activities (account migration).
@@ -44,4 +44,3 @@ Notes:
 - [ ] Work through `frontend_checklist.md` (prioritized UX parity with Mastodon/Pleroma clients).
 - [ ] Composer polish: unify controls, fix edge cases, add missing attachments flows, improve keyboard UX.
 - [ ] Thread/status view polish (navigation, scroll restoration, reply modal UX).
-
