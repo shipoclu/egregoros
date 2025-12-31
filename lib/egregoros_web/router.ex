@@ -161,6 +161,7 @@ defmodule EgregorosWeb.Router do
     get "/accounts/relationships", AccountsController, :relationships
     get "/timelines/home", TimelinesController, :home
     get "/notifications", NotificationsController, :index
+    get "/conversations", ConversationsController, :index
     get "/preferences", PreferencesController, :show
     get "/filters", EmptyListController, :index
     get "/lists", EmptyListController, :index
