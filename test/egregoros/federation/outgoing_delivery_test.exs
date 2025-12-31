@@ -3,6 +3,8 @@ defmodule Egregoros.Federation.OutgoingDeliveryTest do
 
   import Mox
 
+  alias Egregoros.Activities.Update
+  alias Egregoros.Objects
   alias Egregoros.Pipeline
   alias Egregoros.Users
   alias Egregoros.Workers.DeliverActivity
@@ -129,6 +131,86 @@ defmodule Egregoros.Federation.OutgoingDeliveryTest do
       |> Enum.map(& &1.args)
       |> Enum.find(fn
         %{"activity" => %{"type" => "Create"}} -> true
+        _ -> false
+      end)
+
+    assert is_map(args)
+    assert :ok = perform_job(DeliverActivity, args)
+  end
+
+  test "local Update delivers to remote followers" do
+    {:ok, local} = Users.create_local_user("alice")
+    public = "https://www.w3.org/ns/activitystreams#Public"
+
+    {:ok, remote_follower} =
+      Users.create_user(%{
+        nickname: "carol",
+        ap_id: "https://remote.example/users/carol",
+        inbox: "https://remote.example/users/carol/inbox",
+        outbox: "https://remote.example/users/carol/outbox",
+        public_key: "PUB",
+        private_key: nil,
+        local: false
+      })
+
+    follow = %{
+      "id" => "https://remote.example/activities/follow/update-1",
+      "type" => "Follow",
+      "actor" => remote_follower.ap_id,
+      "object" => local.ap_id
+    }
+
+    assert {:ok, _} = Pipeline.ingest(follow, local: false)
+
+    note_id = "https://local.example/objects/update-target"
+
+    assert {:ok, _} =
+             Objects.create_object(%{
+               ap_id: note_id,
+               type: "Note",
+               actor: local.ap_id,
+               data: %{
+                 "id" => note_id,
+                 "type" => "Note",
+                 "attributedTo" => local.ap_id,
+                 "to" => [public],
+                 "cc" => [local.ap_id <> "/followers"],
+                 "content" => "<p>old</p>"
+               },
+               local: true
+             })
+
+    note = %{
+      "id" => note_id,
+      "type" => "Note",
+      "attributedTo" => local.ap_id,
+      "to" => [public],
+      "cc" => [local.ap_id <> "/followers"],
+      "content" => "<p>new</p>"
+    }
+
+    update = Update.build(local, note)
+
+    Egregoros.HTTP.Mock
+    |> expect(:post, fn url, body, _headers ->
+      assert url == remote_follower.inbox
+
+      decoded = Jason.decode!(body)
+      assert decoded["type"] == "Update"
+      assert decoded["actor"] == local.ap_id
+      assert is_map(decoded["object"])
+      assert decoded["object"]["id"] == note_id
+
+      {:ok, %{status: 202, body: "", headers: []}}
+    end)
+
+    assert {:ok, _} = Pipeline.ingest(update, local: true)
+
+    args =
+      all_enqueued(worker: DeliverActivity)
+      |> Enum.map(& &1.args)
+      |> Enum.find(fn
+        %{"activity" => %{"type" => "Update"}} -> true
         _ -> false
       end)
 

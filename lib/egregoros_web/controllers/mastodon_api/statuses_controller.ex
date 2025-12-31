@@ -4,7 +4,10 @@ defmodule EgregorosWeb.MastodonAPI.StatusesController do
   alias Egregoros.Activities.Announce
   alias Egregoros.Activities.Delete
   alias Egregoros.Activities.Like
+  alias Egregoros.Activities.Update
   alias Egregoros.Activities.Undo
+  alias Egregoros.HTML
+  alias Egregoros.Mentions
   alias Egregoros.Media
   alias Egregoros.Objects
   alias Egregoros.Pipeline
@@ -52,6 +55,38 @@ defmodule EgregorosWeb.MastodonAPI.StatusesController do
     send_resp(conn, 422, "Unprocessable Entity")
   end
 
+  def update(conn, %{"id" => id} = params) do
+    status = params |> Map.get("status", "") |> to_string() |> String.trim()
+    spoiler_text = Map.get(params, "spoiler_text")
+    sensitive = Map.get(params, "sensitive")
+    language = Map.get(params, "language")
+    user = conn.assigns.current_user
+
+    cond do
+      status == "" ->
+        send_resp(conn, 422, "Unprocessable Entity")
+
+      true ->
+        with %{} = object <- Objects.get(id),
+             true <- object.type == "Note" and object.actor == user.ap_id and object.local == true,
+             %{} = note <- build_updated_note(object, user, status, spoiler_text, sensitive, language),
+             update <- Update.build(user, note),
+             {:ok, _} <- Pipeline.ingest(update, local: true),
+             %{} = object <- Objects.get(id) do
+          json(conn, StatusRenderer.render_status(object, user))
+        else
+          nil -> send_resp(conn, 404, "Not Found")
+          false -> send_resp(conn, 403, "Forbidden")
+          {:error, _} -> send_resp(conn, 422, "Unprocessable Entity")
+          _ -> send_resp(conn, 422, "Unprocessable Entity")
+        end
+    end
+  end
+
+  def update(conn, _params) do
+    send_resp(conn, 422, "Unprocessable Entity")
+  end
+
   defp resolve_in_reply_to(nil, _user), do: {:ok, nil}
   defp resolve_in_reply_to("", _user), do: {:ok, nil}
 
@@ -84,6 +119,78 @@ defmodule EgregorosWeb.MastodonAPI.StatusesController do
   end
 
   defp resolve_in_reply_to(_in_reply_to_id, _user), do: {:error, :not_found}
+
+  defp build_updated_note(%{data: %{} = data, ap_id: ap_id}, user, status, spoiler_text, sensitive, language)
+       when is_map(user) and is_binary(ap_id) and is_binary(status) do
+    tags = Map.get(data, "tag", [])
+    mention_hrefs = mention_hrefs_from_tags(tags)
+
+    content_html =
+      HTML.to_safe_html(status,
+        format: :text,
+        mention_hrefs: mention_hrefs
+      )
+
+    data
+    |> Map.put("id", ap_id)
+    |> Map.put("type", "Note")
+    |> Map.put("attributedTo", user.ap_id)
+    |> Map.put("content", content_html)
+    |> Map.put("updated", DateTime.utc_now() |> DateTime.to_iso8601())
+    |> maybe_put_summary(spoiler_text)
+    |> maybe_put_sensitive(sensitive)
+    |> maybe_put_language(language)
+  end
+
+  defp build_updated_note(_object, _user, _status, _spoiler_text, _sensitive, _language), do: nil
+
+  defp mention_hrefs_from_tags(tags) do
+    tags
+    |> List.wrap()
+    |> Enum.filter(&is_map/1)
+    |> Enum.reduce(%{}, fn
+      %{"type" => "Mention", "href" => href, "name" => name}, acc
+      when is_binary(href) and href != "" and is_binary(name) and name != "" ->
+        handle =
+          name
+          |> String.trim()
+          |> String.trim_leading("@")
+
+        case Mentions.parse(handle) do
+          {:ok, nickname, host} -> Map.put(acc, {nickname, host}, href)
+          :error -> acc
+        end
+
+      _other, acc ->
+        acc
+    end)
+  end
+
+  defp maybe_put_summary(%{} = note, value) when is_binary(value) do
+    summary = String.trim(value)
+    if summary == "", do: note, else: Map.put(note, "summary", summary)
+  end
+
+  defp maybe_put_summary(note, _value), do: note
+
+  defp maybe_put_sensitive(%{} = note, value) do
+    case value do
+      true -> Map.put(note, "sensitive", true)
+      "true" -> Map.put(note, "sensitive", true)
+      false -> Map.put(note, "sensitive", false)
+      "false" -> Map.put(note, "sensitive", false)
+      _ -> note
+    end
+  end
+
+  defp maybe_put_sensitive(note, _value), do: note
+
+  defp maybe_put_language(%{} = note, value) when is_binary(value) do
+    language = String.trim(value)
+    if language == "", do: note, else: Map.put(note, "language", language)
+  end
+
+  defp maybe_put_language(note, _value), do: note
 
   def show(conn, %{"id" => id}) do
     current_user = conn.assigns[:current_user]

@@ -9,14 +9,19 @@ defmodule Egregoros.Activities.Update do
   alias Egregoros.ActivityPub.ObjectValidators.Types.ObjectID
   alias Egregoros.ActivityPub.ObjectValidators.Types.Recipients
   alias Egregoros.Domain
+  alias Egregoros.Federation.Delivery
   alias Egregoros.Federation.Actor
   alias Egregoros.InboxTargeting
   alias Egregoros.Object
   alias Egregoros.Objects
+  alias Egregoros.Relationships
   alias Egregoros.Timeline
+  alias Egregoros.User
+  alias Egregoros.Users
   alias EgregorosWeb.Endpoint
 
   @actor_types ~w(Person Service Organization Group Application)
+  @as_public "https://www.w3.org/ns/activitystreams#Public"
 
   def type, do: "Update"
 
@@ -29,6 +34,25 @@ defmodule Egregoros.Activities.Update do
     field :to, Recipients
     field :cc, Recipients
     field :published, APDateTime
+  end
+
+  def build(%User{ap_id: actor}, object) when is_map(object) do
+    build(actor, object)
+  end
+
+  def build(actor, object) when is_binary(actor) and is_map(object) do
+    to = object |> Map.get("to", []) |> List.wrap()
+    cc = object |> Map.get("cc", []) |> List.wrap()
+
+    %{
+      "id" => Endpoint.url() <> "/activities/update/" <> Ecto.UUID.generate(),
+      "type" => type(),
+      "actor" => actor,
+      "object" => object,
+      "published" => DateTime.utc_now() |> DateTime.to_iso8601()
+    }
+    |> maybe_put_recipients("to", to)
+    |> maybe_put_recipients("cc", cc)
   end
 
   def cast_and_validate(activity) when is_map(activity) do
@@ -56,10 +80,18 @@ defmodule Egregoros.Activities.Update do
     end
   end
 
-  def side_effects(%Object{data: %{"object" => %{} = object}, actor: actor_ap_id}, opts)
+  def side_effects(
+        %Object{data: %{"object" => %{} = embedded_object}, actor: actor_ap_id} = update_object,
+        opts
+      )
       when is_binary(actor_ap_id) do
-    maybe_apply_actor_update(actor_ap_id, object)
-    maybe_apply_note_update(actor_ap_id, object, opts)
+    maybe_apply_actor_update(actor_ap_id, embedded_object)
+    maybe_apply_note_update(actor_ap_id, embedded_object, opts)
+
+    if Keyword.get(opts, :local, true) do
+      deliver_update(update_object, opts)
+    end
+
     :ok
   end
 
@@ -120,6 +152,69 @@ defmodule Egregoros.Activities.Update do
   end
 
   defp maybe_apply_note_update(_actor_ap_id, _object, _opts), do: :ok
+
+  defp deliver_update(%Object{} = update_object, _opts) do
+    with %User{} = actor <- Users.get_by_ap_id(update_object.actor),
+         inboxes when is_list(inboxes) and inboxes != [] <- inboxes_for_delivery(update_object, actor) do
+      Enum.each(inboxes, fn inbox_url ->
+        Delivery.deliver(actor, inbox_url, update_object.data)
+      end)
+    else
+      _ -> :ok
+    end
+  end
+
+  defp inboxes_for_delivery(%{data: %{} = data} = update_object, %User{} = actor) do
+    follower_inboxes =
+      if followers_addressed?(data, update_object.actor) do
+        actor.ap_id
+        |> Relationships.list_follows_to()
+        |> Enum.map(fn follow ->
+          case Users.get_by_ap_id(follow.actor) do
+            %User{local: false, inbox: inbox} when is_binary(inbox) and inbox != "" -> inbox
+            _ -> nil
+          end
+        end)
+        |> Enum.reject(&is_nil/1)
+      else
+        []
+      end
+
+    recipient_inboxes =
+      data
+      |> recipient_actor_ids()
+      |> Enum.map(fn actor_id ->
+        case Users.get_by_ap_id(actor_id) do
+          %User{local: false, inbox: inbox} when is_binary(inbox) and inbox != "" -> inbox
+          _ -> nil
+        end
+      end)
+      |> Enum.reject(&is_nil/1)
+
+    (follower_inboxes ++ recipient_inboxes)
+    |> Enum.uniq()
+  end
+
+  defp inboxes_for_delivery(_update_object, _actor), do: []
+
+  defp followers_addressed?(%{} = data, actor_ap_id) when is_binary(actor_ap_id) do
+    followers = actor_ap_id <> "/followers"
+    to = data |> Map.get("to", []) |> List.wrap()
+    cc = data |> Map.get("cc", []) |> List.wrap()
+    followers in to or followers in cc
+  end
+
+  defp followers_addressed?(_data, _actor_ap_id), do: false
+
+  defp recipient_actor_ids(%{} = data) do
+    ((data |> Map.get("to", []) |> List.wrap()) ++ (data |> Map.get("cc", []) |> List.wrap()))
+    |> Enum.filter(&is_binary/1)
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == "" or &1 == @as_public or String.ends_with?(&1, "/followers")))
+    |> Enum.uniq()
+  end
+
+  defp recipient_actor_ids(_data), do: []
 
   defp validate_inbox_target(%{} = activity, opts) when is_list(opts) do
     InboxTargeting.validate(opts, fn inbox_user_ap_id ->
@@ -268,4 +363,23 @@ defmodule Egregoros.Activities.Update do
   defp extract_actor_id(%{id: id}) when is_binary(id), do: id
   defp extract_actor_id(id) when is_binary(id), do: id
   defp extract_actor_id(_), do: nil
+
+  defp maybe_put_recipients(activity, _field, []), do: activity
+
+  defp maybe_put_recipients(activity, field, recipients) when is_map(activity) and is_binary(field) do
+    recipients =
+      recipients
+      |> Enum.filter(&is_binary/1)
+      |> Enum.map(&String.trim/1)
+      |> Enum.reject(&(&1 == ""))
+      |> Enum.uniq()
+
+    if recipients == [] do
+      activity
+    else
+      Map.put(activity, field, recipients)
+    end
+  end
+
+  defp maybe_put_recipients(activity, _field, _recipients), do: activity
 end

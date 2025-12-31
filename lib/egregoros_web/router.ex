@@ -135,6 +135,8 @@ defmodule EgregorosWeb.Router do
     post "/media", MediaController, :create
     put "/media/:id", MediaController, :update
     post "/statuses", StatusesController, :create
+    put "/statuses/:id", StatusesController, :update
+    patch "/statuses/:id", StatusesController, :update
     delete "/statuses/:id", StatusesController, :delete
     post "/statuses/:id/favourite", StatusesController, :favourite
     post "/statuses/:id/unfavourite", StatusesController, :unfavourite

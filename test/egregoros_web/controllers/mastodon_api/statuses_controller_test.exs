@@ -24,6 +24,28 @@ defmodule EgregorosWeb.MastodonAPI.StatusesControllerTest do
     assert object.data["content"] == "<p>Hello API</p>"
   end
 
+  test "PUT /api/v1/statuses/:id updates a status and emits an Update activity", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("local")
+    {:ok, create} = Publish.post_note(user, "Original")
+
+    note = Objects.get_by_ap_id(create.object)
+    assert note.data["content"] == "<p>Original</p>"
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, user} end)
+
+    conn = put(conn, "/api/v1/statuses/#{note.id}", %{"status" => "Edited"})
+
+    response = json_response(conn, 200)
+    assert response["id"] == Integer.to_string(note.id)
+    assert response["content"] == "<p>Edited</p>"
+
+    note = Objects.get(note.id)
+    assert note.data["content"] == "<p>Edited</p>"
+
+    assert Objects.get_by_type_actor_object("Update", user.ap_id, note.ap_id)
+  end
+
   test "POST /api/v1/statuses supports replies via in_reply_to_id", %{conn: conn} do
     {:ok, user} = Users.create_local_user("local")
 
