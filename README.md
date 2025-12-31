@@ -1,13 +1,114 @@
 # Egregoros
 
-To start your Phoenix server:
+Egregoros is a **PostgreSQL + Elixir/OTP + Phoenix (LiveView)** ActivityPub server with:
 
-* Run `mix setup` to install and setup dependencies
-* Start Phoenix endpoint with `mix phx.server` or inside IEx with `iex -S mix phx.server`
+- a Mastodon-compatible API (including streaming),
+- a first-class LiveView UI (Tailwind v4),
+- a reduced, opinionated architecture designed to stay maintainable.
 
-Now you can visit [`localhost:4000`](http://localhost:4000) from your browser.
+## Design goals
 
-Ready to run in production? Please [check our deployment guides](https://hexdocs.pm/phoenix/deployment.html).
+- **Single ActivityPub storage model:** everything ActivityPub (objects *and* activities) is stored in one Postgres table (`objects`) using a JSONB payload plus a few denormalized query columns.
+- **One module per ActivityPub type:** activity handling lives in `lib/egregoros/activities/*` (Ecto embedded schema + ingestion + side effects) so adding new types doesn’t require editing many files.
+- **Unified ingestion:** local authoring, inbound federation, and on-demand fetches all go through a single ingestion pipeline (`Egregoros.Pipeline`).
+- **Swapability:** caching, discovery, HTTP, signatures, media storage, authz, and rate limiting sit behind behaviour boundaries so they can be replaced later without rewrites.
+
+## Feature highlights
+
+### Federation (ActivityPub)
+
+- WebFinger + NodeInfo 2.0
+- Actor endpoints, inbox/outbox, object fetch (`/objects/:uuid`)
+- HTTP Signatures for deliveries
+- Signed fetch (for servers that require signed GETs for public objects)
+- Async ingestion/delivery via Oban (burst-resistant federation)
+- Thread completion (best-effort, bounded, async):
+  - fetch missing ancestors via `inReplyTo`
+  - fetch replies via ActivityPub `replies` collections when available
+
+### Social features
+
+- Posts (Notes)
+- Attachments (images/video/audio) with alt text
+- Likes, reposts (Announce), emoji reactions (including custom emoji reactions)
+- Follows + unfollows, follow requests (locked accounts)
+- Bookmarks, favourites
+
+### Mastodon API
+
+Implements a Mastodon-compatible API sufficient for real clients (including WebSocket streaming). Exact surface area is still evolving; keep an eye on `tasks.md` for compatibility work.
+
+### LiveView UI
+
+- Public + home timelines with live updates
+- Status/thread view (`/@:nickname/:uuid`) with reply modal
+- Composer with visibility, language, content warnings, sensitive toggle, attachments, emoji picker, mention autocomplete
+- Profiles, notifications, settings, light/dark/system theme
+
+## Architecture (quick tour)
+
+- **Core ingestion:** `lib/egregoros/pipeline.ex` → activity module (`lib/egregoros/activities/*`) → `objects` + `relationships` + side effects (broadcast, notifications, delivery).
+- **Storage model:**
+  - `objects` (`lib/egregoros/object.ex`): ActivityPub objects/activities (JSON payload + columns: `ap_id`, `type`, `actor`, `object`, `published`, `local`)
+  - `relationships` (`lib/egregoros/relationship.ex`): unique actor↔object state (Follow/Like/Announce/Bookmark/EmojiReact:* etc)
+  - `users` (`lib/egregoros/user.ex`): local + remote actors
+- **Federation:** inbox/outbox/object controllers, `Egregoros.Federation.Delivery` (outbound), `Egregoros.Federation.SignedFetch` (signed GET).
+- **Background work:** Oban workers under `lib/egregoros/workers/*` for ingestion, delivery, and thread completion.
+- **Rendering safety:** `lib/egregoros/html.ex` is the single HTML safety boundary (sanitize remote HTML; escape+linkify local text).
+
+For the full overview, read `architecture.md`.
+
+## Development
+
+### Prerequisites
+
+- Elixir + Erlang/OTP
+- PostgreSQL
+
+### Setup
+
+```sh
+mix setup
+mix phx.server
+```
+
+Visit `http://localhost:4000`.
+
+### External host (ngrok / reverse proxies)
+
+ActivityPub IDs and API URLs are generated from the configured endpoint URL. To run behind ngrok, set:
+
+- `PHX_HOST` (or `EGREGOROS_EXTERNAL_HOST`) to your ngrok hostname
+- `PHX_SCHEME` (or `EGREGOROS_EXTERNAL_SCHEME`) to `https`
+- `PHX_PORT` (or `EGREGOROS_EXTERNAL_PORT`) to `443`
+
+These are read in `config/runtime.exs`.
+
+### Tests
+
+```sh
+mix test
+mix test --cover
+```
+
+When you’re done with a batch of changes, run:
+
+```sh
+mix precommit
+```
+
+### Benchmarks
+
+See `BENCHMARKS.md` for seeding and running the built-in benchmark harness.
+
+## Docs / checklists
+
+- `architecture.md` — moving parts and data flow
+- `security.md` — security & privacy checklist
+- `tasks.md` — current backlog and priorities
+- `frontend_checklist.md` — UI parity checklist
+- `BENCHMARKS.md` — benchmark harness
+- `e2ee_dm.md` — notes on end-to-end encrypted DMs (frontend crypto)
 
 ## Troubleshooting
 
@@ -22,11 +123,3 @@ Increase it before starting the server:
 ulimit -n 8192
 mix phx.server
 ```
-
-## Learn more
-
-* Official website: https://www.phoenixframework.org/
-* Guides: https://hexdocs.pm/phoenix/overview.html
-* Docs: https://hexdocs.pm/phoenix
-* Forum: https://elixirforum.com/c/phoenix-forum
-* Source: https://github.com/phoenixframework/phoenix
