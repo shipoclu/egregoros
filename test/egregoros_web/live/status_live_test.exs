@@ -472,6 +472,75 @@ defmodule EgregorosWeb.StatusLiveTest do
     assert render(view) =~ "Register to bookmark posts."
   end
 
+  test "signed-in users can delete their own status and are navigated back to the timeline", %{
+    conn: conn,
+    user: user
+  } do
+    assert {:ok, note} = Pipeline.ingest(Note.build(user, "Delete me"), local: true)
+    uuid = uuid_from_ap_id(note.ap_id)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}")
+
+    view
+    |> element("#post-#{note.id} button[data-role='delete-post-confirm']")
+    |> render_click()
+
+    assert Objects.get(note.id) == nil
+    assert_redirect(view, "/?timeline=home")
+  end
+
+  test "deleting a reply refreshes the thread without navigating away", %{conn: conn, user: user} do
+    assert {:ok, root} = Pipeline.ingest(Note.build(user, "Root"), local: true)
+
+    assert {:ok, reply} =
+             Pipeline.ingest(
+               Note.build(user, "Reply") |> Map.put("inReplyTo", root.ap_id),
+               local: true
+             )
+
+    uuid = uuid_from_ap_id(root.ap_id)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}")
+
+    assert has_element?(view, "#post-#{reply.id}", "Reply")
+
+    view
+    |> element("#post-#{reply.id} button[data-role='delete-post-confirm']")
+    |> render_click()
+
+    assert Objects.get(reply.id) == nil
+    refute has_element?(view, "#post-#{reply.id}")
+    assert has_element?(view, "#post-#{root.id}")
+  end
+
+  test "signed-out users cannot delete posts from the status view", %{conn: conn, user: user} do
+    assert {:ok, note} = Pipeline.ingest(Note.build(user, "Hello"), local: true)
+    uuid = uuid_from_ap_id(note.ap_id)
+
+    assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}")
+
+    _html = render_click(view, "delete_post", %{"id" => note.id})
+
+    assert render(view) =~ "Register to delete posts."
+    assert Objects.get(note.id)
+  end
+
+  test "reply content warning toggle opens and closes the CW field", %{conn: conn, user: user} do
+    assert {:ok, note} = Pipeline.ingest(Note.build(user, "CW toggle"), local: true)
+    uuid = uuid_from_ap_id(note.ap_id)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}?reply=true")
+
+    assert has_element?(view, "[data-role='compose-cw'][data-state='closed']")
+
+    _html = render_click(view, "toggle_reply_cw", %{})
+
+    assert has_element?(view, "[data-role='compose-cw'][data-state='open']")
+  end
+
   test "status view handles unrelated messages without crashing", %{conn: conn, user: user} do
     assert {:ok, note} = Pipeline.ingest(Note.build(user, "Hello"), local: true)
     uuid = uuid_from_ap_id(note.ap_id)
