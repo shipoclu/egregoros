@@ -1228,4 +1228,236 @@ defmodule EgregorosWeb.TimelineLiveTest do
     assert next_html =~ "egregoros:media-next"
     refute next_html =~ "media_next"
   end
+
+  test "timeline can be switched between home and public via patch", %{conn: conn, user: user} do
+    assert {:ok, _public_post} = Pipeline.ingest(Note.build(user, "Public post"), local: true)
+
+    assert {:ok, _dm_post} =
+             Pipeline.ingest(
+               %{
+                 "id" => "https://remote.example/objects/dm-for-switch",
+                 "type" => "Note",
+                 "attributedTo" => "https://remote.example/users/stranger",
+                 "to" => [user.ap_id],
+                 "cc" => [],
+                 "content" => "<p>Switch DM</p>"
+               },
+               local: false
+             )
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/?timeline=home")
+
+    assert has_element?(view, "[data-role='timeline-current']", "home")
+    assert has_element?(view, "article[data-role='status-card']", "Switch DM")
+
+    view
+    |> element("a", "Public")
+    |> render_click()
+
+    assert_patch(view, "/?timeline=public")
+    assert has_element?(view, "[data-role='timeline-current']", "public")
+    refute has_element?(view, "article[data-role='status-card']", "Switch DM")
+  end
+
+  test "compose content warning can be toggled and cleared", %{conn: conn, user: user} do
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/")
+
+    assert has_element?(view, "#compose-cw[data-role='compose-cw'][data-state='closed']")
+
+    _html = render_click(view, "toggle_compose_cw", %{})
+    assert has_element?(view, "#compose-cw[data-role='compose-cw'][data-state='open']")
+
+    _html =
+      render_change(view, "compose_change", %{
+        "post" => %{"spoiler_text" => "CW", "content" => "hello"}
+      })
+
+    assert has_element?(view, "input[name='post[spoiler_text]'][value='CW']")
+
+    _html = render_click(view, "toggle_compose_cw", %{})
+    assert has_element?(view, "#compose-cw[data-role='compose-cw'][data-state='closed']")
+    assert has_element?(view, "input[name='post[spoiler_text]'][value='']")
+  end
+
+  test "timeline shows feedback when copying a post link", %{conn: conn} do
+    {:ok, view, _html} = live(conn, "/")
+
+    _html = render_click(view, "copied_link", %{})
+
+    assert render(view) =~ "Copied link to clipboard."
+  end
+
+  test "attachments can be removed from the composer", %{conn: conn, user: user} do
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/")
+
+    fixture_path = Fixtures.path!("DSCN0010.png")
+    content = File.read!(fixture_path)
+
+    upload =
+      file_input(view, "#timeline-form", :media, [
+        %{
+          last_modified: 1_694_171_879_000,
+          name: "photo.png",
+          content: content,
+          size: byte_size(content),
+          type: "image/png"
+        }
+      ])
+
+    assert render_upload(upload, "photo.png") =~ "100%"
+    assert has_element?(view, "[data-role='media-entry']")
+
+    view
+    |> element("[data-role='media-entry'] button[phx-click='cancel_media']")
+    |> render_click()
+
+    refute has_element?(view, "[data-role='media-entry']")
+  end
+
+  test "posting reports upload failures from the media storage backend", %{conn: conn, user: user} do
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/")
+
+    fixture_path = Fixtures.path!("DSCN0010.png")
+    content = File.read!(fixture_path)
+
+    upload =
+      file_input(view, "#timeline-form", :media, [
+        %{
+          last_modified: 1_694_171_879_000,
+          name: "photo.png",
+          content: content,
+          type: "image/png"
+        }
+      ])
+
+    expect(Egregoros.MediaStorage.Mock, :store_media, fn passed_user, _upload ->
+      assert passed_user.id == user.id
+      {:error, :storage_failed}
+    end)
+
+    assert render_upload(upload, "photo.png") =~ "100%"
+
+    view
+    |> form("#timeline-form", post: %{content: "Hello with failing media"})
+    |> render_submit()
+
+    assert has_element?(view, "[data-role='compose-error']", "Could not upload attachment.")
+  end
+
+  test "home timeline includes direct messages addressed via recipient map ids", %{
+    conn: conn,
+    user: user
+  } do
+    dm_1 = %{
+      "id" => "https://remote.example/objects/dm-map-1",
+      "type" => "Note",
+      "attributedTo" => "https://remote.example/users/stranger",
+      "to" => [%{"id" => user.ap_id}],
+      "cc" => [],
+      "content" => "<p>dm-map-1</p>"
+    }
+
+    dm_2 = %{
+      "id" => "https://remote.example/objects/dm-map-2",
+      "type" => "Note",
+      "attributedTo" => "https://remote.example/users/stranger",
+      "to" => [%{id: user.ap_id}],
+      "cc" => [],
+      "content" => "<p>dm-map-2</p>"
+    }
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/")
+
+    refute has_element?(view, "article[data-role='status-card']", "dm-map-1")
+    refute has_element?(view, "article[data-role='status-card']", "dm-map-2")
+
+    assert {:ok, _} = Pipeline.ingest(dm_1, local: false)
+    assert {:ok, _} = Pipeline.ingest(dm_2, local: false)
+    _ = :sys.get_state(view.pid)
+
+    assert has_element?(view, "article[data-role='status-card']", "dm-map-1")
+    assert has_element?(view, "article[data-role='status-card']", "dm-map-2")
+  end
+
+  test "reply composer state reacts to cw toggles and reply_change events", %{conn: conn, user: user} do
+    assert {:ok, parent} = Pipeline.ingest(Note.build(user, "Reply target"), local: true)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/")
+
+    view
+    |> element("#post-#{parent.id} button[data-role='reply']")
+    |> render_click()
+
+    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='open']")
+    assert has_element?(view, "#reply-modal-cw[data-role='compose-cw'][data-state='closed']")
+
+    _html = render_click(view, "toggle_reply_cw", %{})
+    assert has_element?(view, "#reply-modal-cw[data-role='compose-cw'][data-state='open']")
+
+    _html =
+      render_change(view, "reply_change", %{
+        "reply" => %{"ui_options_open" => "true", "spoiler_text" => "cw"}
+      })
+
+    assert has_element?(
+             view,
+             "input[type='hidden'][data-role='compose-options-state'][name='reply[ui_options_open]'][value='true']"
+           )
+  end
+
+  test "replying reports upload failures from the media storage backend", %{conn: conn, user: user} do
+    assert {:ok, parent} = Pipeline.ingest(Note.build(user, "Reply target"), local: true)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/")
+
+    view
+    |> element("#post-#{parent.id} button[data-role='reply']")
+    |> render_click()
+
+    fixture_path = Fixtures.path!("DSCN0010.png")
+    content = File.read!(fixture_path)
+
+    upload =
+      file_input(view, "#reply-modal-form", :reply_media, [
+        %{
+          last_modified: 1_694_171_879_000,
+          name: "photo.png",
+          content: content,
+          type: "image/png"
+        }
+      ])
+
+    expect(Egregoros.MediaStorage.Mock, :store_media, fn passed_user, _upload ->
+      assert passed_user.id == user.id
+      {:error, :storage_failed}
+    end)
+
+    assert render_upload(upload, "photo.png") =~ "100%"
+
+    view
+    |> form("#reply-modal-form", reply: %{content: "Reply with failing media"})
+    |> render_submit()
+
+    assert render(view) =~ "Could not upload attachment."
+  end
+
+  test "new posts label pluralizes when multiple posts are buffered", %{conn: conn, user: user} do
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/")
+
+    render_hook(view, "timeline_at_top", %{"at_top" => false})
+
+    assert {:ok, _} = Pipeline.ingest(Note.build(user, "Buffered 1"), local: true)
+    assert {:ok, _} = Pipeline.ingest(Note.build(user, "Buffered 2"), local: true)
+    _ = :sys.get_state(view.pid)
+
+    assert has_element?(view, "button[data-role='new-posts']", "2 new posts")
+  end
 end
