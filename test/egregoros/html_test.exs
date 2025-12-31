@@ -9,6 +9,11 @@ defmodule Egregoros.HTMLTest do
   setup :verify_on_exit!
 
   describe "sanitize/1" do
+    test "returns an empty string for nil and non-binary input" do
+      assert HTML.sanitize(nil) == ""
+      assert HTML.sanitize(123) == ""
+    end
+
     test "removes script tags" do
       html = "<p>ok</p><script>alert(1)</script>"
 
@@ -238,9 +243,45 @@ defmodule Egregoros.HTMLTest do
 
       assert scrubbed =~ "&lt;p&gt;ok&lt;/p&gt;"
     end
+
+    test "returns an empty string for invalid sanitize/2 inputs" do
+      assert HTML.sanitize(:not_a_binary, FastSanitize.Sanitizer) == ""
+      assert HTML.sanitize("<p>ok</p>", "not_a_module") == ""
+    end
+
+    test "falls back to escaping when scrub throws or exits" do
+      Egregoros.HTML.Sanitizer.Mock
+      |> expect(:scrub, fn _html, _scrubber -> throw(:boom) end)
+
+      assert HTML.sanitize("<p>ok</p>", Egregoros.HTML.Sanitizer.Mock) =~ "&lt;p&gt;ok&lt;/p&gt;"
+
+      Egregoros.HTML.Sanitizer.Mock
+      |> expect(:scrub, fn _html, _scrubber -> exit(:boom) end)
+
+      assert HTML.sanitize("<p>ok</p>", Egregoros.HTML.Sanitizer.Mock) =~ "&lt;p&gt;ok&lt;/p&gt;"
+    end
+
+    test "unescapes ampersands in text nodes but preserves them in attributes" do
+      html = "<a href='https://example.com/?a=1&amp;b=2'>AT&amp;T</a>"
+
+      scrubbed = HTML.sanitize(html)
+
+      assert scrubbed =~ ~s(href="https://example.com/?a=1&amp;b=2")
+      assert scrubbed =~ ">AT&T</a>"
+    end
   end
 
   describe "to_safe_html/2" do
+    test "supports default options and returns safe html" do
+      assert HTML.to_safe_html("hello") =~ "<p>hello</p>"
+    end
+
+    test "returns an empty string for nil, blank, or non-binary content" do
+      assert HTML.to_safe_html(nil) == ""
+      assert HTML.to_safe_html("   \n") == ""
+      assert HTML.to_safe_html(123, format: :text) == ""
+    end
+
     test "renders plain text as escaped html" do
       assert HTML.to_safe_html("<script>alert(1)</script>", format: :text) =~
                "&lt;script&gt;alert(1)&lt;/script&gt;"
@@ -258,6 +299,10 @@ defmodule Egregoros.HTMLTest do
       safe = HTML.to_safe_html("<p>ok</p><script>alert(1)</script>", format: :html)
       assert safe =~ "<p>ok</p>"
       refute safe =~ "<script"
+    end
+
+    test "treats :html content without html tags as plain text" do
+      assert HTML.to_safe_html("hello", format: :html) =~ "<p>hello</p>"
     end
 
     test "doesn't double-escape existing entities when converting to html" do
@@ -386,6 +431,31 @@ defmodule Egregoros.HTMLTest do
       assert safe =~ ">https://example.com</a>)."
     end
 
+    test "falls back to auto-building mention hrefs when mention_hrefs is not a map" do
+      safe = HTML.to_safe_html("hi @alice", format: :text, mention_hrefs: "nope")
+      href = "#{EgregorosWeb.Endpoint.url()}/@alice"
+
+      assert safe =~
+               ~r/<a[^>]*href="#{Regex.escape(href)}"[^>]*class="[^"]*mention-link[^"]*"[^>]*>@<span>alice<\/span><\/a>/
+    end
+
+    test "treats @mentions for the local domain as local profiles" do
+      endpoint = EgregorosWeb.Endpoint.url()
+      %URI{host: host, port: port} = URI.parse(endpoint)
+
+      domain =
+        case port do
+          nil -> host
+          80 -> host
+          443 -> host
+          port when is_integer(port) -> host <> ":" <> Integer.to_string(port)
+        end
+
+      safe = HTML.to_safe_html("hi @alice@#{domain}", format: :text)
+
+      assert safe =~ ~s(href="#{endpoint}/@alice")
+    end
+
     test "linkifies urls inside surrounding punctuation" do
       safe = HTML.to_safe_html("see (https://example.com)", format: :text)
       assert safe =~ "(<a "
@@ -511,6 +581,21 @@ defmodule Egregoros.HTMLTest do
   end
 
   describe "to_safe_inline_html/2" do
+    test "supports default options and escapes inline html" do
+      assert HTML.to_safe_inline_html("<b>hi</b>") == "&lt;b&gt;hi&lt;/b&gt;"
+    end
+
+    test "returns an empty string for nil content or non-list opts" do
+      assert HTML.to_safe_inline_html(nil) == ""
+      assert HTML.to_safe_inline_html("hi", %{emojis: []}) == ""
+    end
+
+    test "decodes valid numeric entities and preserves invalid ones" do
+      assert HTML.to_safe_inline_html("&#x1F525;") =~ "🔥"
+      assert HTML.to_safe_inline_html("&#55296;") == "&amp;#55296;"
+      assert HTML.to_safe_inline_html("&#xD800;") == "&amp;#xD800;"
+    end
+
     test "renders emoji shortcodes as inline img tags" do
       safe =
         HTML.to_safe_inline_html(":shrug: hi",
