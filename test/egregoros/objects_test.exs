@@ -4,6 +4,7 @@ defmodule Egregoros.ObjectsTest do
   alias Egregoros.Object
   alias Egregoros.Objects
   alias Egregoros.Pipeline
+  alias Egregoros.Relationships
   alias Egregoros.Users
 
   @note_attrs %{
@@ -36,6 +37,14 @@ defmodule Egregoros.ObjectsTest do
     assert {:ok, %Object{} = object} = Objects.create_object(@note_attrs)
     assert %Object{id: id} = Objects.get_by_ap_id(@note_attrs.ap_id)
     assert id == object.id
+  end
+
+  test "get_by_ap_id returns nil for nil" do
+    assert Objects.get_by_ap_id(nil) == nil
+  end
+
+  test "get returns nil for non-integer ids" do
+    assert Objects.get("nope") == nil
   end
 
   test "ap_id is unique" do
@@ -578,6 +587,304 @@ defmodule Egregoros.ObjectsTest do
     assert Enum.any?(Objects.list_notes_by_hashtag("elixir"), &(&1.id == with_tag.id))
     refute Enum.any?(Objects.list_notes_by_hashtag("elixir"), &(&1.id == without_tag.id))
     assert Objects.list_notes_by_hashtag("   ") == []
+  end
+
+  test "list_notes_by_hashtag returns an empty list for invalid input types" do
+    assert Objects.list_notes_by_hashtag(nil) == []
+    assert Objects.list_notes_by_hashtag(123) == []
+  end
+
+  test "list_public_statuses_by_hashtag returns notes and announces matching the hashtag" do
+    public = "https://www.w3.org/ns/activitystreams#Public"
+
+    note_ap_id = "https://remote.example/objects/tagged-announce-#{Ecto.UUID.generate()}"
+    other_ap_id = "https://remote.example/objects/tagged-other-#{Ecto.UUID.generate()}"
+
+    assert {:ok, %Object{} = note} =
+             Objects.create_object(%{
+               ap_id: note_ap_id,
+               type: "Note",
+               actor: "https://remote.example/users/alice",
+               local: false,
+               data: %{
+                 "id" => note_ap_id,
+                 "type" => "Note",
+                 "actor" => "https://remote.example/users/alice",
+                 "to" => [public],
+                 "cc" => [],
+                 "content" => "Hello",
+                 "tag" => [%{"type" => "Hashtag", "name" => "#elixir"}]
+               }
+             })
+
+    assert {:ok, %Object{} = other_note} =
+             Objects.create_object(%{
+               ap_id: other_ap_id,
+               type: "Note",
+               actor: "https://remote.example/users/alice",
+               local: false,
+               data: %{
+                 "id" => other_ap_id,
+                 "type" => "Note",
+                 "actor" => "https://remote.example/users/alice",
+                 "to" => [public],
+                 "cc" => [],
+                 "content" => "Hello",
+                 "tag" => [%{"type" => "Hashtag", "name" => "#other"}]
+               }
+             })
+
+    assert {:ok, %Object{} = announce} =
+             Objects.create_object(%{
+               ap_id: "https://remote.example/activities/announce-hashtag-#{Ecto.UUID.generate()}",
+               type: "Announce",
+               actor: "https://remote.example/users/bob",
+               object: note.ap_id,
+               local: false,
+               data: %{
+                 "id" => "https://remote.example/activities/announce-hashtag",
+                 "type" => "Announce",
+                 "actor" => "https://remote.example/users/bob",
+                 "object" => note.ap_id,
+                 "to" => [public],
+                 "cc" => []
+               }
+             })
+
+    results = Objects.list_public_statuses_by_hashtag("  #ELIXIR ")
+
+    assert Enum.any?(results, &(&1.id == note.id))
+    assert Enum.any?(results, &(&1.id == announce.id))
+    refute Enum.any?(results, &(&1.id == other_note.id))
+  end
+
+  test "list_public_statuses_by_hashtag returns [] for blank or invalid inputs" do
+    assert Objects.list_public_statuses_by_hashtag("   ") == []
+    assert Objects.list_public_statuses_by_hashtag(nil) == []
+  end
+
+  test "count_emoji_reacts counts reactions per emoji and object" do
+    object_ap_id = "https://remote.example/objects/react-target-#{Ecto.UUID.generate()}"
+    actor = "https://remote.example/users/alice"
+
+    for emoji <- ["🔥", "🔥", "👍"] do
+      {:ok, _} =
+        Objects.create_object(%{
+          ap_id: "https://remote.example/activities/react-#{Ecto.UUID.generate()}",
+          type: "EmojiReact",
+          actor: actor,
+          object: object_ap_id,
+          local: false,
+          data: %{
+            "id" => "https://remote.example/activities/react",
+            "type" => "EmojiReact",
+            "actor" => actor,
+            "object" => object_ap_id,
+            "content" => emoji
+          }
+        })
+    end
+
+    assert Objects.count_emoji_reacts(object_ap_id, "🔥") == 2
+    assert Objects.count_emoji_reacts(object_ap_id, "👍") == 1
+  end
+
+  test "list_follows_to and list_follows_by_actor return follow objects" do
+    actor = "https://remote.example/users/alice"
+    object = "https://remote.example/users/bob"
+
+    assert {:ok, %Object{} = follow} =
+             Objects.create_object(%{
+               ap_id: "https://remote.example/activities/follow-#{Ecto.UUID.generate()}",
+               type: "Follow",
+               actor: actor,
+               object: object,
+               local: false,
+               data: %{"type" => "Follow", "actor" => actor, "object" => object}
+             })
+
+    assert Enum.any?(Objects.list_follows_to(object), &(&1.id == follow.id))
+    assert Enum.any?(Objects.list_follows_by_actor(actor), &(&1.id == follow.id))
+  end
+
+  test "list_home_notes accepts an integer limit argument" do
+    {:ok, alice} = Users.create_local_user("alice")
+
+    for idx <- 1..3 do
+      assert {:ok, _} =
+               Pipeline.ingest(
+                 %{
+                   "id" => "https://local.example/objects/home-limit-#{idx}-#{Ecto.UUID.generate()}",
+                   "type" => "Note",
+                   "actor" => alice.ap_id,
+                   "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+                   "cc" => [],
+                   "content" => "Post #{idx}"
+                 },
+                 local: true
+               )
+    end
+
+    assert length(Objects.list_home_notes(alice.ap_id, 1)) == 1
+  end
+
+  test "list_notes_by_actor supports default and integer limits" do
+    actor = "https://remote.example/users/alice"
+    public = "https://www.w3.org/ns/activitystreams#Public"
+
+    for idx <- 1..25 do
+      assert {:ok, _} =
+               Objects.create_object(%{
+                 ap_id: "https://remote.example/objects/by-actor-#{idx}-#{Ecto.UUID.generate()}",
+                 type: "Note",
+                 actor: actor,
+                 local: false,
+                 data: %{
+                   "id" => "https://remote.example/objects/by-actor-#{idx}",
+                   "type" => "Note",
+                   "actor" => actor,
+                   "to" => [public],
+                   "cc" => [],
+                   "content" => "Post #{idx}"
+                 }
+               })
+    end
+
+    assert length(Objects.list_notes_by_actor(actor)) == 20
+    assert length(Objects.list_notes_by_actor(actor, 5)) == 5
+  end
+
+  test "list_visible_notes_by_actor respects profile visibility rules" do
+    {:ok, alice} = Users.create_local_user("alice")
+    {:ok, bob} = Users.create_local_user("bob")
+
+    public = "https://www.w3.org/ns/activitystreams#Public"
+    followers = alice.ap_id <> "/followers"
+
+    {:ok, public_note} =
+      Objects.create_object(%{
+        ap_id: "https://local.example/objects/profile-public-#{Ecto.UUID.generate()}",
+        type: "Note",
+        actor: alice.ap_id,
+        local: true,
+        data: %{"id" => "https://local.example/objects/profile-public", "type" => "Note", "to" => [public], "cc" => []}
+      })
+
+    {:ok, followers_note} =
+      Objects.create_object(%{
+        ap_id: "https://local.example/objects/profile-followers-#{Ecto.UUID.generate()}",
+        type: "Note",
+        actor: alice.ap_id,
+        local: true,
+        data: %{"id" => "https://local.example/objects/profile-followers", "type" => "Note", "to" => [followers], "cc" => []}
+      })
+
+    {:ok, direct_note} =
+      Objects.create_object(%{
+        ap_id: "https://local.example/objects/profile-direct-#{Ecto.UUID.generate()}",
+        type: "Note",
+        actor: alice.ap_id,
+        local: true,
+        data: %{"id" => "https://local.example/objects/profile-direct", "type" => "Note", "to" => [bob.ap_id], "cc" => []}
+      })
+
+    assert Enum.any?(Objects.list_visible_notes_by_actor(alice.ap_id, nil), &(&1.id == public_note.id))
+    refute Enum.any?(Objects.list_visible_notes_by_actor(alice.ap_id, nil), &(&1.id == followers_note.id))
+    refute Enum.any?(Objects.list_visible_notes_by_actor(alice.ap_id, nil), &(&1.id == direct_note.id))
+
+    assert Enum.any?(Objects.list_visible_notes_by_actor(alice.ap_id, bob), &(&1.id == public_note.id))
+    refute Enum.any?(Objects.list_visible_notes_by_actor(alice.ap_id, bob), &(&1.id == followers_note.id))
+
+    assert {:ok, _} = Relationships.upsert_relationship(%{type: "Follow", actor: bob.ap_id, object: alice.ap_id})
+
+    follower_view = Objects.list_visible_notes_by_actor(alice.ap_id, bob)
+    assert Enum.any?(follower_view, &(&1.id == followers_note.id))
+    refute Enum.any?(follower_view, &(&1.id == direct_note.id))
+
+    self_view = Objects.list_visible_notes_by_actor(alice.ap_id, alice)
+    assert Enum.any?(self_view, &(&1.id == direct_note.id))
+  end
+
+  test "list_visible_statuses_by_actor includes announces when the object exists" do
+    {:ok, alice} = Users.create_local_user("alice")
+    public = "https://www.w3.org/ns/activitystreams#Public"
+
+    {:ok, note} =
+      Objects.create_object(%{
+        ap_id: "https://remote.example/objects/status-#{Ecto.UUID.generate()}",
+        type: "Note",
+        actor: alice.ap_id,
+        local: false,
+        data: %{"id" => "https://remote.example/objects/status", "type" => "Note", "to" => [public], "cc" => []}
+      })
+
+    {:ok, announce} =
+      Objects.create_object(%{
+        ap_id: "https://remote.example/activities/announce-#{Ecto.UUID.generate()}",
+        type: "Announce",
+        actor: alice.ap_id,
+        object: note.ap_id,
+        local: false,
+        data: %{"id" => "https://remote.example/activities/announce", "type" => "Announce", "object" => note.ap_id, "to" => [public], "cc" => []}
+      })
+
+    statuses = Objects.list_visible_statuses_by_actor(alice.ap_id, nil, limit: 10)
+    assert Enum.any?(statuses, &(&1.id == note.id))
+    assert Enum.any?(statuses, &(&1.id == announce.id))
+  end
+
+  test "list_visible_notes_by_actor and list_visible_statuses_by_actor return [] for invalid inputs" do
+    assert Objects.list_visible_notes_by_actor(nil, nil) == []
+    assert Objects.list_visible_statuses_by_actor(nil, nil) == []
+  end
+
+  test "normalize_limit falls back to 20 for invalid values" do
+    actor = "https://remote.example/users/alice"
+    public = "https://www.w3.org/ns/activitystreams#Public"
+
+    for idx <- 1..25 do
+      assert {:ok, _} =
+               Objects.create_object(%{
+                 ap_id: "https://remote.example/objects/limit-default-#{idx}-#{Ecto.UUID.generate()}",
+                 type: "Note",
+                 actor: actor,
+                 local: false,
+                 data: %{
+                   "id" => "https://remote.example/objects/limit-default-#{idx}",
+                   "type" => "Note",
+                   "actor" => actor,
+                   "to" => [public],
+                   "cc" => [],
+                   "content" => "Post #{idx}"
+                 }
+               })
+    end
+
+    assert length(Objects.list_notes(limit: "nope")) == 20
+  end
+
+  test "list_public_statuses_by_actor and list_statuses_by_actor support paging options" do
+    actor = "https://remote.example/users/paging"
+    public = "https://www.w3.org/ns/activitystreams#Public"
+
+    created =
+      for idx <- 1..3 do
+        {:ok, object} =
+          Objects.create_object(%{
+            ap_id: "https://remote.example/objects/paging-#{idx}-#{Ecto.UUID.generate()}",
+            type: "Note",
+            actor: actor,
+            local: false,
+            data: %{"id" => "https://remote.example/objects/paging-#{idx}", "type" => "Note", "to" => [public], "cc" => []}
+          })
+
+        object
+      end
+
+    [newest, middle | _rest] = Enum.sort_by(created, & &1.id, :desc)
+
+    assert Enum.all?(Objects.list_statuses_by_actor(actor, since_id: middle.id), &(&1.id > middle.id))
+    assert Enum.all?(Objects.list_public_statuses_by_actor(actor, max_id: newest.id), &(&1.id < newest.id))
   end
 
   test "list_public_statuses supports filtering to posts with media including reblogs" do
