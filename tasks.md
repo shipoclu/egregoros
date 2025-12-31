@@ -22,8 +22,8 @@ Notes:
 
 - [ ] Fill out remaining Mastodon API gaps that clients expect:
   - [ ] `GET /api/v1/conversations`
-  - [ ] `GET /api/v1/favourites` (currently stubbed)
-  - [ ] `GET /api/v1/bookmarks` (currently stubbed)
+  - [x] `GET /api/v1/favourites` (was stubbed)
+  - [x] `GET /api/v1/bookmarks` (was stubbed)
   - [ ] Status edit/Update flows end-to-end (API + AP Update).
   - [ ] Ensure Status entity fields match `docs.joinmastodon.org/entities/Status/` where feasible.
 
