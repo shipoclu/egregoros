@@ -18,6 +18,22 @@ defmodule Egregoros.Federation.Actor do
     end
   end
 
+  def upsert_from_map(%{} = actor) do
+    actor_url = actor |> extract_id() |> normalize_id()
+
+    with actor_url when is_binary(actor_url) and actor_url != "" <- actor_url,
+         :ok <- SafeURL.validate_http_url(actor_url),
+         {:ok, attrs} <- to_user_attrs(actor, actor_url),
+         {:ok, user} <- Users.upsert_user(attrs) do
+      {:ok, user}
+    else
+      {:error, _} = error -> error
+      _ -> {:error, :invalid_actor}
+    end
+  end
+
+  def upsert_from_map(_actor), do: {:error, :invalid_actor}
+
   defp fetch_actor(actor_url) when is_binary(actor_url) do
     case HTTP.get(actor_url, headers()) do
       {:ok, %{status: status, body: body}} when status in 200..299 ->
@@ -125,6 +141,18 @@ defmodule Egregoros.Federation.Actor do
   end
 
   defp to_user_attrs(_actor, _actor_url), do: {:error, :invalid_actor}
+
+  defp extract_id(%{"id" => id}) when is_binary(id), do: id
+  defp extract_id(%{id: id}) when is_binary(id), do: id
+  defp extract_id(_actor), do: nil
+
+  defp normalize_id(nil), do: nil
+
+  defp normalize_id(id) when is_binary(id) do
+    String.trim(id)
+  end
+
+  defp normalize_id(_id), do: nil
 
   defp to_user_attrs_from_id(%{} = actor, id) when is_binary(id) do
     public_key = get_in(actor, ["publicKey", "publicKeyPem"])
