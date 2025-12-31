@@ -22,6 +22,12 @@ defmodule Egregoros.Objects do
   end
 
   def upsert_object(attrs) do
+    upsert_object(attrs, conflict: :nothing)
+  end
+
+  def upsert_object(attrs, opts) when is_list(opts) do
+    conflict = Keyword.get(opts, :conflict, :nothing)
+
     case create_object(attrs) do
       {:ok, %Object{} = object} ->
         {:ok, object}
@@ -31,7 +37,7 @@ defmodule Egregoros.Objects do
           ap_id = Map.get(attrs, :ap_id) || Map.get(attrs, "ap_id")
 
           case get_by_ap_id(ap_id) do
-            %Object{} = object -> {:ok, object}
+            %Object{} = object -> resolve_conflict(conflict, object, attrs, changeset)
             _ -> {:error, changeset}
           end
         else
@@ -39,6 +45,8 @@ defmodule Egregoros.Objects do
         end
     end
   end
+
+  def upsert_object(attrs, _opts), do: upsert_object(attrs)
 
   def get_by_ap_id(nil), do: nil
   def get_by_ap_id(ap_id) when is_binary(ap_id), do: Repo.get_by(Object, ap_id: ap_id)
@@ -882,6 +890,50 @@ defmodule Egregoros.Objects do
   end
 
   defp normalize_limit(_), do: 20
+
+  defp resolve_conflict(:nothing, %Object{} = object, _attrs, _changeset), do: {:ok, object}
+
+  defp resolve_conflict(:replace, %Object{} = object, attrs, changeset) when is_map(attrs) do
+    cond do
+      ap_id_mismatch?(object, attrs) ->
+        {:error, changeset}
+
+      type_mismatch?(object, attrs) ->
+        {:error, changeset}
+
+      true ->
+        attrs =
+          attrs
+          |> Map.delete(:ap_id)
+          |> Map.delete("ap_id")
+          |> Map.delete(:type)
+          |> Map.delete("type")
+
+        update_object(object, attrs)
+    end
+  end
+
+  defp resolve_conflict(_other, %Object{} = object, _attrs, _changeset), do: {:ok, object}
+
+  defp ap_id_mismatch?(%Object{ap_id: existing}, attrs) when is_map(attrs) and is_binary(existing) do
+    case Map.get(attrs, :ap_id) || Map.get(attrs, "ap_id") do
+      nil -> false
+      value when is_binary(value) -> String.trim(value) != "" and String.trim(value) != existing
+      _ -> true
+    end
+  end
+
+  defp ap_id_mismatch?(_object, _attrs), do: false
+
+  defp type_mismatch?(%Object{type: existing}, attrs) when is_map(attrs) and is_binary(existing) do
+    case Map.get(attrs, :type) || Map.get(attrs, "type") do
+      nil -> false
+      value when is_binary(value) -> String.trim(value) != "" and String.trim(value) != existing
+      _ -> true
+    end
+  end
+
+  defp type_mismatch?(_object, _attrs), do: false
 
   defp unique_ap_id_error?(%Ecto.Changeset{errors: errors}) do
     Enum.any?(errors, fn
