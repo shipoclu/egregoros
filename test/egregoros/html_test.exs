@@ -269,6 +269,18 @@ defmodule Egregoros.HTMLTest do
       assert scrubbed =~ ~s(href="https://example.com/?a=1&amp;b=2")
       assert scrubbed =~ ">AT&T</a>"
     end
+
+    test "unescapes ampersands for sanitizer output using single-quoted attributes" do
+      Egregoros.HTML.Sanitizer.Mock
+      |> expect(:scrub, fn _html, _scrubber ->
+        {:ok, "<a href='https://example.com/?a=1&amp;b=2'>AT&amp;T</a>"}
+      end)
+
+      scrubbed = HTML.sanitize("<p>ignored</p>", Egregoros.HTML.Sanitizer.Mock)
+
+      assert scrubbed =~ "href='https://example.com/?a=1&amp;b=2'"
+      assert scrubbed =~ ">AT&T</a>"
+    end
   end
 
   describe "to_safe_html/2" do
@@ -524,6 +536,52 @@ defmodule Egregoros.HTMLTest do
       assert safe =~ ":shrug:"
     end
 
+    test "keeps unknown shortcodes intact in html input when emojis are provided" do
+      safe =
+        HTML.to_safe_html("<p>hi :shrug:</p>",
+          format: :html,
+          emojis: [%{shortcode: "other", url: "https://cdn.example/other.png"}]
+        )
+
+      assert safe =~ ":shrug:"
+      refute safe =~ "<img"
+    end
+
+    test "keeps unknown shortcodes intact in plain text when an emoji map exists" do
+      safe =
+        HTML.to_safe_html("hi :shrug:",
+          format: :text,
+          emojis: [%{shortcode: "other", url: "https://cdn.example/other.png"}]
+        )
+
+      assert safe =~ ":shrug:"
+      refute safe =~ "<img"
+    end
+
+    test "accepts emojis as a precomputed shortcode->url map" do
+      safe =
+        HTML.to_safe_html("hi :shrug:",
+          format: :text,
+          emojis: %{"shrug" => "https://cdn.example/shrug.png"}
+        )
+
+      assert safe =~ "<img"
+      assert safe =~ "src=\"https://cdn.example/shrug.png\""
+    end
+
+    test "does not linkify invalid http urls" do
+      safe = HTML.to_safe_html("see https://)", format: :text)
+
+      assert safe =~ "https://)"
+      refute safe =~ "<a "
+    end
+
+    test "handles lines that start with whitespace while linkifying" do
+      safe = HTML.to_safe_html("hi\n @alice", format: :text)
+      assert safe =~ "<br"
+      assert safe =~ ~s(href="#{EgregorosWeb.Endpoint.url()}/@alice")
+    end
+
     test "styles mention links in html input when mention tags are provided" do
       safe =
         HTML.to_safe_html("<p>hi <a href=\"https://remote.example/users/bob\">@bob</a></p>",
@@ -541,6 +599,43 @@ defmodule Egregoros.HTMLTest do
 
       assert safe =~
                ~r/<a[^>]*href="#{Regex.escape(href)}"[^>]*class="mention-link"[^>]*>@bob<\/a>/
+    end
+
+    test "rewrites mention links based on href data when the mention name is not parseable" do
+      safe =
+        HTML.to_safe_html("<p>hi <a href='https://remote.example/users/bob'>@</a></p>",
+          format: :html,
+          ap_tags: [
+            %{
+              "type" => "Mention",
+              "href" => "https://remote.example/users/bob",
+              "name" => "@"
+            }
+          ]
+        )
+
+      href = "#{EgregorosWeb.Endpoint.url()}/@bob@remote.example"
+
+      assert safe =~ ~s(href="#{href}")
+      assert safe =~ "mention-link"
+    end
+
+    test "does not duplicate mention-link classes when the link already has them" do
+      safe =
+        HTML.to_safe_html(
+          "<p>hi <a class='mention-link u-url mention' href='https://remote.example/users/bob'>@bob</a></p>",
+          format: :html,
+          ap_tags: [
+            %{
+              "type" => "Mention",
+              "href" => "https://remote.example/users/bob",
+              "name" => "@bob@remote.example"
+            }
+          ]
+        )
+
+      assert String.split(safe, "mention-link") |> length() == 2
+      assert safe =~ ~s(href="#{EgregorosWeb.Endpoint.url()}/@bob@remote.example")
     end
 
     test "styles mention links in html input when mention tag is a map" do
