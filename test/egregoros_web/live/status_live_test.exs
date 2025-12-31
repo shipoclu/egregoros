@@ -6,6 +6,7 @@ defmodule EgregorosWeb.StatusLiveTest do
   alias Egregoros.Activities.Note
   alias Egregoros.Objects
   alias Egregoros.Pipeline
+  alias Egregoros.Relationships
   alias Egregoros.TestSupport.Fixtures
   alias Egregoros.Users
   alias Egregoros.Workers.FetchThreadReplies
@@ -50,6 +51,21 @@ defmodule EgregorosWeb.StatusLiveTest do
 
     _html = render_hook(view, "mention_search", %{"q" => "bo", "scope" => "reply-modal"})
     assert has_element?(view, "[data-role='mention-suggestion']", "@bob")
+  end
+
+  test "reply composer mention autocomplete suggestions can be cleared", %{conn: conn, user: user} do
+    {:ok, note} = Pipeline.ingest(Note.build(user, "Hello from status"), local: true)
+    uuid = uuid_from_ap_id(note.ap_id)
+    {:ok, _} = Users.create_local_user("bob")
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/@alice/#{uuid}?reply=true")
+
+    _html = render_hook(view, "mention_search", %{"q" => "bo", "scope" => "reply-modal"})
+    assert has_element?(view, "[data-role='mention-suggestion']", "@bob")
+
+    _html = render_hook(view, "mention_clear", %{"scope" => "reply-modal"})
+    refute has_element?(view, "[data-role='mention-suggestion']")
   end
 
   test "redirects to the canonical nickname for local status permalinks", %{
@@ -388,6 +404,84 @@ defmodule EgregorosWeb.StatusLiveTest do
     assert html =~ note.ap_id
 
     assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='closed']")
+  end
+
+  test "status view ignores open_reply_modal when signed out or missing a target", %{
+    conn: conn,
+    user: user
+  } do
+    assert {:ok, note} = Pipeline.ingest(Note.build(user, "Replyable"), local: true)
+    uuid = uuid_from_ap_id(note.ap_id)
+
+    assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}")
+    refute has_element?(view, "#reply-modal")
+
+    _html =
+      render_click(view, "open_reply_modal", %{"in_reply_to" => note.ap_id, "actor_handle" => "@alice"})
+
+    refute has_element?(view, "#reply-modal")
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}")
+
+    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='closed']")
+
+    _html = render_click(view, "open_reply_modal", %{"in_reply_to" => "", "actor_handle" => "@alice"})
+
+    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='closed']")
+  end
+
+  test "status view can open the reply modal via open_reply_modal event", %{conn: conn, user: user} do
+    assert {:ok, note} = Pipeline.ingest(Note.build(user, "Replyable"), local: true)
+    uuid = uuid_from_ap_id(note.ap_id)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}")
+
+    _html =
+      render_click(view, "open_reply_modal", %{"in_reply_to" => note.ap_id, "actor_handle" => "@alice"})
+
+    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='open']")
+    assert has_element?(view, "input[data-role='reply-in-reply-to'][value='#{note.ap_id}']")
+  end
+
+  test "signed-in users can bookmark posts from the status page", %{conn: conn, user: user} do
+    assert {:ok, note} = Pipeline.ingest(Note.build(user, "Bookmark me"), local: true)
+    uuid = uuid_from_ap_id(note.ap_id)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}")
+
+    refute Relationships.get_by_type_actor_object("Bookmark", user.ap_id, note.ap_id)
+
+    view
+    |> element("#post-#{note.id} button[data-role='bookmark']")
+    |> render_click()
+
+    assert Relationships.get_by_type_actor_object("Bookmark", user.ap_id, note.ap_id)
+  end
+
+  test "signed-out users cannot bookmark posts from the status page", %{conn: conn, user: user} do
+    assert {:ok, note} = Pipeline.ingest(Note.build(user, "Bookmark me"), local: true)
+    uuid = uuid_from_ap_id(note.ap_id)
+
+    assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}")
+
+    _html = render_click(view, "toggle_bookmark", %{"id" => note.id})
+
+    assert render(view) =~ "Register to bookmark posts."
+  end
+
+  test "status view handles unrelated messages without crashing", %{conn: conn, user: user} do
+    assert {:ok, note} = Pipeline.ingest(Note.build(user, "Hello"), local: true)
+    uuid = uuid_from_ap_id(note.ap_id)
+
+    assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}")
+
+    send(view.pid, :unrelated)
+    _ = :sys.get_state(view.pid)
+
+    assert has_element?(view, "article[data-role='status-card']", "Hello")
   end
 
   test "replying rejects content longer than 5000 characters", %{conn: conn, user: user} do
