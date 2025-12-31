@@ -9,11 +9,11 @@ Notes:
 
 ## Next priorities (recommended)
 
-- [ ] **Mastodon `Status` entity completeness** (reduce client quirks)
-  - [ ] Add contract-style tests for required keys/types from `docs.joinmastodon.org/entities/Status/`.
-  - [ ] Ensure optional-but-expected keys are present (`application`, `edited_at`, `filtered`, etc.).
-  - [ ] Ensure reblogs (`Announce`) map cleanly to Mastodon “reblog” shape (bookmark/like/reblog flags reflect the original status).
-  - [ ] Ensure reply metadata is complete (`in_reply_to_id` + `in_reply_to_account_id`) when parent + actor are known.
+- [x] **Mastodon `Status` entity completeness** (reduce client quirks)
+  - [x] Add contract-style tests for required keys/types from `docs.joinmastodon.org/entities/Status/`.
+  - [x] Ensure optional-but-expected keys are present (`application`, `edited_at`, `filtered`, etc.).
+  - [x] Ensure reblogs (`Announce`) map cleanly to Mastodon “reblog” shape (bookmark/like/reblog flags reflect the original status).
+  - [x] Ensure reply metadata is complete (`in_reply_to_id` + `in_reply_to_account_id`) when parent + actor are known.
 - [ ] **Status/thread view polish** (`/@:nickname/:uuid`)
   - [ ] Make reply UI consistent with the main composer (same component, same options).
   - [ ] Reply in-place/modal from timeline (no navigation required).
@@ -30,7 +30,7 @@ Notes:
   - [x] Apply **object edits** (`Note`) where compatible (edit history + visibility rules).
   - [x] Decide/implement **object upsert semantics** for Updates (currently “insert-or-return existing”).
 - [x] Ingest `Move` activities (account migration).
-- [ ] Implement/verify `Update`/`Delete` constraints for **impersonation safety** (e.g. Update actor must match updated actor id).
+- [x] Implement/verify `Update`/`Delete` constraints for **impersonation safety** (e.g. Update actor must match updated actor id).
 - [x] Improve “fetch-on-demand” ingestion contexts so internally-fetched activities aren’t rejected as “not targeted”.
 - [ ] Keep/expand thread completion: fetch missing replies/ancestors/descendants when receiving partial threads.
 
