@@ -24,6 +24,17 @@ defmodule EgregorosWeb.MastodonAPI.StatusesControllerTest do
     assert object.data["content"] == "<p>Hello API</p>"
   end
 
+  test "POST /api/v1/statuses rejects missing status param", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("local")
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, user} end)
+
+    conn = post(conn, "/api/v1/statuses", %{})
+    assert response(conn, 422)
+    assert Objects.list_notes() == []
+  end
+
   test "PUT /api/v1/statuses/:id updates a status and emits an Update activity", %{conn: conn} do
     {:ok, user} = Users.create_local_user("local")
     {:ok, create} = Publish.post_note(user, "Original")
@@ -46,6 +57,94 @@ defmodule EgregorosWeb.MastodonAPI.StatusesControllerTest do
     assert Objects.get_by_type_actor_object("Update", user.ap_id, note.ap_id)
   end
 
+  test "PUT /api/v1/statuses/:id rejects empty status", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("local")
+    {:ok, create} = Publish.post_note(user, "Original")
+    note = Objects.get_by_ap_id(create.object)
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, user} end)
+
+    conn = put(conn, "/api/v1/statuses/#{note.id}", %{"status" => "  "})
+    assert response(conn, 422)
+    assert Objects.get(note.id).data["content"] == "<p>Original</p>"
+  end
+
+  test "PUT /api/v1/statuses/:id forbids updating other users' or remote statuses", %{conn: conn} do
+    {:ok, alice} = Users.create_local_user("alice")
+    {:ok, bob} = Users.create_local_user("bob")
+
+    {:ok, create} = Publish.post_note(alice, "Owned by alice")
+    note = Objects.get_by_ap_id(create.object)
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, bob} end)
+
+    conn = put(conn, "/api/v1/statuses/#{note.id}", %{"status" => "Edited?"})
+    assert response(conn, 403)
+
+    {:ok, remote_note} =
+      Pipeline.ingest(
+        %{
+          "id" => "https://example.com/objects/remote-edit",
+          "type" => "Note",
+          "actor" => alice.ap_id,
+          "content" => "Remote",
+          "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+          "cc" => []
+        },
+        local: false
+      )
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, alice} end)
+
+    conn = put(conn, "/api/v1/statuses/#{remote_note.id}", %{"status" => "Edited remote?"})
+    assert response(conn, 403)
+  end
+
+  test "PUT /api/v1/statuses/:id updates summary, sensitive, language, and mention links", %{
+    conn: conn
+  } do
+    {:ok, user} = Users.create_local_user("local")
+    {:ok, create} = Publish.post_note(user, "Original")
+    note = Objects.get_by_ap_id(create.object)
+
+    tags = [
+      %{
+        "type" => "Mention",
+        "href" => "https://remote.example/users/bob",
+        "name" => "@bob@remote.example"
+      },
+      %{
+        "type" => "Mention",
+        "href" => "https://remote.example/users/invalid",
+        "name" => "@???"
+      }
+    ]
+
+    {:ok, _} = Objects.update_object(note, %{data: Map.put(note.data, "tag", tags)})
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, user} end)
+
+    conn =
+      put(conn, "/api/v1/statuses/#{note.id}", %{
+        "status" => "Hello @bob@remote.example",
+        "spoiler_text" => "cw",
+        "sensitive" => "true",
+        "language" => "en"
+      })
+
+    response = json_response(conn, 200)
+
+    assert response["content"] =~ "mention-link"
+    assert response["content"] =~ "bob@remote.example"
+    assert response["spoiler_text"] == "cw"
+    assert response["sensitive"] == true
+    assert response["language"] == "en"
+  end
+
   test "GET /api/v1/statuses/:id/source returns StatusSource for the owner", %{conn: conn} do
     {:ok, user} = Users.create_local_user("local")
     {:ok, create} = Publish.post_note(user, "Hello source", spoiler_text: "cw")
@@ -64,6 +163,49 @@ defmodule EgregorosWeb.MastodonAPI.StatusesControllerTest do
     assert response["id"] == Integer.to_string(note.id)
     assert response["text"] == "Hello source"
     assert response["spoiler_text"] == "cw"
+  end
+
+  test "GET /api/v1/statuses/:id/source returns 404 for non-owners", %{conn: conn} do
+    {:ok, alice} = Users.create_local_user("alice")
+    {:ok, bob} = Users.create_local_user("bob")
+    {:ok, create} = Publish.post_note(alice, "Hello source")
+    note = Objects.get_by_ap_id(create.object)
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, bob} end)
+
+    conn =
+      conn
+      |> put_req_header("authorization", "Bearer token")
+      |> get("/api/v1/statuses/#{note.id}/source")
+
+    assert response(conn, 404)
+  end
+
+  test "GET /api/v1/statuses/:id/source falls back to content when source is missing", %{
+    conn: conn
+  } do
+    {:ok, user} = Users.create_local_user("local")
+
+    {:ok, note} =
+      Objects.create_object(%{
+        ap_id: Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
+        type: "Note",
+        actor: user.ap_id,
+        local: true,
+        data: %{"type" => "Note", "content" => "<p>Fallback</p>"}
+      })
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, user} end)
+
+    conn =
+      conn
+      |> put_req_header("authorization", "Bearer token")
+      |> get("/api/v1/statuses/#{note.id}/source")
+
+    response = json_response(conn, 200)
+    assert response["text"] == "<p>Fallback</p>"
   end
 
   test "POST /api/v1/statuses supports replies via in_reply_to_id", %{conn: conn} do
