@@ -41,7 +41,7 @@ Notes:
   - [x] `GET /api/v1/favourites` (was stubbed)
   - [x] `GET /api/v1/bookmarks` (was stubbed)
   - [x] Status edit/Update flows end-to-end (API + AP Update).
-  - [ ] Ensure Status entity fields match `docs.joinmastodon.org/entities/Status/` where feasible.
+  - [x] Ensure Status entity fields match `docs.joinmastodon.org/entities/Status/` where feasible.
 
 ## Performance / scalability
 
