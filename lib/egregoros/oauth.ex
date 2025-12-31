@@ -311,6 +311,10 @@ defmodule Egregoros.OAuth do
           (is_nil(t.refresh_expires_at) or t.refresh_expires_at > ^now)
     )
     |> Repo.one()
+    |> case do
+      %Token{} = token -> token
+      nil -> :not_found
+    end
   end
 
   defp get_token_by_refresh_token(_refresh_token), do: nil
