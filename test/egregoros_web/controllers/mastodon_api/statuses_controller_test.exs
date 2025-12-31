@@ -46,6 +46,26 @@ defmodule EgregorosWeb.MastodonAPI.StatusesControllerTest do
     assert Objects.get_by_type_actor_object("Update", user.ap_id, note.ap_id)
   end
 
+  test "GET /api/v1/statuses/:id/source returns StatusSource for the owner", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("local")
+    {:ok, create} = Publish.post_note(user, "Hello source", spoiler_text: "cw")
+
+    note = Objects.get_by_ap_id(create.object)
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, user} end)
+
+    conn =
+      conn
+      |> put_req_header("authorization", "Bearer token")
+      |> get("/api/v1/statuses/#{note.id}/source")
+
+    response = json_response(conn, 200)
+    assert response["id"] == Integer.to_string(note.id)
+    assert response["text"] == "Hello source"
+    assert response["spoiler_text"] == "cw"
+  end
+
   test "POST /api/v1/statuses supports replies via in_reply_to_id", %{conn: conn} do
     {:ok, user} = Users.create_local_user("local")
 

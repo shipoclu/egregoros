@@ -175,6 +175,7 @@ defmodule EgregorosWeb.Router do
     get "/markers", MarkersController, :index
     get "/statuses/:id/favourited_by", StatusesController, :favourited_by
     get "/statuses/:id/reblogged_by", StatusesController, :reblogged_by
+    get "/statuses/:id/source", StatusesController, :source
   end
 
   scope "/api/v1", EgregorosWeb.MastodonAPI do

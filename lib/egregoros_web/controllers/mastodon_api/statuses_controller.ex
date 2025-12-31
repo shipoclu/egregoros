@@ -136,6 +136,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusesController do
     |> Map.put("type", "Note")
     |> Map.put("attributedTo", user.ap_id)
     |> Map.put("content", content_html)
+    |> Map.put("source", %{"content" => status, "mediaType" => "text/plain"})
     |> Map.put("updated", DateTime.utc_now() |> DateTime.to_iso8601())
     |> maybe_put_summary(spoiler_text)
     |> maybe_put_sensitive(sensitive)
@@ -208,6 +209,26 @@ defmodule EgregorosWeb.MastodonAPI.StatusesController do
     end
   end
 
+  def source(conn, %{"id" => id}) do
+    current_user = conn.assigns.current_user
+
+    case Objects.get(id) do
+      %{} = object ->
+        if object.type == "Note" and object.local == true and object.actor == current_user.ap_id do
+          json(conn, %{
+            "id" => Integer.to_string(object.id),
+            "text" => source_text(object),
+            "spoiler_text" => source_spoiler_text(object)
+          })
+        else
+          send_resp(conn, 404, "Not Found")
+        end
+
+      _ ->
+        send_resp(conn, 404, "Not Found")
+    end
+  end
+
   def context(conn, %{"id" => id}) do
     current_user = conn.assigns[:current_user]
 
@@ -236,6 +257,16 @@ defmodule EgregorosWeb.MastodonAPI.StatusesController do
         end
     end
   end
+
+  defp source_text(%{data: %{"source" => %{"content" => content}}}) when is_binary(content),
+    do: content
+
+  defp source_text(%{data: %{"content" => content}}) when is_binary(content), do: content
+
+  defp source_text(_object), do: ""
+
+  defp source_spoiler_text(%{data: %{"summary" => summary}}) when is_binary(summary), do: summary
+  defp source_spoiler_text(_object), do: ""
 
   def favourited_by(conn, %{"id" => id}) do
     current_user = conn.assigns.current_user

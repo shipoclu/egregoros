@@ -65,6 +65,7 @@ defmodule Egregoros.Publish do
         note =
           user
           |> Note.build(content_html)
+          |> Map.put("source", %{"content" => content, "mediaType" => "text/plain"})
           |> maybe_put_attachments(attachments)
           |> maybe_put_in_reply_to(in_reply_to)
           |> maybe_put_visibility(visibility, user.ap_id, mention_recipient_ids)
