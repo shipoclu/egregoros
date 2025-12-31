@@ -381,6 +381,86 @@ defmodule EgregorosWeb.ProfileLiveTest do
     assert render(view) =~ "Copied link to clipboard."
   end
 
+  test "profile reply modal can be opened and replies can be posted", %{conn: conn, viewer: viewer} do
+    assert {:ok, parent} = Pipeline.ingest(Note.build(viewer, "Parent post"), local: true)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: viewer.id})
+    {:ok, view, _html} = live(conn, "/@#{viewer.nickname}")
+
+    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='closed']")
+
+    view
+    |> element("#post-#{parent.id} button[data-role='reply']")
+    |> render_click()
+
+    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='open']")
+
+    view
+    |> form("#reply-modal-form", reply: %{content: "A reply"})
+    |> render_submit()
+
+    assert render(view) =~ "Reply posted."
+
+    [reply] = Objects.list_replies_to(parent.ap_id, limit: 1)
+    assert reply.data["inReplyTo"] == parent.ap_id
+  end
+
+  test "profile reply composer mention autocomplete suggests users", %{
+    conn: conn,
+    viewer: viewer
+  } do
+    assert {:ok, parent} = Pipeline.ingest(Note.build(viewer, "Parent post"), local: true)
+    {:ok, _} = Users.create_local_user("bob2")
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: viewer.id})
+    {:ok, view, _html} = live(conn, "/@#{viewer.nickname}")
+
+    view
+    |> element("#post-#{parent.id} button[data-role='reply']")
+    |> render_click()
+
+    _html = render_hook(view, "mention_search", %{"q" => "bo", "scope" => "reply-modal"})
+    assert has_element?(view, "[data-role='mention-suggestion']", "@bob2")
+
+    _html = render_hook(view, "mention_clear", %{"scope" => "reply-modal"})
+    refute has_element?(view, "[data-role='mention-suggestion']")
+  end
+
+  test "profile supports liking, reposting, reacting, and bookmarking posts", %{
+    conn: conn,
+    viewer: viewer,
+    profile_user: profile_user
+  } do
+    assert {:ok, note} = Pipeline.ingest(Note.build(profile_user, "Interact with me"), local: true)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: viewer.id})
+    {:ok, view, _html} = live(conn, "/@#{profile_user.nickname}")
+
+    view
+    |> element("#post-#{note.id} button[data-role='like']")
+    |> render_click()
+
+    assert Objects.get_by_type_actor_object("Like", viewer.ap_id, note.ap_id)
+
+    view
+    |> element("#post-#{note.id} button[data-role='repost']")
+    |> render_click()
+
+    assert Objects.get_by_type_actor_object("Announce", viewer.ap_id, note.ap_id)
+
+    view
+    |> element("#post-#{note.id} button[data-role='reaction'][data-emoji='🔥']")
+    |> render_click()
+
+    assert Objects.get_emoji_react(viewer.ap_id, note.ap_id, "🔥")
+
+    view
+    |> element("#post-#{note.id} button[data-role='bookmark']")
+    |> render_click()
+
+    assert Relationships.get_by_type_actor_object("Bookmark", viewer.ap_id, note.ap_id)
+  end
+
   test "profile posts provide media viewer controls without a server roundtrip", %{
     conn: conn,
     viewer: viewer,
