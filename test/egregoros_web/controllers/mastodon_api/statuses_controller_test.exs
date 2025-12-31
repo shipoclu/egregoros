@@ -1055,4 +1055,256 @@ defmodule EgregorosWeb.MastodonAPI.StatusesControllerTest do
     assert response["id"] == Integer.to_string(note.id)
     assert Objects.get(note.id) == nil
   end
+
+  test "missing status id returns 404 for write endpoints", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("local")
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, 7, fn _conn -> {:ok, user} end)
+
+    id = "999999"
+
+    write_calls = [
+      {:delete, "/api/v1/statuses/#{id}"},
+      {:post, "/api/v1/statuses/#{id}/favourite"},
+      {:post, "/api/v1/statuses/#{id}/unfavourite"},
+      {:post, "/api/v1/statuses/#{id}/bookmark"},
+      {:post, "/api/v1/statuses/#{id}/unbookmark"},
+      {:post, "/api/v1/statuses/#{id}/reblog"},
+      {:post, "/api/v1/statuses/#{id}/unreblog"}
+    ]
+
+    Enum.each(write_calls, fn
+      {:delete, path} ->
+        assert conn |> recycle() |> delete(path) |> response(404)
+
+      {:post, path} ->
+        assert conn |> recycle() |> post(path) |> response(404)
+    end)
+  end
+
+  test "GET /api/v1/statuses/:id returns 404 for missing status", %{conn: conn} do
+    conn = get(conn, "/api/v1/statuses/999999")
+    assert response(conn, 404)
+  end
+
+  test "GET /api/v1/statuses/:id/context returns 404 for missing status", %{conn: conn} do
+    conn = get(conn, "/api/v1/statuses/999999/context")
+    assert response(conn, 404)
+  end
+
+  test "GET /api/v1/statuses/:id/context does not expose direct statuses to non-recipients", %{
+    conn: conn
+  } do
+    {:ok, alice} = Users.create_local_user("alice")
+    {:ok, bob} = Users.create_local_user("bob")
+
+    {:ok, note} =
+      Pipeline.ingest(
+        %{
+          "id" => "https://example.com/objects/dm-context-hidden-1",
+          "type" => "Note",
+          "actor" => "https://example.com/users/charlie",
+          "content" => "Secret DM for bob",
+          "to" => [bob.ap_id],
+          "cc" => []
+        },
+        local: false
+      )
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, alice} end)
+
+    conn =
+      conn
+      |> put_req_header("authorization", "Bearer test-token")
+      |> get("/api/v1/statuses/#{note.id}/context")
+
+    assert response(conn, 404)
+  end
+
+  test "oauth read status endpoints return 404 for missing status", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("local")
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, 3, fn _conn -> {:ok, user} end)
+
+    conn = conn |> recycle() |> get("/api/v1/statuses/999999/source")
+    assert response(conn, 404)
+
+    conn = conn |> recycle() |> get("/api/v1/statuses/999999/favourited_by")
+    assert response(conn, 404)
+
+    conn = conn |> recycle() |> get("/api/v1/statuses/999999/reblogged_by")
+    assert response(conn, 404)
+  end
+
+  test "POST /api/v1/statuses ignores blank in_reply_to_id", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("local")
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, user} end)
+
+    conn =
+      post(conn, "/api/v1/statuses", %{
+        "status" => "Hello",
+        "in_reply_to_id" => ""
+      })
+
+    response = json_response(conn, 200)
+    assert response["content"] == "<p>Hello</p>"
+    assert response["in_reply_to_id"] == nil
+  end
+
+  test "POST /api/v1/statuses rejects replies to missing statuses", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("local")
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, user} end)
+
+    conn =
+      post(conn, "/api/v1/statuses", %{
+        "status" => "Reply post",
+        "in_reply_to_id" => "999999"
+      })
+
+    assert response(conn, 422)
+  end
+
+  test "POST /api/v1/statuses accepts integer in_reply_to_id when sent as JSON", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("local")
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, user} end)
+
+    {:ok, parent} =
+      Pipeline.ingest(
+        %{
+          "id" => "https://example.com/objects/parent-int",
+          "type" => "Note",
+          "actor" => "https://example.com/users/alice",
+          "content" => "Parent post",
+          "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+          "cc" => []
+        },
+        local: false
+      )
+
+    body =
+      Jason.encode!(%{
+        "status" => "Reply post",
+        "in_reply_to_id" => parent.id
+      })
+
+    conn =
+      conn
+      |> put_req_header("content-type", "application/json")
+      |> put_req_header("accept", "application/json")
+      |> post("/api/v1/statuses", body)
+
+    response = json_response(conn, 200)
+    assert response["content"] == "<p>Reply post</p>"
+    assert response["in_reply_to_id"] == Integer.to_string(parent.id)
+  end
+
+  test "POST /api/v1/statuses rejects unsupported in_reply_to_id types", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("local")
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, user} end)
+
+    body =
+      Jason.encode!(%{
+        "status" => "Reply post",
+        "in_reply_to_id" => %{"oops" => "not a scalar id"}
+      })
+
+    conn =
+      conn
+      |> put_req_header("content-type", "application/json")
+      |> put_req_header("accept", "application/json")
+      |> post("/api/v1/statuses", body)
+
+    assert response(conn, 422)
+  end
+
+  test "PUT /api/v1/statuses/:id returns 404 for missing status", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("local")
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, user} end)
+
+    conn = put(conn, "/api/v1/statuses/999999", %{"status" => "Hello"})
+    assert response(conn, 404)
+  end
+
+  test "PUT /api/v1/statuses/:id handles JSON boolean sensitive values", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("local")
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, 3, fn _conn -> {:ok, user} end)
+
+    {:ok, create} = Publish.post_note(user, "Original")
+    note = Objects.get_by_ap_id(create.object)
+
+    body = Jason.encode!(%{"status" => "Edited", "sensitive" => true})
+
+    conn =
+      conn
+      |> recycle()
+      |> put_req_header("content-type", "application/json")
+      |> put_req_header("accept", "application/json")
+      |> put("/api/v1/statuses/#{note.id}", body)
+
+    assert json_response(conn, 200)["sensitive"] == true
+
+    body = Jason.encode!(%{"status" => "Edited again", "sensitive" => false})
+
+    conn =
+      conn
+      |> recycle()
+      |> put_req_header("content-type", "application/json")
+      |> put_req_header("accept", "application/json")
+      |> put("/api/v1/statuses/#{note.id}", body)
+
+    assert json_response(conn, 200)["sensitive"] == false
+
+    conn = put(conn |> recycle(), "/api/v1/statuses/#{note.id}", %{"status" => "Edited 3", "sensitive" => "false"})
+    assert json_response(conn, 200)["sensitive"] == false
+  end
+
+  test "bookmark/unbookmark/unfavourite/unreblog do not expose direct statuses to non-recipients", %{
+    conn: conn
+  } do
+    {:ok, alice} = Users.create_local_user("alice")
+    {:ok, bob} = Users.create_local_user("bob")
+
+    {:ok, note} =
+      Pipeline.ingest(
+        %{
+          "id" => "https://example.com/objects/dm-hidden-actions-1",
+          "type" => "Note",
+          "actor" => "https://example.com/users/charlie",
+          "content" => "Secret DM for bob",
+          "to" => [bob.ap_id],
+          "cc" => []
+        },
+        local: false
+      )
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, 4, fn _conn -> {:ok, alice} end)
+
+    conn = post(conn, "/api/v1/statuses/#{note.id}/unfavourite")
+    assert response(conn, 404)
+
+    conn = post(conn |> recycle(), "/api/v1/statuses/#{note.id}/bookmark")
+    assert response(conn, 404)
+
+    conn = post(conn |> recycle(), "/api/v1/statuses/#{note.id}/unbookmark")
+    assert response(conn, 404)
+
+    conn = post(conn |> recycle(), "/api/v1/statuses/#{note.id}/unreblog")
+    assert response(conn, 404)
+  end
 end
