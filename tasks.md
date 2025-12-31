@@ -21,7 +21,7 @@ Notes:
 ## Mastodon API compatibility
 
 - [ ] Fill out remaining Mastodon API gaps that clients expect:
-  - [ ] `GET /api/v1/conversations`
+  - [x] `GET /api/v1/conversations` (currently returns `[]`)
   - [x] `GET /api/v1/favourites` (was stubbed)
   - [x] `GET /api/v1/bookmarks` (was stubbed)
   - [ ] Status edit/Update flows end-to-end (API + AP Update).
