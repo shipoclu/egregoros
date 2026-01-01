@@ -7,7 +7,8 @@ defmodule Egregoros.Signature.HTTPActorFetchTest do
   alias Egregoros.Users
 
   test "verify_request fetches unknown actor public key" do
-    actor_url = "https://remote.example/users/alice"
+    unique = Ecto.UUID.generate() |> String.replace("-", "")
+    actor_url = "https://remote.example/users/alice-#{unique}"
     {public_key, private_key_pem} = Keys.generate_rsa_keypair()
 
     Egregoros.HTTP.Mock
@@ -87,11 +88,12 @@ defmodule Egregoros.Signature.HTTPActorFetchTest do
   end
 
   test "verify_request rejects invalid stored public keys without crashing" do
-    actor_url = "https://remote.example/users/alice"
+    unique = Ecto.UUID.generate() |> String.replace("-", "")
+    actor_url = "https://remote.example/users/alice-#{unique}"
 
     {:ok, _user} =
       Users.create_user(%{
-        nickname: "alice",
+        nickname: "alice_#{unique}",
         ap_id: actor_url,
         inbox: actor_url <> "/inbox",
         outbox: actor_url <> "/outbox",
