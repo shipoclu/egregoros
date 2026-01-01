@@ -648,7 +648,11 @@ defmodule EgregorosWeb.StatusCard do
 
     ~H"""
     <details data-role="status-menu" class="relative">
-      <summary class="list-none [&::-webkit-details-marker]:hidden">
+      <summary
+        data-role="status-menu-trigger"
+        aria-label="Post actions"
+        class="list-none [&::-webkit-details-marker]:hidden"
+      >
         <span class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 dark:text-slate-500 dark:hover:bg-slate-700 dark:hover:text-slate-300">
           <.icon name="hero-ellipsis-horizontal" class="size-5" />
         </span>
