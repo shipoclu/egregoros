@@ -61,6 +61,41 @@ defmodule Egregoros.OAuthTest do
     assert app.redirect_uris == ["urn:ietf:wg:oauth:2.0:oob"]
   end
 
+  test "create_application stores empty redirect_uris when given nil or an invalid value" do
+    {:ok, app} = OAuth.create_application(%{"client_name" => "Husky", "redirect_uris" => nil})
+    assert app.redirect_uris == []
+
+    {:ok, app} = OAuth.create_application(%{"client_name" => "Husky", "redirect_uris" => 123})
+    assert app.redirect_uris == []
+  end
+
+  test "get_application_by_client_id returns nil for nil ids" do
+    assert OAuth.get_application_by_client_id(nil) == nil
+  end
+
+  test "get_authorization_code returns nil for nil inputs" do
+    assert OAuth.get_authorization_code(nil) == nil
+  end
+
+  test "redirect_uri_allowed? returns false for non-matching inputs" do
+    app = create_app!(%{"redirect_uris" => ["https://example.com/callback"]})
+
+    assert OAuth.redirect_uri_allowed?(app, "https://example.com/callback") == true
+    assert OAuth.redirect_uri_allowed?(app, "https://example.com/other") == false
+    assert OAuth.redirect_uri_allowed?(app, nil) == false
+    assert OAuth.redirect_uri_allowed?(nil, "https://example.com/callback") == false
+  end
+
+  test "get_user_by_token and get_token return nil for nil tokens" do
+    assert OAuth.get_user_by_token(nil) == nil
+    assert OAuth.get_token(nil) == nil
+  end
+
+  test "exchange_code_for_token returns unsupported_grant_type for unknown grants" do
+    assert OAuth.exchange_code_for_token(%{"grant_type" => "password"}) ==
+             {:error, :unsupported_grant_type}
+  end
+
   test "authorization codes require a registered redirect uri" do
     user = create_user!()
     app = create_app!(%{"scopes" => "read"})
@@ -105,6 +140,19 @@ defmodule Egregoros.OAuthTest do
                "code" => "nope",
                "client_id" => "missing",
                "client_secret" => "missing",
+               "redirect_uri" => "urn:ietf:wg:oauth:2.0:oob"
+             })
+  end
+
+  test "authorization code exchange fails when the authorization code cannot be found" do
+    app = create_app!()
+
+    assert {:error, :invalid_grant} =
+             OAuth.exchange_code_for_token(%{
+               "grant_type" => "authorization_code",
+               "code" => "missing",
+               "client_id" => app.client_id,
+               "client_secret" => app.client_secret,
                "redirect_uri" => "urn:ietf:wg:oauth:2.0:oob"
              })
   end
@@ -349,6 +397,11 @@ defmodule Egregoros.OAuthTest do
              "client_id" => app.client_id,
              "client_secret" => app.client_secret
            }) == {:error, :invalid_grant}
+  end
+
+  test "revoke_token rejects unknown applications" do
+    assert OAuth.revoke_token(%{"token" => "token", "client_id" => "missing", "client_secret" => "x"}) ==
+             {:error, :invalid_client}
   end
 
   test "revoke_token rejects missing params" do
