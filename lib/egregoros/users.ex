@@ -115,34 +115,34 @@ defmodule Egregoros.Users do
   end
 
   def get_or_create_local_user(nickname) when is_binary(nickname) do
+    nickname = String.trim(nickname)
+
     case get_by_nickname(nickname) do
       %User{} = user ->
         {:ok, user}
 
       nil ->
-        case create_local_user(nickname) do
-          {:ok, %User{} = user} ->
-            {:ok, user}
+        Repo.transaction(fn ->
+          lock_key = :erlang.phash2({__MODULE__, :local_user, nickname})
+          _ = Repo.query!("SELECT pg_advisory_xact_lock($1)", [lock_key])
 
-          {:error, %Ecto.Changeset{} = changeset} ->
-            if local_user_unique_conflict?(changeset) do
-              case get_by_nickname(nickname) do
-                %User{} = user -> {:ok, user}
-                nil -> {:error, changeset}
+          case get_by_nickname(nickname) do
+            %User{} = user ->
+              user
+
+            nil ->
+              case create_local_user(nickname) do
+                {:ok, %User{} = user} -> user
+                {:error, %Ecto.Changeset{} = changeset} -> Repo.rollback(changeset)
               end
-            else
-              {:error, changeset}
-            end
+          end
+        end)
+        |> case do
+          {:ok, %User{} = user} -> {:ok, user}
+          {:error, %Ecto.Changeset{} = changeset} -> {:error, changeset}
+          {:error, reason} -> {:error, reason}
         end
     end
-  end
-
-  defp local_user_unique_conflict?(%Ecto.Changeset{} = changeset) do
-    Enum.any?(changeset.errors, fn
-      {:nickname, {_msg, opts}} -> Keyword.get(opts, :constraint) == :unique
-      {:ap_id, {_msg, opts}} -> Keyword.get(opts, :constraint) == :unique
-      _ -> false
-    end)
   end
 
   def get_by_ap_id(nil), do: nil
