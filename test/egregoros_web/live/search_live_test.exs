@@ -220,49 +220,8 @@ defmodule EgregorosWeb.SearchLiveTest do
   test "logged-in users can follow remote accounts by handle", %{conn: conn} do
     {:ok, user} = Users.create_local_user("alice")
 
-    actor_url = "https://remote.example/users/bob"
-
-    Egregoros.HTTP.Mock
-    |> expect(:get, fn url, _headers ->
-      assert url ==
-               "https://remote.example/.well-known/webfinger?resource=acct:bob@remote.example"
-
-      {:ok,
-       %{
-         status: 200,
-         body: %{
-           "links" => [
-             %{
-               "rel" => "self",
-               "type" => "application/activity+json",
-               "href" => actor_url
-             }
-           ]
-         },
-         headers: []
-       }}
-    end)
-    |> expect(:get, fn url, _headers ->
-      assert url == actor_url
-
-      {:ok,
-       %{
-         status: 200,
-         body: %{
-           "id" => actor_url,
-           "type" => "Person",
-           "preferredUsername" => "bob",
-           "inbox" => "https://remote.example/users/bob/inbox",
-           "outbox" => "https://remote.example/users/bob/outbox",
-           "publicKey" => %{
-             "id" => actor_url <> "#main-key",
-             "owner" => actor_url,
-             "publicKeyPem" => "-----BEGIN PUBLIC KEY-----\nMIIB...\n-----END PUBLIC KEY-----\n"
-           }
-         },
-         headers: []
-       }}
-    end)
+    expect(Egregoros.HTTP.Mock, :get, 0, fn _url, _headers -> :ok end)
+    expect(Egregoros.HTTP.Mock, :post, 0, fn _url, _body, _headers -> :ok end)
 
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
 
@@ -274,7 +233,12 @@ defmodule EgregorosWeb.SearchLiveTest do
     |> element("button[data-role='remote-follow-button']")
     |> render_click()
 
-    assert has_element?(view, "[data-role='search-result-handle']", "@bob@remote.example")
+    assert render(view) =~ "Queued follow request for @bob@remote.example."
+    assert has_element?(view, "[data-role='remote-follow']", "Remote follow queued")
+
+    assert Enum.any?(all_enqueued(), fn job ->
+             job.worker == "Egregoros.Workers.FollowRemote"
+           end)
   end
 
   test "follow remote shows a flash error when invoked while signed out", %{conn: conn} do
@@ -285,11 +249,14 @@ defmodule EgregorosWeb.SearchLiveTest do
     assert render(view) =~ "Login to follow remote accounts."
   end
 
-  test "follow remote shows a flash error when federation follow fails", %{conn: conn} do
+  test "follow remote shows a flash error when the handle is unsafe", %{conn: conn} do
     {:ok, user} = Users.create_local_user("alice")
 
+    expect(Egregoros.HTTP.Mock, :get, 0, fn _url, _headers -> :ok end)
+    expect(Egregoros.HTTP.Mock, :post, 0, fn _url, _body, _headers -> :ok end)
+
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
-    {:ok, view, _html} = live(conn, "/search?q=bob@remote.example")
+    {:ok, view, _html} = live(conn, "/search?q=bob@127.0.0.1")
 
     view
     |> element("button[data-role='remote-follow-button']")

@@ -35,6 +35,7 @@ defmodule EgregorosWeb.SearchLive do
         current_user: current_user,
         notifications_count: notifications_count(current_user),
         mention_suggestions: %{},
+        remote_follow_queued?: false,
         reply_modal_open?: false,
         reply_to_ap_id: nil,
         reply_to_handle: nil,
@@ -91,13 +92,21 @@ defmodule EgregorosWeb.SearchLive do
   def handle_event("follow_remote", _params, socket) do
     with %User{} = user <- socket.assigns.current_user,
          handle when is_binary(handle) and handle != "" <- socket.assigns.remote_handle,
-         {:ok, remote_user} <- Federation.follow_remote(user, handle) do
-      socket =
-        socket
-        |> put_flash(:info, "Following #{ActorVM.handle(remote_user, remote_user.ap_id)}.")
-        |> apply_params(%{"q" => socket.assigns.query})
+         {:ok, result} <- Federation.follow_remote_async(user, handle) do
+      {socket, queued?} =
+        case result do
+          %User{} = remote_user ->
+            handle = ActorVM.handle(remote_user, remote_user.ap_id)
+            {put_flash(socket, :info, "Sent a follow request to #{handle}."), false}
 
-      {:noreply, socket}
+          :queued ->
+            {put_flash(socket, :info, "Queued follow request for @#{handle}."), true}
+        end
+
+      {:noreply,
+       socket
+       |> apply_params(%{"q" => socket.assigns.query})
+       |> assign(remote_follow_queued?: queued?)}
     else
       nil ->
         {:noreply, put_flash(socket, :error, "Login to follow remote accounts.")}
@@ -495,7 +504,20 @@ defmodule EgregorosWeb.SearchLive do
             </.card>
 
             <.card
-              :if={@remote_handle != nil and @current_user != nil and !@remote_following?}
+              :if={@remote_handle != nil and @current_user != nil and @remote_follow_queued?}
+              data_role="remote-follow"
+              class="p-6"
+            >
+              <p class="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                Remote follow queued
+              </p>
+              <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                Fetching <span class="font-semibold">@{@remote_handle}</span> and sending your follow request.
+              </p>
+            </.card>
+
+            <.card
+              :if={@remote_handle != nil and @current_user != nil and !@remote_following? and !@remote_follow_queued?}
               data_role="remote-follow"
               class="p-6"
             >
@@ -718,6 +740,7 @@ defmodule EgregorosWeb.SearchLive do
       tag_query: tag_query,
       remote_handle: remote_handle,
       remote_following?: remote_following?,
+      remote_follow_queued?: false,
       post_results: post_results,
       results: results,
       search_form: Phoenix.Component.to_form(%{"q" => q}, as: :search)
