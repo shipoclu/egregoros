@@ -4,6 +4,10 @@ defmodule Egregoros.UsersTest do
   alias Egregoros.User
   alias Egregoros.Users
 
+  defp unique_nickname(prefix) do
+    prefix <> Integer.to_string(System.unique_integer([:positive]))
+  end
+
   test "create_user stores a user" do
     attrs = %{
       nickname: "alice",
@@ -138,5 +142,59 @@ defmodule Egregoros.UsersTest do
       })
 
     assert user.domain == "remote.example:8443"
+  end
+
+  test "update_profile/2 strips admin from attrs while allowing other fields" do
+    {:ok, user} = Users.create_local_user(unique_nickname("alice"))
+
+    assert user.admin == false
+
+    assert {:ok, updated} =
+             Users.update_profile(user, %{
+               admin: true,
+               name: "New Name"
+             })
+
+    assert updated.admin == false
+    assert updated.name == "New Name"
+  end
+
+  test "update_profile/2 normalizes blank email values to nil" do
+    {:ok, user} = Users.create_local_user(unique_nickname("alice"))
+
+    assert {:ok, updated} = Users.update_profile(user, %{email: "alice@example.com"})
+    assert updated.email == "alice@example.com"
+
+    assert {:ok, updated} = Users.update_profile(updated, %{"email" => "   \n"})
+    assert updated.email == nil
+  end
+
+  test "update_password/3 enforces current password checks and minimum length" do
+    nickname = unique_nickname("alice")
+
+    assert {:ok, user} =
+             Users.register_local_user(%{
+               nickname: nickname,
+               password: "current-password"
+             })
+
+    assert {:error, :unauthorized} = Users.update_password(user, "wrong", "new-password")
+
+    assert {:error, :invalid_password} =
+             Users.update_password(user, "current-password", "short")
+
+    assert {:ok, _updated} =
+             Users.update_password(user, "current-password", "new-password")
+
+    assert {:error, :unauthorized} = Users.authenticate_local_user(nickname, "current-password")
+    assert {:ok, %User{nickname: ^nickname}} = Users.authenticate_local_user(nickname, "new-password")
+  end
+
+  test "update_password/3 rejects password changes for passkey-only users" do
+    nickname = unique_nickname("alice")
+    assert {:ok, user} = Users.create_local_user(nickname)
+    assert user.password_hash == nil
+
+    assert {:error, :unauthorized} = Users.update_password(user, "current-password", "new-password")
   end
 end
