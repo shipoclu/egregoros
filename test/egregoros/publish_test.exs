@@ -14,6 +14,132 @@ defmodule Egregoros.PublishTest do
     assert {:error, :too_long} = Publish.post_note(local, String.duplicate("a", 5001))
   end
 
+  test "post_note/2 rejects blank content when no attachments are provided" do
+    {:ok, local} = Users.create_local_user("alice")
+    assert {:error, :empty} = Publish.post_note(local, "   \n")
+  end
+
+  test "post_note/3 accepts attachment-only posts" do
+    {:ok, local} = Users.create_local_user("alice")
+
+    attachments = [
+      %{
+        "type" => "Document",
+        "mediaType" => "image/png",
+        "url" => [%{"href" => "https://cdn.example/files/1.png", "mediaType" => "image/png"}]
+      }
+    ]
+
+    assert {:ok, create} = Publish.post_note(local, "  ", attachments: attachments)
+
+    assert %{} = note = Objects.get_by_ap_id(create.object)
+    assert List.wrap(note.data["attachment"]) != []
+  end
+
+  test "post_note/3 ignores non-list attachment params" do
+    {:ok, local} = Users.create_local_user("alice")
+
+    assert {:ok, create} = Publish.post_note(local, "hello", attachments: "nope")
+
+    assert %{} = note = Objects.get_by_ap_id(create.object)
+    assert Map.get(note.data, "attachment") in [nil, []]
+  end
+
+  test "post_note/3 ignores non-binary inReplyTo values" do
+    {:ok, local} = Users.create_local_user("alice")
+
+    assert {:ok, create} = Publish.post_note(local, "hello", in_reply_to: 123)
+
+    assert %{} = note = Objects.get_by_ap_id(create.object)
+    assert Map.get(note.data, "inReplyTo") in [nil, ""]
+  end
+
+  test "post_note/3 defaults to public visibility when passed an unknown string" do
+    {:ok, local} = Users.create_local_user("alice")
+
+    assert {:ok, create} = Publish.post_note(local, "hello", visibility: "wat")
+
+    assert %{} = note = Objects.get_by_ap_id(create.object)
+    assert "https://www.w3.org/ns/activitystreams#Public" in List.wrap(note.data["to"])
+    assert (local.ap_id <> "/followers") in List.wrap(note.data["cc"])
+  end
+
+  test "post_note/3 keeps default addressing when visibility is not a string" do
+    {:ok, local} = Users.create_local_user("alice")
+
+    assert {:ok, create} = Publish.post_note(local, "hello", visibility: 123)
+
+    assert %{} = note = Objects.get_by_ap_id(create.object)
+    assert "https://www.w3.org/ns/activitystreams#Public" in List.wrap(note.data["to"])
+    assert (local.ap_id <> "/followers") in List.wrap(note.data["cc"])
+  end
+
+  test "post_note/3 accepts sensitive flag values as strings" do
+    {:ok, local} = Users.create_local_user("alice")
+
+    assert {:ok, create} = Publish.post_note(local, "hello", sensitive: "true")
+
+    assert %{} = note = Objects.get_by_ap_id(create.object)
+    assert note.data["sensitive"] == true
+  end
+
+  test "post_note/3 ignores empty E2EE payloads" do
+    {:ok, alice} = Users.create_local_user("alice")
+    {:ok, bob} = Users.create_local_user("bob")
+
+    assert {:ok, create} =
+             Publish.post_note(alice, "@bob hello",
+               visibility: "direct",
+               e2ee_dm: %{}
+             )
+
+    assert %{} = note = Objects.get_by_ap_id(create.object)
+    assert bob.ap_id in List.wrap(note.data["to"])
+    refute Map.has_key?(note.data, "egregoros:e2ee_dm")
+  end
+
+  test "post_note/2 treats mentions for the local domain as local mentions" do
+    {:ok, alice} = Users.create_local_user("alice")
+    {:ok, bob} = Users.create_local_user("bob")
+
+    endpoint = EgregorosWeb.Endpoint.url()
+    %URI{host: host, port: port} = URI.parse(endpoint)
+
+    domain =
+      case port do
+        nil -> host
+        80 -> host
+        443 -> host
+        port when is_integer(port) -> host <> ":" <> Integer.to_string(port)
+      end
+
+    assert {:ok, create} = Publish.post_note(alice, "@bob@#{domain} hi")
+
+    assert %{} = note = Objects.get_by_ap_id(create.object)
+    assert bob.ap_id in List.wrap(note.data["cc"])
+
+    assert Enum.any?(List.wrap(note.data["tag"]), fn
+             %{"type" => "Mention", "href" => href, "name" => name} ->
+               href == bob.ap_id and name == "@bob"
+
+             _ ->
+               false
+           end)
+  end
+
+  test "post_note/2 ignores unresolved mentions" do
+    {:ok, alice} = Users.create_local_user("alice")
+
+    assert {:ok, create} = Publish.post_note(alice, "hello @missing")
+
+    assert %{} = note = Objects.get_by_ap_id(create.object)
+
+    refute Enum.any?(List.wrap(note.data["tag"]), fn
+             %{"type" => "Mention"} -> true
+             _ -> false
+           end)
+  end
+
   test "post_note/2 delivers Create with addressing to remote followers" do
     {:ok, local} = Users.create_local_user("alice")
 
