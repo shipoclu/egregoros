@@ -250,6 +250,33 @@ defmodule EgregorosWeb.StatusLiveTest do
     )
   end
 
+  test "thread view shows a fetching state when replies are being discovered", %{
+    conn: conn,
+    user: user
+  } do
+    root_id = "https://remote.example/objects/root-fetching-replies"
+    replies_url = root_id <> "/replies"
+
+    assert {:ok, root} =
+             Pipeline.ingest(
+               %{
+                 "id" => root_id,
+                 "type" => "Note",
+                 "attributedTo" => "https://remote.example/users/bob",
+                 "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+                 "cc" => [],
+                 "content" => "<p>Root</p>",
+                 "replies" => %{"id" => replies_url, "type" => "OrderedCollection"}
+               },
+               local: false
+             )
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    assert {:ok, view, _html} = live(conn, "/@bob@remote.example/#{root.id}")
+
+    assert has_element?(view, "[data-role='thread-replies-fetching']", "Fetching replies")
+  end
+
   test "thread view updates when new replies arrive", %{conn: conn, user: user} do
     assert {:ok, root} = Pipeline.ingest(Note.build(user, "Root"), local: true)
     uuid = uuid_from_ap_id(root.ap_id)

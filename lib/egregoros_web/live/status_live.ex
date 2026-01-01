@@ -76,8 +76,17 @@ defmodule EgregorosWeb.StatusLive do
           {nil, [], [], nil, false}
       end
 
-    if connected?(socket) and match?(%Egregoros.Object{type: "Note"}, thread_note) and
-         descendant_entries == [] do
+    fetching_replies? =
+      case thread_note do
+        %Egregoros.Object{type: "Note", local: false} = note ->
+          replies_url = note |> replies_url() |> normalize_binary()
+          replies_url != "" and descendant_entries == []
+
+        _ ->
+          false
+      end
+
+    if connected?(socket) and fetching_replies? do
       _ = ThreadDiscovery.enqueue_replies(thread_note, existing_descendants: 0)
     end
 
@@ -122,6 +131,7 @@ defmodule EgregorosWeb.StatusLive do
         descendants: descendant_entries,
         thread_index: thread_index,
         thread_missing_context?: missing_parent?,
+        thread_fetching_replies?: fetching_replies?,
         reply_modal_open?: reply_modal_open?,
         reply_to_ap_id: reply_to_ap_id,
         reply_to_handle: reply_to_handle,
@@ -650,7 +660,15 @@ defmodule EgregorosWeb.StatusLive do
                 </div>
 
                 <div
-                  :if={@descendants == []}
+                  :if={@descendants == [] and @thread_fetching_replies?}
+                  data-role="thread-replies-fetching"
+                  class="rounded-3xl border border-slate-200/80 bg-white/70 p-6 text-sm text-slate-600 shadow-sm shadow-slate-200/20 dark:border-slate-700/70 dark:bg-slate-950/50 dark:text-slate-300 dark:shadow-slate-900/30"
+                >
+                  Fetching replies…
+                </div>
+
+                <div
+                  :if={@descendants == [] and not @thread_fetching_replies?}
                   data-role="thread-replies-empty"
                   class="rounded-3xl border border-slate-200/80 bg-white/70 p-6 text-sm text-slate-600 shadow-sm shadow-slate-200/20 dark:border-slate-700/70 dark:bg-slate-950/50 dark:text-slate-300 dark:shadow-slate-900/30"
                 >
@@ -891,6 +909,10 @@ defmodule EgregorosWeb.StatusLive do
         descendant_entries = decorate_descendants(note, current_user)
         thread_index = build_thread_index(status_entry, ancestor_entries, descendant_entries)
 
+        fetching_replies? =
+          note.local == false and descendant_entries == [] and
+            note |> replies_url() |> normalize_binary() != ""
+
         parent_ap_id =
           note.data
           |> Map.get("inReplyTo")
@@ -905,7 +927,8 @@ defmodule EgregorosWeb.StatusLive do
           ancestors: ancestor_entries,
           descendants: descendant_entries,
           thread_index: thread_index,
-          thread_missing_context?: missing_parent?
+          thread_missing_context?: missing_parent?,
+          thread_fetching_replies?: fetching_replies?
         )
 
       _ ->
@@ -1115,6 +1138,19 @@ defmodule EgregorosWeb.StatusLive do
   defp in_reply_to_ap_id(value) when is_binary(value), do: value
   defp in_reply_to_ap_id(%{"id" => id}) when is_binary(id), do: id
   defp in_reply_to_ap_id(_), do: nil
+
+  defp replies_url(%{data: %{} = data}) do
+    data
+    |> Map.get("replies")
+    |> extract_link()
+  end
+
+  defp replies_url(_object), do: nil
+
+  defp extract_link(value) when is_binary(value), do: value
+  defp extract_link(%{"id" => id}) when is_binary(id), do: id
+  defp extract_link(%{id: id}) when is_binary(id), do: id
+  defp extract_link(_value), do: nil
 
   defp normalize_binary(value) when is_binary(value), do: String.trim(value)
   defp normalize_binary(_value), do: ""
