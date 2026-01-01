@@ -161,6 +161,16 @@ a.mention-link:hover {
   border-bottom-color: currentColor;
 }
 
+/* Anchor navigation inside threads should land with context and visual feedback. */
+article[data-role="status-card"] {
+  scroll-margin-top: 6rem;
+}
+
+article[data-role="status-card"]:target {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 0.5rem;
+}
+
 /* Gradient text for branding */
 .text-gradient {
   background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
