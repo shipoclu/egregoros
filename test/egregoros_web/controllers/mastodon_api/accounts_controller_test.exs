@@ -692,4 +692,192 @@ defmodule EgregorosWeb.MastodonAPI.AccountsControllerTest do
     File.write!(path, <<0, 1, 2, 3>>)
     path
   end
+
+  test "PATCH /api/v1/accounts/update_credentials returns 422 when avatar storage fails", %{
+    conn: conn
+  } do
+    {:ok, user} = Users.create_local_user("local")
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, user} end)
+
+    upload =
+      %Plug.Upload{
+        path: tmp_upload_path(),
+        filename: "avatar.png",
+        content_type: "image/png"
+      }
+
+    Egregoros.AvatarStorage.Mock
+    |> expect(:store_avatar, fn ^user, %Plug.Upload{filename: "avatar.png"} ->
+      {:error, :boom}
+    end)
+
+    conn =
+      patch(conn, "/api/v1/accounts/update_credentials", %{
+        "avatar" => upload
+      })
+
+    assert response(conn, 422) == "Unprocessable Entity"
+  end
+
+  test "GET /api/v1/accounts/:id returns 404 when the account does not exist", %{conn: conn} do
+    conn = get(conn, "/api/v1/accounts/0")
+    assert response(conn, 404) == "Not Found"
+  end
+
+  test "GET /api/v1/accounts/lookup returns 422 for empty or invalid acct params", %{conn: conn} do
+    conn = get(conn, "/api/v1/accounts/lookup", %{"acct" => ""})
+    assert response(conn, 422) == "Unprocessable Entity"
+
+    conn = get(conn, "/api/v1/accounts/lookup", %{"acct" => "@"})
+    assert response(conn, 422) == "Unprocessable Entity"
+
+    conn = get(conn, "/api/v1/accounts/lookup")
+    assert response(conn, 422) == "Unprocessable Entity"
+  end
+
+  test "GET /api/v1/accounts/:id/statuses returns 404 when the account does not exist", %{
+    conn: conn
+  } do
+    conn = get(conn, "/api/v1/accounts/0/statuses")
+    assert response(conn, 404) == "Not Found"
+  end
+
+  test "GET /api/v1/accounts/:id/followers returns 404 when the account does not exist", %{
+    conn: conn
+  } do
+    conn = get(conn, "/api/v1/accounts/0/followers")
+    assert response(conn, 404) == "Not Found"
+  end
+
+  test "GET /api/v1/accounts/:id/following returns 404 when the account does not exist", %{
+    conn: conn
+  } do
+    conn = get(conn, "/api/v1/accounts/0/following")
+    assert response(conn, 404) == "Not Found"
+  end
+
+  test "POST /api/v1/accounts/:id/follow returns 404 when the account does not exist", %{
+    conn: conn
+  } do
+    {:ok, user} = Users.create_local_user("local")
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, user} end)
+
+    conn = post(conn, "/api/v1/accounts/0/follow")
+    assert response(conn, 404) == "Not Found"
+  end
+
+  test "POST /api/v1/accounts/:id/unfollow returns 404 when there is no follow relationship", %{
+    conn: conn
+  } do
+    {:ok, user} = Users.create_local_user("local")
+    {:ok, target} = Users.create_local_user("target")
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, user} end)
+
+    conn = post(conn, "/api/v1/accounts/#{target.id}/unfollow")
+    assert response(conn, 404) == "Not Found"
+  end
+
+  test "POST /api/v1/accounts/:id/unfollow returns 404 when the follow activity ap_id cannot be resolved",
+       %{conn: conn} do
+    {:ok, user} = Users.create_local_user("local")
+    {:ok, target} = Users.create_local_user("target")
+
+    assert {:ok, _} =
+             Relationships.upsert_relationship(%{
+               type: "Follow",
+               actor: user.ap_id,
+               object: target.ap_id,
+               activity_ap_id: nil
+             })
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, user} end)
+
+    conn = post(conn, "/api/v1/accounts/#{target.id}/unfollow")
+    assert response(conn, 404) == "Not Found"
+  end
+
+  test "POST /api/v1/accounts/:id/block returns 422 when blocking yourself", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("local")
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, user} end)
+
+    conn = post(conn, "/api/v1/accounts/#{user.id}/block")
+    assert response(conn, 422) == "Unprocessable Entity"
+  end
+
+  test "POST /api/v1/accounts/:id/block returns 404 when the account does not exist", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("local")
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, user} end)
+
+    conn = post(conn, "/api/v1/accounts/0/block")
+    assert response(conn, 404) == "Not Found"
+  end
+
+  test "POST /api/v1/accounts/:id/unblock returns 404 when the account does not exist", %{
+    conn: conn
+  } do
+    {:ok, user} = Users.create_local_user("local")
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, user} end)
+
+    conn = post(conn, "/api/v1/accounts/0/unblock")
+    assert response(conn, 404) == "Not Found"
+  end
+
+  test "POST /api/v1/accounts/:id/mute returns 422 when muting yourself", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("local")
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, user} end)
+
+    conn = post(conn, "/api/v1/accounts/#{user.id}/mute")
+    assert response(conn, 422) == "Unprocessable Entity"
+  end
+
+  test "POST /api/v1/accounts/:id/unmute returns 404 when the account does not exist", %{
+    conn: conn
+  } do
+    {:ok, user} = Users.create_local_user("local")
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, user} end)
+
+    conn = post(conn, "/api/v1/accounts/0/unmute")
+    assert response(conn, 404) == "Not Found"
+  end
+
+  test "GET /api/v1/accounts/:id/statuses treats pinned=1 as pinned-only", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("alice")
+    {:ok, _} = Publish.post_note(user, "First post")
+
+    conn = get(conn, "/api/v1/accounts/#{user.id}/statuses", %{"pinned" => "1"})
+    assert json_response(conn, 200) == []
+  end
+
+  test "GET /api/v1/accounts/lookup returns 404 for unknown local users", %{conn: conn} do
+    conn = get(conn, "/api/v1/accounts/lookup", %{"acct" => "missing"})
+    assert response(conn, 404) == "Not Found"
+  end
+
+  test "GET /api/v1/accounts/lookup returns 404 when remote WebFinger lookup fails", %{conn: conn} do
+    Egregoros.HTTP.Mock
+    |> expect(:get, fn url, _headers ->
+      assert url == "https://remote.example/.well-known/webfinger?resource=acct:missing@remote.example"
+      {:ok, %{status: 404, body: %{}, headers: []}}
+    end)
+
+    conn = get(conn, "/api/v1/accounts/lookup", %{"acct" => "missing@remote.example"})
+    assert response(conn, 404) == "Not Found"
+  end
 end
