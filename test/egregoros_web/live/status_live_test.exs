@@ -9,6 +9,7 @@ defmodule EgregorosWeb.StatusLiveTest do
   alias Egregoros.Relationships
   alias Egregoros.TestSupport.Fixtures
   alias Egregoros.Users
+  alias Egregoros.Workers.FetchThreadAncestors
   alias Egregoros.Workers.FetchThreadReplies
 
   setup do
@@ -195,6 +196,26 @@ defmodule EgregorosWeb.StatusLiveTest do
            )
 
     assert has_element?(view, "#post-#{child.id}", "Child from alice")
+  end
+
+  test "thread view enqueues fetching missing ancestors and shows a hint when context is incomplete",
+       %{conn: conn, user: user} do
+    parent_ap_id = "https://remote.example/objects/missing-parent"
+
+    assert {:ok, reply} =
+             Pipeline.ingest(
+               Note.build(user, "Reply") |> Map.put("inReplyTo", parent_ap_id),
+               local: true,
+               thread_fetch: true
+             )
+
+    uuid = uuid_from_ap_id(reply.ap_id)
+
+    assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}")
+
+    assert has_element?(view, "[data-role='thread-missing-context']", "Fetching context")
+
+    assert_enqueued(worker: FetchThreadAncestors, args: %{"start_ap_id" => reply.ap_id})
   end
 
   test "status view enqueues a thread replies fetch when the object advertises a replies collection",

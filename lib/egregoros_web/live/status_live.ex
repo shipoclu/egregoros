@@ -48,27 +48,41 @@ defmodule EgregorosWeb.StatusLive do
 
     reply_modal_open? = Param.truthy?(Map.get(params, "reply")) and not is_nil(current_user)
 
-    {status_entry, ancestor_entries, descendant_entries, thread_note} =
+    {status_entry, ancestor_entries, descendant_entries, thread_note, missing_parent?} =
       case object do
         %{type: "Note"} = note ->
           status_entry = StatusVM.decorate(note, current_user)
 
+          raw_ancestors = Objects.thread_ancestors(note)
+
           ancestors =
-            note
-            |> Objects.thread_ancestors()
+            raw_ancestors
             |> Enum.filter(&Objects.visible_to?(&1, current_user))
             |> StatusVM.decorate_many(current_user)
 
           descendants = decorate_descendants(note, current_user)
-          {status_entry, ancestors, descendants, note}
+
+          parent_ap_id =
+            note.data
+            |> Map.get("inReplyTo")
+            |> in_reply_to_ap_id()
+            |> normalize_binary()
+
+          missing_parent? = parent_ap_id != "" and raw_ancestors == []
+
+          {status_entry, ancestors, descendants, note, missing_parent?}
 
         _ ->
-          {nil, [], [], nil}
+          {nil, [], [], nil, false}
       end
 
     if connected?(socket) and match?(%Egregoros.Object{type: "Note"}, thread_note) and
          descendant_entries == [] do
       _ = ThreadDiscovery.enqueue_replies(thread_note, existing_descendants: 0)
+    end
+
+    if connected?(socket) and missing_parent? do
+      _ = ThreadDiscovery.enqueue(thread_note)
     end
 
     reply_to_handle =
@@ -107,6 +121,7 @@ defmodule EgregorosWeb.StatusLive do
         ancestors: ancestor_entries,
         descendants: descendant_entries,
         thread_index: thread_index,
+        thread_missing_context?: missing_parent?,
         reply_modal_open?: reply_modal_open?,
         reply_to_ap_id: reply_to_ap_id,
         reply_to_handle: reply_to_handle,
@@ -583,6 +598,22 @@ defmodule EgregorosWeb.StatusLive do
               </div>
 
               <% status_parent = reply_parent_info(@thread_index, @status.object) %>
+              <div
+                :if={@thread_missing_context?}
+                data-role="thread-missing-context"
+                class="flex items-start gap-3 rounded-3xl border border-slate-200/80 bg-white/70 px-5 py-4 text-sm text-slate-600 shadow-sm shadow-slate-200/20 dark:border-slate-700/70 dark:bg-slate-950/50 dark:text-slate-300 dark:shadow-slate-900/30"
+              >
+                <span class="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-200">
+                  <.icon name="hero-arrow-path" class="size-5" />
+                </span>
+                <div class="min-w-0">
+                  <p class="font-semibold text-slate-900 dark:text-slate-100">Fetching context…</p>
+                  <p class="mt-1 leading-relaxed">
+                    This post replies to something we haven’t fetched yet. We’ll try to pull in the missing
+                    thread context in the background.
+                  </p>
+                </div>
+              </div>
 
               <div
                 :if={is_map(status_parent)}
@@ -850,21 +881,31 @@ defmodule EgregorosWeb.StatusLive do
       %{object: %{type: "Note"} = note} ->
         status_entry = StatusVM.decorate(note, current_user)
 
+        raw_ancestors = Objects.thread_ancestors(note)
+
         ancestor_entries =
-          note
-          |> Objects.thread_ancestors()
+          raw_ancestors
           |> Enum.filter(&Objects.visible_to?(&1, current_user))
           |> StatusVM.decorate_many(current_user)
 
         descendant_entries = decorate_descendants(note, current_user)
         thread_index = build_thread_index(status_entry, ancestor_entries, descendant_entries)
 
+        parent_ap_id =
+          note.data
+          |> Map.get("inReplyTo")
+          |> in_reply_to_ap_id()
+          |> normalize_binary()
+
+        missing_parent? = parent_ap_id != "" and raw_ancestors == []
+
         socket
         |> assign(
           status: status_entry,
           ancestors: ancestor_entries,
           descendants: descendant_entries,
-          thread_index: thread_index
+          thread_index: thread_index,
+          thread_missing_context?: missing_parent?
         )
 
       _ ->
@@ -1074,6 +1115,9 @@ defmodule EgregorosWeb.StatusLive do
   defp in_reply_to_ap_id(value) when is_binary(value), do: value
   defp in_reply_to_ap_id(%{"id" => id}) when is_binary(id), do: id
   defp in_reply_to_ap_id(_), do: nil
+
+  defp normalize_binary(value) when is_binary(value), do: String.trim(value)
+  defp normalize_binary(_value), do: ""
 
   defp thread_indent(depth) when is_integer(depth) do
     depth = depth |> max(1) |> min(5)
