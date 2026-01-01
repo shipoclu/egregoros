@@ -293,7 +293,7 @@ defmodule EgregorosWeb.InboxControllerTest do
   test "POST /users/:nickname/inbox ingests public activities for the internal fetch actor", %{
     conn: conn
   } do
-    {:ok, _internal} = Users.create_local_user("internal.fetch")
+    {:ok, _internal} = Users.get_or_create_local_user("internal.fetch")
     {public_key, private_key} = Egregoros.Keys.generate_rsa_keypair()
 
     {:ok, _} =
