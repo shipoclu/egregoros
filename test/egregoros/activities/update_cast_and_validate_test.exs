@@ -32,5 +32,41 @@ defmodule Egregoros.Activities.UpdateCastAndValidateTest do
 
     assert {:error, %Ecto.Changeset{}} = Update.cast_and_validate(activity)
   end
-end
 
+  test "normalizes actor objects into string ids" do
+    actor_ap_id = "https://example.com/users/alice"
+
+    activity = %{
+      "id" => "https://example.com/activities/update/actor-object",
+      "type" => "Update",
+      "actor" => %{"id" => actor_ap_id},
+      "object" => %{
+        "id" => actor_ap_id,
+        "type" => "Person"
+      }
+    }
+
+    assert {:ok, validated} = Update.cast_and_validate(activity)
+    assert validated["actor"] == actor_ap_id
+  end
+
+  test "accepts Update for a Note when actor matches the Note's actor list" do
+    actor_ap_id = "https://example.com/users/alice"
+
+    activity = %{
+      "id" => "https://example.com/activities/update/note",
+      "type" => "Update",
+      "actor" => actor_ap_id,
+      "object" => %{
+        "id" => "https://example.com/objects/1",
+        "type" => "Note",
+        "actor" => %{"id" => actor_ap_id},
+        "content" => "hello"
+      }
+    }
+
+    assert {:ok, validated} = Update.cast_and_validate(activity)
+    assert validated["actor"] == actor_ap_id
+    assert validated["object"]["id"] == "https://example.com/objects/1"
+  end
+end

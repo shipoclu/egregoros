@@ -6,6 +6,7 @@ defmodule Egregoros.Activities.UpdateIngestTest do
   alias Egregoros.Pipeline
   alias Egregoros.Relationships
   alias Egregoros.Users
+  alias EgregorosWeb.Endpoint
 
   @public "https://www.w3.org/ns/activitystreams#Public"
 
@@ -74,5 +75,90 @@ defmodule Egregoros.Activities.UpdateIngestTest do
     assert user.banner_url == "https://remote.example/media/banner.png"
 
     assert %{"shortcode" => "linux", "url" => "https://remote.example/emoji/linux.png"} in user.emojis
+  end
+
+  test "ingest accepts Update when addressed to the inbox user (without an existing follow)" do
+    {:ok, inbox_user} = Users.create_local_user("inbox-user-#{Ecto.UUID.generate()}")
+    actor_ap_id = "https://remote.example/users/alice-#{Ecto.UUID.generate()}"
+    {public_key, _private_key} = Keys.generate_rsa_keypair()
+
+    update = %{
+      "id" => actor_ap_id <> "/activities/update/1",
+      "type" => "Update",
+      "actor" => actor_ap_id,
+      "to" => [inbox_user.ap_id],
+      "cc" => [],
+      "object" => %{
+        "id" => actor_ap_id,
+        "type" => "Person",
+        "preferredUsername" => "alice",
+        "inbox" => actor_ap_id <> "/inbox",
+        "outbox" => actor_ap_id <> "/outbox",
+        "publicKey" => %{
+          "id" => actor_ap_id <> "#main-key",
+          "owner" => actor_ap_id,
+          "publicKeyPem" => public_key
+        }
+      }
+    }
+
+    assert {:ok, %Object{} = object} =
+             Pipeline.ingest(update, local: false, inbox_user_ap_id: inbox_user.ap_id)
+
+    assert object.type == "Update"
+    assert object.actor == actor_ap_id
+  end
+
+  test "ingest rejects Update when it is not addressed to or followed by the inbox user" do
+    {:ok, inbox_user} = Users.create_local_user("inbox-user-#{Ecto.UUID.generate()}")
+    actor_ap_id = "https://remote.example/users/alice-#{Ecto.UUID.generate()}"
+    {public_key, _private_key} = Keys.generate_rsa_keypair()
+
+    update = %{
+      "id" => actor_ap_id <> "/activities/update/2",
+      "type" => "Update",
+      "actor" => actor_ap_id,
+      "to" => [@public],
+      "cc" => [],
+      "object" => %{
+        "id" => actor_ap_id,
+        "type" => "Person",
+        "preferredUsername" => "alice",
+        "inbox" => actor_ap_id <> "/inbox",
+        "outbox" => actor_ap_id <> "/outbox",
+        "publicKey" => %{
+          "id" => actor_ap_id <> "#main-key",
+          "owner" => actor_ap_id,
+          "publicKeyPem" => public_key
+        }
+      }
+    }
+
+    assert {:error, :not_targeted} =
+             Pipeline.ingest(update, local: false, inbox_user_ap_id: inbox_user.ap_id)
+  end
+
+  test "ingest rejects Update that attempts to reference a local object when coming from remote" do
+    {:ok, inbox_user} = Users.create_local_user("inbox-user-#{Ecto.UUID.generate()}")
+    actor_ap_id = "https://remote.example/users/alice-#{Ecto.UUID.generate()}"
+
+    update = %{
+      "id" => actor_ap_id <> "/activities/update/3",
+      "type" => "Update",
+      "actor" => actor_ap_id,
+      "to" => [inbox_user.ap_id],
+      "cc" => [],
+      "object" => %{
+        "id" => Endpoint.url() <> "/objects/local-target",
+        "type" => "Note",
+        "attributedTo" => actor_ap_id,
+        "to" => [@public],
+        "cc" => [],
+        "content" => "<p>evil</p>"
+      }
+    }
+
+    assert {:error, :local_id} =
+             Pipeline.ingest(update, local: false, inbox_user_ap_id: inbox_user.ap_id)
   end
 end
