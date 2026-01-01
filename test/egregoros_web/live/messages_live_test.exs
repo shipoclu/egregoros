@@ -4,6 +4,7 @@ defmodule EgregorosWeb.MessagesLiveTest do
   import Phoenix.LiveViewTest
 
   alias Egregoros.DirectMessages
+  alias Egregoros.Objects
   alias Egregoros.Publish
   alias Egregoros.Users
 
@@ -83,5 +84,36 @@ defmodule EgregorosWeb.MessagesLiveTest do
 
     [dm] = DirectMessages.list_for_user(alice, limit: 1)
     assert dm.data["egregoros:e2ee_dm"] == payload
+  end
+
+  test "messages reply modal can be opened and replies default to direct visibility", %{
+    conn: conn,
+    alice: alice,
+    bob: bob
+  } do
+    assert {:ok, create} = Publish.post_note(bob, "@alice Secret DM", visibility: "direct")
+    parent = Objects.get_by_ap_id(create.object)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: alice.id})
+    {:ok, view, _html} = live(conn, "/messages")
+
+    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='closed']")
+
+    view
+    |> element("#dm-#{parent.id} button[data-role='reply']")
+    |> render_click()
+
+    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='open']")
+    assert has_element?(view, "#reply-modal [data-role='compose-visibility-label']", "Direct")
+
+    view
+    |> form("#reply-modal-form", reply: %{content: "Reply DM"})
+    |> render_submit()
+
+    assert render(view) =~ "Reply posted."
+
+    [reply] = Objects.list_replies_to(parent.ap_id, limit: 1)
+    assert reply.data["inReplyTo"] == parent.ap_id
+    assert bob.ap_id in List.wrap(reply.data["to"])
   end
 end
