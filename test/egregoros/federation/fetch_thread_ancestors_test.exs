@@ -14,10 +14,12 @@ defmodule Egregoros.Federation.FetchThreadAncestorsTest do
   end
 
   test "perform/1 normalizes Create wrapper objects to their embedded Note for ancestor fetching" do
-    start_ap_id = "https://remote.example/activities/create/1"
-    note_ap_id = "https://remote.example/objects/note/1"
-    parent_id = "https://remote.example/objects/parent/1"
-    actor = "https://remote.example/users/alice"
+    suffix = Ecto.UUID.generate()
+
+    start_ap_id = "https://remote.example/activities/create/" <> suffix
+    note_ap_id = "https://remote.example/objects/note/" <> suffix
+    parent_id = "https://remote.example/objects/parent/" <> suffix
+    actor = "https://remote.example/users/alice-" <> suffix
 
     assert {:ok, _note} =
              Objects.create_object(%{
@@ -76,10 +78,12 @@ defmodule Egregoros.Federation.FetchThreadAncestorsTest do
   end
 
   test "perform/1 clamps max_depth parsed from strings and stops fetching when exhausted" do
-    reply_id = "https://remote.example/objects/reply-depth"
-    parent_id = "https://remote.example/objects/parent-depth"
-    grandparent_id = "https://remote.example/objects/grandparent-depth"
-    actor = "https://remote.example/users/alice"
+    suffix = Ecto.UUID.generate()
+
+    reply_id = "https://remote.example/objects/reply-depth/" <> suffix
+    parent_id = "https://remote.example/objects/parent-depth/" <> suffix
+    grandparent_id = "https://remote.example/objects/grandparent-depth/" <> suffix
+    actor = "https://remote.example/users/alice-" <> suffix
 
     assert {:ok, _reply} =
              Objects.create_object(%{
@@ -125,21 +129,23 @@ defmodule Egregoros.Federation.FetchThreadAncestorsTest do
   end
 
   test "perform/1 fetches missing start objects and broadcasts pending announces" do
-    start_ap_id = "https://remote.example/objects/missing-start"
-    parent_id = "https://remote.example/objects/missing-parent"
-    actor = "https://remote.example/users/alice"
+    suffix = Ecto.UUID.generate()
+
+    start_ap_id = "https://remote.example/objects/missing-start/" <> suffix
+    parent_id = "https://remote.example/objects/missing-parent/" <> suffix
+    actor = "https://remote.example/users/alice-" <> suffix
 
     Timeline.subscribe_public()
 
     assert {:ok, announce} =
              Objects.create_object(%{
-               ap_id: "https://remote.example/activities/announce/1",
+               ap_id: "https://remote.example/activities/announce/" <> suffix,
                type: "Announce",
                actor: actor,
                object: start_ap_id,
                local: false,
                data: %{
-                 "id" => "https://remote.example/activities/announce/1",
+                 "id" => "https://remote.example/activities/announce/" <> suffix,
                  "type" => "Announce",
                  "actor" => actor,
                  "object" => start_ap_id,
@@ -192,9 +198,11 @@ defmodule Egregoros.Federation.FetchThreadAncestorsTest do
   end
 
   test "perform/1 ignores forbidden or missing parents without failing the job" do
-    reply_id = "https://remote.example/objects/reply-forbidden"
-    parent_id = "https://remote.example/objects/parent-forbidden"
-    actor = "https://remote.example/users/alice"
+    suffix = Ecto.UUID.generate()
+
+    reply_id = "https://remote.example/objects/reply-forbidden/" <> suffix
+    parent_id = "https://remote.example/objects/parent-forbidden/" <> suffix
+    actor = "https://remote.example/users/alice-" <> suffix
 
     assert {:ok, _reply} =
              Objects.create_object(%{
