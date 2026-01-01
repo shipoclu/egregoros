@@ -140,6 +140,65 @@ defmodule Egregoros.PublishTest do
            end)
   end
 
+  test "post_note/2 offloads unknown remote mention resolution (no HTTP on request path)" do
+    {:ok, alice} = Users.create_local_user("alice")
+
+    stub(Egregoros.HTTP.Mock, :get, fn _url, _headers ->
+      flunk("unexpected HTTP GET during post_note/2")
+    end)
+
+    stub(Egregoros.HTTP.Mock, :post, fn _url, _body, _headers ->
+      flunk("unexpected HTTP POST during post_note/2")
+    end)
+
+    assert {:ok, _create} = Publish.post_note(alice, "hi @toast@donotsta.re")
+
+    assert Enum.any?(all_enqueued(), fn job ->
+             job.worker == "Egregoros.Workers.ResolveMentions"
+           end)
+  end
+
+  test "post_note/2 skips Create delivery until remote mentions are resolved" do
+    {:ok, local} = Users.create_local_user("alice")
+
+    {:ok, remote_follower} =
+      Users.create_user(%{
+        nickname: "lain",
+        ap_id: "https://lain.com/users/lain",
+        inbox: "https://lain.com/users/lain/inbox",
+        outbox: "https://lain.com/users/lain/outbox",
+        public_key: "-----BEGIN PUBLIC KEY-----\nMIIB...\n-----END PUBLIC KEY-----\n",
+        local: false
+      })
+
+    follow = %{
+      "id" => "https://lain.com/activities/follow/1",
+      "type" => "Follow",
+      "actor" => remote_follower.ap_id,
+      "object" => local.ap_id
+    }
+
+    assert {:ok, _} = Pipeline.ingest(follow, local: false)
+
+    stub(Egregoros.HTTP.Mock, :get, fn _url, _headers ->
+      {:ok, %{status: 404, body: %{}, headers: []}}
+    end)
+
+    assert {:ok, _create} = Publish.post_note(local, "hi @toast@donotsta.re")
+
+    assert Enum.any?(all_enqueued(), fn job ->
+             job.worker == "Egregoros.Workers.ResolveMentions"
+           end)
+
+    create_jobs =
+      all_enqueued(worker: DeliverActivity)
+      |> Enum.filter(fn job ->
+        match?(%{"activity" => %{"type" => "Create"}}, job.args)
+      end)
+
+    refute Enum.any?(create_jobs, &(&1.args["inbox_url"] == remote_follower.inbox))
+  end
+
   test "post_note/2 delivers Create with addressing to remote followers" do
     {:ok, local} = Users.create_local_user("alice")
 

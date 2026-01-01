@@ -3,8 +3,6 @@ defmodule Egregoros.Publish do
   alias Egregoros.Activities.Note
   alias Egregoros.Domain
   alias Egregoros.HTML
-  alias Egregoros.Federation.Actor
-  alias Egregoros.Federation.WebFinger
   alias Egregoros.Objects
   alias Egregoros.Mentions
   alias Egregoros.Pipeline
@@ -37,7 +35,7 @@ defmodule Egregoros.Publish do
         {:error, :too_long}
 
       true ->
-        mentions = resolve_mentions(content, user.ap_id)
+        {mentions, unresolved_remote_mentions} = resolve_mentions(content, user.ap_id)
         reply_mentions = resolve_reply_mentions(in_reply_to, user.ap_id)
 
         mentions =
@@ -77,7 +75,26 @@ defmodule Egregoros.Publish do
 
         create = Create.build(user, note)
 
-        Pipeline.ingest(create, local: true)
+        ingest_opts =
+          if unresolved_remote_mentions == [] do
+            [local: true]
+          else
+            [local: true, deliver: false]
+          end
+
+        with {:ok, create_object} <- Pipeline.ingest(create, ingest_opts) do
+          if unresolved_remote_mentions != [] do
+            _ =
+              Oban.insert(
+                Egregoros.Workers.ResolveMentions.new(%{
+                  "create_ap_id" => create_object.ap_id,
+                  "remote_mentions" => unresolved_remote_mentions
+                })
+              )
+          end
+
+          {:ok, create_object}
+        end
     end
   end
 
@@ -200,22 +217,35 @@ defmodule Egregoros.Publish do
 
     content
     |> Mentions.extract()
-    |> Enum.reduce([], fn {nickname, host}, acc ->
+    |> Enum.reduce({[], []}, fn {nickname, host}, {mentions, unresolved} ->
       host_normalized = normalize_host(host)
       name = mention_name(nickname, host_normalized, local_domains)
 
       case resolve_mention_recipient(nickname, host_normalized, local_domains) do
         ap_id when is_binary(ap_id) and ap_id != "" ->
-          [%{nickname: nickname, host: host_normalized, ap_id: ap_id, name: name} | acc]
+          {[%{nickname: nickname, host: host_normalized, ap_id: ap_id, name: name} | mentions],
+           unresolved}
+
+        {:unresolved, handle} when is_binary(handle) and handle != "" ->
+          {mentions, [handle | unresolved]}
 
         _ ->
-          acc
+          {mentions, unresolved}
       end
     end)
-    |> Enum.uniq_by(& &1.ap_id)
+    |> then(fn {mentions, unresolved} ->
+      unresolved =
+        unresolved
+        |> Enum.filter(&is_binary/1)
+        |> Enum.map(&String.trim/1)
+        |> Enum.reject(&(&1 == ""))
+        |> Enum.uniq()
+
+      {Enum.uniq_by(mentions, & &1.ap_id), unresolved}
+    end)
   end
 
-  defp resolve_mentions(_content, _actor_ap_id), do: []
+  defp resolve_mentions(_content, _actor_ap_id), do: {[], []}
 
   defp resolve_reply_mentions(nil, _actor_ap_id), do: []
 
@@ -262,12 +292,7 @@ defmodule Egregoros.Publish do
           ap_id
 
         _ ->
-          with {:ok, actor_url} <- WebFinger.lookup(handle),
-               {:ok, %User{ap_id: ap_id}} <- Actor.fetch_and_store(actor_url) do
-            ap_id
-          else
-            _ -> nil
-          end
+          {:unresolved, handle}
       end
     end
   end

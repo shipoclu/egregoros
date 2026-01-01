@@ -79,7 +79,7 @@ defmodule Egregoros.Activities.Create do
   end
 
   def side_effects(object, opts) do
-    if Keyword.get(opts, :local, true) do
+    if Keyword.get(opts, :local, true) and Keyword.get(opts, :deliver, true) do
       deliver(object)
     end
 
