@@ -48,4 +48,21 @@ defmodule EgregorosWeb.AppShellTest do
     assert html =~ ~s(data-role="nav-login")
     assert html =~ ~s(data-role="nav-register")
   end
+
+  test "marks active navigation links with aria-current" do
+    html =
+      render_component(&AppShell.app_shell/1, %{
+        id: "app-shell",
+        nav_id: "app-nav",
+        main_id: "app-main",
+        aside_id: "app-aside",
+        active: :timeline,
+        current_user: %{nickname: "alice", name: "Alice Example"},
+        notifications_count: 2,
+        inner_block: [%{inner_block: fn _, _ -> "Main content" end}]
+      })
+
+    assert html =~ ~r/<a[^>]*data-role="nav-timeline"[^>]*aria-current="page"/
+    refute html =~ ~r/<a[^>]*data-role="nav-search"[^>]*aria-current="page"/
+  end
 end
