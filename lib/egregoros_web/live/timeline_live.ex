@@ -382,7 +382,7 @@ defmodule EgregorosWeb.TimelineLive do
         {:noreply, socket}
       end
     else
-      {:noreply, socket}
+      {:noreply, put_flash(socket, :error, "Register to reply.")}
     end
   end
 
@@ -593,7 +593,7 @@ defmodule EgregorosWeb.TimelineLive do
       {:noreply, refresh_post(socket, post_id)}
     else
       nil ->
-        {:noreply, assign(socket, error: "Register to like posts.")}
+        {:noreply, put_flash(socket, :error, "Register to like posts.")}
 
       _ ->
         {:noreply, socket}
@@ -608,7 +608,7 @@ defmodule EgregorosWeb.TimelineLive do
       {:noreply, refresh_post(socket, post_id)}
     else
       nil ->
-        {:noreply, assign(socket, error: "Register to repost.")}
+        {:noreply, put_flash(socket, :error, "Register to repost.")}
 
       _ ->
         {:noreply, socket}
@@ -624,7 +624,7 @@ defmodule EgregorosWeb.TimelineLive do
       {:noreply, refresh_post(socket, post_id)}
     else
       nil ->
-        {:noreply, assign(socket, error: "Register to react.")}
+        {:noreply, put_flash(socket, :error, "Register to react.")}
 
       _ ->
         {:noreply, socket}
@@ -639,7 +639,7 @@ defmodule EgregorosWeb.TimelineLive do
       {:noreply, refresh_post(socket, post_id)}
     else
       nil ->
-        {:noreply, assign(socket, error: "Register to bookmark posts.")}
+        {:noreply, put_flash(socket, :error, "Register to bookmark posts.")}
 
       _ ->
         {:noreply, socket}

@@ -419,6 +419,7 @@ defmodule EgregorosWeb.StatusLiveTest do
     _html =
       render_click(view, "open_reply_modal", %{"in_reply_to" => note.ap_id, "actor_handle" => "@alice"})
 
+    assert render(view) =~ "Register to reply."
     refute has_element?(view, "#reply-modal")
 
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})

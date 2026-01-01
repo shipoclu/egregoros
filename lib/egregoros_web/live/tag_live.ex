@@ -142,7 +142,7 @@ defmodule EgregorosWeb.TagLive do
         {:noreply, socket}
       end
     else
-      {:noreply, socket}
+      {:noreply, put_flash(socket, :error, "Register to reply.")}
     end
   end
 

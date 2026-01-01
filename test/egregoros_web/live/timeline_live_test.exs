@@ -103,6 +103,33 @@ defmodule EgregorosWeb.TimelineLiveTest do
     refute has_element?(view, "article", "Secret DM")
   end
 
+  test "signed-out users see toast feedback for interactions", %{conn: conn, user: user} do
+    assert {:ok, note} = Pipeline.ingest(Note.build(user, "Interactable"), local: true)
+
+    {:ok, view, _html} = live(conn, "/")
+    assert has_element?(view, "#post-#{note.id}")
+
+    _html = render_click(view, "toggle_like", %{"id" => note.id})
+    assert render(view) =~ "Register to like posts."
+
+    _html = render_click(view, "toggle_repost", %{"id" => note.id})
+    assert render(view) =~ "Register to repost."
+
+    _html = render_click(view, "toggle_reaction", %{"id" => note.id, "emoji" => "🔥"})
+    assert render(view) =~ "Register to react."
+
+    _html = render_click(view, "toggle_bookmark", %{"id" => note.id})
+    assert render(view) =~ "Register to bookmark posts."
+
+    _html =
+      render_click(view, "open_reply_modal", %{
+        "in_reply_to" => note.ap_id,
+        "actor_handle" => "@alice"
+      })
+
+    assert render(view) =~ "Register to reply."
+  end
+
   test "home timeline includes direct messages addressed to the signed-in user", %{
     conn: conn,
     user: user
