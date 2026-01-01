@@ -94,6 +94,8 @@ defmodule EgregorosWeb.StatusLive do
 
     reply_form = Phoenix.Component.to_form(reply_params, as: :reply)
 
+    thread_index = build_thread_index(status_entry, ancestor_entries, descendant_entries)
+
     socket =
       socket
       |> assign(
@@ -104,6 +106,7 @@ defmodule EgregorosWeb.StatusLive do
         status: status_entry,
         ancestors: ancestor_entries,
         descendants: descendant_entries,
+        thread_index: thread_index,
         reply_modal_open?: reply_modal_open?,
         reply_to_ap_id: reply_to_ap_id,
         reply_to_handle: reply_to_handle,
@@ -579,6 +582,23 @@ defmodule EgregorosWeb.StatusLive do
                 />
               </div>
 
+              <% status_parent = reply_parent_info(@thread_index, @status.object) %>
+
+              <div
+                :if={is_map(status_parent)}
+                data-role="thread-replying-to"
+                data-parent-id={status_parent.dom_id}
+                class="flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/70 px-4 py-2 text-xs font-semibold text-slate-600 shadow-sm shadow-slate-200/20 dark:border-slate-700/70 dark:bg-slate-950/50 dark:text-slate-300 dark:shadow-slate-900/30"
+              >
+                <.icon name="hero-arrow-uturn-left" class="size-4" />
+                <a
+                  href={"##{status_parent.dom_id}"}
+                  class="text-violet-600 underline underline-offset-2 transition hover:text-violet-700 dark:text-violet-300 dark:hover:text-violet-200"
+                >
+                  Replying to {status_parent.handle}
+                </a>
+              </div>
+
               <div class="rounded-3xl ring-2 ring-slate-900/10 dark:ring-white/10">
                 <StatusCard.status_card
                   id={"post-#{@status.object.id}"}
@@ -610,11 +630,47 @@ defmodule EgregorosWeb.StatusLive do
                   :for={%{entry: entry, depth: depth} <- @descendants}
                   data-role="thread-descendant"
                   data-depth={depth}
-                  style={"margin-left: #{thread_indent(depth)}px"}
-                  class={[
-                    depth > 1 && "border-l border-slate-200/60 pl-4 dark:border-slate-700/60"
-                  ]}
+                  style={"--thread-indent: #{thread_indent(depth)}px"}
+                  class="relative pl-[calc(var(--thread-indent)+2.5rem)]"
                 >
+                  <span
+                    data-role="thread-rail"
+                    class="absolute bottom-0 left-[var(--thread-indent)] top-0 w-px bg-slate-200/60 dark:bg-slate-700/60"
+                    aria-hidden="true"
+                  >
+                  </span>
+
+                  <span
+                    data-role="thread-node"
+                    class="absolute left-[calc(var(--thread-indent)-0.375rem)] top-10 h-3 w-3 rounded-full border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900"
+                    aria-hidden="true"
+                  >
+                  </span>
+
+                  <span
+                    data-role="thread-connector"
+                    class="absolute left-[var(--thread-indent)] top-11 h-px w-6 bg-slate-200/60 dark:bg-slate-700/60"
+                    aria-hidden="true"
+                  >
+                  </span>
+
+                  <% parent_info = reply_parent_info(@thread_index, entry.object) %>
+
+                  <div
+                    :if={is_map(parent_info)}
+                    data-role="thread-replying-to"
+                    data-parent-id={parent_info.dom_id}
+                    class="mb-2 flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400"
+                  >
+                    <.icon name="hero-arrow-uturn-left" class="size-4" />
+                    <a
+                      href={"##{parent_info.dom_id}"}
+                      class="text-violet-600 underline underline-offset-2 transition hover:text-violet-700 dark:text-violet-300 dark:hover:text-violet-200"
+                    >
+                      Replying to {parent_info.handle}
+                    </a>
+                  </div>
+
                   <StatusCard.status_card
                     id={"post-#{entry.object.id}"}
                     entry={entry}
@@ -792,15 +848,23 @@ defmodule EgregorosWeb.StatusLive do
 
     case socket.assigns.status do
       %{object: %{type: "Note"} = note} ->
+        status_entry = StatusVM.decorate(note, current_user)
+
+        ancestor_entries =
+          note
+          |> Objects.thread_ancestors()
+          |> Enum.filter(&Objects.visible_to?(&1, current_user))
+          |> StatusVM.decorate_many(current_user)
+
+        descendant_entries = decorate_descendants(note, current_user)
+        thread_index = build_thread_index(status_entry, ancestor_entries, descendant_entries)
+
         socket
         |> assign(
-          status: StatusVM.decorate(note, current_user),
-          ancestors:
-            note
-            |> Objects.thread_ancestors()
-            |> Enum.filter(&Objects.visible_to?(&1, current_user))
-            |> StatusVM.decorate_many(current_user),
-          descendants: decorate_descendants(note, current_user)
+          status: status_entry,
+          ancestors: ancestor_entries,
+          descendants: descendant_entries,
+          thread_index: thread_index
         )
 
       _ ->
@@ -940,16 +1004,80 @@ defmodule EgregorosWeb.StatusLive do
 
   defp descendant_depths(_root_ap_id, _descendants), do: []
 
+  defp build_thread_index(status_entry, ancestor_entries, descendant_entries)
+       when is_list(ancestor_entries) and is_list(descendant_entries) do
+    entries =
+      [status_entry | ancestor_entries ++ Enum.map(descendant_entries, &Map.get(&1, :entry))]
+      |> Enum.filter(&is_map/1)
+
+    Enum.reduce(entries, %{dom_id_by_ap_id: %{}, handle_by_ap_id: %{}}, fn entry, acc ->
+      object = Map.get(entry, :object) || %{}
+      actor = Map.get(entry, :actor) || %{}
+
+      ap_id =
+        case Map.get(object, :ap_id) do
+          value when is_binary(value) -> String.trim(value)
+          _ -> ""
+        end
+
+      object_id = Map.get(object, :id)
+
+      handle =
+        case Map.get(actor, :handle) do
+          value when is_binary(value) -> String.trim(value)
+          _ -> ""
+        end
+
+      if ap_id != "" and is_integer(object_id) do
+        acc
+        |> put_in([:dom_id_by_ap_id, ap_id], "post-#{object_id}")
+        |> put_in([:handle_by_ap_id, ap_id], handle)
+      else
+        acc
+      end
+    end)
+  end
+
+  defp build_thread_index(_status_entry, _ancestor_entries, _descendant_entries) do
+    %{dom_id_by_ap_id: %{}, handle_by_ap_id: %{}}
+  end
+
+  defp reply_parent_info(
+         %{dom_id_by_ap_id: dom_id_by_ap_id, handle_by_ap_id: handle_by_ap_id},
+         object
+       )
+       when is_map(dom_id_by_ap_id) and is_map(handle_by_ap_id) and is_map(object) do
+    parent_ap_id =
+      object
+      |> Map.get(:data, %{})
+      |> Map.get("inReplyTo")
+      |> in_reply_to_ap_id()
+
+    parent_ap_id =
+      case parent_ap_id do
+        ap_id when is_binary(ap_id) -> String.trim(ap_id)
+        _ -> nil
+      end
+
+    dom_id = if is_binary(parent_ap_id), do: Map.get(dom_id_by_ap_id, parent_ap_id), else: nil
+    handle = if is_binary(parent_ap_id), do: Map.get(handle_by_ap_id, parent_ap_id), else: nil
+
+    if is_binary(dom_id) and dom_id != "" and is_binary(handle) and handle != "" do
+      %{dom_id: dom_id, handle: handle}
+    else
+      nil
+    end
+  end
+
+  defp reply_parent_info(_thread_index, _object), do: nil
+
   defp in_reply_to_ap_id(value) when is_binary(value), do: value
   defp in_reply_to_ap_id(%{"id" => id}) when is_binary(id), do: id
   defp in_reply_to_ap_id(_), do: nil
 
   defp thread_indent(depth) when is_integer(depth) do
-    depth
-    |> Kernel.-(1)
-    |> max(0)
-    |> min(5)
-    |> Kernel.*(24)
+    depth = depth |> max(1) |> min(5)
+    depth * 24
   end
 
   defp thread_indent(_depth), do: 0

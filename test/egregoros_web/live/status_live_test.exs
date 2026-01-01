@@ -155,6 +155,48 @@ defmodule EgregorosWeb.StatusLiveTest do
     assert has_element?(view, "[data-role='thread-descendant'][data-depth='2']", "Child")
   end
 
+  test "thread view shows reply context links for descendants", %{conn: conn, user: user} do
+    {:ok, bob} = Users.create_local_user("bob")
+
+    assert {:ok, root} = Pipeline.ingest(Note.build(user, "Root"), local: true)
+
+    assert {:ok, reply} =
+             Pipeline.ingest(
+               Note.build(bob, "Reply from bob") |> Map.put("inReplyTo", root.ap_id),
+               local: true
+             )
+
+    assert {:ok, child} =
+             Pipeline.ingest(
+               Note.build(user, "Child from alice") |> Map.put("inReplyTo", reply.ap_id),
+               local: true
+             )
+
+    uuid = uuid_from_ap_id(root.ap_id)
+
+    assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}")
+
+    assert has_element?(
+             view,
+             "[data-role='thread-replying-to'][data-parent-id='post-#{root.id}']",
+             "Replying to @alice"
+           )
+
+    assert has_element?(
+             view,
+             "[data-role='thread-replying-to'][data-parent-id='post-#{reply.id}']",
+             "Replying to @bob"
+           )
+
+    assert has_element?(
+             view,
+             "[data-role='thread-replying-to'] a[href='#post-#{reply.id}']",
+             "Replying to @bob"
+           )
+
+    assert has_element?(view, "#post-#{child.id}", "Child from alice")
+  end
+
   test "status view enqueues a thread replies fetch when the object advertises a replies collection",
        %{
          conn: conn,
