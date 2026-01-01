@@ -1,3 +1,5 @@
+import {lockScroll, unlockScroll} from "./scroll_lock"
+
 const MediaViewer = {
   mounted() {
     this.index = this.readIndex()
@@ -67,6 +69,7 @@ const MediaViewer = {
   },
 
   destroyed() {
+    if (this.isOpen()) unlockScroll()
     this.el.removeEventListener("egregoros:media-open", this.onOpen)
     this.el.removeEventListener("egregoros:media-next", this.onNext)
     this.el.removeEventListener("egregoros:media-prev", this.onPrev)
@@ -84,6 +87,7 @@ const MediaViewer = {
   },
 
   open() {
+    lockScroll()
     this.el.classList.remove("hidden")
     this.el.dataset.state = "open"
     this.el.setAttribute("aria-hidden", "false")
@@ -93,6 +97,7 @@ const MediaViewer = {
   },
 
   close() {
+    unlockScroll()
     this.el.classList.add("hidden")
     this.el.dataset.state = "closed"
     this.el.setAttribute("aria-hidden", "true")

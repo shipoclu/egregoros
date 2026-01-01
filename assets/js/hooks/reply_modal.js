@@ -1,3 +1,5 @@
+import {lockScroll, unlockScroll} from "./scroll_lock"
+
 const ReplyModal = {
   mounted() {
     this.lastFocused = null
@@ -38,6 +40,7 @@ const ReplyModal = {
   },
 
   destroyed() {
+    if (this.isOpen()) unlockScroll()
     this.el.removeEventListener("egregoros:reply-open", this.onOpen)
     this.el.removeEventListener("egregoros:reply-close", this.onClose)
     window.removeEventListener("keydown", this.onKeydown)
@@ -48,12 +51,14 @@ const ReplyModal = {
   },
 
   open() {
+    lockScroll()
     this.el.classList.remove("hidden")
     this.el.dataset.state = "open"
     this.el.setAttribute("aria-hidden", "false")
   },
 
   close() {
+    unlockScroll()
     this.el.classList.add("hidden")
     this.el.dataset.state = "closed"
     this.el.setAttribute("aria-hidden", "true")
