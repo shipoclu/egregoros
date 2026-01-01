@@ -10,3 +10,9 @@ Mox.defmock(Egregoros.MediaStorage.Mock, for: Egregoros.MediaStorage)
 Mox.defmock(Egregoros.HTML.Sanitizer.Mock, for: Egregoros.HTML.Sanitizer)
 Mox.defmock(Egregoros.RateLimiter.Mock, for: Egregoros.RateLimiter)
 Ecto.Adapters.SQL.Sandbox.mode(Egregoros.Repo, :manual)
+
+# Ensure system actors exist outside the SQL sandbox so async tests don't fight over
+# creating them inside long-running sandbox transactions.
+Ecto.Adapters.SQL.Sandbox.unboxed_run(Egregoros.Repo, fn ->
+  {:ok, _} = Egregoros.Users.get_or_create_local_user("internal.fetch")
+end)

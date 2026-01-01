@@ -37,6 +37,7 @@ defmodule Egregoros.UsersRaceTest do
       |> Enum.uniq()
 
     assert length(ids) == 1
-    assert Repo.aggregate(User, :count, :id) == 1
+
+    assert Repo.aggregate(from(u in User, where: u.nickname == ^nickname), :count, :id) == 1
   end
 end

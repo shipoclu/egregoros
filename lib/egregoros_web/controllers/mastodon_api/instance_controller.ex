@@ -14,7 +14,9 @@ defmodule EgregorosWeb.MastodonAPI.InstanceController do
     base_url = Endpoint.url()
     host = URI.parse(base_url).host || "localhost"
 
-    user_count = Repo.aggregate(User, :count, :id)
+    user_count =
+      from(u in User, where: u.nickname != "internal.fetch")
+      |> Repo.aggregate(:count, :id)
 
     status_count =
       from(o in Object, where: o.type == "Note")
@@ -99,7 +101,9 @@ defmodule EgregorosWeb.MastodonAPI.InstanceController do
     base_url = Endpoint.url()
     host = URI.parse(base_url).host || "localhost"
 
-    active_month = Repo.aggregate(User, :count, :id)
+    active_month =
+      from(u in User, where: u.nickname != "internal.fetch")
+      |> Repo.aggregate(:count, :id)
 
     json(conn, %{
       "domain" => host,
@@ -200,7 +204,9 @@ defmodule EgregorosWeb.MastodonAPI.InstanceController do
 
   defp count_local_registrations(%DateTime{} = start_dt, %DateTime{} = end_dt) do
     from(u in User,
-      where: u.local == true and u.inserted_at >= ^start_dt and u.inserted_at <= ^end_dt
+      where:
+        u.local == true and u.nickname != "internal.fetch" and u.inserted_at >= ^start_dt and
+          u.inserted_at <= ^end_dt
     )
     |> Repo.aggregate(:count, :id)
   end

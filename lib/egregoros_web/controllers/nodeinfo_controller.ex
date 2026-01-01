@@ -21,7 +21,7 @@ defmodule EgregorosWeb.NodeinfoController do
 
   def nodeinfo(conn, _params) do
     user_count =
-      from(u in User, where: u.local == true)
+      from(u in User, where: u.local == true and u.nickname != "internal.fetch")
       |> Repo.aggregate(:count, :id)
 
     local_posts =
