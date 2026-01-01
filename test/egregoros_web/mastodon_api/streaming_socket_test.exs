@@ -38,6 +38,11 @@ defmodule EgregorosWeb.MastodonAPI.StreamingSocketTest do
     assert {:push, {:ping, ""}, _state} = StreamingSocket.handle_info(:heartbeat, state)
   end
 
+  test "handle_in ignores non-text websocket frames" do
+    {:ok, state} = StreamingSocket.init(%{streams: [], current_user: nil})
+    assert {:ok, ^state} = StreamingSocket.handle_in({"ping", opcode: :binary}, state)
+  end
+
   test "delivers user timeline updates for followed actors" do
     {:ok, user} = Users.create_local_user("alice")
     {:ok, followed} = Users.create_user(remote_user_attrs("bob@example.com"))
@@ -368,6 +373,26 @@ defmodule EgregorosWeb.MastodonAPI.StreamingSocketTest do
     assert %{"id" => _id, "type" => _type} = Jason.decode!(notification_payload)
   end
 
+  test "does not deliver notification updates when no notification streams are subscribed" do
+    {:ok, user} = Users.create_local_user("alice")
+    assert {:ok, note} = Pipeline.ingest(Note.build(user, "Hello"), local: true)
+
+    {:ok, like_actor} = Users.create_user(remote_user_attrs("bob@example.com"))
+
+    activity = %{
+      "id" => "https://remote.example/activities/like/2",
+      "type" => "Like",
+      "actor" => like_actor.ap_id,
+      "object" => note.ap_id
+    }
+
+    assert {:ok, like} = Pipeline.ingest(activity, local: false)
+
+    {:ok, state} = StreamingSocket.init(%{streams: ["public"], current_user: user})
+
+    assert {:ok, _state} = StreamingSocket.handle_info({:notification_created, like}, state)
+  end
+
   test "handle_in returns an error when subscribing to user streams without a current user" do
     {:ok, state} = StreamingSocket.init(%{streams: [], current_user: nil})
 
@@ -380,9 +405,229 @@ defmodule EgregorosWeb.MastodonAPI.StreamingSocketTest do
     assert %{"error" => "Missing access token", "status" => 401} = Jason.decode!(reply)
   end
 
+  test "handle_in returns an error when subscribing to unknown streams" do
+    {:ok, state} = StreamingSocket.init(%{streams: [], current_user: nil})
+
+    assert {:push, {:text, reply}, _state} =
+             StreamingSocket.handle_in(
+               {Jason.encode!(%{"type" => "subscribe", "stream" => "nope"}), opcode: :text},
+               state
+             )
+
+    assert %{"error" => "Unknown stream type", "status" => 400} = Jason.decode!(reply)
+  end
+
+  test "handle_in ignores unsubscribe events for unknown or non-subscribed streams" do
+    {:ok, state} = StreamingSocket.init(%{streams: [], current_user: nil})
+
+    assert {:ok, ^state} =
+             StreamingSocket.handle_in(
+               {Jason.encode!(%{"type" => "unsubscribe", "stream" => "nope"}), opcode: :text},
+               state
+             )
+
+    assert {:ok, ^state} =
+             StreamingSocket.handle_in(
+               {Jason.encode!(%{"type" => "unsubscribe", "stream" => "public"}), opcode: :text},
+               state
+             )
+  end
+
+  test "handle_in removes streams on unsubscribe and updates subscription flags" do
+    {:ok, state} = StreamingSocket.init(%{streams: ["public"], current_user: nil})
+    assert MapSet.member?(state.streams, "public")
+    assert state.timeline_public_subscribed == true
+
+    assert {:ok, state} =
+             StreamingSocket.handle_in(
+               {Jason.encode!(%{"type" => "unsubscribe", "stream" => "public"}), opcode: :text},
+               state
+             )
+
+    refute MapSet.member?(state.streams, "public")
+    assert state.timeline_public_subscribed == false
+  end
+
   test "handle_in ignores unknown messages" do
     {:ok, state} = StreamingSocket.init(%{streams: [], current_user: nil})
     assert {:ok, ^state} = StreamingSocket.handle_in({"ping", opcode: :text}, state)
+  end
+
+  test "handle_in ignores invalid json messages" do
+    {:ok, state} = StreamingSocket.init(%{streams: [], current_user: nil})
+    assert {:ok, ^state} = StreamingSocket.handle_in({"{", opcode: :text}, state)
+  end
+
+  test "pushes updates to both public streams when both are subscribed" do
+    {:ok, state} = StreamingSocket.init(%{streams: ["public", "public:local"], current_user: nil})
+
+    public = "https://www.w3.org/ns/activitystreams#Public"
+    uuid = Ecto.UUID.generate()
+    ap_id = "https://remote.example/objects/#{uuid}"
+
+    assert {:ok, note} =
+             Objects.create_object(%{
+               ap_id: ap_id,
+               type: "Note",
+               actor: "https://remote.example/users/alice",
+               local: true,
+               data: %{
+                 "id" => ap_id,
+                 "type" => "Note",
+                 "attributedTo" => "https://remote.example/users/alice",
+                 "to" => [public],
+                 "cc" => [],
+                 "content" => "<p>Hello</p>"
+               }
+             })
+
+    assert {:push, messages, _state} = StreamingSocket.handle_info({:post_created, note}, state)
+    assert is_list(messages)
+    assert length(messages) == 2
+
+    streams =
+      Enum.map(messages, fn {:text, payload} ->
+        %{"stream" => [stream]} = Jason.decode!(payload)
+        stream
+      end)
+
+    assert Enum.sort(streams) == ["public", "public:local"]
+  end
+
+  test "skips pushing updates for objects with an ap_id that has already been seen" do
+    {:ok, state} = StreamingSocket.init(%{streams: ["public"], current_user: nil})
+    public = "https://www.w3.org/ns/activitystreams#Public"
+    uuid = Ecto.UUID.generate()
+    ap_id = "https://remote.example/objects/#{uuid}"
+
+    assert {:ok, note} =
+             Objects.create_object(%{
+               ap_id: ap_id,
+               type: "Note",
+               actor: "https://remote.example/users/alice",
+               local: false,
+               data: %{
+                 "id" => ap_id,
+                 "type" => "Note",
+                 "attributedTo" => "https://remote.example/users/alice",
+                 "to" => [public],
+                 "cc" => [],
+                 "content" => "<p>Hello</p>"
+               }
+             })
+
+    assert {:push, {:text, _payload}, state} = StreamingSocket.handle_info({:post_created, note}, state)
+    assert {:ok, _state} = StreamingSocket.handle_info({:post_created, note}, state)
+  end
+
+  test "delivers user stream updates for recipient fields expressed as maps" do
+    {:ok, user} = Users.create_local_user("alice")
+    {:ok, state} = StreamingSocket.init(%{streams: ["user"], current_user: user})
+
+    uuid = Ecto.UUID.generate()
+    ap_id = "https://remote.example/objects/dm/#{uuid}"
+
+    assert {:ok, note} =
+             Objects.create_object(%{
+               ap_id: ap_id,
+               type: "Note",
+               actor: "https://remote.example/users/stranger",
+               local: false,
+               data: %{
+                 "id" => ap_id,
+                 "type" => "Note",
+                 "attributedTo" => "https://remote.example/users/stranger",
+                 "to" => [%{"id" => user.ap_id}],
+                 "cc" => [],
+                 "content" => "<p>Secret</p>"
+               }
+             })
+
+    note = %{note | data: Map.put(note.data, "bcc", [%{id: user.ap_id}])}
+
+    assert {:push, {:text, payload}, _state} =
+             StreamingSocket.handle_info({:post_created, note}, state)
+
+    assert %{"event" => "update", "stream" => ["user"]} = Jason.decode!(payload)
+  end
+
+  test "unsubscribing from the user stream clears home timeline and notifications subscriptions" do
+    {:ok, user} = Users.create_local_user("alice")
+    {:ok, state} = StreamingSocket.init(%{streams: ["user"], current_user: user})
+
+    assert MapSet.member?(state.streams, "user")
+    assert state.timeline_user_subscribed == true
+    assert state.notifications_subscribed == true
+    assert MapSet.member?(state.home_actor_ids, user.ap_id)
+
+    assert {:ok, state} =
+             StreamingSocket.handle_in(
+               {Jason.encode!(%{"type" => "unsubscribe", "stream" => "user"}), opcode: :text},
+               state
+             )
+
+    refute MapSet.member?(state.streams, "user")
+    assert state.timeline_user_subscribed == false
+    assert state.notifications_subscribed == false
+    assert state.home_actor_ids == MapSet.new()
+  end
+
+  test "does not push updates for unknown streams" do
+    {:ok, state} = StreamingSocket.init(%{streams: ["nope"], current_user: nil})
+    public = "https://www.w3.org/ns/activitystreams#Public"
+    uuid = Ecto.UUID.generate()
+    ap_id = "https://remote.example/objects/#{uuid}"
+
+    assert {:ok, note} =
+             Objects.create_object(%{
+               ap_id: ap_id,
+               type: "Note",
+               actor: "https://remote.example/users/alice",
+               local: false,
+               data: %{
+                 "id" => ap_id,
+                 "type" => "Note",
+                 "attributedTo" => "https://remote.example/users/alice",
+                 "to" => [public],
+                 "cc" => [],
+                 "content" => "<p>Hello</p>"
+               }
+             })
+
+    assert {:ok, _state} = StreamingSocket.handle_info({:post_created, note}, state)
+  end
+
+  test "handle_info ignores unknown messages" do
+    {:ok, state} = StreamingSocket.init(%{streams: [], current_user: nil})
+    assert {:ok, ^state} = StreamingSocket.handle_info(:nope, state)
+  end
+
+  test "handles announce updates where the announced ap_id cannot be derived" do
+    {:ok, state} = StreamingSocket.init(%{streams: ["public"], current_user: nil})
+    public = "https://www.w3.org/ns/activitystreams#Public"
+    uuid = Ecto.UUID.generate()
+
+    assert {:ok, announce} =
+             Objects.create_object(%{
+               ap_id: "https://remote.example/activities/announce/no-object/#{uuid}",
+               type: "Announce",
+               actor: "https://remote.example/users/alice",
+               object: nil,
+               local: false,
+               data: %{
+                 "id" => "https://remote.example/activities/announce/no-object/#{uuid}",
+                 "type" => "Announce",
+                 "actor" => "https://remote.example/users/alice",
+                 "object" => nil,
+                 "to" => [public],
+                 "cc" => []
+               }
+             })
+
+    assert {:push, {:text, payload}, _state} = StreamingSocket.handle_info({:post_created, announce}, state)
+
+    assert %{"event" => "update", "stream" => ["public"]} =
+             Jason.decode!(payload)
   end
 
   defp remote_user_attrs(handle) do
