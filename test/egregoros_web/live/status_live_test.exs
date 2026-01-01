@@ -461,6 +461,81 @@ defmodule EgregorosWeb.StatusLiveTest do
     assert Relationships.get_by_type_actor_object("Bookmark", user.ap_id, note.ap_id)
   end
 
+  test "signed-out users cannot like posts from the status page", %{conn: conn, user: user} do
+    assert {:ok, note} = Pipeline.ingest(Note.build(user, "Like me"), local: true)
+    uuid = uuid_from_ap_id(note.ap_id)
+
+    assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}")
+
+    _html = render_click(view, "toggle_like", %{"id" => note.id})
+
+    assert render(view) =~ "Register to like posts."
+  end
+
+  test "status view ignores invalid ids for interaction events", %{conn: conn, user: user} do
+    assert {:ok, note} = Pipeline.ingest(Note.build(user, "Ignore invalid ids"), local: true)
+    uuid = uuid_from_ap_id(note.ap_id)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}")
+
+    _html = render_click(view, "toggle_like", %{"id" => "nope"})
+    _html = render_click(view, "toggle_repost", %{"id" => "nope"})
+    _html = render_click(view, "toggle_reaction", %{"id" => "nope", "emoji" => "🔥"})
+    _html = render_click(view, "toggle_bookmark", %{"id" => "nope"})
+
+    refute render(view) =~ "Register to like posts."
+    refute render(view) =~ "Register to repost."
+    refute render(view) =~ "Register to react."
+    refute render(view) =~ "Register to bookmark posts."
+  end
+
+  test "status view rejects delete requests for posts not owned by the user", %{conn: conn, user: user} do
+    {:ok, bob} = Users.create_local_user("bob")
+    assert {:ok, note} = Pipeline.ingest(Note.build(bob, "Not yours"), local: true)
+    uuid = uuid_from_ap_id(note.ap_id)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    assert {:ok, view, _html} = live(conn, "/@bob/#{uuid}")
+
+    _html = render_click(view, "delete_post", %{"id" => note.id})
+
+    assert render(view) =~ "Could not delete post."
+    assert Objects.get(note.id)
+  end
+
+  test "status view uses in_reply_to from form params when reply target is not assigned", %{
+    conn: conn,
+    user: user
+  } do
+    assert {:ok, parent} = Pipeline.ingest(Note.build(user, "Parent post"), local: true)
+    uuid = uuid_from_ap_id(parent.ap_id)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}")
+
+    view
+    |> form("#reply-modal-form", reply: %{content: "Param reply", in_reply_to: parent.ap_id})
+    |> render_submit()
+
+    assert has_element?(view, "article", "Param reply")
+  end
+
+  test "status view ignores post updates not related to the current thread", %{conn: conn, user: user} do
+    assert {:ok, parent} = Pipeline.ingest(Note.build(user, "Thread parent"), local: true)
+    uuid = uuid_from_ap_id(parent.ap_id)
+
+    assert {:ok, other} = Pipeline.ingest(Note.build(user, "Other post"), local: true)
+
+    assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}")
+    assert has_element?(view, "article[data-role='status-card']", "Thread parent")
+
+    send(view.pid, {:post_updated, other})
+    _ = :sys.get_state(view.pid)
+
+    assert has_element?(view, "article[data-role='status-card']", "Thread parent")
+  end
+
   test "signed-out users cannot bookmark posts from the status page", %{conn: conn, user: user} do
     assert {:ok, note} = Pipeline.ingest(Note.build(user, "Bookmark me"), local: true)
     uuid = uuid_from_ap_id(note.ap_id)
