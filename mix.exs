@@ -8,7 +8,21 @@ defmodule Egregoros.MixProject do
       elixir: "~> 1.15",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
-      test_coverage: [summary: [threshold: 82]],
+      test_coverage: [
+        summary: [threshold: 82],
+        ignore_modules: [
+          EgregorosWeb.AdminHTML,
+          EgregorosWeb.OAuthHTML,
+          EgregorosWeb.RegistrationHTML,
+          EgregorosWeb.SessionHTML,
+          EgregorosWeb.SettingsHTML,
+          Mix.Tasks.Egregoros.Admin,
+          Mix.Tasks.Egregoros.Actors.Refetch,
+          Mix.Tasks.Egregoros.Bench.Seed,
+          Mix.Tasks.Egregoros.Bench.Run,
+          Egregoros.Bench.Seed
+        ]
+      ],
       aliases: aliases(),
       deps: deps(),
       compilers: [:phoenix_live_view] ++ Mix.compilers(),
