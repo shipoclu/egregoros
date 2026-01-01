@@ -316,6 +316,145 @@ defmodule EgregorosWeb.MastodonAPI.StatusRendererTest do
     assert preview == url
   end
 
+  test "renders media attachments when attachment id is missing" do
+    {:ok, alice} = Users.create_local_user("alice")
+    uuid = Ecto.UUID.generate()
+
+    {:ok, note} =
+      Objects.create_object(%{
+        ap_id: "https://remote.example/objects/no-id-attachment/#{uuid}",
+        type: "Note",
+        actor: alice.ap_id,
+        local: false,
+        data: %{
+          "id" => "https://remote.example/objects/no-id-attachment/#{uuid}",
+          "type" => "Note",
+          "actor" => alice.ap_id,
+          "attachment" => [
+            %{
+              "mediaType" => "image/png",
+              "name" => "pic",
+              "url" => "/media/pic.png"
+            }
+          ]
+        }
+      })
+
+    rendered = StatusRenderer.render_status(note)
+
+    assert [
+             %{
+               "id" => "unknown",
+               "type" => "image",
+               "url" => url,
+               "preview_url" => preview,
+               "description" => "pic"
+             }
+           ] = rendered["media_attachments"]
+
+    assert url == Endpoint.url() <> "/media/pic.png"
+    assert preview == url
+  end
+
+  test "uses attachment ap_id as the Mastodon id when the media object is missing" do
+    {:ok, alice} = Users.create_local_user("alice")
+    uuid = Ecto.UUID.generate()
+    attachment_ap_id = "https://remote.example/objects/media-missing/#{uuid}"
+
+    {:ok, note} =
+      Objects.create_object(%{
+        ap_id: "https://remote.example/objects/with-missing-media/#{uuid}",
+        type: "Note",
+        actor: alice.ap_id,
+        local: false,
+        data: %{
+          "id" => "https://remote.example/objects/with-missing-media/#{uuid}",
+          "type" => "Note",
+          "actor" => alice.ap_id,
+          "attachment" => [
+            %{
+              "id" => attachment_ap_id,
+              "url" => [%{"href" => "/media/clip.mp4", "mediaType" => "video/mp4"}]
+            }
+          ]
+        }
+      })
+
+    rendered = StatusRenderer.render_status(note)
+
+    assert [%{"id" => media_id, "type" => "video", "url" => url}] = rendered["media_attachments"]
+    assert media_id == attachment_ap_id
+    assert url == Endpoint.url() <> "/media/clip.mp4"
+  end
+
+  test "filters out media attachments that do not have a usable url" do
+    {:ok, alice} = Users.create_local_user("alice")
+    uuid = Ecto.UUID.generate()
+
+    {:ok, note} =
+      Objects.create_object(%{
+        ap_id: "https://remote.example/objects/with-bad-media/#{uuid}",
+        type: "Note",
+        actor: alice.ap_id,
+        local: false,
+        data: %{
+          "id" => "https://remote.example/objects/with-bad-media/#{uuid}",
+          "type" => "Note",
+          "actor" => alice.ap_id,
+          "attachment" => [
+            %{
+              "id" => "https://remote.example/objects/media-without-url/#{uuid}",
+              "mediaType" => "image/png"
+            }
+          ]
+        }
+      })
+
+    rendered = StatusRenderer.render_status(note)
+
+    assert rendered["media_attachments"] == []
+  end
+
+  test "classifies audio and unknown media attachments based on mime type" do
+    {:ok, alice} = Users.create_local_user("alice")
+    uuid = Ecto.UUID.generate()
+
+    {:ok, note} =
+      Objects.create_object(%{
+        ap_id: "https://remote.example/objects/with-audio/#{uuid}",
+        type: "Note",
+        actor: alice.ap_id,
+        local: false,
+        data: %{
+          "id" => "https://remote.example/objects/with-audio/#{uuid}",
+          "type" => "Note",
+          "actor" => alice.ap_id,
+          "attachment" => [
+            %{
+              "id" => "https://remote.example/objects/audio/#{uuid}",
+              "mediaType" => "audio/ogg",
+              "url" => "/media/clip.ogg"
+            },
+            %{
+              "id" => "https://remote.example/objects/unknown/#{uuid}",
+              "mediaType" => "application/octet-stream",
+              "url" => "/media/blob.bin"
+            }
+          ]
+        }
+      })
+
+    rendered = StatusRenderer.render_status(note)
+
+    assert [
+             %{"type" => "audio", "url" => audio_url},
+             %{"type" => "unknown", "url" => unknown_url}
+           ] = rendered["media_attachments"]
+
+    assert audio_url == Endpoint.url() <> "/media/clip.ogg"
+    assert unknown_url == Endpoint.url() <> "/media/blob.bin"
+  end
+
   test "does not render a reblog when the announced object is missing" do
     {:ok, alice} = Users.create_local_user("alice")
 
@@ -333,6 +472,31 @@ defmodule EgregorosWeb.MastodonAPI.StatusRendererTest do
           "object" => "https://remote.example/objects/missing",
           "to" => ["https://www.w3.org/ns/activitystreams#Public"],
           "cc" => []
+        }
+      })
+
+    rendered = StatusRenderer.render_status(announce)
+
+    assert rendered["content"] == ""
+    assert rendered["reblog"] == nil
+  end
+
+  test "renders announces with a missing object field as a non-reblog status" do
+    {:ok, alice} = Users.create_local_user("alice")
+    uuid = Ecto.UUID.generate()
+
+    {:ok, announce} =
+      Objects.create_object(%{
+        ap_id: "https://remote.example/activities/announce/no-object/#{uuid}",
+        type: "Announce",
+        actor: alice.ap_id,
+        object: nil,
+        local: false,
+        data: %{
+          "id" => "https://remote.example/activities/announce/no-object/#{uuid}",
+          "type" => "Announce",
+          "actor" => alice.ap_id,
+          "object" => nil
         }
       })
 
@@ -371,6 +535,223 @@ defmodule EgregorosWeb.MastodonAPI.StatusRendererTest do
 
     assert [%{"name" => "🔥", "count" => 1, "me" => true, "url" => nil}] =
              rendered["pleroma"]["emoji_reactions"]
+  end
+
+  test "renders mentions when the tag uses id instead of href" do
+    {:ok, alice} = Users.create_local_user("alice")
+    uuid = Ecto.UUID.generate()
+
+    {:ok, note} =
+      Objects.create_object(%{
+        ap_id: "https://remote.example/objects/with-mention-id/#{uuid}",
+        type: "Note",
+        actor: alice.ap_id,
+        local: false,
+        data: %{
+          "id" => "https://remote.example/objects/with-mention-id/#{uuid}",
+          "type" => "Note",
+          "actor" => alice.ap_id,
+          "content" => "hi",
+          "tag" => [
+            %{
+              "type" => "Mention",
+              "id" => "https://remote.example/users/bob",
+              "name" => "@bob@remote.example"
+            }
+          ]
+        }
+      })
+
+    rendered = StatusRenderer.render_status(note)
+
+    assert [%{"username" => "bob", "acct" => "bob@remote.example", "url" => url}] =
+             rendered["mentions"]
+
+    assert url == Endpoint.url() <> "/@bob@remote.example"
+  end
+
+  test "filters mention tags that do not include href/id" do
+    {:ok, alice} = Users.create_local_user("alice")
+    uuid = Ecto.UUID.generate()
+
+    {:ok, note} =
+      Objects.create_object(%{
+        ap_id: "https://remote.example/objects/mention-without-href/#{uuid}",
+        type: "Note",
+        actor: alice.ap_id,
+        local: false,
+        data: %{
+          "id" => "https://remote.example/objects/mention-without-href/#{uuid}",
+          "type" => "Note",
+          "actor" => alice.ap_id,
+          "content" => "hi",
+          "tag" => [
+            %{
+              "type" => "Mention",
+              "name" => "@bob@remote.example"
+            }
+          ]
+        }
+      })
+
+    rendered = StatusRenderer.render_status(note)
+
+    assert rendered["mentions"] == []
+  end
+
+  test "renders mention acct based on href host even when name lacks a leading @" do
+    {:ok, alice} = Users.create_local_user("alice")
+    uuid = Ecto.UUID.generate()
+
+    {:ok, note} =
+      Objects.create_object(%{
+        ap_id: "https://remote.example/objects/mention-no-at/#{uuid}",
+        type: "Note",
+        actor: alice.ap_id,
+        local: false,
+        data: %{
+          "id" => "https://remote.example/objects/mention-no-at/#{uuid}",
+          "type" => "Note",
+          "actor" => alice.ap_id,
+          "content" => "hi",
+          "tag" => [
+            %{
+              "type" => "Mention",
+              "href" => "https://remote.example/users/mallory",
+              "name" => "mallory"
+            }
+          ]
+        }
+      })
+
+    rendered = StatusRenderer.render_status(note)
+
+    assert [%{"username" => "mallory", "acct" => "mallory@remote.example"}] = rendered["mentions"]
+  end
+
+  test "falls back to href-derived username when mention name is missing" do
+    {:ok, alice} = Users.create_local_user("alice")
+    uuid = Ecto.UUID.generate()
+
+    {:ok, note} =
+      Objects.create_object(%{
+        ap_id: "https://remote.example/objects/mention-no-name/#{uuid}",
+        type: "Note",
+        actor: alice.ap_id,
+        local: false,
+        data: %{
+          "id" => "https://remote.example/objects/mention-no-name/#{uuid}",
+          "type" => "Note",
+          "actor" => alice.ap_id,
+          "content" => "hi",
+          "tag" => [
+            %{
+              "type" => "Mention",
+              "href" => "https://remote.example/users/stranger"
+            }
+          ]
+        }
+      })
+
+    rendered = StatusRenderer.render_status(note)
+
+    assert [%{"username" => "stranger", "acct" => "stranger@remote.example"}] = rendered["mentions"]
+  end
+
+  test "uses stored remote user records to build mention ids and acct values" do
+    {:ok, alice} = Users.create_local_user("alice")
+    uuid = Ecto.UUID.generate()
+
+    {:ok, remote} =
+      Users.create_user(%{
+        nickname: "bob",
+        domain: "remote.example",
+        ap_id: "https://remote.example/users/bob",
+        inbox: "https://remote.example/users/bob/inbox",
+        outbox: "https://remote.example/users/bob/outbox",
+        public_key: "remote-key",
+        private_key: nil,
+        local: false
+      })
+
+    {:ok, note} =
+      Objects.create_object(%{
+        ap_id: "https://remote.example/objects/mention-known-user/#{uuid}",
+        type: "Note",
+        actor: alice.ap_id,
+        local: false,
+        data: %{
+          "id" => "https://remote.example/objects/mention-known-user/#{uuid}",
+          "type" => "Note",
+          "actor" => alice.ap_id,
+          "content" => "hi",
+          "tag" => [
+            %{
+              "type" => "Mention",
+              "href" => remote.ap_id,
+              "name" => "@bob@remote.example"
+            }
+          ]
+        }
+      })
+
+    rendered = StatusRenderer.render_status(note)
+
+    assert [%{"id" => id, "acct" => "bob@remote.example", "username" => "bob"}] =
+             rendered["mentions"]
+
+    assert id == Integer.to_string(remote.id)
+  end
+
+  test "renders custom emojis when icon urls are provided in lists" do
+    {:ok, alice} = Users.create_local_user("alice")
+    uuid = Ecto.UUID.generate()
+
+    {:ok, note} =
+      Objects.create_object(%{
+        ap_id: "https://remote.example/objects/emoji-icon-variants/#{uuid}",
+        type: "Note",
+        actor: alice.ap_id,
+        local: false,
+        data: %{
+          "id" => "https://remote.example/objects/emoji-icon-variants/#{uuid}",
+          "type" => "Note",
+          "actor" => alice.ap_id,
+          "content" => "hi",
+          "tag" => [
+            %{
+              "type" => "Emoji",
+              "name" => ":blob:",
+              "icon" => %{"url" => [%{"href" => "https://cdn.example/blob.png"}]}
+            },
+            %{
+              "type" => "Emoji",
+              "name" => ":blob2:",
+              "icon" => %{"url" => [%{"url" => "https://cdn.example/blob2.png"}]}
+            },
+            %{
+              "type" => "Emoji",
+              "name" => ":broken:",
+              "icon" => %{}
+            },
+            %{
+              "type" => "Emoji",
+              "name" => 123,
+              "icon" => %{"url" => "https://cdn.example/nope.png"}
+            },
+            %{
+              "type" => "Hashtag"
+            }
+          ]
+        }
+      })
+
+    rendered = StatusRenderer.render_status(note)
+
+    assert [
+             %{"shortcode" => "blob", "url" => "https://cdn.example/blob.png"},
+             %{"shortcode" => "blob2", "url" => "https://cdn.example/blob2.png"}
+           ] = rendered["emojis"]
   end
 
   test "renders custom emoji reactions with a url and host-qualified name" do
