@@ -8,6 +8,7 @@ defmodule Egregoros.Federation.OutgoingDeliveryTest do
   alias Egregoros.Pipeline
   alias Egregoros.Users
   alias Egregoros.Workers.DeliverActivity
+  alias Egregoros.Workers.DeliverToActor
 
   test "local Follow delivers to remote inbox" do
     {:ok, local} = Users.create_local_user("alice")
@@ -274,6 +275,45 @@ defmodule Egregoros.Federation.OutgoingDeliveryTest do
     assert :ok = perform_job(DeliverActivity, args)
   end
 
+  test "local Like delivery does not fetch remote actor on request path" do
+    {:ok, local} = Users.create_local_user("alice")
+
+    remote_author_ap_id = "https://remote.example/users/bob"
+
+    note = %{
+      "id" => "https://remote.example/objects/like-target-missing-actor",
+      "type" => "Note",
+      "attributedTo" => remote_author_ap_id,
+      "content" => "Like me"
+    }
+
+    assert {:ok, _} = Pipeline.ingest(note, local: false)
+
+    like = %{
+      "id" => "https://local.example/activities/like/missing-actor",
+      "type" => "Like",
+      "actor" => local.ap_id,
+      "object" => note["id"]
+    }
+
+    stub(Egregoros.HTTP.Mock, :get, fn _url, _headers ->
+      flunk("unexpected HTTP GET during local Like ingestion")
+    end)
+
+    stub(Egregoros.HTTP.Mock, :post, fn _url, _body, _headers ->
+      flunk("unexpected HTTP POST during local Like ingestion")
+    end)
+
+    assert {:ok, _} = Pipeline.ingest(like, local: true)
+
+    assert [] = all_enqueued(worker: DeliverActivity)
+
+    assert Enum.any?(all_enqueued(worker: DeliverToActor), fn job ->
+             job.args["target_actor_ap_id"] == remote_author_ap_id and
+               match?(%{"type" => "Like"}, job.args["activity"])
+           end)
+  end
+
   test "local EmojiReact delivers to remote object's actor inbox" do
     {:ok, local} = Users.create_local_user("alice")
 
@@ -330,6 +370,46 @@ defmodule Egregoros.Federation.OutgoingDeliveryTest do
 
     assert is_map(args)
     assert :ok = perform_job(DeliverActivity, args)
+  end
+
+  test "local EmojiReact delivery does not fetch remote actor on request path" do
+    {:ok, local} = Users.create_local_user("alice")
+
+    remote_author_ap_id = "https://remote.example/users/bob"
+
+    note = %{
+      "id" => "https://remote.example/objects/react-target-missing-actor",
+      "type" => "Note",
+      "attributedTo" => remote_author_ap_id,
+      "content" => "React to me"
+    }
+
+    assert {:ok, _} = Pipeline.ingest(note, local: false)
+
+    react = %{
+      "id" => "https://local.example/activities/react/missing-actor",
+      "type" => "EmojiReact",
+      "actor" => local.ap_id,
+      "object" => note["id"],
+      "content" => ":fire:"
+    }
+
+    stub(Egregoros.HTTP.Mock, :get, fn _url, _headers ->
+      flunk("unexpected HTTP GET during local EmojiReact ingestion")
+    end)
+
+    stub(Egregoros.HTTP.Mock, :post, fn _url, _body, _headers ->
+      flunk("unexpected HTTP POST during local EmojiReact ingestion")
+    end)
+
+    assert {:ok, _} = Pipeline.ingest(react, local: true)
+
+    assert [] = all_enqueued(worker: DeliverActivity)
+
+    assert Enum.any?(all_enqueued(worker: DeliverToActor), fn job ->
+             job.args["target_actor_ap_id"] == remote_author_ap_id and
+               match?(%{"type" => "EmojiReact"}, job.args["activity"])
+           end)
   end
 
   test "local Announce delivers to remote followers" do

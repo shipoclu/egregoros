@@ -17,6 +17,7 @@ defmodule Egregoros.Activities.EmojiReact do
   alias Egregoros.Timeline
   alias Egregoros.User
   alias Egregoros.Users
+  alias Egregoros.Workers.DeliverToActor
   alias EgregorosWeb.Endpoint
 
   @public "https://www.w3.org/ns/activitystreams#Public"
@@ -166,20 +167,29 @@ defmodule Egregoros.Activities.EmojiReact do
   defp deliver_reaction(object) do
     with %{} = actor <- Users.get_by_ap_id(object.actor),
          %{} = reacted_object <- Objects.get_by_ap_id(object.object),
-         %{} = target <- get_or_fetch_user(reacted_object.actor),
-         false <- target.local do
-      Delivery.deliver(actor, target.inbox, object.data)
-    end
-  end
+         target_actor_ap_id when is_binary(target_actor_ap_id) <- reacted_object.actor do
+      case Users.get_by_ap_id(target_actor_ap_id) do
+        %User{local: false, inbox: inbox} when is_binary(inbox) and inbox != "" ->
+          _ = Delivery.deliver(actor, inbox, object.data)
+          :ok
 
-  defp get_or_fetch_user(nil), do: nil
+        %User{local: true} ->
+          :ok
 
-  defp get_or_fetch_user(ap_id) when is_binary(ap_id) do
-    Users.get_by_ap_id(ap_id) ||
-      case Egregoros.Federation.Actor.fetch_and_store(ap_id) do
-        {:ok, user} -> user
-        _ -> nil
+        _ ->
+          _ =
+            Oban.insert(
+              DeliverToActor.new(%{
+                "user_id" => actor.id,
+                "target_actor_ap_id" => target_actor_ap_id,
+                "activity_id" => object.ap_id,
+                "activity" => object.data
+              })
+            )
+
+          :ok
       end
+    end
   end
 
   defp recipients(actor, %Object{actor: object_actor} = object) when is_binary(object_actor) do
