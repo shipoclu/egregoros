@@ -9,7 +9,7 @@ defmodule Egregoros.MixProject do
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       test_coverage: [
-        summary: [threshold: 82],
+        summary: [threshold: 85],
         ignore_modules: [
           EgregorosWeb.AdminHTML,
           EgregorosWeb.OAuthHTML,
