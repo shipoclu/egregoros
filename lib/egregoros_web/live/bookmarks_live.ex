@@ -4,13 +4,19 @@ defmodule EgregorosWeb.BookmarksLive do
   import Ecto.Query, only: [from: 2]
 
   alias Egregoros.Interactions
+  alias Egregoros.Media
+  alias Egregoros.MediaStorage
   alias Egregoros.Notifications
   alias Egregoros.Object
   alias Egregoros.Objects
+  alias Egregoros.Publish
   alias Egregoros.Relationship
   alias Egregoros.Repo
   alias Egregoros.User
   alias Egregoros.Users
+  alias EgregorosWeb.Live.Uploads, as: LiveUploads
+  alias EgregorosWeb.MentionAutocomplete
+  alias EgregorosWeb.Param
   alias EgregorosWeb.ViewModels.Status, as: StatusVM
 
   @page_size 20
@@ -23,19 +29,52 @@ defmodule EgregorosWeb.BookmarksLive do
         id -> Users.get(id)
       end
 
-    {:ok,
-     socket
-     |> assign(
-       current_user: current_user,
-       notifications_count: notifications_count(current_user),
-       kind: kind_for_action(socket.assigns.live_action),
-       relationship_type: relationship_type(kind_for_action(socket.assigns.live_action)),
-       saved_cursor: nil,
-       saved_end?: true,
-       page_kicker: nil,
-       page_title: nil,
-       empty_message: nil
-     )}
+    socket =
+      socket
+      |> assign(
+        current_user: current_user,
+        notifications_count: notifications_count(current_user),
+        kind: kind_for_action(socket.assigns.live_action),
+        relationship_type: relationship_type(kind_for_action(socket.assigns.live_action)),
+        saved_cursor: nil,
+        saved_end?: true,
+        page_kicker: nil,
+        page_title: nil,
+        empty_message: nil,
+        mention_suggestions: %{},
+        reply_modal_open?: false,
+        reply_to_ap_id: nil,
+        reply_to_handle: nil,
+        reply_form: Phoenix.Component.to_form(default_reply_params(), as: :reply),
+        reply_media_alt: %{},
+        reply_options_open?: false,
+        reply_cw_open?: false
+      )
+      |> allow_upload(:reply_media,
+        accept: ~w(
+          .png
+          .jpg
+          .jpeg
+          .webp
+          .gif
+          .heic
+          .heif
+          .mp4
+          .webm
+          .mov
+          .m4a
+          .mp3
+          .ogg
+          .opus
+          .wav
+          .aac
+        ),
+        max_entries: 4,
+        max_file_size: 10_000_000,
+        auto_upload: true
+      )
+
+    {:ok, socket}
   end
 
   @impl true
@@ -47,6 +86,270 @@ defmodule EgregorosWeb.BookmarksLive do
   @impl true
   def handle_event("copied_link", _params, socket) do
     {:noreply, put_flash(socket, :info, "Copied link to clipboard.")}
+  end
+
+  def handle_event("mention_search", %{"q" => q, "scope" => scope}, socket) do
+    q = q |> to_string() |> String.trim() |> String.trim_leading("@")
+    scope = scope |> to_string() |> String.trim()
+
+    suggestions =
+      if q == "" or scope == "" do
+        []
+      else
+        MentionAutocomplete.suggestions(q, limit: 8)
+      end
+
+    mention_suggestions =
+      socket.assigns.mention_suggestions
+      |> Map.put(scope, suggestions)
+
+    {:noreply, assign(socket, mention_suggestions: mention_suggestions)}
+  end
+
+  def handle_event("mention_clear", %{"scope" => scope}, socket) do
+    scope = scope |> to_string() |> String.trim()
+
+    mention_suggestions =
+      socket.assigns.mention_suggestions
+      |> Map.delete(scope)
+
+    {:noreply, assign(socket, mention_suggestions: mention_suggestions)}
+  end
+
+  def handle_event(
+        "open_reply_modal",
+        %{"in_reply_to" => in_reply_to, "actor_handle" => actor_handle},
+        socket
+      ) do
+    if socket.assigns.current_user do
+      in_reply_to = in_reply_to |> to_string() |> String.trim()
+      actor_handle = actor_handle |> to_string() |> String.trim()
+
+      if in_reply_to == "" do
+        {:noreply, socket}
+      else
+        reply_params =
+          default_reply_params()
+          |> Map.put("in_reply_to", in_reply_to)
+
+        socket =
+          socket
+          |> LiveUploads.cancel_all(:reply_media)
+          |> assign(
+            reply_modal_open?: true,
+            reply_to_ap_id: in_reply_to,
+            reply_to_handle: actor_handle,
+            reply_form: Phoenix.Component.to_form(reply_params, as: :reply),
+            reply_media_alt: %{},
+            reply_options_open?: false,
+            reply_cw_open?: false
+          )
+
+        {:noreply, socket}
+      end
+    else
+      {:noreply, put_flash(socket, :error, "Register to reply.")}
+    end
+  end
+
+  def handle_event("close_reply_modal", _params, socket) do
+    socket =
+      socket
+      |> LiveUploads.cancel_all(:reply_media)
+      |> assign(
+        reply_modal_open?: false,
+        reply_to_ap_id: nil,
+        reply_to_handle: nil,
+        reply_form: Phoenix.Component.to_form(default_reply_params(), as: :reply),
+        reply_media_alt: %{},
+        reply_options_open?: false,
+        reply_cw_open?: false
+      )
+
+    {:noreply, socket}
+  end
+
+  def handle_event("toggle_reply_cw", _params, socket) do
+    {:noreply, assign(socket, reply_cw_open?: !socket.assigns.reply_cw_open?)}
+  end
+
+  def handle_event("reply_change", %{"reply" => %{} = reply_params}, socket) do
+    reply_params = Map.merge(default_reply_params(), reply_params)
+    media_alt = Map.get(reply_params, "media_alt", %{})
+
+    reply_options_open? = Param.truthy?(Map.get(reply_params, "ui_options_open"))
+
+    reply_cw_open? =
+      socket.assigns.reply_cw_open? ||
+        reply_params |> Map.get("spoiler_text", "") |> to_string() |> String.trim() != ""
+
+    {:noreply,
+     assign(socket,
+       reply_form: Phoenix.Component.to_form(reply_params, as: :reply),
+       reply_media_alt: media_alt,
+       reply_options_open?: reply_options_open?,
+       reply_cw_open?: reply_cw_open?
+     )}
+  end
+
+  def handle_event("cancel_reply_media", %{"ref" => ref}, socket) do
+    {:noreply,
+     socket
+     |> cancel_upload(:reply_media, ref)
+     |> assign(:reply_media_alt, Map.delete(socket.assigns.reply_media_alt, ref))}
+  end
+
+  def handle_event("create_reply", %{"reply" => %{} = reply_params}, socket) do
+    case socket.assigns.current_user do
+      nil ->
+        {:noreply, put_flash(socket, :error, "Register to reply.")}
+
+      user ->
+        in_reply_to =
+          case socket.assigns.reply_to_ap_id do
+            ap_id when is_binary(ap_id) -> String.trim(ap_id)
+            _ -> reply_params |> Map.get("in_reply_to", "") |> to_string() |> String.trim()
+          end
+
+        if in_reply_to != "" do
+          reply_params = Map.merge(default_reply_params(), reply_params)
+          content = reply_params |> Map.get("content", "") |> to_string()
+          media_alt = Map.get(reply_params, "media_alt", %{})
+          visibility = Map.get(reply_params, "visibility", "public")
+          spoiler_text = Map.get(reply_params, "spoiler_text")
+          sensitive = Map.get(reply_params, "sensitive")
+          language = Map.get(reply_params, "language")
+
+          reply_options_open? = Param.truthy?(Map.get(reply_params, "ui_options_open"))
+
+          reply_cw_open? =
+            socket.assigns.reply_cw_open? ||
+              reply_params |> Map.get("spoiler_text", "") |> to_string() |> String.trim() != ""
+
+          upload = socket.assigns.uploads.reply_media
+
+          cond do
+            Enum.any?(upload.entries, &(!&1.done?)) ->
+              {:noreply,
+               socket
+               |> put_flash(:error, "Wait for attachments to finish uploading.")
+               |> assign(
+                 reply_form: Phoenix.Component.to_form(reply_params, as: :reply),
+                 reply_media_alt: media_alt,
+                 reply_options_open?: reply_options_open?,
+                 reply_cw_open?: reply_cw_open?
+               )}
+
+            upload.errors != [] or Enum.any?(upload.entries, &(!&1.valid?)) ->
+              {:noreply,
+               socket
+               |> put_flash(:error, "Remove invalid attachments before posting.")
+               |> assign(
+                 reply_form: Phoenix.Component.to_form(reply_params, as: :reply),
+                 reply_media_alt: media_alt,
+                 reply_options_open?: reply_options_open?,
+                 reply_cw_open?: reply_cw_open?
+               )}
+
+            true ->
+              attachments =
+                consume_uploaded_entries(socket, :reply_media, fn %{path: path}, entry ->
+                  upload = %Plug.Upload{
+                    path: path,
+                    filename: entry.client_name,
+                    content_type: entry.client_type
+                  }
+
+                  description =
+                    media_alt |> Map.get(entry.ref, "") |> to_string() |> String.trim()
+
+                  with {:ok, url_path} <- MediaStorage.store_media(user, upload),
+                       {:ok, object} <-
+                         Media.create_media_object(user, upload, url_path,
+                           description: description
+                         ) do
+                    {:ok, object.data}
+                  else
+                    {:error, reason} -> {:ok, {:error, reason}}
+                  end
+                end)
+
+              case Enum.find(attachments, &match?({:error, _}, &1)) do
+                {:error, _reason} ->
+                  {:noreply,
+                   socket
+                   |> put_flash(:error, "Could not upload attachment.")
+                   |> assign(
+                     reply_form: Phoenix.Component.to_form(reply_params, as: :reply),
+                     reply_media_alt: media_alt,
+                     reply_options_open?: reply_options_open?,
+                     reply_cw_open?: reply_cw_open?
+                   )}
+
+                nil ->
+                  case Publish.post_note(user, content,
+                         in_reply_to: in_reply_to,
+                         attachments: attachments,
+                         visibility: visibility,
+                         spoiler_text: spoiler_text,
+                         sensitive: sensitive,
+                         language: language
+                       ) do
+                    {:ok, _reply} ->
+                      {:noreply,
+                       socket
+                       |> put_flash(:info, "Reply posted.")
+                       |> assign(
+                         reply_modal_open?: false,
+                         reply_to_ap_id: nil,
+                         reply_to_handle: nil,
+                         reply_form:
+                           Phoenix.Component.to_form(default_reply_params(), as: :reply),
+                         reply_media_alt: %{},
+                         reply_options_open?: false,
+                         reply_cw_open?: false
+                       )
+                       |> push_event("reply_modal_close", %{})}
+
+                    {:error, :too_long} ->
+                      {:noreply,
+                       socket
+                       |> put_flash(:error, "Reply is too long.")
+                       |> assign(
+                         reply_form: Phoenix.Component.to_form(reply_params, as: :reply),
+                         reply_media_alt: media_alt,
+                         reply_options_open?: reply_options_open?,
+                         reply_cw_open?: reply_cw_open?
+                       )}
+
+                    {:error, :empty} ->
+                      {:noreply,
+                       socket
+                       |> put_flash(:error, "Reply can't be empty.")
+                       |> assign(
+                         reply_form: Phoenix.Component.to_form(reply_params, as: :reply),
+                         reply_media_alt: media_alt,
+                         reply_options_open?: reply_options_open?,
+                         reply_cw_open?: reply_cw_open?
+                       )}
+
+                    _ ->
+                      {:noreply,
+                       socket
+                       |> put_flash(:error, "Could not post reply.")
+                       |> assign(
+                         reply_form: Phoenix.Component.to_form(reply_params, as: :reply),
+                         reply_media_alt: media_alt,
+                         reply_options_open?: reply_options_open?,
+                         reply_cw_open?: reply_cw_open?
+                       )}
+                  end
+              end
+          end
+        else
+          {:noreply, put_flash(socket, :error, "Select a post to reply to.")}
+        end
+    end
   end
 
   def handle_event("toggle_like", %{"id" => id}, socket) do
@@ -247,6 +550,7 @@ defmodule EgregorosWeb.BookmarksLive do
                 id={id}
                 entry={entry}
                 current_user={@current_user}
+                reply_mode={:modal}
               />
             </div>
 
@@ -277,6 +581,18 @@ defmodule EgregorosWeb.BookmarksLive do
           <% end %>
         </section>
       </AppShell.app_shell>
+
+      <ReplyModal.reply_modal
+        :if={@current_user}
+        form={@reply_form}
+        upload={@uploads.reply_media}
+        media_alt={@reply_media_alt}
+        reply_to_handle={@reply_to_handle}
+        mention_suggestions={@mention_suggestions}
+        options_open?={@reply_options_open?}
+        cw_open?={@reply_cw_open?}
+        open={@reply_modal_open?}
+      />
 
       <MediaViewer.media_viewer
         viewer={%{items: [], index: 0}}
@@ -433,5 +749,17 @@ defmodule EgregorosWeb.BookmarksLive do
     user
     |> Notifications.list_for_user(limit: 20)
     |> length()
+  end
+
+  defp default_reply_params do
+    %{
+      "content" => "",
+      "spoiler_text" => "",
+      "visibility" => "public",
+      "sensitive" => "false",
+      "language" => "",
+      "ui_options_open" => "false",
+      "media_alt" => %{}
+    }
   end
 end

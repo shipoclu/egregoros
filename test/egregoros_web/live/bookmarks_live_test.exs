@@ -5,6 +5,7 @@ defmodule EgregorosWeb.BookmarksLiveTest do
 
   alias Egregoros.Activities.Note
   alias Egregoros.Interactions
+  alias Egregoros.Objects
   alias Egregoros.Pipeline
   alias Egregoros.Relationships
   alias Egregoros.Users
@@ -51,6 +52,31 @@ defmodule EgregorosWeb.BookmarksLiveTest do
     |> render_click()
 
     refute has_element?(view, "#post-#{note.id}")
+  end
+
+  test "bookmarks reply modal can be opened and replies can be posted", %{conn: conn, user: user} do
+    assert {:ok, parent} = Pipeline.ingest(Note.build(user, "Parent post"), local: true)
+    assert {:ok, :bookmarked} = Interactions.toggle_bookmark(user, parent.id)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/bookmarks")
+
+    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='closed']")
+
+    view
+    |> element("#post-#{parent.id} button[data-role='reply']")
+    |> render_click()
+
+    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='open']")
+
+    view
+    |> form("#reply-modal-form", reply: %{content: "A reply"})
+    |> render_submit()
+
+    assert render(view) =~ "Reply posted."
+
+    [reply] = Objects.list_replies_to(parent.ap_id, limit: 1)
+    assert reply.data["inReplyTo"] == parent.ap_id
   end
 
   test "favourites page lists liked posts and allows unliking", %{conn: conn, user: user} do
