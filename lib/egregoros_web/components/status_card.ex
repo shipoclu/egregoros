@@ -115,7 +115,7 @@ defmodule EgregorosWeb.StatusCard do
             <.time_ago at={@entry.object.inserted_at} />
           <% end %>
 
-          <.status_menu entry={@entry} current_user={@current_user} />
+      <.status_menu card_id={@id} entry={@entry} current_user={@current_user} />
         </div>
       </div>
 
@@ -636,6 +636,7 @@ defmodule EgregorosWeb.StatusCard do
 
   defp safe_http_url?(_url), do: false
 
+  attr :card_id, :string, required: true
   attr :entry, :map, required: true
   attr :current_user, :any, default: nil
 
@@ -645,9 +646,10 @@ defmodule EgregorosWeb.StatusCard do
       |> assign(:share_url, status_share_url(assigns.entry))
       |> assign(:can_delete?, can_delete_post?(assigns.entry, assigns.current_user))
       |> assign(:bookmarked?, Map.get(assigns.entry, :bookmarked?, false))
+      |> assign_new(:menu_id, fn -> "#{assigns.card_id}-menu" end)
 
     ~H"""
-    <details data-role="status-menu" class="relative">
+    <details id={@menu_id} data-role="status-menu" class="relative">
       <summary
         data-role="status-menu-trigger"
         aria-label="Post actions"
@@ -658,13 +660,22 @@ defmodule EgregorosWeb.StatusCard do
         </span>
       </summary>
 
-      <div class="absolute right-0 top-9 z-40 w-48 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-800">
+      <div
+        class="absolute right-0 top-9 z-40 w-48 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-800"
+        phx-click-away={JS.remove_attribute("open", to: "##{@menu_id}")}
+        phx-window-keydown={JS.remove_attribute("open", to: "##{@menu_id}")}
+        phx-key="escape"
+      >
         <button
           :if={is_binary(@share_url) and @share_url != ""}
           type="button"
           data-role="copy-link"
           data-copy-text={@share_url}
-          phx-click={JS.dispatch("egregoros:copy") |> JS.push("copied_link")}
+          phx-click={
+            JS.dispatch("egregoros:copy")
+            |> JS.push("copied_link")
+            |> JS.remove_attribute("open", to: "##{@menu_id}")
+          }
           class="flex w-full items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-700"
         >
           <.icon name="hero-clipboard-document" class="size-5 text-slate-500 dark:text-slate-400" />

@@ -505,6 +505,9 @@ defmodule EgregorosWeb.StatusCardTest do
     assert html =~ ~s(data-role="status-menu")
     assert html =~ ~s(data-role="status-menu-trigger")
     assert html =~ ~s(aria-label="Post actions")
+    assert html =~ ~s(phx-click-away=)
+    assert html =~ ~s(phx-window-keydown=)
+    assert html =~ ~s(phx-key="escape")
     assert html =~ ~s(data-role="copy-link")
     assert html =~ ~s(data-copy-text="#{permalink}")
   end
