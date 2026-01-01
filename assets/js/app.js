@@ -32,6 +32,7 @@ import ComposeMentions from "./hooks/compose_mentions"
 import EmojiPicker from "./hooks/emoji_picker"
 import MediaViewer from "./hooks/media_viewer"
 import ReplyModal from "./hooks/reply_modal"
+import ScrollRestore from "./hooks/scroll_restore"
 
 const base64UrlEncode = bytes => {
   let binary = ""
@@ -1095,6 +1096,7 @@ const liveSocket = new LiveSocket("/live", Socket, {
     EmojiPicker,
     MediaViewer,
     ReplyModal,
+    ScrollRestore,
     E2EEDMComposer,
     E2EEDMMessage,
   },

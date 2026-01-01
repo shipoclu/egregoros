@@ -840,6 +840,14 @@ defmodule EgregorosWeb.TimelineLive do
 
         <section class="space-y-4">
           <div
+            id="timeline-scroll-restore"
+            phx-hook="ScrollRestore"
+            class="h-px w-px"
+            aria-hidden="true"
+          >
+          </div>
+
+          <div
             id="timeline-top-sentinel"
             phx-hook="TimelineTopSentinel"
             class="h-px w-px"

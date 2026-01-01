@@ -1176,6 +1176,6 @@ defmodule EgregorosWeb.StatusLive do
     }
   end
 
-  defp timeline_href(%{id: _}), do: ~p"/?timeline=home"
-  defp timeline_href(_user), do: ~p"/?timeline=public"
+  defp timeline_href(%{id: _}), do: ~p"/?timeline=home" <> "&restore_scroll=1"
+  defp timeline_href(_user), do: ~p"/?timeline=public" <> "&restore_scroll=1"
 end

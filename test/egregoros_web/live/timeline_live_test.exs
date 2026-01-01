@@ -93,6 +93,13 @@ defmodule EgregorosWeb.TimelineLiveTest do
     refute has_element?(view, "#timeline-aside")
   end
 
+  test "timeline includes a scroll restore hook for returning from threads", %{conn: conn, user: user} do
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/")
+
+    assert has_element?(view, "#timeline-scroll-restore[phx-hook='ScrollRestore']")
+  end
+
   test "public timeline does not include direct messages", %{conn: conn, user: user} do
     {:ok, _} = Publish.post_note(user, "Hello public")
     {:ok, _} = Publish.post_note(user, "Secret DM", visibility: "direct")
