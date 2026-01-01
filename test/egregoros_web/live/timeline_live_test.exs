@@ -374,6 +374,29 @@ defmodule EgregorosWeb.TimelineLiveTest do
     assert has_element?(view, "[data-role='timeline-current']", "public")
   end
 
+  test "local timeline shows only local public posts", %{conn: conn, user: user} do
+    assert {:ok, _local_note} = Pipeline.ingest(Note.build(user, "Local note"), local: true)
+
+    assert {:ok, _remote_note} =
+             Pipeline.ingest(
+               %{
+                 "id" => "https://remote.example/objects/remote-local-timeline",
+                 "type" => "Note",
+                 "attributedTo" => "https://remote.example/users/bob",
+                 "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+                 "cc" => ["https://remote.example/users/bob/followers"],
+                 "content" => "<p>Remote note</p>"
+               },
+               local: false
+             )
+
+    {:ok, view, _html} = live(conn, "/?timeline=local")
+
+    assert has_element?(view, "[data-role='timeline-current']", "local")
+    assert has_element?(view, "article[data-role='status-card']", "Local note")
+    refute has_element?(view, "article[data-role='status-card']", "Remote note")
+  end
+
   test "compose sheet can be opened and closed", %{conn: conn, user: user} do
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     {:ok, view, _html} = live(conn, "/")

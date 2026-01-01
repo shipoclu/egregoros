@@ -849,7 +849,7 @@ defmodule EgregorosWeb.TimelineLive do
             <div>
               <h2 class="font-display text-xl text-slate-900 dark:text-slate-100">Timeline</h2>
               <p class="mt-1 text-xs uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
-                {if @timeline == :home, do: "Home", else: "Public"}
+                {timeline_label(@timeline)}
               </p>
               <span data-role="timeline-current" class="sr-only">{@timeline}</span>
             </div>
@@ -873,6 +873,19 @@ defmodule EgregorosWeb.TimelineLive do
                   Home
                 </span>
               <% end %>
+
+              <.link
+                patch={~p"/?timeline=local"}
+                class={[
+                  "rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] transition",
+                  @timeline == :local &&
+                    "bg-slate-900 text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white",
+                  @timeline != :local &&
+                    "border border-slate-200/80 bg-white/70 text-slate-700 hover:-translate-y-0.5 hover:bg-white dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:hover:bg-slate-950"
+                ]}
+              >
+                Local
+              </.link>
 
               <.link
                 patch={~p"/?timeline=public"}
@@ -993,11 +1006,13 @@ defmodule EgregorosWeb.TimelineLive do
   end
 
   defp timeline_from_params(%{"timeline" => "public"}, _user), do: :public
+  defp timeline_from_params(%{"timeline" => "local"}, _user), do: :local
   defp timeline_from_params(%{"timeline" => "home"}, %User{}), do: :home
   defp timeline_from_params(_params, %User{}), do: :home
   defp timeline_from_params(_params, _user), do: :public
 
   defp timeline_topics(:public, _user), do: [Timeline.public_topic()]
+  defp timeline_topics(:local, _user), do: [Timeline.public_topic()]
   defp timeline_topics(:home, %User{} = user), do: [Timeline.user_topic(user.ap_id)]
   defp timeline_topics(_timeline, _user), do: [Timeline.public_topic()]
 
@@ -1031,6 +1046,10 @@ defmodule EgregorosWeb.TimelineLive do
 
   defp list_timeline_posts(:home, %User{} = user, opts) when is_list(opts) do
     Objects.list_home_notes(user.ap_id, opts)
+  end
+
+  defp list_timeline_posts(:local, _user, opts) when is_list(opts) do
+    Objects.list_public_notes(Keyword.put(opts, :local, true))
   end
 
   defp list_timeline_posts(_timeline, _user, opts) when is_list(opts) do
@@ -1072,6 +1091,12 @@ defmodule EgregorosWeb.TimelineLive do
   defp include_post?(%{type: "Note"} = post, :public, _user, _home_actor_ids) do
     Objects.publicly_listed?(post)
   end
+
+  defp include_post?(%{type: "Note", local: true} = post, :local, _user, _home_actor_ids) do
+    Objects.publicly_listed?(post)
+  end
+
+  defp include_post?(%{type: "Note"} = _post, :local, _user, _home_actor_ids), do: false
 
   defp include_post?(_post, _timeline, _user, _home_actor_ids), do: false
 
@@ -1164,6 +1189,11 @@ defmodule EgregorosWeb.TimelineLive do
   defp new_posts_label(count) when is_integer(count) and count == 1, do: "1 new post"
   defp new_posts_label(count) when is_integer(count) and count > 1, do: "#{count} new posts"
   defp new_posts_label(_count), do: "New posts"
+
+  defp timeline_label(:home), do: "Home"
+  defp timeline_label(:public), do: "Public"
+  defp timeline_label(:local), do: "Local"
+  defp timeline_label(_timeline), do: "Public"
 
   defp refresh_post(socket, post_id) when is_integer(post_id) do
     current_user = socket.assigns.current_user

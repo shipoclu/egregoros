@@ -152,6 +152,8 @@ defmodule Egregoros.Objects do
     limit = opts |> Keyword.get(:limit, 20) |> normalize_limit()
     max_id = Keyword.get(opts, :max_id)
     since_id = Keyword.get(opts, :since_id)
+    local_only? = Keyword.get(opts, :local, false) == true
+    remote_only? = Keyword.get(opts, :remote, false) == true
 
     from(o in Object,
       where: o.type == "Note",
@@ -159,6 +161,7 @@ defmodule Egregoros.Objects do
       limit: ^limit
     )
     |> where_publicly_listed()
+    |> maybe_where_origin(local_only?, remote_only?)
     |> maybe_where_max_id(max_id)
     |> maybe_where_since_id(since_id)
     |> Repo.all()
