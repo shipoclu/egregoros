@@ -12,14 +12,14 @@ defmodule Egregoros.Federation.ObjectFetcher do
 
     with :ok <- SafeURL.validate_http_url(ap_id),
          {:ok, %{status: status, body: body}} <- SignedFetch.get(ap_id, accept: @accept),
-         true <- status in 200..299,
+         status when status in 200..299 <- status,
          {:ok, map} <- decode_json(body),
          :ok <- validate_id(map, ap_id),
          {:ok, object} <- Pipeline.ingest(map, local: false, thread_fetch: true) do
       {:ok, object}
     else
-      false ->
-        {:error, :object_fetch_failed}
+      status when is_integer(status) ->
+        {:error, {:http_status, status}}
 
       {:ok, %{status: status}} ->
         {:error, {:http_status, status}}
