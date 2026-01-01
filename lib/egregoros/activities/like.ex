@@ -252,5 +252,4 @@ defmodule Egregoros.Activities.Like do
     |> Helpers.maybe_put("cc", like.cc)
     |> Helpers.maybe_put("published", like.published)
   end
-
 end

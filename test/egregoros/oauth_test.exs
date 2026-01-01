@@ -400,7 +400,11 @@ defmodule Egregoros.OAuthTest do
   end
 
   test "revoke_token rejects unknown applications" do
-    assert OAuth.revoke_token(%{"token" => "token", "client_id" => "missing", "client_secret" => "x"}) ==
+    assert OAuth.revoke_token(%{
+             "token" => "token",
+             "client_id" => "missing",
+             "client_secret" => "x"
+           }) ==
              {:error, :invalid_client}
   end
 

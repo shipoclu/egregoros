@@ -90,7 +90,11 @@ defmodule EgregorosWeb.MastodonAPI.StatusRenderer do
     me_relationships =
       case current_user do
         %User{ap_id: ap_id} when is_binary(ap_id) ->
-          Relationships.list_by_types_actor_objects(["Like", "Announce", "Bookmark"], ap_id, object_ap_ids)
+          Relationships.list_by_types_actor_objects(
+            ["Like", "Announce", "Bookmark"],
+            ap_id,
+            object_ap_ids
+          )
 
         _ ->
           MapSet.new()
@@ -271,7 +275,11 @@ defmodule EgregorosWeb.MastodonAPI.StatusRenderer do
 
   defp format_datetime(%Object{}), do: DateTime.utc_now() |> DateTime.to_iso8601()
 
-  defp edited_at(%Object{type: "Note", inserted_at: %DateTime{} = inserted_at, updated_at: %DateTime{} = updated_at}) do
+  defp edited_at(%Object{
+         type: "Note",
+         inserted_at: %DateTime{} = inserted_at,
+         updated_at: %DateTime{} = updated_at
+       }) do
     case DateTime.compare(updated_at, inserted_at) do
       :gt -> DateTime.to_iso8601(updated_at)
       _ -> nil

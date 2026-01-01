@@ -247,5 +247,4 @@ defmodule Egregoros.Activities.Create do
   defp extract_actor_id(%{id: id}) when is_binary(id), do: id
   defp extract_actor_id(id) when is_binary(id), do: id
   defp extract_actor_id(_), do: nil
-
 end

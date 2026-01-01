@@ -49,4 +49,3 @@ defmodule Egregoros.Workers.DeliverToActor do
 
   defp get_or_fetch_target(_target_actor_ap_id), do: {:error, :invalid_target}
 end
-

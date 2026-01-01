@@ -302,5 +302,4 @@ defmodule Egregoros.Activities.Undo do
     |> Helpers.maybe_put("cc", undo.cc)
     |> Helpers.maybe_put("published", undo.published)
   end
-
 end

@@ -96,4 +96,3 @@ defmodule Egregoros.MixTasksTest do
     end
   end
 end
-

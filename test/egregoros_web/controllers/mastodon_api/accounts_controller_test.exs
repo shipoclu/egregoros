@@ -813,7 +813,9 @@ defmodule EgregorosWeb.MastodonAPI.AccountsControllerTest do
     assert response(conn, 422) == "Unprocessable Entity"
   end
 
-  test "POST /api/v1/accounts/:id/block returns 404 when the account does not exist", %{conn: conn} do
+  test "POST /api/v1/accounts/:id/block returns 404 when the account does not exist", %{
+    conn: conn
+  } do
     {:ok, user} = Users.create_local_user("local")
 
     Egregoros.Auth.Mock
@@ -873,7 +875,9 @@ defmodule EgregorosWeb.MastodonAPI.AccountsControllerTest do
   test "GET /api/v1/accounts/lookup returns 404 when remote WebFinger lookup fails", %{conn: conn} do
     Egregoros.HTTP.Mock
     |> expect(:get, fn url, _headers ->
-      assert url == "https://remote.example/.well-known/webfinger?resource=acct:missing@remote.example"
+      assert url ==
+               "https://remote.example/.well-known/webfinger?resource=acct:missing@remote.example"
+
       {:ok, %{status: 404, body: %{}, headers: []}}
     end)
 

@@ -78,7 +78,8 @@ defmodule Egregoros.Workers.FetchThreadReplies do
   def perform(%Oban.Job{}), do: {:discard, :invalid_args}
 
   defp fetch_pages(url, pages_left, items_left, visited)
-       when is_binary(url) and is_integer(pages_left) and pages_left > 0 and is_integer(items_left) and
+       when is_binary(url) and is_integer(pages_left) and pages_left > 0 and
+              is_integer(items_left) and
               items_left > 0 and is_map(visited) do
     url = String.trim(url)
 
@@ -163,7 +164,7 @@ defmodule Egregoros.Workers.FetchThreadReplies do
       |> Map.get("orderedItems") ||
         Map.get(json, "items") ||
         []
-      |> List.wrap()
+        |> List.wrap()
 
     next =
       json
@@ -272,4 +273,3 @@ defmodule Egregoros.Workers.FetchThreadReplies do
 
   defp normalize_max_items(_value), do: @default_max_items
 end
-

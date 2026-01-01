@@ -27,4 +27,3 @@ defmodule Egregoros.Repo.Migrations.RenameOauthTokenDigestColumns do
     rename table(:oauth_tokens), :refresh_token_digest, to: :refresh_token
   end
 end
-

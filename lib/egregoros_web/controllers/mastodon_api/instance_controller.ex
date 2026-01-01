@@ -196,7 +196,8 @@ defmodule EgregorosWeb.MastodonAPI.InstanceController do
   defp count_local_statuses(%DateTime{} = start_dt, %DateTime{} = end_dt) do
     from(o in Object,
       where:
-        o.type == "Note" and o.local == true and not is_nil(o.published) and o.published >= ^start_dt and
+        o.type == "Note" and o.local == true and not is_nil(o.published) and
+          o.published >= ^start_dt and
           o.published <= ^end_dt
     )
     |> Repo.aggregate(:count, :id)

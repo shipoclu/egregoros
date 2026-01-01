@@ -187,7 +187,9 @@ defmodule Egregoros.UsersTest do
              Users.update_password(user, "current-password", "new-password")
 
     assert {:error, :unauthorized} = Users.authenticate_local_user(nickname, "current-password")
-    assert {:ok, %User{nickname: ^nickname}} = Users.authenticate_local_user(nickname, "new-password")
+
+    assert {:ok, %User{nickname: ^nickname}} =
+             Users.authenticate_local_user(nickname, "new-password")
   end
 
   test "update_password/3 rejects password changes for passkey-only users" do
@@ -195,6 +197,7 @@ defmodule Egregoros.UsersTest do
     assert {:ok, user} = Users.create_local_user(nickname)
     assert user.password_hash == nil
 
-    assert {:error, :unauthorized} = Users.update_password(user, "current-password", "new-password")
+    assert {:error, :unauthorized} =
+             Users.update_password(user, "current-password", "new-password")
   end
 end

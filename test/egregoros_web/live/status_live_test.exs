@@ -155,10 +155,11 @@ defmodule EgregorosWeb.StatusLiveTest do
     assert has_element?(view, "[data-role='thread-descendant'][data-depth='2']", "Child")
   end
 
-  test "status view enqueues a thread replies fetch when the object advertises a replies collection", %{
-    conn: conn,
-    user: user
-  } do
+  test "status view enqueues a thread replies fetch when the object advertises a replies collection",
+       %{
+         conn: conn,
+         user: user
+       } do
     root_id = "https://remote.example/objects/root-with-replies"
     replies_url = root_id <> "/replies"
 
@@ -417,7 +418,10 @@ defmodule EgregorosWeb.StatusLiveTest do
     refute has_element?(view, "#reply-modal")
 
     _html =
-      render_click(view, "open_reply_modal", %{"in_reply_to" => note.ap_id, "actor_handle" => "@alice"})
+      render_click(view, "open_reply_modal", %{
+        "in_reply_to" => note.ap_id,
+        "actor_handle" => "@alice"
+      })
 
     assert render(view) =~ "Register to reply."
     refute has_element?(view, "#reply-modal")
@@ -427,12 +431,16 @@ defmodule EgregorosWeb.StatusLiveTest do
 
     assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='closed']")
 
-    _html = render_click(view, "open_reply_modal", %{"in_reply_to" => "", "actor_handle" => "@alice"})
+    _html =
+      render_click(view, "open_reply_modal", %{"in_reply_to" => "", "actor_handle" => "@alice"})
 
     assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='closed']")
   end
 
-  test "status view can open the reply modal via open_reply_modal event", %{conn: conn, user: user} do
+  test "status view can open the reply modal via open_reply_modal event", %{
+    conn: conn,
+    user: user
+  } do
     assert {:ok, note} = Pipeline.ingest(Note.build(user, "Replyable"), local: true)
     uuid = uuid_from_ap_id(note.ap_id)
 
@@ -440,7 +448,10 @@ defmodule EgregorosWeb.StatusLiveTest do
     assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}")
 
     _html =
-      render_click(view, "open_reply_modal", %{"in_reply_to" => note.ap_id, "actor_handle" => "@alice"})
+      render_click(view, "open_reply_modal", %{
+        "in_reply_to" => note.ap_id,
+        "actor_handle" => "@alice"
+      })
 
     assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='open']")
     assert has_element?(view, "input[data-role='reply-in-reply-to'][value='#{note.ap_id}']")
@@ -491,7 +502,10 @@ defmodule EgregorosWeb.StatusLiveTest do
     refute render(view) =~ "Register to bookmark posts."
   end
 
-  test "status view rejects delete requests for posts not owned by the user", %{conn: conn, user: user} do
+  test "status view rejects delete requests for posts not owned by the user", %{
+    conn: conn,
+    user: user
+  } do
     {:ok, bob} = Users.create_local_user("bob")
     assert {:ok, note} = Pipeline.ingest(Note.build(bob, "Not yours"), local: true)
     uuid = uuid_from_ap_id(note.ap_id)
@@ -522,7 +536,10 @@ defmodule EgregorosWeb.StatusLiveTest do
     assert has_element?(view, "article", "Param reply")
   end
 
-  test "status view ignores post updates not related to the current thread", %{conn: conn, user: user} do
+  test "status view ignores post updates not related to the current thread", %{
+    conn: conn,
+    user: user
+  } do
     assert {:ok, parent} = Pipeline.ingest(Note.build(user, "Thread parent"), local: true)
     uuid = uuid_from_ap_id(parent.ap_id)
 

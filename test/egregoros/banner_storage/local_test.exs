@@ -79,4 +79,3 @@ defmodule Egregoros.BannerStorage.LocalTest do
     assert {:error, :enoent} = Local.store_banner(user, upload, root)
   end
 end
-

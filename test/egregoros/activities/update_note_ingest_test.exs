@@ -80,4 +80,3 @@ defmodule Egregoros.Activities.UpdateNoteIngestTest do
     assert {:error, %Ecto.Changeset{}} = Egregoros.Activities.Update.cast_and_validate(update)
   end
 end
-

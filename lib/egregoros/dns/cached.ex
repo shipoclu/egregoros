@@ -92,4 +92,3 @@ defmodule Egregoros.DNS.Cached do
     end
   end
 end
-

@@ -66,7 +66,11 @@ defmodule Egregoros.Activities.UpdateSideEffectsTest do
         "id" => note_id,
         "type" => "Note",
         "attributedTo" => actor.ap_id,
-        "to" => [@public, remote_recipient.ap_id, "https://missing.example/users/missing-#{unique}"],
+        "to" => [
+          @public,
+          remote_recipient.ap_id,
+          "https://missing.example/users/missing-#{unique}"
+        ],
         "cc" => [actor.ap_id <> "/followers"],
         "content" => "<p>Hello</p>"
       }
@@ -103,4 +107,3 @@ defmodule Egregoros.Activities.UpdateSideEffectsTest do
     )
   end
 end
-

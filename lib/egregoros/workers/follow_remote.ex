@@ -24,4 +24,3 @@ defmodule Egregoros.Workers.FollowRemote do
 
   def perform(%Oban.Job{}), do: {:discard, :invalid_args}
 end
-

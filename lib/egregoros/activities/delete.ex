@@ -165,5 +165,4 @@ defmodule Egregoros.Activities.Delete do
     |> Helpers.maybe_put("cc", delete.cc)
     |> Helpers.maybe_put("published", delete.published)
   end
-
 end

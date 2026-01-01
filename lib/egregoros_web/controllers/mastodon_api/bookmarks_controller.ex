@@ -44,4 +44,3 @@ defmodule EgregorosWeb.MastodonAPI.BookmarksController do
     |> Enum.filter(&Objects.visible_to?(&1, user))
   end
 end
-

@@ -177,5 +177,4 @@ defmodule Egregoros.Activities.Follow do
     |> Helpers.maybe_put("cc", follow.cc)
     |> Helpers.maybe_put("published", follow.published)
   end
-
 end

@@ -625,7 +625,8 @@ defmodule Egregoros.Objects do
 
   def list_visible_statuses_by_actor(actor, viewer, opts \\ [])
 
-  def list_visible_statuses_by_actor(actor, viewer, opts) when is_binary(actor) and is_list(opts) do
+  def list_visible_statuses_by_actor(actor, viewer, opts)
+      when is_binary(actor) and is_list(opts) do
     limit = opts |> Keyword.get(:limit, 20) |> normalize_limit()
     max_id = Keyword.get(opts, :max_id)
     since_id = Keyword.get(opts, :since_id)
@@ -939,7 +940,8 @@ defmodule Egregoros.Objects do
 
   defp resolve_conflict(_other, %Object{} = object, _attrs, _changeset), do: {:ok, object}
 
-  defp ap_id_mismatch?(%Object{ap_id: existing}, attrs) when is_map(attrs) and is_binary(existing) do
+  defp ap_id_mismatch?(%Object{ap_id: existing}, attrs)
+       when is_map(attrs) and is_binary(existing) do
     case Map.get(attrs, :ap_id) || Map.get(attrs, "ap_id") do
       nil -> false
       value when is_binary(value) -> String.trim(value) != "" and String.trim(value) != existing
@@ -949,7 +951,8 @@ defmodule Egregoros.Objects do
 
   defp ap_id_mismatch?(_object, _attrs), do: false
 
-  defp type_mismatch?(%Object{type: existing}, attrs) when is_map(attrs) and is_binary(existing) do
+  defp type_mismatch?(%Object{type: existing}, attrs)
+       when is_map(attrs) and is_binary(existing) do
     case Map.get(attrs, :type) || Map.get(attrs, "type") do
       nil -> false
       value when is_binary(value) -> String.trim(value) != "" and String.trim(value) != existing

@@ -58,7 +58,7 @@ defmodule Egregoros.Signature.HTTPTest do
       {:ok, user} =
         create_remote_user(%{
           public_key: public_key,
-          private_key: nil,
+          private_key: nil
         })
 
       conn =
@@ -77,7 +77,7 @@ defmodule Egregoros.Signature.HTTPTest do
       {:ok, user} =
         create_remote_user(%{
           public_key: public_key,
-          private_key: nil,
+          private_key: nil
         })
 
       conn =
@@ -97,7 +97,7 @@ defmodule Egregoros.Signature.HTTPTest do
       {:ok, user} =
         create_remote_user(%{
           public_key: public_key,
-          private_key: nil,
+          private_key: nil
         })
 
       conn =
@@ -117,7 +117,7 @@ defmodule Egregoros.Signature.HTTPTest do
       {:ok, user} =
         create_remote_user(%{
           public_key: public_key,
-          private_key: nil,
+          private_key: nil
         })
 
       date = :httpd_util.rfc1123_date() |> List.to_string()
@@ -140,7 +140,7 @@ defmodule Egregoros.Signature.HTTPTest do
       {:ok, user} =
         create_remote_user(%{
           public_key: public_key,
-          private_key: private_key,
+          private_key: private_key
         })
 
       body = ""
@@ -171,7 +171,7 @@ defmodule Egregoros.Signature.HTTPTest do
       {:ok, user} =
         create_remote_user(%{
           public_key: public_key,
-          private_key: private_key,
+          private_key: private_key
         })
 
       body = ""
@@ -199,7 +199,7 @@ defmodule Egregoros.Signature.HTTPTest do
       {:ok, user} =
         create_remote_user(%{
           public_key: public_key,
-          private_key: private_key,
+          private_key: private_key
         })
 
       body = ""
@@ -226,7 +226,7 @@ defmodule Egregoros.Signature.HTTPTest do
       {:ok, user} =
         create_remote_user(%{
           public_key: public_key,
-          private_key: nil,
+          private_key: nil
         })
 
       conn =
@@ -247,7 +247,7 @@ defmodule Egregoros.Signature.HTTPTest do
     {:ok, user} =
       create_remote_user(%{
         public_key: public_key,
-        private_key: private_key,
+        private_key: private_key
       })
 
     body = Jason.encode!(%{"id" => "https://remote.example/objects/1", "type" => "Note"})

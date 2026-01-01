@@ -155,7 +155,8 @@ defmodule Egregoros.Activities.Update do
 
   defp deliver_update(%Object{} = update_object, _opts) do
     with %User{} = actor <- Users.get_by_ap_id(update_object.actor),
-         inboxes when is_list(inboxes) and inboxes != [] <- inboxes_for_delivery(update_object, actor) do
+         inboxes when is_list(inboxes) and inboxes != [] <-
+           inboxes_for_delivery(update_object, actor) do
       Enum.each(inboxes, fn inbox_url ->
         Delivery.deliver(actor, inbox_url, update_object.data)
       end)
@@ -366,7 +367,8 @@ defmodule Egregoros.Activities.Update do
 
   defp maybe_put_recipients(activity, _field, []), do: activity
 
-  defp maybe_put_recipients(activity, field, recipients) when is_map(activity) and is_binary(field) do
+  defp maybe_put_recipients(activity, field, recipients)
+       when is_map(activity) and is_binary(field) do
     recipients =
       recipients
       |> Enum.filter(&is_binary/1)

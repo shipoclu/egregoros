@@ -43,7 +43,8 @@ defmodule Egregoros.Workers.ResolveMentions do
          {:ok, note_object} <- Objects.update_object(note_object, %{data: updated_note_data}),
          :ok <- Timeline.broadcast_post_updated(note_object),
          %{} = updated_create_data <- patch_create(create_object.data, updated_note_data),
-         {:ok, create_object} <- Objects.update_object(create_object, %{data: updated_create_data}) do
+         {:ok, create_object} <-
+           Objects.update_object(create_object, %{data: updated_create_data}) do
       {:ok, {create_object, note_object}}
     else
       _ -> {:error, :invalid_note}
@@ -134,7 +135,8 @@ defmodule Egregoros.Workers.ResolveMentions do
 
   defp fetch_missing_recipients(_note_data), do: :ok
 
-  defp resolve_mentions(content, actor_ap_id) when is_binary(content) and is_binary(actor_ap_id) do
+  defp resolve_mentions(content, actor_ap_id)
+       when is_binary(content) and is_binary(actor_ap_id) do
     local_domains = local_domains(actor_ap_id)
 
     mentions =

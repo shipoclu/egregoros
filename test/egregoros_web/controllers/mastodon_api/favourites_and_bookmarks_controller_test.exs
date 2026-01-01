@@ -81,4 +81,3 @@ defmodule EgregorosWeb.MastodonAPI.FavouritesAndBookmarksControllerTest do
     assert status["bookmarked"] == true
   end
 end
-

@@ -516,7 +516,9 @@ defmodule EgregorosWeb.MastodonAPI.StreamingSocketTest do
                }
              })
 
-    assert {:push, {:text, _payload}, state} = StreamingSocket.handle_info({:post_created, note}, state)
+    assert {:push, {:text, _payload}, state} =
+             StreamingSocket.handle_info({:post_created, note}, state)
+
     assert {:ok, _state} = StreamingSocket.handle_info({:post_created, note}, state)
   end
 
@@ -624,7 +626,8 @@ defmodule EgregorosWeb.MastodonAPI.StreamingSocketTest do
                }
              })
 
-    assert {:push, {:text, payload}, _state} = StreamingSocket.handle_info({:post_created, announce}, state)
+    assert {:push, {:text, payload}, _state} =
+             StreamingSocket.handle_info({:post_created, announce}, state)
 
     assert %{"event" => "update", "stream" => ["public"]} =
              Jason.decode!(payload)

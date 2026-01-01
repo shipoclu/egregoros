@@ -16,9 +16,7 @@ defmodule EgregorosWeb.InboxController do
          activity when is_map(activity) <- conn.body_params,
          args <- ingest_args(nickname, inbox_user_ap_id, activity),
          {:ok, _job} <-
-           Oban.insert(
-             IngestActivity.new(args)
-           ) do
+           Oban.insert(IngestActivity.new(args)) do
       send_resp(conn, 202, "")
     else
       nil -> send_resp(conn, 404, "Not Found")

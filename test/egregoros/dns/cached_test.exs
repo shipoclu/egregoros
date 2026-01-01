@@ -65,4 +65,3 @@ defmodule Egregoros.DNS.CachedTest do
     end
   end
 end
-

@@ -59,4 +59,3 @@ defmodule Egregoros.Federation.FollowRemoteAsyncTest do
     assert Enum.any?(follow_jobs, &(&1.args["inbox_url"] == remote.inbox))
   end
 end
-

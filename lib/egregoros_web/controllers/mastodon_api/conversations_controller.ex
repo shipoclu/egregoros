@@ -5,4 +5,3 @@ defmodule EgregorosWeb.MastodonAPI.ConversationsController do
     json(conn, [])
   end
 end
-

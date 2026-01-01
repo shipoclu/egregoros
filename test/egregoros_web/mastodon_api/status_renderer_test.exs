@@ -655,7 +655,8 @@ defmodule EgregorosWeb.MastodonAPI.StatusRendererTest do
 
     rendered = StatusRenderer.render_status(note)
 
-    assert [%{"username" => "stranger", "acct" => "stranger@remote.example"}] = rendered["mentions"]
+    assert [%{"username" => "stranger", "acct" => "stranger@remote.example"}] =
+             rendered["mentions"]
   end
 
   test "uses stored remote user records to build mention ids and acct values" do

@@ -1595,7 +1595,10 @@ defmodule EgregorosWeb.TimelineLiveTest do
     assert has_element?(view, "article[data-role='status-card']", "dm-map-2")
   end
 
-  test "reply composer state reacts to cw toggles and reply_change events", %{conn: conn, user: user} do
+  test "reply composer state reacts to cw toggles and reply_change events", %{
+    conn: conn,
+    user: user
+  } do
     assert {:ok, parent} = Pipeline.ingest(Note.build(user, "Reply target"), local: true)
 
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
@@ -1622,7 +1625,10 @@ defmodule EgregorosWeb.TimelineLiveTest do
            )
   end
 
-  test "replying reports upload failures from the media storage backend", %{conn: conn, user: user} do
+  test "replying reports upload failures from the media storage backend", %{
+    conn: conn,
+    user: user
+  } do
     assert {:ok, parent} = Pipeline.ingest(Note.build(user, "Reply target"), local: true)
 
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})

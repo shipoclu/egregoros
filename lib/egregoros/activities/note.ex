@@ -218,5 +218,4 @@ defmodule Egregoros.Activities.Note do
     |> validate_required([:content])
     |> validate_length(:content, min: 1)
   end
-
 end

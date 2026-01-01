@@ -25,7 +25,8 @@ defmodule Egregoros.Federation do
 
       case Users.get_by_handle(handle) do
         %User{local: false} = remote_user ->
-          with {:ok, _follow} <- Pipeline.ingest(Follow.build(local_user, remote_user), local: true) do
+          with {:ok, _follow} <-
+                 Pipeline.ingest(Follow.build(local_user, remote_user), local: true) do
             {:ok, remote_user}
           end
 

@@ -44,7 +44,7 @@ defmodule EgregorosWeb.SessionController do
 
   def create(conn, _params) do
     conn
-      |> put_status(:unprocessable_entity)
-      |> text("Unprocessable Entity")
+    |> put_status(:unprocessable_entity)
+    |> text("Unprocessable Entity")
   end
 end

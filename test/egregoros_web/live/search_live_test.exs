@@ -208,13 +208,21 @@ defmodule EgregorosWeb.SearchLiveTest do
 
     assert has_element?(view, "#search-post-#{note.id} button[data-role='like']", "Unlike")
 
-    refute has_element?(view, "#search-post-#{note.id} button[data-role='bookmark']", "Unbookmark")
+    refute has_element?(
+             view,
+             "#search-post-#{note.id} button[data-role='bookmark']",
+             "Unbookmark"
+           )
 
     view
     |> element("#search-post-#{note.id} button[data-role='bookmark']")
     |> render_click()
 
-    assert has_element?(view, "#search-post-#{note.id} button[data-role='bookmark']", "Unbookmark")
+    assert has_element?(
+             view,
+             "#search-post-#{note.id} button[data-role='bookmark']",
+             "Unbookmark"
+           )
   end
 
   test "logged-in users can follow remote accounts by handle", %{conn: conn} do
@@ -476,7 +484,9 @@ defmodule EgregorosWeb.SearchLiveTest do
     assert render(view) =~ "Deleted post."
   end
 
-  test "search refreshes statuses after interactions and drops now-invisible results", %{conn: conn} do
+  test "search refreshes statuses after interactions and drops now-invisible results", %{
+    conn: conn
+  } do
     {:ok, alice} = Users.create_local_user("alice")
     {:ok, bob} = Users.create_local_user("bob")
 

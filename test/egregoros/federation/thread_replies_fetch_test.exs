@@ -213,7 +213,8 @@ defmodule Egregoros.Federation.ThreadRepliesFetchTest do
 
     assert :ok = FetchThreadReplies.perform(%Oban.Job{args: %{"root_ap_id" => missing}})
 
-    assert :ok = FetchThreadReplies.perform(%Oban.Job{args: %{"root_ap_id" => "javascript:alert(1)"}})
+    assert :ok =
+             FetchThreadReplies.perform(%Oban.Job{args: %{"root_ap_id" => "javascript:alert(1)"}})
 
     id_mismatch = "https://remote.example/objects/mismatch-root"
 

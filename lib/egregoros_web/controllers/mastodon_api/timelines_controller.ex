@@ -78,5 +78,4 @@ defmodule EgregorosWeb.MastodonAPI.TimelinesController do
     |> Pagination.maybe_put_links(objects, has_more?, pagination)
     |> json(StatusRenderer.render_statuses(objects))
   end
-
 end

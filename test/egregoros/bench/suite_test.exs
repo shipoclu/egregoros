@@ -19,4 +19,3 @@ defmodule Egregoros.Bench.SuiteTest do
     end)
   end
 end
-

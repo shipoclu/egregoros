@@ -100,4 +100,3 @@ defmodule Egregoros.Activities.DeleteSideEffectsTest do
     refute Relationships.get_by_type_actor_object("Like", inbox_user.ap_id, note.ap_id)
   end
 end
-

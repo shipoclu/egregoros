@@ -6,4 +6,3 @@ defmodule Egregoros.RelationshipSchemaTest do
     assert :utc_datetime_usec == Egregoros.Relationship.__schema__(:type, :updated_at)
   end
 end
-

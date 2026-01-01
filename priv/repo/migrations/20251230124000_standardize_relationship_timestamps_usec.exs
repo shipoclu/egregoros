@@ -15,4 +15,3 @@ defmodule Egregoros.Repo.Migrations.StandardizeRelationshipTimestampsUsec do
     end
   end
 end
-

@@ -92,7 +92,10 @@ defmodule Egregoros.Workers.ResolveMentionsTest do
                "preferredUsername" => "toast",
                "inbox" => actor_url <> "/inbox",
                "outbox" => actor_url <> "/outbox",
-               "publicKey" => %{"publicKeyPem" => "-----BEGIN PUBLIC KEY-----\nMIIB...\n-----END PUBLIC KEY-----\n"}
+               "publicKey" => %{
+                 "publicKeyPem" =>
+                   "-----BEGIN PUBLIC KEY-----\nMIIB...\n-----END PUBLIC KEY-----\n"
+               }
              },
              headers: []
            }}
@@ -127,4 +130,3 @@ defmodule Egregoros.Workers.ResolveMentionsTest do
     assert Enum.any?(create_jobs, &(&1.args["inbox_url"] == remote.inbox))
   end
 end
-

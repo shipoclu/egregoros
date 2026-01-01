@@ -11,4 +11,3 @@ defmodule Egregoros.HTTP.StubTest do
              Egregoros.HTTP.Stub.post("https://example.com/inbox", "{}", [])
   end
 end
-

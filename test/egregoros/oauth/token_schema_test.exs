@@ -14,4 +14,3 @@ defmodule Egregoros.OAuth.TokenSchemaTest do
     assert :refresh_token in virtual_fields
   end
 end
-

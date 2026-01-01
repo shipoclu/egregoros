@@ -115,7 +115,7 @@ defmodule EgregorosWeb.StatusCard do
             <.time_ago at={@entry.object.inserted_at} />
           <% end %>
 
-      <.status_menu card_id={@id} entry={@entry} current_user={@current_user} />
+          <.status_menu card_id={@id} entry={@entry} current_user={@current_user} />
         </div>
       </div>
 

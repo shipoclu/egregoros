@@ -32,4 +32,3 @@ defmodule Egregoros.Activities.HelpersTest do
     end
   end
 end
-

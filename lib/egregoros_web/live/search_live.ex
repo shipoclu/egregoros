@@ -512,12 +512,16 @@ defmodule EgregorosWeb.SearchLive do
                 Remote follow queued
               </p>
               <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">
-                Fetching <span class="font-semibold">@{@remote_handle}</span> and sending your follow request.
+                Fetching <span class="font-semibold">@{@remote_handle}</span>
+                and sending your follow request.
               </p>
             </.card>
 
             <.card
-              :if={@remote_handle != nil and @current_user != nil and !@remote_following? and !@remote_follow_queued?}
+              :if={
+                @remote_handle != nil and @current_user != nil and !@remote_following? and
+                  !@remote_follow_queued?
+              }
               data_role="remote-follow"
               class="p-6"
             >

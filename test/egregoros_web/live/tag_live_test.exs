@@ -201,7 +201,11 @@ defmodule EgregorosWeb.TagLiveTest do
     assert render(view) =~ "Copied link to clipboard."
   end
 
-  test "reply composer supports attachments and can cancel them", %{conn: conn, user: user, note: note} do
+  test "reply composer supports attachments and can cancel them", %{
+    conn: conn,
+    user: user,
+    note: note
+  } do
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     assert {:ok, view, _html} = live(conn, "/tags/elixir")
 
@@ -286,7 +290,9 @@ defmodule EgregorosWeb.TagLiveTest do
     assert render(view) =~ "Register to reply."
   end
 
-  test "load more marks the tag timeline complete when there are no additional posts", %{conn: conn} do
+  test "load more marks the tag timeline complete when there are no additional posts", %{
+    conn: conn
+  } do
     {:ok, user} = Users.create_local_user("loader")
 
     for idx <- 1..20 do

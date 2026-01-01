@@ -79,4 +79,3 @@ defmodule Egregoros.CBORTest do
     end
   end
 end
-

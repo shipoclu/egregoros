@@ -22,7 +22,8 @@ defmodule Egregoros.Passkeys.WebAuthnTest do
     rp_id_hash <> <<flags::8, sign_count::32>>
   end
 
-  defp valid_attestation_object(credential_id) when is_binary(credential_id) and credential_id != "" do
+  defp valid_attestation_object(credential_id)
+       when is_binary(credential_id) and credential_id != "" do
     flags = 0x01 + 0x04 + 0x40
     sign_count = 0
 
@@ -143,7 +144,9 @@ defmodule Egregoros.Passkeys.WebAuthnTest do
 
   test "verify_attestation/2 returns invalid_payload when response is missing" do
     credential = %{"rawId" => b64url("credential-id")}
-    assert {:error, :invalid_payload} = WebAuthn.verify_attestation(credential, b64url("challenge"))
+
+    assert {:error, :invalid_payload} =
+             WebAuthn.verify_attestation(credential, b64url("challenge"))
   end
 
   test "verify_attestation/2 returns invalid_payload when rawId is not base64url" do
@@ -164,7 +167,9 @@ defmodule Egregoros.Passkeys.WebAuthnTest do
 
   test "verify_attestation/2 returns invalid_payload when rawId is not a string" do
     credential = %{"rawId" => 123, "response" => %{}}
-    assert {:error, :invalid_payload} = WebAuthn.verify_attestation(credential, b64url("challenge"))
+
+    assert {:error, :invalid_payload} =
+             WebAuthn.verify_attestation(credential, b64url("challenge"))
   end
 
   test "verify_attestation/2 returns invalid_payload when clientDataJSON is not JSON" do
@@ -224,7 +229,8 @@ defmodule Egregoros.Passkeys.WebAuthnTest do
       "rawId" => b64url("credential-id"),
       "response" => %{
         "clientDataJSON" => b64url(client_data),
-        "attestationObject" => b64url(attestation_object_with_auth_data(authenticator_data(flags, sign_count)))
+        "attestationObject" =>
+          b64url(attestation_object_with_auth_data(authenticator_data(flags, sign_count)))
       }
     }
 
@@ -242,7 +248,8 @@ defmodule Egregoros.Passkeys.WebAuthnTest do
       "rawId" => b64url("credential-id"),
       "response" => %{
         "clientDataJSON" => b64url(client_data),
-        "attestationObject" => b64url(attestation_object_with_auth_data(authenticator_data(flags, sign_count)))
+        "attestationObject" =>
+          b64url(attestation_object_with_auth_data(authenticator_data(flags, sign_count)))
       }
     }
 

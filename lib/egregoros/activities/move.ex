@@ -111,7 +111,12 @@ defmodule Egregoros.Activities.Move do
 
   defp migrate_local_followers(_actor_ap_id, _target), do: :ok
 
-  defp migrate_local_follower(%User{} = follower, %Relationship{} = follow_rel, actor_ap_id, target) do
+  defp migrate_local_follower(
+         %User{} = follower,
+         %Relationship{} = follow_rel,
+         actor_ap_id,
+         target
+       ) do
     _ = maybe_unfollow_old(follower, follow_rel, actor_ap_id)
     _ = maybe_follow_target(follower, target)
     :ok

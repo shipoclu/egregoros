@@ -14,4 +14,3 @@ defmodule EgregorosWeb.MastodonAPI.ConversationsControllerTest do
     assert conn |> get("/api/v1/conversations") |> json_response(200) == []
   end
 end
-

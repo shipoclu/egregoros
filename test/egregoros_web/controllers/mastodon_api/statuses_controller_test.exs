@@ -1269,13 +1269,19 @@ defmodule EgregorosWeb.MastodonAPI.StatusesControllerTest do
 
     assert json_response(conn, 200)["sensitive"] == false
 
-    conn = put(conn |> recycle(), "/api/v1/statuses/#{note.id}", %{"status" => "Edited 3", "sensitive" => "false"})
+    conn =
+      put(conn |> recycle(), "/api/v1/statuses/#{note.id}", %{
+        "status" => "Edited 3",
+        "sensitive" => "false"
+      })
+
     assert json_response(conn, 200)["sensitive"] == false
   end
 
-  test "bookmark/unbookmark/unfavourite/unreblog do not expose direct statuses to non-recipients", %{
-    conn: conn
-  } do
+  test "bookmark/unbookmark/unfavourite/unreblog do not expose direct statuses to non-recipients",
+       %{
+         conn: conn
+       } do
     {:ok, alice} = Users.create_local_user("alice")
     {:ok, bob} = Users.create_local_user("bob")
 

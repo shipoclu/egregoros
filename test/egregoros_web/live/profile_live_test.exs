@@ -382,7 +382,10 @@ defmodule EgregorosWeb.ProfileLiveTest do
     assert render(view) =~ "Copied link to clipboard."
   end
 
-  test "profile reply modal can be opened and replies can be posted", %{conn: conn, viewer: viewer} do
+  test "profile reply modal can be opened and replies can be posted", %{
+    conn: conn,
+    viewer: viewer
+  } do
     assert {:ok, parent} = Pipeline.ingest(Note.build(viewer, "Parent post"), local: true)
 
     conn = Plug.Test.init_test_session(conn, %{user_id: viewer.id})
@@ -590,7 +593,10 @@ defmodule EgregorosWeb.ProfileLiveTest do
     assert Objects.list_replies_to(parent.ap_id, limit: 10) == []
   end
 
-  test "profile reply composer validates content length and emptiness", %{conn: conn, viewer: viewer} do
+  test "profile reply composer validates content length and emptiness", %{
+    conn: conn,
+    viewer: viewer
+  } do
     assert {:ok, parent} = Pipeline.ingest(Note.build(viewer, "Parent post"), local: true)
 
     conn = Plug.Test.init_test_session(conn, %{user_id: viewer.id})
@@ -643,7 +649,8 @@ defmodule EgregorosWeb.ProfileLiveTest do
     viewer: viewer,
     profile_user: profile_user
   } do
-    assert {:ok, note} = Pipeline.ingest(Note.build(profile_user, "Interact with me"), local: true)
+    assert {:ok, note} =
+             Pipeline.ingest(Note.build(profile_user, "Interact with me"), local: true)
 
     conn = Plug.Test.init_test_session(conn, %{user_id: viewer.id})
     {:ok, view, _html} = live(conn, "/@#{profile_user.nickname}")

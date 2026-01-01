@@ -206,5 +206,4 @@ defmodule EgregorosWeb.PasskeysController do
       {:error, reason} -> {:error, reason}
     end
   end
-
 end

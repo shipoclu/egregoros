@@ -26,4 +26,3 @@ defmodule Egregoros.CustomEmojisTest do
              CustomEmojis.from_activity_tags(tags)
   end
 end
-

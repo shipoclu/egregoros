@@ -69,7 +69,8 @@ defmodule EgregorosWeb.MastodonAPI.StatusesController do
       true ->
         with %{} = object <- Objects.get(id),
              true <- object.type == "Note" and object.actor == user.ap_id and object.local == true,
-             %{} = note <- build_updated_note(object, user, status, spoiler_text, sensitive, language),
+             %{} = note <-
+               build_updated_note(object, user, status, spoiler_text, sensitive, language),
              update <- Update.build(user, note),
              {:ok, _} <- Pipeline.ingest(update, local: true),
              %{} = object <- Objects.get(id) do
@@ -100,7 +101,8 @@ defmodule EgregorosWeb.MastodonAPI.StatusesController do
           {:error, :not_found}
         end
 
-      _ -> {:error, :not_found}
+      _ ->
+        {:error, :not_found}
     end
   end
 
@@ -114,13 +116,21 @@ defmodule EgregorosWeb.MastodonAPI.StatusesController do
           {:error, :not_found}
         end
 
-      _ -> {:error, :not_found}
+      _ ->
+        {:error, :not_found}
     end
   end
 
   defp resolve_in_reply_to(_in_reply_to_id, _user), do: {:error, :not_found}
 
-  defp build_updated_note(%{data: %{} = data, ap_id: ap_id}, user, status, spoiler_text, sensitive, language)
+  defp build_updated_note(
+         %{data: %{} = data, ap_id: ap_id},
+         user,
+         status,
+         spoiler_text,
+         sensitive,
+         language
+       )
        when is_map(user) and is_binary(ap_id) and is_binary(status) do
     tags = Map.get(data, "tag", [])
     mention_hrefs = mention_hrefs_from_tags(tags)

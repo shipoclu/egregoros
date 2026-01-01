@@ -237,5 +237,4 @@ defmodule Egregoros.Activities.EmojiReact do
   end
 
   defp trim_content(activity), do: activity
-
 end

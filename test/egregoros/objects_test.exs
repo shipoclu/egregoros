@@ -636,7 +636,8 @@ defmodule Egregoros.ObjectsTest do
 
     assert {:ok, %Object{} = announce} =
              Objects.create_object(%{
-               ap_id: "https://remote.example/activities/announce-hashtag-#{Ecto.UUID.generate()}",
+               ap_id:
+                 "https://remote.example/activities/announce-hashtag-#{Ecto.UUID.generate()}",
                type: "Announce",
                actor: "https://remote.example/users/bob",
                object: note.ap_id,
@@ -714,7 +715,8 @@ defmodule Egregoros.ObjectsTest do
       assert {:ok, _} =
                Pipeline.ingest(
                  %{
-                   "id" => "https://local.example/objects/home-limit-#{idx}-#{Ecto.UUID.generate()}",
+                   "id" =>
+                     "https://local.example/objects/home-limit-#{idx}-#{Ecto.UUID.generate()}",
                    "type" => "Note",
                    "actor" => alice.ap_id,
                    "to" => ["https://www.w3.org/ns/activitystreams#Public"],
@@ -767,7 +769,12 @@ defmodule Egregoros.ObjectsTest do
         type: "Note",
         actor: alice.ap_id,
         local: true,
-        data: %{"id" => "https://local.example/objects/profile-public", "type" => "Note", "to" => [public], "cc" => []}
+        data: %{
+          "id" => "https://local.example/objects/profile-public",
+          "type" => "Note",
+          "to" => [public],
+          "cc" => []
+        }
       })
 
     {:ok, followers_note} =
@@ -776,7 +783,12 @@ defmodule Egregoros.ObjectsTest do
         type: "Note",
         actor: alice.ap_id,
         local: true,
-        data: %{"id" => "https://local.example/objects/profile-followers", "type" => "Note", "to" => [followers], "cc" => []}
+        data: %{
+          "id" => "https://local.example/objects/profile-followers",
+          "type" => "Note",
+          "to" => [followers],
+          "cc" => []
+        }
       })
 
     {:ok, direct_note} =
@@ -785,17 +797,45 @@ defmodule Egregoros.ObjectsTest do
         type: "Note",
         actor: alice.ap_id,
         local: true,
-        data: %{"id" => "https://local.example/objects/profile-direct", "type" => "Note", "to" => [bob.ap_id], "cc" => []}
+        data: %{
+          "id" => "https://local.example/objects/profile-direct",
+          "type" => "Note",
+          "to" => [bob.ap_id],
+          "cc" => []
+        }
       })
 
-    assert Enum.any?(Objects.list_visible_notes_by_actor(alice.ap_id, nil), &(&1.id == public_note.id))
-    refute Enum.any?(Objects.list_visible_notes_by_actor(alice.ap_id, nil), &(&1.id == followers_note.id))
-    refute Enum.any?(Objects.list_visible_notes_by_actor(alice.ap_id, nil), &(&1.id == direct_note.id))
+    assert Enum.any?(
+             Objects.list_visible_notes_by_actor(alice.ap_id, nil),
+             &(&1.id == public_note.id)
+           )
 
-    assert Enum.any?(Objects.list_visible_notes_by_actor(alice.ap_id, bob), &(&1.id == public_note.id))
-    refute Enum.any?(Objects.list_visible_notes_by_actor(alice.ap_id, bob), &(&1.id == followers_note.id))
+    refute Enum.any?(
+             Objects.list_visible_notes_by_actor(alice.ap_id, nil),
+             &(&1.id == followers_note.id)
+           )
 
-    assert {:ok, _} = Relationships.upsert_relationship(%{type: "Follow", actor: bob.ap_id, object: alice.ap_id})
+    refute Enum.any?(
+             Objects.list_visible_notes_by_actor(alice.ap_id, nil),
+             &(&1.id == direct_note.id)
+           )
+
+    assert Enum.any?(
+             Objects.list_visible_notes_by_actor(alice.ap_id, bob),
+             &(&1.id == public_note.id)
+           )
+
+    refute Enum.any?(
+             Objects.list_visible_notes_by_actor(alice.ap_id, bob),
+             &(&1.id == followers_note.id)
+           )
+
+    assert {:ok, _} =
+             Relationships.upsert_relationship(%{
+               type: "Follow",
+               actor: bob.ap_id,
+               object: alice.ap_id
+             })
 
     follower_view = Objects.list_visible_notes_by_actor(alice.ap_id, bob)
     assert Enum.any?(follower_view, &(&1.id == followers_note.id))
@@ -815,7 +855,12 @@ defmodule Egregoros.ObjectsTest do
         type: "Note",
         actor: alice.ap_id,
         local: false,
-        data: %{"id" => "https://remote.example/objects/status", "type" => "Note", "to" => [public], "cc" => []}
+        data: %{
+          "id" => "https://remote.example/objects/status",
+          "type" => "Note",
+          "to" => [public],
+          "cc" => []
+        }
       })
 
     {:ok, announce} =
@@ -825,7 +870,13 @@ defmodule Egregoros.ObjectsTest do
         actor: alice.ap_id,
         object: note.ap_id,
         local: false,
-        data: %{"id" => "https://remote.example/activities/announce", "type" => "Announce", "object" => note.ap_id, "to" => [public], "cc" => []}
+        data: %{
+          "id" => "https://remote.example/activities/announce",
+          "type" => "Announce",
+          "object" => note.ap_id,
+          "to" => [public],
+          "cc" => []
+        }
       })
 
     statuses = Objects.list_visible_statuses_by_actor(alice.ap_id, nil, limit: 10)
@@ -845,7 +896,8 @@ defmodule Egregoros.ObjectsTest do
     for idx <- 1..25 do
       assert {:ok, _} =
                Objects.create_object(%{
-                 ap_id: "https://remote.example/objects/limit-default-#{idx}-#{Ecto.UUID.generate()}",
+                 ap_id:
+                   "https://remote.example/objects/limit-default-#{idx}-#{Ecto.UUID.generate()}",
                  type: "Note",
                  actor: actor,
                  local: false,
@@ -875,7 +927,12 @@ defmodule Egregoros.ObjectsTest do
             type: "Note",
             actor: actor,
             local: false,
-            data: %{"id" => "https://remote.example/objects/paging-#{idx}", "type" => "Note", "to" => [public], "cc" => []}
+            data: %{
+              "id" => "https://remote.example/objects/paging-#{idx}",
+              "type" => "Note",
+              "to" => [public],
+              "cc" => []
+            }
           })
 
         object
@@ -883,8 +940,15 @@ defmodule Egregoros.ObjectsTest do
 
     [newest, middle | _rest] = Enum.sort_by(created, & &1.id, :desc)
 
-    assert Enum.all?(Objects.list_statuses_by_actor(actor, since_id: middle.id), &(&1.id > middle.id))
-    assert Enum.all?(Objects.list_public_statuses_by_actor(actor, max_id: newest.id), &(&1.id < newest.id))
+    assert Enum.all?(
+             Objects.list_statuses_by_actor(actor, since_id: middle.id),
+             &(&1.id > middle.id)
+           )
+
+    assert Enum.all?(
+             Objects.list_public_statuses_by_actor(actor, max_id: newest.id),
+             &(&1.id < newest.id)
+           )
   end
 
   test "list_public_statuses supports filtering to posts with media including reblogs" do
@@ -903,7 +967,12 @@ defmodule Egregoros.ObjectsTest do
                  "to" => [public],
                  "cc" => [],
                  "content" => "With media",
-                 "attachment" => [%{"mediaType" => "image/png", "url" => [%{"href" => "https://cdn.example/x.png"}]}]
+                 "attachment" => [
+                   %{
+                     "mediaType" => "image/png",
+                     "url" => [%{"href" => "https://cdn.example/x.png"}]
+                   }
+                 ]
                }
              })
 
