@@ -47,6 +47,11 @@ defmodule Egregoros.Passkeys.WebAuthnTest do
     |> CBOR.encode()
   end
 
+  defp attestation_object_with_auth_data(auth_data) when is_binary(auth_data) do
+    %{"authData" => auth_data}
+    |> CBOR.encode()
+  end
+
   test "registration_options/3 encodes challenge and user handle as base64url" do
     options = WebAuthn.registration_options("alice", "challenge", "user-handle")
 
@@ -97,6 +102,26 @@ defmodule Egregoros.Passkeys.WebAuthnTest do
     assert result.sign_count == 0
   end
 
+  test "verify_attestation/2 returns invalid_attestation when rawId does not match the attested credential id" do
+    attested_credential_id = "credential-id"
+    raw_id_b64 = b64url("other-credential-id")
+    challenge_b64 = b64url("challenge")
+
+    client_data = client_data_json("webauthn.create", challenge_b64)
+    attestation_object = valid_attestation_object(attested_credential_id)
+
+    credential = %{
+      "rawId" => raw_id_b64,
+      "response" => %{
+        "clientDataJSON" => b64url(client_data),
+        "attestationObject" => b64url(attestation_object)
+      }
+    }
+
+    assert {:error, :invalid_attestation} =
+             WebAuthn.verify_attestation(credential, challenge_b64)
+  end
+
   test "verify_attestation/2 returns challenge_mismatch when the client challenge is wrong" do
     credential_id = "credential-id"
     raw_id_b64 = b64url(credential_id)
@@ -114,6 +139,200 @@ defmodule Egregoros.Passkeys.WebAuthnTest do
 
     assert {:error, :challenge_mismatch} =
              WebAuthn.verify_attestation(credential, expected_challenge_b64)
+  end
+
+  test "verify_attestation/2 returns invalid_payload when response is missing" do
+    credential = %{"rawId" => b64url("credential-id")}
+    assert {:error, :invalid_payload} = WebAuthn.verify_attestation(credential, b64url("challenge"))
+  end
+
+  test "verify_attestation/2 returns invalid_payload when rawId is not base64url" do
+    challenge_b64 = b64url("challenge")
+    client_data = client_data_json("webauthn.create", challenge_b64)
+
+    credential = %{
+      "rawId" => "not base64",
+      "response" => %{
+        "clientDataJSON" => b64url(client_data),
+        "attestationObject" => b64url(valid_attestation_object("credential-id"))
+      }
+    }
+
+    assert {:error, :invalid_payload} =
+             WebAuthn.verify_attestation(credential, challenge_b64)
+  end
+
+  test "verify_attestation/2 returns invalid_payload when rawId is not a string" do
+    credential = %{"rawId" => 123, "response" => %{}}
+    assert {:error, :invalid_payload} = WebAuthn.verify_attestation(credential, b64url("challenge"))
+  end
+
+  test "verify_attestation/2 returns invalid_payload when clientDataJSON is not JSON" do
+    challenge_b64 = b64url("challenge")
+
+    credential = %{
+      "rawId" => b64url("credential-id"),
+      "response" => %{
+        "clientDataJSON" => b64url("{"),
+        "attestationObject" => b64url(valid_attestation_object("credential-id"))
+      }
+    }
+
+    assert {:error, :invalid_payload} =
+             WebAuthn.verify_attestation(credential, challenge_b64)
+  end
+
+  test "verify_attestation/2 returns invalid_attestation when attestationObject is missing authData" do
+    challenge_b64 = b64url("challenge")
+    client_data = client_data_json("webauthn.create", challenge_b64)
+
+    credential = %{
+      "rawId" => b64url("credential-id"),
+      "response" => %{
+        "clientDataJSON" => b64url(client_data),
+        "attestationObject" => b64url(CBOR.encode(%{}))
+      }
+    }
+
+    assert {:error, :invalid_attestation} =
+             WebAuthn.verify_attestation(credential, challenge_b64)
+  end
+
+  test "verify_attestation/2 returns invalid_attestation when authData is too short to parse" do
+    challenge_b64 = b64url("challenge")
+    client_data = client_data_json("webauthn.create", challenge_b64)
+
+    credential = %{
+      "rawId" => b64url("credential-id"),
+      "response" => %{
+        "clientDataJSON" => b64url(client_data),
+        "attestationObject" => b64url(attestation_object_with_auth_data(<<1, 2, 3>>))
+      }
+    }
+
+    assert {:error, :invalid_attestation} =
+             WebAuthn.verify_attestation(credential, challenge_b64)
+  end
+
+  test "verify_attestation/2 returns invalid_public_key when attested credential data is missing" do
+    flags = 0x01 + 0x04 + 0x40
+    sign_count = 0
+    challenge_b64 = b64url("challenge")
+    client_data = client_data_json("webauthn.create", challenge_b64)
+
+    credential = %{
+      "rawId" => b64url("credential-id"),
+      "response" => %{
+        "clientDataJSON" => b64url(client_data),
+        "attestationObject" => b64url(attestation_object_with_auth_data(authenticator_data(flags, sign_count)))
+      }
+    }
+
+    assert {:error, :invalid_public_key} =
+             WebAuthn.verify_attestation(credential, challenge_b64)
+  end
+
+  test "verify_attestation/2 returns invalid_payload when user presence is missing" do
+    flags = 0x04 + 0x40
+    sign_count = 0
+    challenge_b64 = b64url("challenge")
+    client_data = client_data_json("webauthn.create", challenge_b64)
+
+    credential = %{
+      "rawId" => b64url("credential-id"),
+      "response" => %{
+        "clientDataJSON" => b64url(client_data),
+        "attestationObject" => b64url(attestation_object_with_auth_data(authenticator_data(flags, sign_count)))
+      }
+    }
+
+    assert {:error, :invalid_payload} =
+             WebAuthn.verify_attestation(credential, challenge_b64)
+  end
+
+  test "verify_attestation/2 returns invalid_public_key when attested credential data is too short" do
+    flags = 0x01 + 0x04 + 0x40
+    sign_count = 0
+    challenge_b64 = b64url("challenge")
+    client_data = client_data_json("webauthn.create", challenge_b64)
+
+    credential_data = <<0::128, 0::16>>
+    auth_data = authenticator_data(flags, sign_count) <> credential_data
+
+    credential = %{
+      "rawId" => b64url("credential-id"),
+      "response" => %{
+        "clientDataJSON" => b64url(client_data),
+        "attestationObject" => b64url(attestation_object_with_auth_data(auth_data))
+      }
+    }
+
+    assert {:error, :invalid_public_key} =
+             WebAuthn.verify_attestation(credential, challenge_b64)
+  end
+
+  test "verify_attestation/2 returns invalid_public_key when credential id length is longer than the available bytes" do
+    flags = 0x01 + 0x04 + 0x40
+    sign_count = 0
+    challenge_b64 = b64url("challenge")
+    client_data = client_data_json("webauthn.create", challenge_b64)
+
+    credential_data = <<0::128, 10::16, "short">>
+    auth_data = authenticator_data(flags, sign_count) <> credential_data
+
+    credential = %{
+      "rawId" => b64url("credential-id"),
+      "response" => %{
+        "clientDataJSON" => b64url(client_data),
+        "attestationObject" => b64url(attestation_object_with_auth_data(auth_data))
+      }
+    }
+
+    assert {:error, :invalid_public_key} =
+             WebAuthn.verify_attestation(credential, challenge_b64)
+  end
+
+  test "verify_attestation/2 returns invalid_public_key when COSE key is missing" do
+    flags = 0x01 + 0x04 + 0x40
+    sign_count = 0
+    challenge_b64 = b64url("challenge")
+    client_data = client_data_json("webauthn.create", challenge_b64)
+
+    credential_data = <<0::128, 4::16, "abcd">>
+    auth_data = authenticator_data(flags, sign_count) <> credential_data
+
+    credential = %{
+      "rawId" => b64url("credential-id"),
+      "response" => %{
+        "clientDataJSON" => b64url(client_data),
+        "attestationObject" => b64url(attestation_object_with_auth_data(auth_data))
+      }
+    }
+
+    assert {:error, :invalid_public_key} =
+             WebAuthn.verify_attestation(credential, challenge_b64)
+  end
+
+  test "verify_attestation/2 returns invalid_public_key when COSE key is not a map" do
+    flags = 0x01 + 0x04 + 0x40
+    sign_count = 0
+    challenge_b64 = b64url("challenge")
+    client_data = client_data_json("webauthn.create", challenge_b64)
+
+    cose_key = CBOR.encode(123)
+    credential_data = <<0::128, 4::16, "abcd", cose_key::binary>>
+    auth_data = authenticator_data(flags, sign_count) <> credential_data
+
+    credential = %{
+      "rawId" => b64url("credential-id"),
+      "response" => %{
+        "clientDataJSON" => b64url(client_data),
+        "attestationObject" => b64url(attestation_object_with_auth_data(auth_data))
+      }
+    }
+
+    assert {:error, :invalid_public_key} =
+             WebAuthn.verify_attestation(credential, challenge_b64)
   end
 
   test "verify_assertion/4 returns ok for a valid signature and rpId hash" do
@@ -176,4 +395,3 @@ defmodule Egregoros.Passkeys.WebAuthnTest do
              )
   end
 end
-
