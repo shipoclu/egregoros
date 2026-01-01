@@ -318,7 +318,9 @@ defmodule EgregorosWeb.TimelineLive do
                      ) do
                   {:ok, _post} ->
                     {:noreply,
-                     assign(socket,
+                     socket
+                     |> put_flash(:info, "Posted.")
+                     |> assign(
                        form: Phoenix.Component.to_form(default_post_params(), as: :post),
                        compose_open?: false,
                        compose_options_open?: false,

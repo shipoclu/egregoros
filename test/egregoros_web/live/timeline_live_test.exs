@@ -32,6 +32,17 @@ defmodule EgregorosWeb.TimelineLiveTest do
     assert has_element?(view, "article", "Hello world")
   end
 
+  test "posting shows toast feedback", %{conn: conn, user: user} do
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/")
+
+    view
+    |> form("#timeline-form", post: %{content: "Hello world"})
+    |> render_submit()
+
+    assert render(view) =~ "Posted."
+  end
+
   test "create_post is rejected when signed out", %{conn: conn} do
     {:ok, view, _html} = live(conn, "/")
 
