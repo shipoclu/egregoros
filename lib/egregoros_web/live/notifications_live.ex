@@ -316,14 +316,13 @@ defmodule EgregorosWeb.NotificationsLive do
       type="button"
       data-role="notifications-filter"
       data-filter={@filter}
+      data-active={if @active?, do: "true", else: "false"}
       phx-click={set_filter_js(@filter)}
       aria-pressed={@active?}
       class={[
         "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] transition",
-        @active? &&
-          "border-slate-900 bg-slate-900 text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800 dark:border-slate-100 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white",
-        !@active? &&
-          "border-slate-200/80 bg-white/70 text-slate-700 hover:-translate-y-0.5 hover:bg-white dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:hover:bg-slate-950"
+        "data-[active=true]:border-slate-900 data-[active=true]:bg-slate-900 data-[active=true]:text-white data-[active=true]:shadow-lg data-[active=true]:shadow-slate-900/20 data-[active=true]:hover:bg-slate-800 dark:data-[active=true]:border-slate-100 dark:data-[active=true]:bg-slate-100 dark:data-[active=true]:text-slate-900 dark:data-[active=true]:hover:bg-white",
+        "data-[active=false]:border-slate-200/80 data-[active=false]:bg-white/70 data-[active=false]:text-slate-700 data-[active=false]:hover:-translate-y-0.5 data-[active=false]:hover:bg-white dark:data-[active=false]:border-slate-700/80 dark:data-[active=false]:bg-slate-950/60 dark:data-[active=false]:text-slate-200 dark:data-[active=false]:hover:bg-slate-950"
       ]}
     >
       <.icon name={@icon} class="size-4" />
@@ -427,6 +426,14 @@ defmodule EgregorosWeb.NotificationsLive do
 
   defp set_filter_js(filter) when is_binary(filter) do
     JS.set_attribute({"data-filter", filter}, to: "#notifications-list")
+    |> JS.set_attribute({"aria-pressed", "false"}, to: "button[data-role='notifications-filter']")
+    |> JS.set_attribute({"data-active", "false"}, to: "button[data-role='notifications-filter']")
+    |> JS.set_attribute({"aria-pressed", "true"},
+      to: "button[data-role='notifications-filter'][data-filter='#{filter}']"
+    )
+    |> JS.set_attribute({"data-active", "true"},
+      to: "button[data-role='notifications-filter'][data-filter='#{filter}']"
+    )
     |> JS.push("set_notifications_filter", value: %{filter: filter})
   end
 

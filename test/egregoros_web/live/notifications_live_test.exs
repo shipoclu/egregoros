@@ -130,6 +130,40 @@ defmodule EgregorosWeb.NotificationsLiveTest do
     assert has_element?(view, "#notifications-list[data-filter='follows']")
   end
 
+  test "notifications filter buttons expose active state for client-side UI", %{
+    conn: conn,
+    user: user
+  } do
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/notifications")
+
+    assert has_element?(
+             view,
+             "button[data-role='notifications-filter'][data-filter='all'][data-active='true']"
+           )
+
+    assert has_element?(
+             view,
+             "button[data-role='notifications-filter'][data-filter='likes'][data-active='false']"
+           )
+
+    view
+    |> element("button[data-role='notifications-filter'][data-filter='likes']")
+    |> render_click()
+
+    assert has_element?(view, "#notifications-list[data-filter='likes']")
+
+    assert has_element?(
+             view,
+             "button[data-role='notifications-filter'][data-filter='likes'][data-active='true']"
+           )
+
+    assert has_element?(
+             view,
+             "button[data-role='notifications-filter'][data-filter='all'][data-active='false']"
+           )
+  end
+
   test "follow requests can be accepted from the notifications screen", %{
     conn: conn,
     user: user,
