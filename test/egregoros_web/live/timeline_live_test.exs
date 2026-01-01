@@ -32,6 +32,31 @@ defmodule EgregorosWeb.TimelineLiveTest do
     assert has_element?(view, "article", "Hello world")
   end
 
+  test "create_post is rejected when signed out", %{conn: conn} do
+    {:ok, view, _html} = live(conn, "/")
+
+    assert Objects.list_notes() == []
+
+    _html = render_click(view, "create_post", %{"post" => %{"content" => "Hello"}})
+
+    assert Objects.list_notes() == []
+    assert :sys.get_state(view.pid).socket.assigns.error == "Register to post."
+  end
+
+  test "posting an empty post shows an error", %{conn: conn, user: user} do
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/")
+
+    assert Objects.list_notes() == []
+
+    view
+    |> form("#timeline-form", post: %{content: ""})
+    |> render_submit()
+
+    assert Objects.list_notes() == []
+    assert has_element?(view, "[data-role='compose-error']", "Post can't be empty.")
+  end
+
   test "timeline escapes unsafe html when posting locally", %{conn: conn, user: user} do
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     {:ok, view, _html} = live(conn, "/")
@@ -453,6 +478,131 @@ defmodule EgregorosWeb.TimelineLiveTest do
     assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='closed']")
 
     assert has_element?(view, "input[data-role='reply-in-reply-to'][value='']")
+  end
+
+  test "reply_change opens the content warning area when spoiler_text is present", %{
+    conn: conn,
+    user: user
+  } do
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/")
+
+    refute has_element?(view, "#reply-modal [data-role='compose-cw'][data-state='open']")
+
+    _html = render_change(view, "reply_change", %{"reply" => %{"spoiler_text" => "cw"}})
+
+    assert has_element?(view, "#reply-modal [data-role='compose-cw'][data-state='open']")
+  end
+
+  test "create_reply is rejected when signed out", %{conn: conn, user: user} do
+    assert {:ok, parent} = Pipeline.ingest(Note.build(user, "Reply target"), local: true)
+
+    {:ok, view, _html} = live(conn, "/")
+
+    _html =
+      render_click(view, "create_reply", %{
+        "reply" => %{
+          "in_reply_to" => parent.ap_id,
+          "content" => "Hello"
+        }
+      })
+
+    assert render(view) =~ "Register to reply."
+    assert Objects.list_replies_to(parent.ap_id, limit: 1) == []
+  end
+
+  test "create_reply falls back to the in_reply_to param when no modal target is set", %{
+    conn: conn,
+    user: user
+  } do
+    assert {:ok, parent} = Pipeline.ingest(Note.build(user, "Reply target"), local: true)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/")
+
+    _html =
+      render_click(view, "create_reply", %{
+        "reply" => %{
+          "in_reply_to" => parent.ap_id,
+          "content" => "Hello"
+        }
+      })
+
+    [reply] = Objects.list_replies_to(parent.ap_id, limit: 1)
+    assert reply.data["inReplyTo"] == parent.ap_id
+  end
+
+  test "cancel_reply_media removes uploads from the reply composer", %{conn: conn, user: user} do
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/")
+
+    fixture_path = Fixtures.path!("DSCN0010.png")
+    content = File.read!(fixture_path)
+
+    upload =
+      file_input(view, "#reply-modal-form", :reply_media, [
+        %{
+          last_modified: 1_694_171_879_000,
+          name: "photo.png",
+          content: content,
+          size: byte_size(content),
+          type: "image/png"
+        }
+      ])
+
+    assert render_upload(upload, "photo.png") =~ "100%"
+    html = render(view)
+    assert [_, ref] = Regex.run(~r/id="reply-modal-media-entry-([^"]+)"/, html)
+
+    assert has_element?(view, "#reply-modal-media-entry-#{ref}")
+
+    view
+    |> element("#reply-modal-media-entry-#{ref} button[aria-label='Remove attachment']")
+    |> render_click()
+
+    refute has_element?(view, "#reply-modal-media-entry-#{ref}")
+  end
+
+  test "replying with an attachment creates a reply with attachments", %{conn: conn, user: user} do
+    assert {:ok, parent} = Pipeline.ingest(Note.build(user, "Reply target"), local: true)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/")
+
+    fixture_path = Fixtures.path!("DSCN0010.png")
+    content = File.read!(fixture_path)
+
+    upload =
+      file_input(view, "#reply-modal-form", :reply_media, [
+        %{
+          last_modified: 1_694_171_879_000,
+          name: "photo.png",
+          content: content,
+          size: byte_size(content),
+          type: "image/png"
+        }
+      ])
+
+    expect(Egregoros.MediaStorage.Mock, :store_media, fn passed_user, passed_upload ->
+      assert passed_user.id == user.id
+      assert passed_upload.filename == "photo.png"
+      assert passed_upload.content_type == "image/png"
+      {:ok, "/uploads/media/#{passed_user.id}/photo.png"}
+    end)
+
+    assert render_upload(upload, "photo.png") =~ "100%"
+
+    _html =
+      render_click(view, "create_reply", %{
+        "reply" => %{
+          "in_reply_to" => parent.ap_id,
+          "content" => "Hello"
+        }
+      })
+
+    [reply] = Objects.list_replies_to(parent.ap_id, limit: 1)
+    assert reply.data["inReplyTo"] == parent.ap_id
+    assert length(List.wrap(reply.data["attachment"])) == 1
   end
 
   test "signed-in users can reply from the timeline", %{conn: conn, user: user} do
