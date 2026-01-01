@@ -96,20 +96,26 @@ defmodule Egregoros.OAuth do
       })
       when is_binary(code) and is_binary(client_id) and is_binary(client_secret) and
              is_binary(redirect_uri) do
-    with %OAuthApplication{} = application <- get_application_by_client_id(client_id),
-         true <- Plug.Crypto.secure_compare(application.client_secret, client_secret),
-         %AuthorizationCode{} = auth_code <- get_authorization_code(code),
-         true <- auth_code.application_id == application.id,
-         true <- auth_code.redirect_uri == redirect_uri,
-         true <- DateTime.compare(auth_code.expires_at, DateTime.utc_now()) == :gt,
-         {:ok, %Token{} = token} <- create_token(application, auth_code.user_id, auth_code.scopes) do
-      _ = Repo.delete(auth_code)
-      {:ok, token}
-    else
-      nil -> {:error, :invalid_client}
-      false -> {:error, :invalid_grant}
-      {:error, _} = error -> error
-      _ -> {:error, :invalid_grant}
+    case get_application_by_client_id(client_id) do
+      %OAuthApplication{} = application ->
+        with true <- Plug.Crypto.secure_compare(application.client_secret, client_secret),
+             %AuthorizationCode{} = auth_code <- get_authorization_code(code),
+             true <- auth_code.application_id == application.id,
+             true <- auth_code.redirect_uri == redirect_uri,
+             true <- DateTime.compare(auth_code.expires_at, DateTime.utc_now()) == :gt,
+             {:ok, %Token{} = token} <-
+               create_token(application, auth_code.user_id, auth_code.scopes) do
+          _ = Repo.delete(auth_code)
+          {:ok, token}
+        else
+          nil -> {:error, :invalid_grant}
+          false -> {:error, :invalid_grant}
+          {:error, _} = error -> error
+          _ -> {:error, :invalid_grant}
+        end
+
+      nil ->
+        {:error, :invalid_client}
     end
   end
 
