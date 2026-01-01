@@ -7,6 +7,7 @@ defmodule EgregorosWeb.ProfileLiveTest do
   alias Egregoros.Objects
   alias Egregoros.Pipeline
   alias Egregoros.Relationships
+  alias Egregoros.TestSupport.Fixtures
   alias Egregoros.Users
 
   setup do
@@ -403,6 +404,217 @@ defmodule EgregorosWeb.ProfileLiveTest do
 
     [reply] = Objects.list_replies_to(parent.ap_id, limit: 1)
     assert reply.data["inReplyTo"] == parent.ap_id
+  end
+
+  test "profile reply modal can be closed and resets reply state", %{conn: conn, viewer: viewer} do
+    assert {:ok, parent} = Pipeline.ingest(Note.build(viewer, "Parent post"), local: true)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: viewer.id})
+    {:ok, view, _html} = live(conn, "/@#{viewer.nickname}")
+
+    view
+    |> element("#post-#{parent.id} button[data-role='reply']")
+    |> render_click()
+
+    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='open']")
+
+    view
+    |> element("#reply-modal button[data-role='reply-modal-close']")
+    |> render_click()
+
+    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='closed']")
+    assert has_element?(view, "#reply-modal input[data-role='reply-in-reply-to'][value='']")
+  end
+
+  test "profile reply composer supports content warning toggles", %{conn: conn, viewer: viewer} do
+    assert {:ok, parent} = Pipeline.ingest(Note.build(viewer, "Parent post"), local: true)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: viewer.id})
+    {:ok, view, _html} = live(conn, "/@#{viewer.nickname}")
+
+    view
+    |> element("#post-#{parent.id} button[data-role='reply']")
+    |> render_click()
+
+    assert has_element?(view, "#reply-modal [data-role='compose-cw'][data-state='closed']")
+
+    view
+    |> element("#reply-modal button[data-role='compose-toggle-cw']")
+    |> render_click()
+
+    assert has_element?(view, "#reply-modal [data-role='compose-cw'][data-state='open']")
+  end
+
+  test "profile reply composer keeps client-side option state in sync via reply_change", %{
+    conn: conn,
+    viewer: viewer
+  } do
+    assert {:ok, parent} = Pipeline.ingest(Note.build(viewer, "Parent post"), local: true)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: viewer.id})
+    {:ok, view, _html} = live(conn, "/@#{viewer.nickname}")
+
+    view
+    |> element("#post-#{parent.id} button[data-role='reply']")
+    |> render_click()
+
+    render_hook(view, "reply_change", %{
+      "reply" => %{"content" => "hello", "spoiler_text" => "CW", "ui_options_open" => "true"}
+    })
+
+    assert has_element?(view, "#reply-modal [data-role='compose-cw'][data-state='open']")
+    assert has_element?(view, "#reply-modal [data-role='compose-options'][data-state='open']")
+  end
+
+  test "profile reply composer supports media uploads and removals", %{
+    conn: conn,
+    viewer: viewer,
+    profile_user: profile_user
+  } do
+    assert {:ok, parent} = Pipeline.ingest(Note.build(profile_user, "Parent post"), local: true)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: viewer.id})
+    {:ok, view, _html} = live(conn, "/@#{profile_user.nickname}")
+
+    view
+    |> element("#post-#{parent.id} button[data-role='reply']")
+    |> render_click()
+
+    fixture_path = Fixtures.path!("DSCN0010.png")
+    content = File.read!(fixture_path)
+
+    upload =
+      file_input(view, "#reply-modal-form", :reply_media, [
+        %{
+          last_modified: 1_694_171_879_000,
+          name: "photo.png",
+          content: content,
+          size: byte_size(content),
+          type: "image/png"
+        }
+      ])
+
+    assert render_upload(upload, "photo.png") =~ "100%"
+    assert has_element?(view, "#reply-modal [data-role='media-entry']")
+
+    view
+    |> element("#reply-modal button[aria-label='Remove attachment']")
+    |> render_click()
+
+    refute has_element?(view, "#reply-modal [data-role='media-entry']")
+  end
+
+  test "profile reply composer posts replies with media attachments", %{
+    conn: conn,
+    viewer: viewer,
+    profile_user: profile_user
+  } do
+    assert {:ok, parent} = Pipeline.ingest(Note.build(profile_user, "Parent post"), local: true)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: viewer.id})
+    {:ok, view, _html} = live(conn, "/@#{profile_user.nickname}")
+
+    view
+    |> element("#post-#{parent.id} button[data-role='reply']")
+    |> render_click()
+
+    fixture_path = Fixtures.path!("DSCN0010.png")
+    content = File.read!(fixture_path)
+
+    upload =
+      file_input(view, "#reply-modal-form", :reply_media, [
+        %{
+          last_modified: 1_694_171_879_000,
+          name: "photo.png",
+          content: content,
+          size: byte_size(content),
+          type: "image/png"
+        }
+      ])
+
+    expect(Egregoros.MediaStorage.Mock, :store_media, fn passed_user, passed_upload ->
+      assert passed_user.id == viewer.id
+      assert passed_upload.filename == "photo.png"
+      assert passed_upload.content_type == "image/png"
+      {:ok, "/uploads/media/#{passed_user.id}/photo.png"}
+    end)
+
+    assert render_upload(upload, "photo.png") =~ "100%"
+
+    view
+    |> form("#reply-modal-form", reply: %{content: "Reply with media", in_reply_to: parent.ap_id})
+    |> render_submit()
+
+    assert render(view) =~ "Reply posted."
+
+    [reply] = Objects.list_replies_to(parent.ap_id, limit: 1)
+    assert List.wrap(reply.data["attachment"]) != []
+  end
+
+  test "profile reply composer surfaces upload errors when attachments cannot be stored", %{
+    conn: conn,
+    viewer: viewer,
+    profile_user: profile_user
+  } do
+    assert {:ok, parent} = Pipeline.ingest(Note.build(profile_user, "Parent post"), local: true)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: viewer.id})
+    {:ok, view, _html} = live(conn, "/@#{profile_user.nickname}")
+
+    view
+    |> element("#post-#{parent.id} button[data-role='reply']")
+    |> render_click()
+
+    upload =
+      file_input(view, "#reply-modal-form", :reply_media, [
+        %{
+          last_modified: 1_694_171_879_000,
+          name: "photo.png",
+          content: "png",
+          size: 3,
+          type: "image/png"
+        }
+      ])
+
+    expect(Egregoros.MediaStorage.Mock, :store_media, fn _user, _upload ->
+      {:error, :storage_failed}
+    end)
+
+    assert render_upload(upload, "photo.png") =~ "100%"
+
+    view
+    |> form("#reply-modal-form", reply: %{content: "Reply with media", in_reply_to: parent.ap_id})
+    |> render_submit()
+
+    assert render(view) =~ "Could not upload attachment."
+    assert Objects.list_replies_to(parent.ap_id, limit: 10) == []
+  end
+
+  test "profile reply composer validates content length and emptiness", %{conn: conn, viewer: viewer} do
+    assert {:ok, parent} = Pipeline.ingest(Note.build(viewer, "Parent post"), local: true)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: viewer.id})
+    {:ok, view, _html} = live(conn, "/@#{viewer.nickname}")
+
+    view
+    |> element("#post-#{parent.id} button[data-role='reply']")
+    |> render_click()
+
+    too_long = String.duplicate("a", 5001)
+
+    view
+    |> form("#reply-modal-form", reply: %{content: too_long})
+    |> render_submit()
+
+    assert render(view) =~ "Reply is too long."
+    assert Objects.list_replies_to(parent.ap_id, limit: 10) == []
+
+    view
+    |> form("#reply-modal-form", reply: %{content: "   \n"})
+    |> render_submit()
+
+    assert render(view) =~ "Reply can&#39;t be empty."
+    assert Objects.list_replies_to(parent.ap_id, limit: 10) == []
   end
 
   test "profile reply composer mention autocomplete suggests users", %{
