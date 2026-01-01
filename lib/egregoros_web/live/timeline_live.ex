@@ -939,6 +939,7 @@ defmodule EgregorosWeb.TimelineLive do
               id={id}
               entry={entry}
               current_user={@current_user}
+              back_timeline={@timeline}
               reply_mode={:modal}
             />
           </div>

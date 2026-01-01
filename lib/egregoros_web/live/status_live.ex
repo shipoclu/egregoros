@@ -29,6 +29,8 @@ defmodule EgregorosWeb.StatusLive do
         id -> Users.get(id)
       end
 
+    back_timeline = back_timeline_from_params(params, current_user)
+
     if connected?(socket) do
       Phoenix.PubSub.subscribe(Egregoros.PubSub, Timeline.public_topic())
 
@@ -126,6 +128,7 @@ defmodule EgregorosWeb.StatusLive do
         notifications_count: notifications_count(current_user),
         nickname: nickname,
         uuid: uuid,
+        back_timeline: back_timeline,
         status: status_entry,
         ancestors: ancestor_entries,
         descendants: descendant_entries,
@@ -343,7 +346,7 @@ defmodule EgregorosWeb.StatusLive do
           %{object: %{id: ^post_id}} ->
             socket
             |> put_flash(:info, "Post deleted.")
-            |> push_navigate(to: timeline_href(user))
+            |> push_navigate(to: timeline_href(user, socket.assigns.back_timeline))
 
           _ ->
             socket
@@ -572,7 +575,7 @@ defmodule EgregorosWeb.StatusLive do
           <section class="space-y-4">
             <div class="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-white/80 bg-white/80 px-5 py-4 shadow-lg shadow-slate-200/20 backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/70 dark:shadow-slate-900/40">
               <.link
-                navigate={timeline_href(@current_user)}
+                navigate={timeline_href(@current_user, @back_timeline)}
                 class="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/70 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700 transition hover:-translate-y-0.5 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:hover:bg-slate-950"
                 aria-label="Back to timeline"
               >
@@ -603,6 +606,7 @@ defmodule EgregorosWeb.StatusLive do
                   id={"post-#{entry.object.id}"}
                   entry={entry}
                   current_user={@current_user}
+                  back_timeline={@back_timeline}
                   reply_mode={:modal}
                 />
               </div>
@@ -645,6 +649,7 @@ defmodule EgregorosWeb.StatusLive do
                   id={"post-#{@status.object.id}"}
                   entry={@status}
                   current_user={@current_user}
+                  back_timeline={@back_timeline}
                   reply_mode={:modal}
                 />
               </div>
@@ -724,6 +729,7 @@ defmodule EgregorosWeb.StatusLive do
                     id={"post-#{entry.object.id}"}
                     entry={entry}
                     current_user={@current_user}
+                    back_timeline={@back_timeline}
                     reply_mode={:modal}
                   />
                 </div>
@@ -738,7 +744,7 @@ defmodule EgregorosWeb.StatusLive do
             </p>
             <div class="mt-6 flex justify-center">
               <.link
-                navigate={timeline_href(@current_user)}
+                navigate={timeline_href(@current_user, @back_timeline)}
                 class="inline-flex items-center gap-2 rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/20 transition hover:-translate-y-0.5 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
               >
                 <.icon name="hero-home" class="size-5" /> Go to timeline
@@ -1176,6 +1182,25 @@ defmodule EgregorosWeb.StatusLive do
     }
   end
 
-  defp timeline_href(%{id: _}), do: ~p"/?timeline=home" <> "&restore_scroll=1"
-  defp timeline_href(_user), do: ~p"/?timeline=public" <> "&restore_scroll=1"
+  defp back_timeline_from_params(params, current_user) when is_map(params) do
+    timeline =
+      (Map.get(params, "back_timeline") || "")
+      |> to_string()
+      |> String.trim()
+      |> String.downcase()
+
+    case timeline do
+      "public" -> :public
+      "home" -> :home
+      _ -> if match?(%User{}, current_user), do: :home, else: :public
+    end
+  end
+
+  defp back_timeline_from_params(_params, current_user) do
+    if match?(%User{}, current_user), do: :home, else: :public
+  end
+
+  defp timeline_href(%{id: _}, :public), do: ~p"/?timeline=public" <> "&restore_scroll=1"
+  defp timeline_href(%{id: _}, _timeline), do: ~p"/?timeline=home" <> "&restore_scroll=1"
+  defp timeline_href(_user, _timeline), do: ~p"/?timeline=public" <> "&restore_scroll=1"
 end

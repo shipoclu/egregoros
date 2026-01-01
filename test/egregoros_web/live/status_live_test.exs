@@ -26,6 +26,22 @@ defmodule EgregorosWeb.StatusLiveTest do
     assert has_element?(view, "article[data-role='status-card']", "Hello from status")
   end
 
+  test "back link returns to the originating timeline when provided via params", %{
+    conn: conn,
+    user: user
+  } do
+    assert {:ok, note} = Pipeline.ingest(Note.build(user, "Hello from status"), local: true)
+    uuid = uuid_from_ap_id(note.ap_id)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}?back_timeline=public")
+
+    assert has_element?(
+             view,
+             "a[aria-label='Back to timeline'][href*='timeline=public'][href*='restore_scroll=1']"
+           )
+  end
+
   test "does not render direct messages on public status permalinks", %{conn: conn, user: user} do
     dm =
       user
@@ -670,7 +686,7 @@ defmodule EgregorosWeb.StatusLiveTest do
     |> render_click()
 
     assert Objects.get(note.id) == nil
-    assert_redirect(view, "/?timeline=home")
+    assert_redirect(view, "/?timeline=home&restore_scroll=1")
   end
 
   test "deleting a reply refreshes the thread without navigating away", %{conn: conn, user: user} do

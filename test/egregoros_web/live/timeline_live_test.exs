@@ -100,6 +100,21 @@ defmodule EgregorosWeb.TimelineLiveTest do
     assert has_element?(view, "#timeline-scroll-restore[phx-hook='ScrollRestore']")
   end
 
+  test "status permalinks include back_timeline so threads can return to the right feed", %{
+    conn: conn,
+    user: user
+  } do
+    assert {:ok, note} = Pipeline.ingest(Note.build(user, "Permalink"), local: true)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/?timeline=public")
+
+    assert has_element?(
+             view,
+             "#post-#{note.id} a[data-role='post-permalink'][href*='back_timeline=public']"
+           )
+  end
+
   test "public timeline does not include direct messages", %{conn: conn, user: user} do
     {:ok, _} = Publish.post_note(user, "Hello public")
     {:ok, _} = Publish.post_note(user, "Secret DM", visibility: "direct")

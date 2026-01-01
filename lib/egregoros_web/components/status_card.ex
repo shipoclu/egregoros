@@ -13,6 +13,7 @@ defmodule EgregorosWeb.StatusCard do
   attr :id, :string, required: true
   attr :entry, :map, required: true
   attr :current_user, :any, default: nil
+  attr :back_timeline, :any, default: nil
   attr :reply_mode, :atom, default: :navigate
 
   def status_card(assigns) do
@@ -104,7 +105,7 @@ defmodule EgregorosWeb.StatusCard do
         <div class="flex items-center gap-2">
           <%= if is_binary(permalink_path = status_permalink_path(@entry)) do %>
             <.link
-              navigate={permalink_path}
+              navigate={with_back_timeline(permalink_path, @back_timeline)}
               data-role="post-permalink"
               class="inline-flex focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 rounded"
               aria-label="Open post"
@@ -580,6 +581,25 @@ defmodule EgregorosWeb.StatusCard do
   defp avatar_initial(_), do: "?"
 
   defp actor_profile_path(actor), do: ProfilePaths.profile_path(actor)
+
+  defp with_back_timeline(path, nil) when is_binary(path), do: path
+
+  defp with_back_timeline(path, back_timeline) when is_binary(path) do
+    timeline =
+      back_timeline
+      |> to_string()
+      |> String.trim()
+      |> String.downcase()
+
+    if timeline in ["home", "public"] do
+      delimiter = if String.contains?(path, "?"), do: "&", else: "?"
+      path <> delimiter <> "back_timeline=" <> URI.encode_www_form(timeline)
+    else
+      path
+    end
+  end
+
+  defp with_back_timeline(path, _back_timeline) when is_binary(path), do: path
 
   defp status_permalink_path(%{object: %{local: true} = object, actor: %{nickname: nickname}})
        when is_binary(nickname) and nickname != "" do
