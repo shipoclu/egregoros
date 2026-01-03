@@ -1,0 +1,1229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mockup 5: Neon Cyberpunk - Pleroma Redux</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700&family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-void: #05050a;
+      --bg-surface: #0a0a12;
+      --bg-panel: #0f0f1a;
+      --bg-elevated: #14142a;
+      --text-primary: #e0e0ff;
+      --text-secondary: #9090b0;
+      --text-muted: #505070;
+      --border: #1a1a3a;
+      --border-glow: #2a2a5a;
+      --neon-cyan: #00ffff;
+      --neon-magenta: #ff00ff;
+      --neon-yellow: #ffff00;
+      --neon-green: #00ff88;
+      --neon-pink: #ff0080;
+      --neon-orange: #ff6600;
+      --glow-cyan: 0 0 10px #00ffff, 0 0 20px #00ffff40, 0 0 40px #00ffff20;
+      --glow-magenta: 0 0 10px #ff00ff, 0 0 20px #ff00ff40, 0 0 40px #ff00ff20;
+      --glow-yellow: 0 0 10px #ffff00, 0 0 20px #ffff0040;
+      --glow-green: 0 0 10px #00ff88, 0 0 20px #00ff8840;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Rajdhani', 'Share Tech Mono', sans-serif;
+      background: var(--bg-void);
+      color: var(--text-primary);
+      font-size: 14px;
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    /* Grid overlay */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-image:
+        linear-gradient(rgba(0, 255, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 255, 255, 0.03) 1px, transparent 1px);
+      background-size: 50px 50px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Scanline effect */
+    body::after {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 0, 0, 0.1) 2px,
+        rgba(0, 0, 0, 0.1) 4px
+      );
+      pointer-events: none;
+      z-index: 9998;
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: 220px 1fr 280px;
+      min-height: 100vh;
+    }
+
+    /* GLOWING BORDERS */
+    .glow-border {
+      border: 1px solid var(--neon-cyan);
+      box-shadow: var(--glow-cyan), inset 0 0 20px rgba(0, 255, 255, 0.05);
+    }
+
+    .glow-border-magenta {
+      border: 1px solid var(--neon-magenta);
+      box-shadow: var(--glow-magenta), inset 0 0 20px rgba(255, 0, 255, 0.05);
+    }
+
+    /* SIDEBAR */
+    .sidebar {
+      background: var(--bg-surface);
+      border-right: 1px solid var(--border);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .logo {
+      font-family: 'Orbitron', monospace;
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--neon-cyan);
+      text-shadow: var(--glow-cyan);
+      text-align: center;
+      padding: 16px;
+      margin-bottom: 24px;
+      border: 1px solid var(--neon-cyan);
+      box-shadow: var(--glow-cyan);
+      letter-spacing: 4px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .logo::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(0, 255, 255, 0.2), transparent);
+      animation: shimmer 3s infinite;
+    }
+
+    @keyframes shimmer {
+      100% { left: 100%; }
+    }
+
+    .nav-section {
+      margin-bottom: 20px;
+    }
+
+    .nav-label {
+      font-family: 'Orbitron', monospace;
+      font-size: 10px;
+      color: var(--neon-magenta);
+      text-shadow: var(--glow-magenta);
+      text-transform: uppercase;
+      letter-spacing: 3px;
+      margin-bottom: 12px;
+      padding-left: 8px;
+    }
+
+    .nav-link {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      margin-bottom: 4px;
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 500;
+      border: 1px solid transparent;
+      transition: all 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .nav-link::before {
+      content: '>';
+      font-family: 'Share Tech Mono', monospace;
+      color: var(--neon-cyan);
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .nav-link:hover {
+      background: rgba(0, 255, 255, 0.05);
+      border-color: var(--neon-cyan);
+      color: var(--neon-cyan);
+      text-shadow: var(--glow-cyan);
+    }
+
+    .nav-link:hover::before {
+      opacity: 1;
+    }
+
+    .nav-link.active {
+      background: rgba(0, 255, 255, 0.1);
+      border-color: var(--neon-cyan);
+      color: var(--neon-cyan);
+      text-shadow: var(--glow-cyan);
+      box-shadow: var(--glow-cyan);
+    }
+
+    .nav-link.active::before {
+      opacity: 1;
+    }
+
+    .nav-badge {
+      margin-left: auto;
+      background: var(--neon-magenta);
+      color: var(--bg-void);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 8px;
+      box-shadow: var(--glow-magenta);
+    }
+
+    .user-panel {
+      margin-top: auto;
+      padding: 16px;
+      border: 1px solid var(--border-glow);
+      background: var(--bg-panel);
+    }
+
+    .user-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 10px;
+      color: var(--neon-green);
+      text-shadow: var(--glow-green);
+      margin-bottom: 8px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      background: var(--neon-green);
+      box-shadow: var(--glow-green);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .user-name {
+      font-family: 'Orbitron', monospace;
+      font-size: 12px;
+      color: var(--neon-cyan);
+      text-shadow: var(--glow-cyan);
+    }
+
+    .user-handle {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    /* MAIN CONTENT */
+    .main {
+      background: var(--bg-surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--bg-panel);
+    }
+
+    .header-title {
+      font-family: 'Orbitron', monospace;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--neon-cyan);
+      text-shadow: var(--glow-cyan);
+      letter-spacing: 2px;
+    }
+
+    .header-tabs {
+      display: flex;
+      gap: 4px;
+    }
+
+    .header-tab {
+      padding: 8px 16px;
+      font-family: 'Orbitron', monospace;
+      font-size: 10px;
+      color: var(--text-muted);
+      text-decoration: none;
+      border: 1px solid var(--border);
+      transition: all 0.2s;
+    }
+
+    .header-tab:hover {
+      border-color: var(--neon-cyan);
+      color: var(--neon-cyan);
+    }
+
+    .header-tab.active {
+      border-color: var(--neon-magenta);
+      color: var(--neon-magenta);
+      text-shadow: var(--glow-magenta);
+      box-shadow: var(--glow-magenta);
+    }
+
+    /* COMPOSER */
+    .composer {
+      padding: 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-panel);
+    }
+
+    .composer-label {
+      font-family: 'Orbitron', monospace;
+      font-size: 10px;
+      color: var(--neon-green);
+      text-shadow: var(--glow-green);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-bottom: 12px;
+    }
+
+    .composer-textarea {
+      width: 100%;
+      min-height: 80px;
+      padding: 14px;
+      background: var(--bg-void);
+      border: 1px solid var(--border-glow);
+      color: var(--text-primary);
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 14px;
+      resize: vertical;
+      transition: all 0.2s;
+    }
+
+    .composer-textarea:focus {
+      outline: none;
+      border-color: var(--neon-cyan);
+      box-shadow: var(--glow-cyan);
+    }
+
+    .composer-textarea::placeholder {
+      color: var(--text-muted);
+    }
+
+    .composer-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 12px;
+    }
+
+    .composer-tools {
+      display: flex;
+      gap: 6px;
+    }
+
+    .tool-btn {
+      width: 36px;
+      height: 36px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .tool-btn:hover {
+      border-color: var(--neon-yellow);
+      color: var(--neon-yellow);
+      text-shadow: var(--glow-yellow);
+    }
+
+    .btn-transmit {
+      padding: 10px 24px;
+      background: transparent;
+      border: 2px solid var(--neon-magenta);
+      color: var(--neon-magenta);
+      font-family: 'Orbitron', monospace;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 2px;
+      cursor: pointer;
+      text-shadow: var(--glow-magenta);
+      box-shadow: var(--glow-magenta);
+      transition: all 0.2s;
+    }
+
+    .btn-transmit:hover {
+      background: var(--neon-magenta);
+      color: var(--bg-void);
+      text-shadow: none;
+    }
+
+    /* STATUS FEED */
+    .feed {
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .status {
+      padding: 20px;
+      border-bottom: 1px solid var(--border);
+      transition: all 0.2s;
+      position: relative;
+    }
+
+    .status::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: var(--neon-cyan);
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .status:hover {
+      background: rgba(0, 255, 255, 0.02);
+    }
+
+    .status:hover::before {
+      opacity: 1;
+      box-shadow: var(--glow-cyan);
+    }
+
+    .status-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 12px;
+    }
+
+    .status-author {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .avatar {
+      width: 44px;
+      height: 44px;
+      border: 2px solid var(--neon-cyan);
+      box-shadow: var(--glow-cyan);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Orbitron', monospace;
+      font-weight: 700;
+      font-size: 16px;
+      color: var(--neon-cyan);
+      background: var(--bg-void);
+    }
+
+    .avatar.magenta {
+      border-color: var(--neon-magenta);
+      box-shadow: var(--glow-magenta);
+      color: var(--neon-magenta);
+    }
+
+    .avatar.yellow {
+      border-color: var(--neon-yellow);
+      box-shadow: var(--glow-yellow);
+      color: var(--neon-yellow);
+    }
+
+    .avatar.green {
+      border-color: var(--neon-green);
+      box-shadow: var(--glow-green);
+      color: var(--neon-green);
+    }
+
+    .author-name {
+      font-family: 'Orbitron', monospace;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+
+    .author-handle {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .author-badge {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 9px;
+      padding: 2px 6px;
+      border: 1px solid var(--neon-green);
+      color: var(--neon-green);
+      text-shadow: var(--glow-green);
+      margin-left: 8px;
+    }
+
+    .author-badge.remote {
+      border-color: var(--neon-orange);
+      color: var(--neon-orange);
+    }
+
+    .status-time {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+
+    .status-content {
+      font-size: 14px;
+      line-height: 1.7;
+      color: var(--text-primary);
+      margin-bottom: 14px;
+    }
+
+    .status-content a {
+      color: var(--neon-cyan);
+      text-decoration: none;
+      text-shadow: 0 0 5px var(--neon-cyan);
+    }
+
+    .status-content a:hover {
+      text-decoration: underline;
+    }
+
+    .status-content .hashtag {
+      color: var(--neon-magenta);
+      text-shadow: 0 0 5px var(--neon-magenta);
+    }
+
+    .status-content .mention {
+      color: var(--neon-yellow);
+      text-shadow: 0 0 5px var(--neon-yellow);
+    }
+
+    .status-media {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .status-media img {
+      width: 100%;
+      height: 140px;
+      object-fit: cover;
+      border: 1px solid var(--border-glow);
+      filter: saturate(1.2) contrast(1.1);
+      transition: all 0.2s;
+    }
+
+    .status-media img:hover {
+      border-color: var(--neon-cyan);
+      box-shadow: var(--glow-cyan);
+    }
+
+    .status-actions {
+      display: flex;
+      gap: 16px;
+    }
+
+    .action-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .action-btn:hover {
+      border-color: var(--neon-cyan);
+      color: var(--neon-cyan);
+    }
+
+    .action-btn.liked {
+      border-color: var(--neon-pink);
+      color: var(--neon-pink);
+      text-shadow: 0 0 5px var(--neon-pink);
+    }
+
+    .action-btn.shared {
+      border-color: var(--neon-green);
+      color: var(--neon-green);
+      text-shadow: var(--glow-green);
+    }
+
+    /* CONTENT WARNING */
+    .content-warning {
+      padding: 14px;
+      border: 1px solid var(--neon-yellow);
+      background: rgba(255, 255, 0, 0.05);
+      margin-bottom: 14px;
+    }
+
+    .cw-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .cw-icon {
+      color: var(--neon-yellow);
+      text-shadow: var(--glow-yellow);
+      font-size: 16px;
+    }
+
+    .cw-label {
+      font-family: 'Orbitron', monospace;
+      font-size: 10px;
+      color: var(--neon-yellow);
+      text-shadow: var(--glow-yellow);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+
+    .cw-text {
+      color: var(--text-secondary);
+      font-size: 13px;
+    }
+
+    .cw-toggle {
+      margin-top: 10px;
+      padding: 6px 14px;
+      background: transparent;
+      border: 1px solid var(--neon-yellow);
+      color: var(--neon-yellow);
+      font-family: 'Orbitron', monospace;
+      font-size: 10px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .cw-toggle:hover {
+      background: var(--neon-yellow);
+      color: var(--bg-void);
+    }
+
+    /* ASIDE */
+    .aside {
+      background: var(--bg-surface);
+      padding: 20px;
+    }
+
+    .aside-panel {
+      margin-bottom: 24px;
+      padding: 16px;
+      border: 1px solid var(--border);
+      background: var(--bg-panel);
+    }
+
+    .aside-title {
+      font-family: 'Orbitron', monospace;
+      font-size: 10px;
+      color: var(--neon-magenta);
+      text-shadow: var(--glow-magenta);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .trending-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .trending-item:last-child {
+      border-bottom: none;
+    }
+
+    .trending-tag {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 13px;
+      color: var(--neon-cyan);
+      text-decoration: none;
+      text-shadow: 0 0 5px var(--neon-cyan);
+    }
+
+    .trending-tag:hover {
+      text-decoration: underline;
+    }
+
+    .trending-count {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .system-stats {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      color: var(--text-secondary);
+      line-height: 2;
+    }
+
+    .system-stats .label {
+      color: var(--text-muted);
+    }
+
+    .system-stats .value {
+      color: var(--neon-green);
+      text-shadow: var(--glow-green);
+    }
+
+    /* THEME TOGGLE */
+    .theme-controls {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      display: flex;
+      gap: 4px;
+      z-index: 100;
+    }
+
+    .theme-btn {
+      padding: 8px 12px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 10px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .theme-btn.cyan {
+      color: var(--neon-cyan);
+      border-color: var(--neon-cyan);
+    }
+
+    .theme-btn.magenta {
+      color: var(--neon-magenta);
+    }
+
+    .theme-btn:hover {
+      box-shadow: 0 0 10px currentColor;
+    }
+
+    /* PAGE INDICATOR */
+    .page-indicator {
+      position: fixed;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 8px 24px;
+      background: var(--bg-void);
+      border: 1px solid var(--neon-cyan);
+      border-top: none;
+      color: var(--neon-cyan);
+      font-family: 'Orbitron', monospace;
+      font-size: 10px;
+      letter-spacing: 3px;
+      text-shadow: var(--glow-cyan);
+      box-shadow: var(--glow-cyan);
+      z-index: 100;
+    }
+
+    /* THREAD STYLES */
+    .thread-line {
+      width: 2px;
+      height: 30px;
+      background: var(--neon-cyan);
+      box-shadow: var(--glow-cyan);
+      margin-left: 41px;
+    }
+
+    .status.ancestor {
+      opacity: 0.6;
+      border-left: 2px solid var(--text-muted);
+      padding-left: 18px;
+    }
+
+    .status.main-status {
+      background: rgba(0, 255, 255, 0.05);
+      border-left: 3px solid var(--neon-cyan);
+      box-shadow: inset 0 0 30px rgba(0, 255, 255, 0.05);
+    }
+
+    .status.main-status::before {
+      opacity: 1;
+      width: 3px;
+    }
+
+    .status.reply {
+      margin-left: 30px;
+      border-left: 1px solid var(--border-glow);
+      padding-left: 18px;
+    }
+
+    .status.reply.nested {
+      margin-left: 60px;
+    }
+
+    /* DIVIDER */
+    .cyber-divider {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      padding: 40px 0;
+      margin: 40px 0;
+    }
+
+    .cyber-divider::before,
+    .cyber-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--neon-cyan), transparent);
+      box-shadow: var(--glow-cyan);
+    }
+
+    .cyber-divider-text {
+      font-family: 'Orbitron', monospace;
+      font-size: 12px;
+      color: var(--neon-cyan);
+      text-shadow: var(--glow-cyan);
+      letter-spacing: 4px;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--bg-void);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--border-glow);
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--neon-cyan);
+      box-shadow: var(--glow-cyan);
+    }
+  </style>
+</head>
+<body>
+  <div class="page-indicator">// TIMELINE.SYS //</div>
+
+  <div class="container">
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="logo">PLEROMA</div>
+
+      <div class="nav-section">
+        <div class="nav-label">// Navigate</div>
+        <a href="#" class="nav-link active">Timeline</a>
+        <a href="#" class="nav-link">Local Feed</a>
+        <a href="#" class="nav-link">Federated</a>
+        <a href="#" class="nav-link">Notifications <span class="nav-badge">5</span></a>
+        <a href="#" class="nav-link">Messages</a>
+        <a href="#" class="nav-link">Bookmarks</a>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-label">// System</div>
+        <a href="#" class="nav-link">Profile</a>
+        <a href="#" class="nav-link">Settings</a>
+      </div>
+
+      <div class="user-panel">
+        <div class="user-status">
+          <div class="status-dot"></div>
+          ONLINE
+        </div>
+        <div class="user-name">ALICE</div>
+        <div class="user-handle">@alice@example.com</div>
+      </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="main">
+      <header class="header">
+        <h1 class="header-title">&gt; HOME_FEED</h1>
+        <div class="header-tabs">
+          <a href="#" class="header-tab active">ALL</a>
+          <a href="#" class="header-tab">MEDIA</a>
+          <a href="#" class="header-tab">LINKS</a>
+        </div>
+      </header>
+
+      <div class="composer">
+        <div class="composer-label">&gt; Transmit_Message</div>
+        <textarea class="composer-textarea" placeholder="Enter transmission data..."></textarea>
+        <div class="composer-footer">
+          <div class="composer-tools">
+            <button class="tool-btn">IMG</button>
+            <button class="tool-btn">VID</button>
+            <button class="tool-btn">⚠</button>
+            <button class="tool-btn">☺</button>
+          </div>
+          <button class="btn-transmit">TRANSMIT</button>
+        </div>
+      </div>
+
+      <div class="feed">
+        <!-- Status 1 -->
+        <article class="status">
+          <div class="status-header">
+            <div class="status-author">
+              <div class="avatar magenta">B</div>
+              <div>
+                <span class="author-name">BOB_SMITH</span>
+                <span class="author-badge remote">REMOTE</span>
+                <div class="author-handle">@bob@remote.server</div>
+              </div>
+            </div>
+            <time class="status-time">2024.01.15 // 14:32:00</time>
+          </div>
+          <div class="status-content">
+            Just finished reading "Gödel, Escher, Bach" for the third time. Each reading reveals new layers I completely missed before.
+
+            The way Hofstadter weaves together music, art, and mathematics to explore consciousness is unparalleled. <span class="hashtag">#books</span> <span class="hashtag">#philosophy</span>
+          </div>
+          <div class="status-actions">
+            <button class="action-btn">↩ REPLY</button>
+            <button class="action-btn shared">↻ 12</button>
+            <button class="action-btn liked">♥ 47</button>
+            <button class="action-btn">☆</button>
+          </div>
+        </article>
+
+        <!-- Status 2 with CW -->
+        <article class="status">
+          <div class="status-header">
+            <div class="status-author">
+              <div class="avatar green">C</div>
+              <div>
+                <span class="author-name">CAROL</span>
+                <span class="author-badge">LOCAL</span>
+                <div class="author-handle">@carol@local</div>
+              </div>
+            </div>
+            <time class="status-time">2024.01.15 // 14:28:15</time>
+          </div>
+          <div class="content-warning">
+            <div class="cw-header">
+              <span class="cw-icon">⚠</span>
+              <span class="cw-label">Warning: Filtered Content</span>
+            </div>
+            <div class="cw-text">Discussion of current events</div>
+            <button class="cw-toggle">DECRYPT</button>
+          </div>
+          <div class="status-actions">
+            <button class="action-btn">↩ REPLY</button>
+            <button class="action-btn">↻ 3</button>
+            <button class="action-btn">♥ 8</button>
+          </div>
+        </article>
+
+        <!-- Status 3 with media -->
+        <article class="status">
+          <div class="status-header">
+            <div class="status-author">
+              <div class="avatar yellow">D</div>
+              <div>
+                <span class="author-name">DAVE</span>
+                <span class="author-badge remote">REMOTE</span>
+                <div class="author-handle">@dave@photos.social</div>
+              </div>
+            </div>
+            <time class="status-time">2024.01.15 // 14:15:42</time>
+          </div>
+          <div class="status-content">
+            Morning light through the fog. Shot on Leica M6 with Portra 400.
+          </div>
+          <div class="status-media">
+            <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='200'%3E%3Crect fill='%230a0a12' width='300' height='200'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%2300ffff' font-family='monospace' font-size='12'%3E[ IMG_001 ]%3C/text%3E%3C/svg%3E" alt="Photo 1">
+            <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='200'%3E%3Crect fill='%230a0a12' width='300' height='200'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23ff00ff' font-family='monospace' font-size='12'%3E[ IMG_002 ]%3C/text%3E%3C/svg%3E" alt="Photo 2">
+          </div>
+          <div class="status-actions">
+            <button class="action-btn">↩ REPLY</button>
+            <button class="action-btn">↻ 28</button>
+            <button class="action-btn liked">♥ 142</button>
+            <button class="action-btn">☆</button>
+          </div>
+        </article>
+
+        <!-- Status 4 -->
+        <article class="status">
+          <div class="status-header">
+            <div class="status-author">
+              <div class="avatar">E</div>
+              <div>
+                <span class="author-name">EVE</span>
+                <span class="author-badge remote">REMOTE</span>
+                <div class="author-handle">@eve@tech.zone</div>
+              </div>
+            </div>
+            <time class="status-time">2024.01.15 // 13:55:08</time>
+          </div>
+          <div class="status-content">
+            TIL: The original UNIX philosophy of "do one thing well" came from Ken Thompson's frustration with over-engineered systems at Bell Labs. Simple tools, powerful combinations.
+          </div>
+          <div class="status-actions">
+            <button class="action-btn">↩ REPLY</button>
+            <button class="action-btn">↻ 5</button>
+            <button class="action-btn">♥ 23</button>
+          </div>
+        </article>
+      </div>
+    </main>
+
+    <!-- ASIDE -->
+    <aside class="aside">
+      <div class="aside-panel">
+        <h3 class="aside-title">&gt; TRENDING.DAT</h3>
+        <div class="trending-item">
+          <a href="#" class="trending-tag">#rust</a>
+          <span class="trending-count">1,234</span>
+        </div>
+        <div class="trending-item">
+          <a href="#" class="trending-tag">#photography</a>
+          <span class="trending-count">892</span>
+        </div>
+        <div class="trending-item">
+          <a href="#" class="trending-tag">#books</a>
+          <span class="trending-count">567</span>
+        </div>
+        <div class="trending-item">
+          <a href="#" class="trending-tag">#opensource</a>
+          <span class="trending-count">445</span>
+        </div>
+      </div>
+
+      <div class="aside-panel">
+        <h3 class="aside-title">&gt; SYSTEM.INFO</h3>
+        <div class="system-stats">
+          <span class="label">NODE:</span> <span class="value">example.com</span><br>
+          <span class="label">USERS:</span> <span class="value">1,234</span><br>
+          <span class="label">POSTS:</span> <span class="value">45,678</span><br>
+          <span class="label">UPTIME:</span> <span class="value">99.9%</span><br>
+          <span class="label">STATUS:</span> <span class="value">ONLINE</span>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- ============================================== -->
+  <!-- THREAD VIEW -->
+  <!-- ============================================== -->
+
+  <div class="cyber-divider">
+    <span class="cyber-divider-text">THREAD.VIEW</span>
+  </div>
+
+  <div class="page-indicator" style="position: relative; top: 0; left: 0; transform: none; display: block; width: fit-content; margin: 0 auto 30px;">// THREAD.SYS //</div>
+
+  <div class="container" style="min-height: auto;">
+    <!-- SIDEBAR -->
+    <aside class="sidebar" style="height: auto;">
+      <div class="logo">PLEROMA</div>
+      <div class="nav-section">
+        <div class="nav-label">// Navigate</div>
+        <a href="#" class="nav-link">Timeline</a>
+        <a href="#" class="nav-link">Notifications <span class="nav-badge">5</span></a>
+      </div>
+    </aside>
+
+    <!-- THREAD -->
+    <main class="main" style="min-height: auto;">
+      <header class="header">
+        <h1 class="header-title">&lt; THREAD [3 NODES]</h1>
+        <div class="header-tabs">
+          <a href="#" class="header-tab">EXPAND</a>
+          <a href="#" class="header-tab">COLLAPSE</a>
+        </div>
+      </header>
+
+      <div class="feed">
+        <!-- Ancestor -->
+        <article class="status ancestor">
+          <div class="status-header">
+            <div class="status-author">
+              <div class="avatar green">A</div>
+              <div>
+                <span class="author-name">ALICE</span>
+                <span class="author-badge">LOCAL</span>
+                <div class="author-handle">@alice@example.com</div>
+              </div>
+            </div>
+            <time class="status-time">2024.01.15 // 12:00:00</time>
+          </div>
+          <div class="status-content">
+            Hot take: Most "best practices" in software development are just cargo culting.
+          </div>
+          <div class="status-actions">
+            <button class="action-btn">5 REPLIES</button>
+            <button class="action-btn">↻ 8</button>
+            <button class="action-btn">♥ 34</button>
+          </div>
+        </article>
+
+        <div class="thread-line"></div>
+
+        <!-- Main -->
+        <article class="status main-status">
+          <div class="status-header">
+            <div class="status-author">
+              <div class="avatar magenta">B</div>
+              <div>
+                <span class="author-name">BOB_SMITH</span>
+                <span class="author-badge remote">REMOTE</span>
+                <div class="author-handle">@bob@remote.server</div>
+              </div>
+            </div>
+            <time class="status-time">2024.01.15 // 12:15:00</time>
+          </div>
+          <div class="status-content">
+            <span class="mention">@alice</span> I'd push back on this. Best practices emerge from collective experience. The problem isn't the practices themselves—it's applying them without understanding the underlying reasoning.
+
+            TDD isn't cargo cult. Neither is code review. But blindly following them without adapting to context? That's the real issue.
+          </div>
+          <div class="status-actions">
+            <button class="action-btn">↩ REPLY</button>
+            <button class="action-btn shared">↻ 12</button>
+            <button class="action-btn liked">♥ 47</button>
+            <button class="action-btn">☆</button>
+          </div>
+        </article>
+
+        <div class="thread-line"></div>
+
+        <!-- Reply 1 -->
+        <article class="status reply">
+          <div class="status-header">
+            <div class="status-author">
+              <div class="avatar yellow">C</div>
+              <div>
+                <span class="author-name">CAROL</span>
+                <span class="author-badge">LOCAL</span>
+                <div class="author-handle">@carol@local</div>
+              </div>
+            </div>
+            <time class="status-time">2024.01.15 // 12:22:00</time>
+          </div>
+          <div class="status-content">
+            <span class="mention">@bob</span> <span class="mention">@alice</span> This is the nuance that's often missing. Context matters. A startup with 2 devs has different needs than a 500-person enterprise.
+          </div>
+          <div class="status-actions">
+            <button class="action-btn">↩ REPLY</button>
+            <button class="action-btn">↻ 2</button>
+            <button class="action-btn">♥ 15</button>
+          </div>
+        </article>
+
+        <!-- Reply 2 nested -->
+        <article class="status reply nested">
+          <div class="status-header">
+            <div class="status-author">
+              <div class="avatar green">A</div>
+              <div>
+                <span class="author-name">ALICE</span>
+                <span class="author-badge">LOCAL</span>
+                <div class="author-handle">@alice@example.com</div>
+              </div>
+            </div>
+            <time class="status-time">2024.01.15 // 12:30:00</time>
+          </div>
+          <div class="status-content">
+            <span class="mention">@carol</span> <span class="mention">@bob</span> Fair points both. I should have been more specific. I meant the practices that get applied without any thought—like "always use microservices" or "never use global state."
+          </div>
+          <div class="status-actions">
+            <button class="action-btn">↩ REPLY</button>
+            <button class="action-btn">↻ 1</button>
+            <button class="action-btn">♥ 8</button>
+          </div>
+        </article>
+
+        <!-- Composer -->
+        <div class="composer" style="margin-left: 30px; margin-top: 20px;">
+          <div class="composer-label">&gt; Reply_To_Thread</div>
+          <textarea class="composer-textarea" placeholder="Enter response..."></textarea>
+          <div class="composer-footer">
+            <div class="composer-tools">
+              <button class="tool-btn">IMG</button>
+              <button class="tool-btn">⚠</button>
+            </div>
+            <button class="btn-transmit">REPLY</button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- ASIDE -->
+    <aside class="aside" style="height: auto;">
+      <div class="aside-panel">
+        <h3 class="aside-title">&gt; PARTICIPANTS</h3>
+        <div class="trending-item">
+          <span class="trending-tag">@alice</span>
+          <span class="trending-count">OP</span>
+        </div>
+        <div class="trending-item">
+          <span class="trending-tag">@bob</span>
+          <span class="trending-count">1</span>
+        </div>
+        <div class="trending-item">
+          <span class="trending-tag">@carol</span>
+          <span class="trending-count">1</span>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <div class="theme-controls">
+    <button class="theme-btn cyan">CYAN</button>
+    <button class="theme-btn magenta">MGTA</button>
+  </div>
+</body>
+</html>

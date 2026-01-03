@@ -1,0 +1,1395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mockup 9: OS/2 Warp Portal - Pleroma Redux</title>
+  <style>
+    :root {
+      --warp-teal: #008080;
+      --warp-teal-light: #00a0a0;
+      --warp-teal-dark: #006060;
+      --warp-purple: #800080;
+      --warp-purple-light: #a000a0;
+      --warp-blue: #000080;
+      --warp-blue-light: #0000c0;
+      --warp-yellow: #ffcc00;
+      --warp-yellow-light: #ffdd44;
+      --warp-orange: #ff8800;
+      --warp-red: #cc0000;
+      --warp-green: #008800;
+      --warp-gray: #c0c0c0;
+      --warp-gray-dark: #808080;
+      --warp-gray-light: #e0e0e0;
+      --warp-white: #ffffff;
+      --warp-black: #000000;
+      --title-gradient: linear-gradient(180deg, #0000c0 0%, #000080 50%, #000060 100%);
+      --button-gradient: linear-gradient(180deg, #e0e0e0 0%, #c0c0c0 50%, #a0a0a0 100%);
+      --panel-gradient: linear-gradient(180deg, #d0d0d0 0%, #c0c0c0 100%);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Tahoma', 'Arial', sans-serif;
+      font-size: 12px;
+      background: linear-gradient(135deg, #008080 0%, #004040 100%);
+      color: var(--warp-black);
+      min-height: 100vh;
+    }
+
+    /* TOP BANNER - Portal style */
+    .portal-banner {
+      background: linear-gradient(90deg, #000080 0%, #0000c0 50%, #000080 100%);
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 3px solid var(--warp-yellow);
+    }
+
+    .portal-logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .portal-logo-icon {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, #ffcc00 0%, #ff8800 100%);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 24px;
+      color: var(--warp-blue);
+      border: 2px solid var(--warp-yellow-light);
+      box-shadow: 2px 2px 0 rgba(0,0,0,0.3);
+    }
+
+    .portal-logo-text {
+      color: var(--warp-white);
+      font-size: 28px;
+      font-weight: bold;
+      text-shadow: 2px 2px 0 var(--warp-black);
+      font-family: 'Impact', 'Arial Black', sans-serif;
+      letter-spacing: 2px;
+    }
+
+    .portal-logo-tagline {
+      color: var(--warp-yellow);
+      font-size: 11px;
+      font-style: italic;
+    }
+
+    .portal-nav {
+      display: flex;
+      gap: 4px;
+    }
+
+    .portal-nav-btn {
+      padding: 6px 14px;
+      background: var(--button-gradient);
+      border: 2px outset var(--warp-gray);
+      color: var(--warp-black);
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: bold;
+      cursor: pointer;
+      text-decoration: none;
+    }
+
+    .portal-nav-btn:active {
+      border-style: inset;
+    }
+
+    .portal-nav-btn.highlight {
+      background: linear-gradient(180deg, #ffdd44 0%, #ffcc00 50%, #ddaa00 100%);
+      color: var(--warp-blue);
+    }
+
+    .portal-user {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--warp-white);
+    }
+
+    .portal-user-avatar {
+      width: 32px;
+      height: 32px;
+      background: var(--warp-yellow);
+      border: 2px solid var(--warp-yellow-light);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      color: var(--warp-blue);
+    }
+
+    /* TOOLBAR */
+    .toolbar {
+      background: var(--warp-gray);
+      border-bottom: 2px solid var(--warp-gray-dark);
+      padding: 4px 8px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .toolbar-group {
+      display: flex;
+      gap: 2px;
+      padding-right: 8px;
+      border-right: 2px groove var(--warp-gray);
+    }
+
+    .toolbar-group:last-child {
+      border-right: none;
+    }
+
+    .toolbar-btn {
+      width: 28px;
+      height: 26px;
+      background: var(--button-gradient);
+      border: 2px outset var(--warp-gray);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+
+    .toolbar-btn:active {
+      border-style: inset;
+    }
+
+    .toolbar-btn:hover {
+      background: linear-gradient(180deg, #f0f0f0 0%, #d0d0d0 50%, #b0b0b0 100%);
+    }
+
+    .toolbar-separator {
+      width: 2px;
+      height: 24px;
+      background: linear-gradient(90deg, var(--warp-gray-dark), var(--warp-white));
+      margin: 0 4px;
+    }
+
+    .address-bar {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .address-label {
+      font-weight: bold;
+      color: var(--warp-black);
+    }
+
+    .address-input {
+      flex: 1;
+      padding: 4px 8px;
+      border: 2px inset var(--warp-gray);
+      background: var(--warp-white);
+      font-family: inherit;
+      font-size: 12px;
+    }
+
+    /* MAIN LAYOUT */
+    .container {
+      display: grid;
+      grid-template-columns: 200px 1fr 220px;
+      gap: 8px;
+      padding: 8px;
+      min-height: calc(100vh - 100px);
+    }
+
+    /* WINDOW FRAMES */
+    .window {
+      background: var(--warp-gray);
+      border: 3px outset var(--warp-gray);
+      box-shadow: 3px 3px 0 rgba(0,0,0,0.4);
+    }
+
+    .window-title {
+      background: var(--title-gradient);
+      color: var(--warp-white);
+      padding: 4px 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: bold;
+      font-size: 12px;
+    }
+
+    .window-title.inactive {
+      background: linear-gradient(180deg, #808080 0%, #606060 100%);
+    }
+
+    .window-title-icon {
+      width: 16px;
+      height: 16px;
+      background: var(--warp-yellow);
+      border: 1px solid var(--warp-black);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+    }
+
+    .window-title-text {
+      flex: 1;
+    }
+
+    .window-title-btns {
+      display: flex;
+      gap: 2px;
+    }
+
+    .window-btn {
+      width: 16px;
+      height: 14px;
+      background: var(--warp-gray);
+      border: 2px outset var(--warp-gray);
+      font-size: 10px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .window-content {
+      padding: 8px;
+      background: var(--warp-gray);
+    }
+
+    .window-content-inset {
+      background: var(--warp-white);
+      border: 2px inset var(--warp-gray);
+      padding: 4px;
+    }
+
+    /* SIDEBAR */
+    .sidebar-section {
+      margin-bottom: 8px;
+    }
+
+    .sidebar-header {
+      background: linear-gradient(90deg, #800080 0%, #a000a0 100%);
+      color: var(--warp-white);
+      padding: 4px 8px;
+      font-weight: bold;
+      font-size: 11px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .sidebar-header-icon {
+      font-size: 14px;
+    }
+
+    .sidebar-list {
+      background: var(--warp-white);
+      border: 2px inset var(--warp-gray);
+    }
+
+    .sidebar-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      cursor: pointer;
+      text-decoration: none;
+      color: var(--warp-black);
+      border-bottom: 1px solid var(--warp-gray-light);
+    }
+
+    .sidebar-item:hover {
+      background: var(--warp-blue);
+      color: var(--warp-white);
+    }
+
+    .sidebar-item.active {
+      background: var(--warp-blue);
+      color: var(--warp-white);
+    }
+
+    .sidebar-item-icon {
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+
+    .sidebar-item-badge {
+      margin-left: auto;
+      background: var(--warp-red);
+      color: var(--warp-white);
+      font-size: 10px;
+      font-weight: bold;
+      padding: 1px 5px;
+      border-radius: 8px;
+    }
+
+    .user-card {
+      background: linear-gradient(135deg, #e0e0e0 0%, #c0c0c0 100%);
+      border: 2px outset var(--warp-gray);
+      padding: 8px;
+      text-align: center;
+    }
+
+    .user-card-avatar {
+      width: 48px;
+      height: 48px;
+      background: linear-gradient(135deg, #ffcc00 0%, #ff8800 100%);
+      border: 3px outset var(--warp-yellow);
+      margin: 0 auto 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      font-weight: bold;
+      color: var(--warp-blue);
+    }
+
+    .user-card-name {
+      font-weight: bold;
+      font-size: 12px;
+    }
+
+    .user-card-handle {
+      font-size: 10px;
+      color: var(--warp-gray-dark);
+    }
+
+    /* MAIN CONTENT */
+    .main-area {
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* TAB BAR */
+    .tab-bar {
+      display: flex;
+      background: var(--warp-gray);
+      padding: 4px 4px 0;
+      gap: 2px;
+    }
+
+    .tab {
+      padding: 6px 16px;
+      background: var(--button-gradient);
+      border: 2px outset var(--warp-gray);
+      border-bottom: none;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: bold;
+      position: relative;
+      top: 2px;
+    }
+
+    .tab.active {
+      background: var(--warp-gray);
+      border-style: outset outset none outset;
+      top: 0;
+      padding-bottom: 8px;
+    }
+
+    .tab-content {
+      border: 2px inset var(--warp-gray);
+      background: var(--warp-gray);
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* COMPOSER */
+    .composer {
+      background: linear-gradient(180deg, #e8e8e8 0%, #d0d0d0 100%);
+      border-bottom: 2px groove var(--warp-gray);
+      padding: 12px;
+    }
+
+    .composer-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .composer-icon {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, #00c000 0%, #008800 100%);
+      border: 2px outset #00a000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    .composer-title {
+      font-weight: bold;
+      font-size: 14px;
+      color: var(--warp-blue);
+    }
+
+    .composer-textarea {
+      width: 100%;
+      min-height: 70px;
+      padding: 8px;
+      border: 2px inset var(--warp-gray);
+      background: var(--warp-white);
+      font-family: inherit;
+      font-size: 12px;
+      resize: vertical;
+    }
+
+    .composer-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 8px;
+    }
+
+    .composer-tools {
+      display: flex;
+      gap: 4px;
+    }
+
+    .composer-tool {
+      width: 28px;
+      height: 26px;
+      background: var(--button-gradient);
+      border: 2px outset var(--warp-gray);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+
+    .composer-tool:active {
+      border-style: inset;
+    }
+
+    .btn-post {
+      padding: 8px 24px;
+      background: linear-gradient(180deg, #00c000 0%, #008800 50%, #006600 100%);
+      border: 2px outset #00a000;
+      color: var(--warp-white);
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: bold;
+      cursor: pointer;
+      text-shadow: 1px 1px 0 var(--warp-black);
+    }
+
+    .btn-post:active {
+      border-style: inset;
+    }
+
+    /* POST LIST */
+    .post-list {
+      flex: 1;
+      overflow-y: auto;
+      background: var(--warp-white);
+      border: 2px inset var(--warp-gray);
+      padding: 8px;
+    }
+
+    .post {
+      background: linear-gradient(180deg, #f8f8f8 0%, #e8e8e8 100%);
+      border: 2px outset var(--warp-gray);
+      margin-bottom: 10px;
+      box-shadow: 2px 2px 0 rgba(0,0,0,0.2);
+    }
+
+    .post-header {
+      background: linear-gradient(90deg, #000080 0%, #0000a0 100%);
+      color: var(--warp-white);
+      padding: 4px 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .post-author-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .post-avatar {
+      width: 24px;
+      height: 24px;
+      border: 2px outset var(--warp-gray);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 12px;
+    }
+
+    .post-avatar.yellow { background: var(--warp-yellow); color: var(--warp-blue); }
+    .post-avatar.teal { background: var(--warp-teal); color: var(--warp-white); }
+    .post-avatar.purple { background: var(--warp-purple); color: var(--warp-white); }
+    .post-avatar.orange { background: var(--warp-orange); color: var(--warp-white); }
+
+    .post-name {
+      font-weight: bold;
+      font-size: 12px;
+    }
+
+    .post-handle {
+      font-size: 10px;
+      opacity: 0.8;
+    }
+
+    .post-badge {
+      font-size: 9px;
+      padding: 1px 4px;
+      border-radius: 2px;
+      margin-left: 4px;
+    }
+
+    .post-badge.local {
+      background: var(--warp-green);
+    }
+
+    .post-badge.remote {
+      background: var(--warp-gray-dark);
+    }
+
+    .post-time {
+      font-size: 10px;
+      opacity: 0.8;
+    }
+
+    .post-body {
+      padding: 10px;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    .post-body a {
+      color: var(--warp-blue);
+    }
+
+    .post-body .hashtag {
+      color: var(--warp-purple);
+      font-weight: bold;
+    }
+
+    .post-media {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 4px;
+      margin-top: 8px;
+    }
+
+    .post-media img {
+      width: 100%;
+      height: 80px;
+      object-fit: cover;
+      border: 2px inset var(--warp-gray);
+    }
+
+    .post-footer {
+      background: var(--warp-gray);
+      border-top: 2px groove var(--warp-gray);
+      padding: 6px 8px;
+      display: flex;
+      gap: 6px;
+    }
+
+    .post-action {
+      padding: 4px 10px;
+      background: var(--button-gradient);
+      border: 2px outset var(--warp-gray);
+      font-family: inherit;
+      font-size: 10px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .post-action:active {
+      border-style: inset;
+    }
+
+    .post-action.active {
+      background: linear-gradient(180deg, #ffe0e0 0%, #ffb0b0 100%);
+      border-color: #ff8080;
+    }
+
+    .post-action.active.green {
+      background: linear-gradient(180deg, #e0ffe0 0%, #b0ffb0 100%);
+      border-color: #80ff80;
+    }
+
+    /* CONTENT WARNING */
+    .content-warning {
+      background: linear-gradient(180deg, #fff0c0 0%, #ffe080 100%);
+      border: 2px solid var(--warp-orange);
+      padding: 8px;
+      margin-bottom: 8px;
+    }
+
+    .cw-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: bold;
+      color: var(--warp-red);
+      font-size: 11px;
+    }
+
+    .cw-text {
+      font-size: 11px;
+      margin: 4px 0;
+    }
+
+    .cw-btn {
+      padding: 3px 10px;
+      background: var(--button-gradient);
+      border: 2px outset var(--warp-gray);
+      font-size: 10px;
+      cursor: pointer;
+    }
+
+    /* RIGHT PANEL */
+    .right-panel .window-content {
+      padding: 0;
+    }
+
+    .info-section {
+      margin-bottom: 2px;
+    }
+
+    .info-header {
+      background: linear-gradient(90deg, #008080 0%, #00a0a0 100%);
+      color: var(--warp-white);
+      padding: 4px 8px;
+      font-weight: bold;
+      font-size: 11px;
+    }
+
+    .info-content {
+      background: var(--warp-white);
+      padding: 8px;
+      font-size: 11px;
+    }
+
+    .trending-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 0;
+      border-bottom: 1px dotted var(--warp-gray);
+    }
+
+    .trending-tag {
+      color: var(--warp-purple);
+      font-weight: bold;
+      text-decoration: none;
+    }
+
+    .trending-tag:hover {
+      text-decoration: underline;
+    }
+
+    .trending-count {
+      color: var(--warp-gray-dark);
+      font-size: 10px;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 4px;
+    }
+
+    .stat-box {
+      background: linear-gradient(180deg, #e0e0e0 0%, #c0c0c0 100%);
+      border: 2px inset var(--warp-gray);
+      padding: 8px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 16px;
+      font-weight: bold;
+      color: var(--warp-blue);
+    }
+
+    .stat-label {
+      font-size: 9px;
+      color: var(--warp-gray-dark);
+    }
+
+    /* MARQUEE / WEB 1.0 TOUCHES */
+    .marquee-bar {
+      background: var(--warp-yellow);
+      color: var(--warp-blue);
+      padding: 4px;
+      font-weight: bold;
+      font-size: 11px;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+
+    .marquee-content {
+      display: inline-block;
+      animation: marquee 20s linear infinite;
+    }
+
+    @keyframes marquee {
+      0% { transform: translateX(100%); }
+      100% { transform: translateX(-100%); }
+    }
+
+    .visitor-counter {
+      background: var(--warp-black);
+      color: var(--warp-green);
+      font-family: 'Courier New', monospace;
+      padding: 4px 8px;
+      text-align: center;
+      font-size: 12px;
+      border: 2px inset var(--warp-gray);
+    }
+
+    /* PAGE INDICATOR */
+    .page-indicator {
+      position: fixed;
+      top: 50px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(180deg, #ffcc00 0%, #ff8800 100%);
+      color: var(--warp-blue);
+      padding: 4px 16px;
+      font-weight: bold;
+      font-size: 11px;
+      border: 2px outset var(--warp-yellow);
+      z-index: 100;
+    }
+
+    /* THREAD STYLES */
+    .post.ancestor {
+      opacity: 0.7;
+    }
+
+    .post.ancestor .post-header {
+      background: linear-gradient(90deg, #606060 0%, #808080 100%);
+    }
+
+    .post.main-post {
+      border: 3px solid var(--warp-yellow);
+      box-shadow: 4px 4px 0 rgba(0,0,0,0.3);
+    }
+
+    .post.main-post .post-header {
+      background: linear-gradient(90deg, #800080 0%, #a000a0 100%);
+    }
+
+    .post.reply {
+      margin-left: 20px;
+    }
+
+    .post.reply.nested {
+      margin-left: 40px;
+    }
+
+    .thread-connector {
+      width: 20px;
+      height: 16px;
+      border-left: 3px solid var(--warp-purple);
+      margin-left: 20px;
+    }
+
+    /* STATUS BAR */
+    .status-bar {
+      background: var(--warp-gray);
+      border-top: 2px outset var(--warp-gray);
+      padding: 4px 8px;
+      display: flex;
+      gap: 4px;
+      font-size: 11px;
+    }
+
+    .status-section {
+      border: 2px inset var(--warp-gray);
+      padding: 2px 8px;
+      flex: 1;
+    }
+
+    .status-section:first-child {
+      flex: 3;
+    }
+
+    /* DIVIDER */
+    .section-break {
+      background: linear-gradient(90deg, transparent, var(--warp-yellow), transparent);
+      height: 4px;
+      margin: 30px 8px;
+    }
+  </style>
+</head>
+<body>
+  <!-- PORTAL BANNER -->
+  <header class="portal-banner">
+    <div class="portal-logo">
+      <div class="portal-logo-icon">P</div>
+      <div>
+        <div class="portal-logo-text">PLEROMA</div>
+        <div class="portal-logo-tagline">Your Gateway to the Fediverse!</div>
+      </div>
+    </div>
+    <nav class="portal-nav">
+      <a href="#" class="portal-nav-btn highlight">🏠 Home</a>
+      <a href="#" class="portal-nav-btn">🌐 Federated</a>
+      <a href="#" class="portal-nav-btn">🔔 Alerts (3)</a>
+      <a href="#" class="portal-nav-btn">✉️ Mail</a>
+      <a href="#" class="portal-nav-btn">⚙️ Settings</a>
+    </nav>
+    <div class="portal-user">
+      <div class="portal-user-avatar">A</div>
+      <div>
+        <div style="font-weight: bold;">Alice</div>
+        <div style="font-size: 10px; opacity: 0.8;">@alice@example.com</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- TOOLBAR -->
+  <div class="toolbar">
+    <div class="toolbar-group">
+      <button class="toolbar-btn" title="Back">◀</button>
+      <button class="toolbar-btn" title="Forward">▶</button>
+      <button class="toolbar-btn" title="Refresh">🔄</button>
+      <button class="toolbar-btn" title="Home">🏠</button>
+    </div>
+    <div class="address-bar">
+      <span class="address-label">Location:</span>
+      <input type="text" class="address-input" value="pleroma://home/timeline" readonly>
+    </div>
+    <div class="toolbar-group">
+      <button class="toolbar-btn" title="Search">🔍</button>
+      <button class="toolbar-btn" title="Bookmarks">⭐</button>
+    </div>
+  </div>
+
+  <!-- MARQUEE -->
+  <div class="marquee-bar">
+    <span class="marquee-content">
+      🌟 Welcome to Pleroma! 🌟 Your federated social network! 🌟 Now with 1,234 users and 45,678 posts! 🌟 Join the conversation today! 🌟
+    </span>
+  </div>
+
+  <div class="page-indicator">📋 Timeline View</div>
+
+  <div class="container">
+    <!-- SIDEBAR -->
+    <div class="window">
+      <div class="window-title">
+        <span class="window-title-icon">📁</span>
+        <span class="window-title-text">Navigation</span>
+        <div class="window-title-btns">
+          <button class="window-btn">_</button>
+          <button class="window-btn">×</button>
+        </div>
+      </div>
+      <div class="window-content" style="padding: 0;">
+        <div class="sidebar-section">
+          <div class="sidebar-header">
+            <span class="sidebar-header-icon">📂</span>
+            Feeds
+          </div>
+          <div class="sidebar-list">
+            <a href="#" class="sidebar-item active">
+              <span class="sidebar-item-icon">📥</span>
+              Home Timeline
+            </a>
+            <a href="#" class="sidebar-item">
+              <span class="sidebar-item-icon">🏠</span>
+              Local
+            </a>
+            <a href="#" class="sidebar-item">
+              <span class="sidebar-item-icon">🌐</span>
+              Federated
+            </a>
+            <a href="#" class="sidebar-item">
+              <span class="sidebar-item-icon">🔔</span>
+              Notifications
+              <span class="sidebar-item-badge">3</span>
+            </a>
+            <a href="#" class="sidebar-item">
+              <span class="sidebar-item-icon">✉️</span>
+              Messages
+            </a>
+            <a href="#" class="sidebar-item">
+              <span class="sidebar-item-icon">📑</span>
+              Bookmarks
+            </a>
+          </div>
+        </div>
+
+        <div class="sidebar-section">
+          <div class="sidebar-header">
+            <span class="sidebar-header-icon">👤</span>
+            Account
+          </div>
+          <div class="sidebar-list">
+            <a href="#" class="sidebar-item">
+              <span class="sidebar-item-icon">🙂</span>
+              My Profile
+            </a>
+            <a href="#" class="sidebar-item">
+              <span class="sidebar-item-icon">⚙️</span>
+              Settings
+            </a>
+          </div>
+        </div>
+
+        <div style="padding: 8px;">
+          <div class="user-card">
+            <div class="user-card-avatar">A</div>
+            <div class="user-card-name">Alice</div>
+            <div class="user-card-handle">@alice@example.com</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MAIN AREA -->
+    <div class="main-area">
+      <div class="window" style="display: flex; flex-direction: column; height: 100%;">
+        <div class="window-title">
+          <span class="window-title-icon">📧</span>
+          <span class="window-title-text">Home Timeline - Pleroma</span>
+          <div class="window-title-btns">
+            <button class="window-btn">_</button>
+            <button class="window-btn">□</button>
+            <button class="window-btn">×</button>
+          </div>
+        </div>
+
+        <div class="tab-bar">
+          <div class="tab active">📥 All Posts</div>
+          <div class="tab">🖼️ Media</div>
+          <div class="tab">🔗 Links</div>
+        </div>
+
+        <div class="tab-content">
+          <div class="composer">
+            <div class="composer-header">
+              <div class="composer-icon">✏️</div>
+              <span class="composer-title">Compose New Post</span>
+            </div>
+            <textarea class="composer-textarea" placeholder="What's happening? Share with the fediverse!"></textarea>
+            <div class="composer-toolbar">
+              <div class="composer-tools">
+                <button class="composer-tool" title="Add Image">🖼️</button>
+                <button class="composer-tool" title="Add Video">🎬</button>
+                <button class="composer-tool" title="Add Poll">📊</button>
+                <button class="composer-tool" title="Content Warning">⚠️</button>
+                <button class="composer-tool" title="Emoji">😊</button>
+              </div>
+              <button class="btn-post">📤 Post It!</button>
+            </div>
+          </div>
+
+          <div class="post-list">
+            <!-- Post 1 -->
+            <article class="post">
+              <div class="post-header">
+                <div class="post-author-info">
+                  <div class="post-avatar yellow">B</div>
+                  <div>
+                    <span class="post-name">Bob Smith</span>
+                    <span class="post-badge remote">Remote</span><br>
+                    <span class="post-handle">@bob@remote.server</span>
+                  </div>
+                </div>
+                <span class="post-time">Jan 15 2:32 PM</span>
+              </div>
+              <div class="post-body">
+                Just finished reading "Gödel, Escher, Bach" for the third time. Each reading reveals new layers I completely missed before.<br><br>
+                The way Hofstadter weaves together music, art, and mathematics to explore consciousness is unparalleled. <span class="hashtag">#books</span> <span class="hashtag">#philosophy</span>
+              </div>
+              <div class="post-footer">
+                <button class="post-action">💬 Reply</button>
+                <button class="post-action active green">🔄 12</button>
+                <button class="post-action active">❤️ 47</button>
+                <button class="post-action">📑 Save</button>
+              </div>
+            </article>
+
+            <!-- Post 2 with CW -->
+            <article class="post">
+              <div class="post-header">
+                <div class="post-author-info">
+                  <div class="post-avatar teal">C</div>
+                  <div>
+                    <span class="post-name">Carol</span>
+                    <span class="post-badge local">Local</span><br>
+                    <span class="post-handle">@carol@local</span>
+                  </div>
+                </div>
+                <span class="post-time">Jan 15 2:28 PM</span>
+              </div>
+              <div class="post-body">
+                <div class="content-warning">
+                  <div class="cw-header">⚠️ Content Warning</div>
+                  <div class="cw-text">Discussion of current events</div>
+                  <button class="cw-btn">👁️ Show Content</button>
+                </div>
+              </div>
+              <div class="post-footer">
+                <button class="post-action">💬 Reply</button>
+                <button class="post-action">🔄 3</button>
+                <button class="post-action">❤️ 8</button>
+              </div>
+            </article>
+
+            <!-- Post 3 with media -->
+            <article class="post">
+              <div class="post-header">
+                <div class="post-author-info">
+                  <div class="post-avatar orange">D</div>
+                  <div>
+                    <span class="post-name">Dave</span>
+                    <span class="post-badge remote">Remote</span><br>
+                    <span class="post-handle">@dave@photos.social</span>
+                  </div>
+                </div>
+                <span class="post-time">Jan 15 2:15 PM</span>
+              </div>
+              <div class="post-body">
+                Morning light through the fog. Shot on Leica M6 with Portra 400. 📷
+                <div class="post-media">
+                  <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='150'%3E%3Crect fill='%23008080' width='200' height='150'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23ffffff' font-family='sans-serif' font-size='11'%3E🖼️ IMG001.JPG%3C/text%3E%3C/svg%3E" alt="Photo 1">
+                  <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='150'%3E%3Crect fill='%23800080' width='200' height='150'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23ffffff' font-family='sans-serif' font-size='11'%3E🖼️ IMG002.JPG%3C/text%3E%3C/svg%3E" alt="Photo 2">
+                </div>
+              </div>
+              <div class="post-footer">
+                <button class="post-action">💬 Reply</button>
+                <button class="post-action">🔄 28</button>
+                <button class="post-action active">❤️ 142</button>
+                <button class="post-action">📑 Save</button>
+              </div>
+            </article>
+
+            <!-- Post 4 -->
+            <article class="post">
+              <div class="post-header">
+                <div class="post-author-info">
+                  <div class="post-avatar purple">E</div>
+                  <div>
+                    <span class="post-name">Eve</span>
+                    <span class="post-badge remote">Remote</span><br>
+                    <span class="post-handle">@eve@tech.zone</span>
+                  </div>
+                </div>
+                <span class="post-time">Jan 15 1:55 PM</span>
+              </div>
+              <div class="post-body">
+                TIL: The original UNIX philosophy of "do one thing well" came from Ken Thompson's frustration with over-engineered systems at Bell Labs. Simple tools, powerful combinations. 💻
+              </div>
+              <div class="post-footer">
+                <button class="post-action">💬 Reply</button>
+                <button class="post-action">🔄 5</button>
+                <button class="post-action">❤️ 23</button>
+              </div>
+            </article>
+          </div>
+        </div>
+
+        <div class="status-bar">
+          <div class="status-section">✓ 4 posts loaded</div>
+          <div class="status-section">🌐 Connected</div>
+          <div class="status-section">📡 Online</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT PANEL -->
+    <div class="window right-panel">
+      <div class="window-title">
+        <span class="window-title-icon">ℹ️</span>
+        <span class="window-title-text">Information</span>
+        <div class="window-title-btns">
+          <button class="window-btn">_</button>
+          <button class="window-btn">×</button>
+        </div>
+      </div>
+      <div class="window-content">
+        <div class="info-section">
+          <div class="info-header">📈 Trending Now!</div>
+          <div class="info-content">
+            <div class="trending-item">
+              <a href="#" class="trending-tag">#rust</a>
+              <span class="trending-count">1,234</span>
+            </div>
+            <div class="trending-item">
+              <a href="#" class="trending-tag">#photography</a>
+              <span class="trending-count">892</span>
+            </div>
+            <div class="trending-item">
+              <a href="#" class="trending-tag">#books</a>
+              <span class="trending-count">567</span>
+            </div>
+            <div class="trending-item">
+              <a href="#" class="trending-tag">#opensource</a>
+              <span class="trending-count">445</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="info-section">
+          <div class="info-header">📊 Instance Stats</div>
+          <div class="info-content">
+            <div class="stats-grid">
+              <div class="stat-box">
+                <div class="stat-value">1,234</div>
+                <div class="stat-label">Users</div>
+              </div>
+              <div class="stat-box">
+                <div class="stat-value">45.6K</div>
+                <div class="stat-label">Posts</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="info-section">
+          <div class="info-header">🖥️ Server Info</div>
+          <div class="info-content">
+            <strong>example.com</strong><br>
+            Version 2.6.0<br>
+            Uptime: 99.9%<br>
+            Status: ✅ Online
+          </div>
+        </div>
+
+        <div style="padding: 8px;">
+          <div class="visitor-counter">
+            👁️ Visitors: 001,337
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================== -->
+  <!-- THREAD VIEW -->
+  <!-- ============================================== -->
+
+  <div class="section-break"></div>
+
+  <div class="page-indicator" style="position: relative; top: 0; left: 0; transform: none; display: block; width: fit-content; margin: 0 auto 16px;">💬 Thread View</div>
+
+  <div class="container" style="min-height: auto; padding-bottom: 40px;">
+    <!-- SIDEBAR -->
+    <div class="window">
+      <div class="window-title">
+        <span class="window-title-icon">📁</span>
+        <span class="window-title-text">Navigation</span>
+        <div class="window-title-btns">
+          <button class="window-btn">×</button>
+        </div>
+      </div>
+      <div class="window-content" style="padding: 0;">
+        <div class="sidebar-list">
+          <a href="#" class="sidebar-item">
+            <span class="sidebar-item-icon">◀</span>
+            Back to Timeline
+          </a>
+          <a href="#" class="sidebar-item">
+            <span class="sidebar-item-icon">🔔</span>
+            Notifications
+            <span class="sidebar-item-badge">3</span>
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- THREAD -->
+    <div class="main-area">
+      <div class="window" style="display: flex; flex-direction: column;">
+        <div class="window-title">
+          <span class="window-title-icon">💬</span>
+          <span class="window-title-text">Thread - 3 Replies</span>
+          <div class="window-title-btns">
+            <button class="window-btn">_</button>
+            <button class="window-btn">□</button>
+            <button class="window-btn">×</button>
+          </div>
+        </div>
+
+        <div class="post-list" style="flex: 1;">
+          <!-- Ancestor -->
+          <article class="post ancestor">
+            <div class="post-header">
+              <div class="post-author-info">
+                <div class="post-avatar orange">A</div>
+                <div>
+                  <span class="post-name">Alice</span>
+                  <span class="post-badge local">Local</span><br>
+                  <span class="post-handle">@alice@example.com</span>
+                </div>
+              </div>
+              <span class="post-time">Jan 15 12:00 PM</span>
+            </div>
+            <div class="post-body">
+              Hot take: Most "best practices" in software development are just cargo culting.
+            </div>
+            <div class="post-footer">
+              <button class="post-action">💬 5</button>
+              <button class="post-action">🔄 8</button>
+              <button class="post-action">❤️ 34</button>
+            </div>
+          </article>
+
+          <div class="thread-connector"></div>
+
+          <!-- Main -->
+          <article class="post main-post">
+            <div class="post-header">
+              <div class="post-author-info">
+                <div class="post-avatar yellow">B</div>
+                <div>
+                  <span class="post-name">Bob Smith</span>
+                  <span class="post-badge remote">Remote</span><br>
+                  <span class="post-handle">@bob@remote.server</span>
+                </div>
+              </div>
+              <span class="post-time">Jan 15 12:15 PM</span>
+            </div>
+            <div class="post-body">
+              <a href="#">@alice</a> I'd push back on this. Best practices emerge from collective experience. The problem isn't the practices themselves—it's applying them without understanding the underlying reasoning.<br><br>
+              TDD isn't cargo cult. Neither is code review. But blindly following them without adapting to context? That's the real issue.
+            </div>
+            <div class="post-footer">
+              <button class="post-action">💬 Reply</button>
+              <button class="post-action active green">🔄 12</button>
+              <button class="post-action active">❤️ 47</button>
+              <button class="post-action">📑 Save</button>
+            </div>
+          </article>
+
+          <div class="thread-connector"></div>
+
+          <!-- Reply 1 -->
+          <article class="post reply">
+            <div class="post-header">
+              <div class="post-author-info">
+                <div class="post-avatar teal">C</div>
+                <div>
+                  <span class="post-name">Carol</span>
+                  <span class="post-badge local">Local</span><br>
+                  <span class="post-handle">@carol@local</span>
+                </div>
+              </div>
+              <span class="post-time">Jan 15 12:22 PM</span>
+            </div>
+            <div class="post-body">
+              <a href="#">@bob</a> <a href="#">@alice</a> This is the nuance that's often missing. Context matters. A startup with 2 devs has different needs than a 500-person enterprise.
+            </div>
+            <div class="post-footer">
+              <button class="post-action">💬 Reply</button>
+              <button class="post-action">🔄 2</button>
+              <button class="post-action">❤️ 15</button>
+            </div>
+          </article>
+
+          <!-- Reply 2 -->
+          <article class="post reply nested">
+            <div class="post-header">
+              <div class="post-author-info">
+                <div class="post-avatar orange">A</div>
+                <div>
+                  <span class="post-name">Alice</span>
+                  <span class="post-badge local">Local</span><br>
+                  <span class="post-handle">@alice@example.com</span>
+                </div>
+              </div>
+              <span class="post-time">Jan 15 12:30 PM</span>
+            </div>
+            <div class="post-body">
+              <a href="#">@carol</a> <a href="#">@bob</a> Fair points both. I should have been more specific. I meant the practices that get applied without any thought—like "always use microservices" or "never use global state."
+            </div>
+            <div class="post-footer">
+              <button class="post-action">💬 Reply</button>
+              <button class="post-action">🔄 1</button>
+              <button class="post-action">❤️ 8</button>
+            </div>
+          </article>
+
+          <!-- Reply composer -->
+          <div class="composer" style="margin-left: 20px; margin-top: 8px; border: 2px outset var(--warp-gray);">
+            <div class="composer-header">
+              <div class="composer-icon">↩️</div>
+              <span class="composer-title">Reply to Thread</span>
+            </div>
+            <textarea class="composer-textarea" placeholder="Write your reply..."></textarea>
+            <div class="composer-toolbar">
+              <div class="composer-tools">
+                <button class="composer-tool">🖼️</button>
+                <button class="composer-tool">😊</button>
+              </div>
+              <button class="btn-post">📤 Reply!</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="status-bar">
+          <div class="status-section">Thread: 4 posts, 3 users</div>
+          <div class="status-section">📡 Online</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT PANEL -->
+    <div class="window right-panel">
+      <div class="window-title">
+        <span class="window-title-icon">👥</span>
+        <span class="window-title-text">Participants</span>
+        <div class="window-title-btns">
+          <button class="window-btn">×</button>
+        </div>
+      </div>
+      <div class="window-content">
+        <div class="info-section">
+          <div class="info-header">👥 In This Thread</div>
+          <div class="info-content">
+            <div class="trending-item">
+              <span>👤 @alice</span>
+              <span class="trending-count">OP</span>
+            </div>
+            <div class="trending-item">
+              <span>👤 @bob</span>
+              <span class="trending-count">1</span>
+            </div>
+            <div class="trending-item">
+              <span>👤 @carol</span>
+              <span class="trending-count">1</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

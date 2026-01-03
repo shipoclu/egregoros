@@ -1,0 +1,1174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mockup 2: Soft Glass - Pleroma Redux</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --gradient-start: #fdf2f8;
+      --gradient-mid: #ede9fe;
+      --gradient-end: #dbeafe;
+      --glass-bg: rgba(255, 255, 255, 0.7);
+      --glass-border: rgba(255, 255, 255, 0.5);
+      --glass-shadow: rgba(147, 51, 234, 0.08);
+      --text-primary: #1e1b4b;
+      --text-secondary: #6b7280;
+      --text-muted: #9ca3af;
+      --accent-purple: #8b5cf6;
+      --accent-pink: #ec4899;
+      --accent-blue: #3b82f6;
+      --accent-teal: #14b8a6;
+      --danger: #f43f5e;
+      --success: #10b981;
+    }
+
+    [data-theme="dark"] {
+      --gradient-start: #1e1b4b;
+      --gradient-mid: #312e81;
+      --gradient-end: #1e3a5f;
+      --glass-bg: rgba(30, 27, 75, 0.6);
+      --glass-border: rgba(139, 92, 246, 0.2);
+      --glass-shadow: rgba(139, 92, 246, 0.15);
+      --text-primary: #f8fafc;
+      --text-secondary: #cbd5e1;
+      --text-muted: #94a3b8;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+      min-height: 100vh;
+      background: linear-gradient(135deg, var(--gradient-start) 0%, var(--gradient-mid) 50%, var(--gradient-end) 100%);
+      background-attachment: fixed;
+      color: var(--text-primary);
+      line-height: 1.6;
+    }
+
+    /* Decorative blobs */
+    body::before,
+    body::after {
+      content: '';
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(100px);
+      z-index: -1;
+      opacity: 0.5;
+    }
+
+    body::before {
+      width: 600px;
+      height: 600px;
+      background: linear-gradient(135deg, #c084fc 0%, #f472b6 100%);
+      top: -200px;
+      left: -200px;
+    }
+
+    body::after {
+      width: 500px;
+      height: 500px;
+      background: linear-gradient(135deg, #60a5fa 0%, #34d399 100%);
+      bottom: -150px;
+      right: -150px;
+    }
+
+    .container {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 24px;
+      display: grid;
+      grid-template-columns: 260px 1fr 300px;
+      gap: 24px;
+      min-height: 100vh;
+    }
+
+    /* GLASS EFFECT */
+    .glass {
+      background: var(--glass-bg);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--glass-border);
+      border-radius: 24px;
+      box-shadow: 0 8px 32px var(--glass-shadow);
+    }
+
+    .glass-subtle {
+      background: var(--glass-bg);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--glass-border);
+      border-radius: 20px;
+    }
+
+    /* SIDEBAR */
+    .sidebar {
+      padding: 28px;
+      position: sticky;
+      top: 24px;
+      height: fit-content;
+      max-height: calc(100vh - 48px);
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 32px;
+    }
+
+    .logo-icon {
+      width: 44px;
+      height: 44px;
+      background: linear-gradient(135deg, var(--accent-purple), var(--accent-pink));
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 700;
+      font-size: 20px;
+      box-shadow: 0 4px 16px rgba(139, 92, 246, 0.3);
+    }
+
+    .logo-text {
+      font-size: 22px;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--accent-purple), var(--accent-pink));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .nav-section {
+      margin-bottom: 24px;
+    }
+
+    .nav-link {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 18px;
+      margin-bottom: 6px;
+      border-radius: 14px;
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-weight: 500;
+      font-size: 15px;
+      transition: all 0.2s ease;
+    }
+
+    .nav-link:hover {
+      background: rgba(139, 92, 246, 0.1);
+      color: var(--accent-purple);
+      transform: translateX(4px);
+    }
+
+    .nav-link.active {
+      background: linear-gradient(135deg, var(--accent-purple), var(--accent-pink));
+      color: white;
+      box-shadow: 0 4px 16px rgba(139, 92, 246, 0.3);
+    }
+
+    .nav-icon {
+      width: 22px;
+      height: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    .nav-badge {
+      margin-left: auto;
+      background: linear-gradient(135deg, var(--accent-pink), var(--accent-purple));
+      color: white;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 20px;
+    }
+
+    .user-card {
+      padding: 16px;
+      border-radius: 16px;
+      background: rgba(139, 92, 246, 0.08);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 24px;
+    }
+
+    .user-avatar {
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--accent-teal), var(--accent-blue));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 600;
+      font-size: 16px;
+    }
+
+    .user-name {
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .user-handle {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    /* MAIN CONTENT */
+    .main {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .page-header {
+      padding: 20px 28px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .page-title {
+      font-size: 24px;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--text-primary), var(--accent-purple));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .tab-pills {
+      display: flex;
+      gap: 8px;
+      background: rgba(139, 92, 246, 0.08);
+      padding: 6px;
+      border-radius: 14px;
+    }
+
+    .tab-pill {
+      padding: 8px 16px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      text-decoration: none;
+      transition: all 0.2s ease;
+    }
+
+    .tab-pill:hover {
+      color: var(--accent-purple);
+    }
+
+    .tab-pill.active {
+      background: white;
+      color: var(--accent-purple);
+      box-shadow: 0 2px 8px rgba(139, 92, 246, 0.15);
+    }
+
+    /* COMPOSER */
+    .composer {
+      padding: 24px;
+    }
+
+    .composer-header {
+      display: flex;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+
+    .composer-avatar {
+      width: 48px;
+      height: 48px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, var(--accent-teal), var(--accent-blue));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+
+    .composer-input {
+      flex: 1;
+    }
+
+    .composer-textarea {
+      width: 100%;
+      min-height: 100px;
+      padding: 16px;
+      border: 2px solid transparent;
+      border-radius: 16px;
+      background: rgba(139, 92, 246, 0.05);
+      color: var(--text-primary);
+      font-family: inherit;
+      font-size: 15px;
+      resize: none;
+      transition: all 0.2s ease;
+    }
+
+    .composer-textarea:focus {
+      outline: none;
+      border-color: var(--accent-purple);
+      background: white;
+      box-shadow: 0 4px 20px rgba(139, 92, 246, 0.15);
+    }
+
+    .composer-textarea::placeholder {
+      color: var(--text-muted);
+    }
+
+    .composer-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 14px;
+      padding-left: 62px;
+    }
+
+    .composer-tools {
+      display: flex;
+      gap: 6px;
+    }
+
+    .tool-btn {
+      width: 38px;
+      height: 38px;
+      border: none;
+      border-radius: 12px;
+      background: rgba(139, 92, 246, 0.1);
+      color: var(--accent-purple);
+      font-size: 16px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .tool-btn:hover {
+      background: rgba(139, 92, 246, 0.2);
+      transform: scale(1.05);
+    }
+
+    .btn-gradient {
+      padding: 12px 28px;
+      border: none;
+      border-radius: 14px;
+      background: linear-gradient(135deg, var(--accent-purple), var(--accent-pink));
+      color: white;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 16px rgba(139, 92, 246, 0.3);
+    }
+
+    .btn-gradient:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 24px rgba(139, 92, 246, 0.4);
+    }
+
+    /* STATUS CARDS */
+    .status-card {
+      padding: 24px;
+      transition: all 0.2s ease;
+    }
+
+    .status-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 40px var(--glass-shadow);
+    }
+
+    .status-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 14px;
+    }
+
+    .status-author {
+      display: flex;
+      gap: 14px;
+      align-items: center;
+    }
+
+    .avatar {
+      width: 48px;
+      height: 48px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 600;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .avatar-gradient-1 { background: linear-gradient(135deg, #f472b6, #c084fc); }
+    .avatar-gradient-2 { background: linear-gradient(135deg, #60a5fa, #34d399); }
+    .avatar-gradient-3 { background: linear-gradient(135deg, #fbbf24, #f97316); }
+    .avatar-gradient-4 { background: linear-gradient(135deg, #a78bfa, #ec4899); }
+
+    .author-name {
+      font-weight: 600;
+      font-size: 15px;
+    }
+
+    .author-handle {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .author-badge {
+      font-size: 10px;
+      padding: 3px 8px;
+      border-radius: 6px;
+      background: rgba(20, 184, 166, 0.15);
+      color: var(--accent-teal);
+      font-weight: 600;
+      margin-left: 8px;
+    }
+
+    .status-time {
+      font-size: 12px;
+      color: var(--text-muted);
+      padding: 4px 10px;
+      background: rgba(139, 92, 246, 0.08);
+      border-radius: 8px;
+    }
+
+    .status-content {
+      margin-left: 62px;
+      font-size: 15px;
+      line-height: 1.7;
+      color: var(--text-primary);
+    }
+
+    .status-content p {
+      margin-bottom: 12px;
+    }
+
+    .status-content a {
+      color: var(--accent-purple);
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    .status-content a:hover {
+      text-decoration: underline;
+    }
+
+    .hashtag {
+      background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(236, 72, 153, 0.15));
+      padding: 2px 8px;
+      border-radius: 6px;
+      color: var(--accent-purple);
+    }
+
+    .status-media {
+      margin-top: 16px;
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      border-radius: 16px;
+      overflow: hidden;
+    }
+
+    .status-media img {
+      width: 100%;
+      height: 180px;
+      object-fit: cover;
+      border-radius: 12px;
+      transition: all 0.3s ease;
+    }
+
+    .status-media img:hover {
+      transform: scale(1.02);
+    }
+
+    .status-actions {
+      margin-left: 62px;
+      margin-top: 16px;
+      display: flex;
+      gap: 8px;
+    }
+
+    .action-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      border: none;
+      border-radius: 12px;
+      background: rgba(139, 92, 246, 0.08);
+      color: var(--text-secondary);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .action-btn:hover {
+      background: rgba(139, 92, 246, 0.15);
+      color: var(--accent-purple);
+      transform: scale(1.02);
+    }
+
+    .action-btn.liked {
+      background: linear-gradient(135deg, rgba(244, 63, 94, 0.15), rgba(236, 72, 153, 0.15));
+      color: var(--danger);
+    }
+
+    .action-btn.reposted {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--success);
+    }
+
+    .action-icon {
+      font-size: 16px;
+    }
+
+    /* Content Warning */
+    .content-warning {
+      margin-left: 62px;
+      padding: 16px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, rgba(251, 191, 36, 0.1), rgba(249, 115, 22, 0.1));
+      border: 1px solid rgba(251, 191, 36, 0.3);
+      margin-bottom: 12px;
+    }
+
+    .cw-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .cw-icon {
+      font-size: 18px;
+    }
+
+    .cw-label {
+      font-weight: 600;
+      font-size: 13px;
+      color: #d97706;
+    }
+
+    .cw-text {
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+
+    .cw-toggle {
+      margin-top: 12px;
+      padding: 8px 16px;
+      border: none;
+      border-radius: 10px;
+      background: rgba(251, 191, 36, 0.2);
+      color: #d97706;
+      font-weight: 500;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .cw-toggle:hover {
+      background: rgba(251, 191, 36, 0.3);
+    }
+
+    /* ASIDE */
+    .aside {
+      position: sticky;
+      top: 24px;
+      height: fit-content;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .aside-card {
+      padding: 24px;
+    }
+
+    .aside-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 18px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .aside-title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(90deg, var(--glass-border), transparent);
+    }
+
+    .trending-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(139, 92, 246, 0.08);
+    }
+
+    .trending-item:last-child {
+      border-bottom: none;
+    }
+
+    .trending-tag {
+      font-weight: 600;
+      font-size: 14px;
+      color: var(--accent-purple);
+      text-decoration: none;
+    }
+
+    .trending-tag:hover {
+      text-decoration: underline;
+    }
+
+    .trending-count {
+      font-size: 12px;
+      color: var(--text-muted);
+      padding: 4px 10px;
+      background: rgba(139, 92, 246, 0.08);
+      border-radius: 8px;
+    }
+
+    .suggested-user {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 0;
+    }
+
+    .suggested-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .suggested-info {
+      flex: 1;
+    }
+
+    .suggested-name {
+      font-weight: 600;
+      font-size: 13px;
+    }
+
+    .suggested-handle {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .follow-btn {
+      padding: 6px 14px;
+      border: none;
+      border-radius: 8px;
+      background: linear-gradient(135deg, var(--accent-purple), var(--accent-pink));
+      color: white;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .follow-btn:hover {
+      transform: scale(1.05);
+    }
+
+    /* THEME TOGGLE */
+    .theme-toggle {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      width: 50px;
+      height: 50px;
+      border: none;
+      border-radius: 16px;
+      background: linear-gradient(135deg, var(--accent-purple), var(--accent-pink));
+      color: white;
+      font-size: 20px;
+      cursor: pointer;
+      box-shadow: 0 4px 20px rgba(139, 92, 246, 0.4);
+      transition: all 0.2s ease;
+    }
+
+    .theme-toggle:hover {
+      transform: scale(1.1) rotate(15deg);
+    }
+
+    /* PAGE INDICATOR */
+    .page-indicator {
+      position: fixed;
+      top: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 10px 24px;
+      background: linear-gradient(135deg, var(--accent-purple), var(--accent-pink));
+      color: white;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      border-radius: 30px;
+      box-shadow: 0 4px 20px rgba(139, 92, 246, 0.4);
+      z-index: 100;
+    }
+
+    /* THREAD STYLES */
+    .thread-connector {
+      width: 3px;
+      height: 30px;
+      background: linear-gradient(180deg, var(--accent-purple), var(--accent-pink));
+      margin-left: 85px;
+      border-radius: 3px;
+    }
+
+    .thread-ancestor {
+      opacity: 0.75;
+      border-left: 4px solid var(--text-muted);
+      border-radius: 0 24px 24px 0;
+    }
+
+    .thread-main {
+      border-left: 4px solid var(--accent-purple);
+      border-radius: 0 24px 24px 0;
+      box-shadow: 0 8px 40px rgba(139, 92, 246, 0.2);
+    }
+
+    .thread-reply {
+      margin-left: 30px;
+      border-left: 3px solid rgba(139, 92, 246, 0.3);
+      border-radius: 0 24px 24px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="page-indicator">Timeline View</div>
+
+  <div class="container">
+    <!-- SIDEBAR -->
+    <aside class="sidebar glass">
+      <div class="logo">
+        <div class="logo-icon">P</div>
+        <span class="logo-text">Pleroma</span>
+      </div>
+
+      <nav class="nav-section">
+        <a href="#" class="nav-link active">
+          <span class="nav-icon">🏠</span>
+          Timeline
+        </a>
+        <a href="#" class="nav-link">
+          <span class="nav-icon">🌐</span>
+          Local
+        </a>
+        <a href="#" class="nav-link">
+          <span class="nav-icon">🌍</span>
+          Federated
+        </a>
+        <a href="#" class="nav-link">
+          <span class="nav-icon">🔔</span>
+          Notifications
+          <span class="nav-badge">5</span>
+        </a>
+        <a href="#" class="nav-link">
+          <span class="nav-icon">💬</span>
+          Messages
+        </a>
+        <a href="#" class="nav-link">
+          <span class="nav-icon">🔖</span>
+          Bookmarks
+        </a>
+        <a href="#" class="nav-link">
+          <span class="nav-icon">👤</span>
+          Profile
+        </a>
+        <a href="#" class="nav-link">
+          <span class="nav-icon">⚙️</span>
+          Settings
+        </a>
+      </nav>
+
+      <div class="user-card">
+        <div class="user-avatar">A</div>
+        <div>
+          <div class="user-name">Alice</div>
+          <div class="user-handle">@alice@example.com</div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="main">
+      <header class="page-header glass">
+        <h1 class="page-title">Home</h1>
+        <div class="tab-pills">
+          <a href="#" class="tab-pill active">All</a>
+          <a href="#" class="tab-pill">Media</a>
+          <a href="#" class="tab-pill">Links</a>
+        </div>
+      </header>
+
+      <div class="composer glass">
+        <div class="composer-header">
+          <div class="composer-avatar">A</div>
+          <div class="composer-input">
+            <textarea class="composer-textarea" placeholder="What's happening?"></textarea>
+          </div>
+        </div>
+        <div class="composer-actions">
+          <div class="composer-tools">
+            <button class="tool-btn">🖼️</button>
+            <button class="tool-btn">🎬</button>
+            <button class="tool-btn">📊</button>
+            <button class="tool-btn">⚠️</button>
+            <button class="tool-btn">😊</button>
+          </div>
+          <button class="btn-gradient">Post</button>
+        </div>
+      </div>
+
+      <!-- Status 1 -->
+      <article class="status-card glass">
+        <header class="status-header">
+          <div class="status-author">
+            <div class="avatar avatar-gradient-1">B</div>
+            <div>
+              <span class="author-name">Bob Smith</span>
+              <span class="author-badge">Remote</span>
+              <div class="author-handle">@bob@remote.server</div>
+            </div>
+          </div>
+          <time class="status-time">2h ago</time>
+        </header>
+        <div class="status-content">
+          <p>Just finished reading "Gödel, Escher, Bach" for the third time. Each reading reveals new layers I completely missed before. 📚</p>
+          <p>The way Hofstadter weaves together music, art, and mathematics to explore consciousness is unparalleled. <span class="hashtag">#books</span> <span class="hashtag">#philosophy</span></p>
+        </div>
+        <div class="status-actions">
+          <button class="action-btn"><span class="action-icon">💬</span> Reply</button>
+          <button class="action-btn reposted"><span class="action-icon">🔄</span> 12</button>
+          <button class="action-btn liked"><span class="action-icon">❤️</span> 47</button>
+          <button class="action-btn"><span class="action-icon">🔖</span></button>
+          <button class="action-btn"><span class="action-icon">⋯</span></button>
+        </div>
+      </article>
+
+      <!-- Status 2 with CW -->
+      <article class="status-card glass">
+        <header class="status-header">
+          <div class="status-author">
+            <div class="avatar avatar-gradient-2">C</div>
+            <div>
+              <span class="author-name">Carol</span>
+              <div class="author-handle">@carol@local</div>
+            </div>
+          </div>
+          <time class="status-time">3h ago</time>
+        </header>
+        <div class="content-warning">
+          <div class="cw-header">
+            <span class="cw-icon">⚠️</span>
+            <span class="cw-label">Content Warning</span>
+          </div>
+          <div class="cw-text">Discussion of current events</div>
+          <button class="cw-toggle">Show Content</button>
+        </div>
+        <div class="status-actions">
+          <button class="action-btn"><span class="action-icon">💬</span> Reply</button>
+          <button class="action-btn"><span class="action-icon">🔄</span> 3</button>
+          <button class="action-btn"><span class="action-icon">🤍</span> 8</button>
+          <button class="action-btn"><span class="action-icon">🔖</span></button>
+        </div>
+      </article>
+
+      <!-- Status 3 with media -->
+      <article class="status-card glass">
+        <header class="status-header">
+          <div class="status-author">
+            <div class="avatar avatar-gradient-3">D</div>
+            <div>
+              <span class="author-name">Dave</span>
+              <div class="author-handle">@dave@photos.social</div>
+            </div>
+          </div>
+          <time class="status-time">4h ago</time>
+        </header>
+        <div class="status-content">
+          <p>Morning light through the fog ✨ Shot on Leica M6 with Portra 400.</p>
+          <div class="status-media">
+            <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300'%3E%3Cdefs%3E%3ClinearGradient id='g1' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%23fce7f3'/%3E%3Cstop offset='100%25' style='stop-color:%23ddd6fe'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect fill='url(%23g1)' width='400' height='300'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%239333ea' font-family='sans-serif' font-weight='500'%3EImage 1%3C/text%3E%3C/svg%3E" alt="Photo 1">
+            <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300'%3E%3Cdefs%3E%3ClinearGradient id='g2' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%23dbeafe'/%3E%3Cstop offset='100%25' style='stop-color:%23d1fae5'/%3E%3C/linearGradient%3E%3E%3C/defs%3E%3Crect fill='url(%23g2)' width='400' height='300'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%230891b2' font-family='sans-serif' font-weight='500'%3EImage 2%3C/text%3E%3C/svg%3E" alt="Photo 2">
+          </div>
+        </div>
+        <div class="status-actions">
+          <button class="action-btn"><span class="action-icon">💬</span> Reply</button>
+          <button class="action-btn"><span class="action-icon">🔄</span> 28</button>
+          <button class="action-btn liked"><span class="action-icon">❤️</span> 142</button>
+          <button class="action-btn"><span class="action-icon">🔖</span></button>
+        </div>
+      </article>
+    </main>
+
+    <!-- ASIDE -->
+    <aside class="aside">
+      <div class="aside-card glass">
+        <h3 class="aside-title">Trending</h3>
+        <div class="trending-item">
+          <a href="#" class="trending-tag">#rust</a>
+          <span class="trending-count">1,234</span>
+        </div>
+        <div class="trending-item">
+          <a href="#" class="trending-tag">#photography</a>
+          <span class="trending-count">892</span>
+        </div>
+        <div class="trending-item">
+          <a href="#" class="trending-tag">#books</a>
+          <span class="trending-count">567</span>
+        </div>
+        <div class="trending-item">
+          <a href="#" class="trending-tag">#opensource</a>
+          <span class="trending-count">445</span>
+        </div>
+      </div>
+
+      <div class="aside-card glass">
+        <h3 class="aside-title">Who to Follow</h3>
+        <div class="suggested-user">
+          <div class="suggested-avatar avatar-gradient-4">E</div>
+          <div class="suggested-info">
+            <div class="suggested-name">Eve</div>
+            <div class="suggested-handle">@eve@tech.zone</div>
+          </div>
+          <button class="follow-btn">Follow</button>
+        </div>
+        <div class="suggested-user">
+          <div class="suggested-avatar avatar-gradient-2">F</div>
+          <div class="suggested-info">
+            <div class="suggested-name">Frank</div>
+            <div class="suggested-handle">@frank@dev.social</div>
+          </div>
+          <button class="follow-btn">Follow</button>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <button class="theme-toggle" onclick="toggleTheme()">◐</button>
+
+  <!-- ============================================== -->
+  <!-- THREAD VIEW -->
+  <!-- ============================================== -->
+
+  <div style="height: 100px; margin: 80px 0; background: linear-gradient(90deg, transparent, rgba(139, 92, 246, 0.3), transparent);"></div>
+
+  <div class="page-indicator" style="position: relative; top: 0; transform: none; display: block; width: fit-content; margin: 0 auto 40px;">Thread View</div>
+
+  <div class="container">
+    <!-- SIDEBAR -->
+    <aside class="sidebar glass" style="position: relative; height: auto;">
+      <div class="logo">
+        <div class="logo-icon">P</div>
+        <span class="logo-text">Pleroma</span>
+      </div>
+      <nav class="nav-section">
+        <a href="#" class="nav-link">
+          <span class="nav-icon">🏠</span>
+          Timeline
+        </a>
+        <a href="#" class="nav-link">
+          <span class="nav-icon">🔔</span>
+          Notifications
+        </a>
+        <a href="#" class="nav-link">
+          <span class="nav-icon">💬</span>
+          Messages
+        </a>
+      </nav>
+    </aside>
+
+    <!-- THREAD CONTENT -->
+    <main class="main">
+      <header class="page-header glass">
+        <h1 class="page-title">← Thread</h1>
+        <span style="color: var(--text-muted); font-size: 14px;">3 replies</span>
+      </header>
+
+      <!-- Ancestor -->
+      <article class="status-card glass thread-ancestor">
+        <header class="status-header">
+          <div class="status-author">
+            <div class="avatar avatar-gradient-2">A</div>
+            <div>
+              <span class="author-name">Alice</span>
+              <div class="author-handle">@alice@example.com</div>
+            </div>
+          </div>
+          <time class="status-time">5h ago</time>
+        </header>
+        <div class="status-content">
+          <p>Hot take: Most "best practices" in software development are just cargo culting. 🛬</p>
+        </div>
+        <div class="status-actions">
+          <button class="action-btn"><span class="action-icon">💬</span> 5</button>
+          <button class="action-btn"><span class="action-icon">🔄</span> 8</button>
+          <button class="action-btn"><span class="action-icon">❤️</span> 34</button>
+        </div>
+      </article>
+
+      <div class="thread-connector"></div>
+
+      <!-- Main post -->
+      <article class="status-card glass thread-main">
+        <header class="status-header">
+          <div class="status-author">
+            <div class="avatar avatar-gradient-1">B</div>
+            <div>
+              <span class="author-name">Bob Smith</span>
+              <div class="author-handle">@bob@remote.server</div>
+            </div>
+          </div>
+          <time class="status-time">4h ago</time>
+        </header>
+        <div class="status-content">
+          <p><a href="#">@alice</a> I'd push back on this. Best practices emerge from collective experience. The problem isn't the practices themselves—it's applying them without understanding the underlying reasoning.</p>
+          <p>TDD isn't cargo cult. Neither is code review. But blindly following them without adapting to context? That's the real issue. 🎯</p>
+        </div>
+        <div class="status-actions">
+          <button class="action-btn"><span class="action-icon">💬</span> Reply</button>
+          <button class="action-btn reposted"><span class="action-icon">🔄</span> 12</button>
+          <button class="action-btn liked"><span class="action-icon">❤️</span> 47</button>
+          <button class="action-btn"><span class="action-icon">🔖</span></button>
+        </div>
+      </article>
+
+      <div class="thread-connector"></div>
+
+      <!-- Reply 1 -->
+      <article class="status-card glass thread-reply">
+        <header class="status-header">
+          <div class="status-author">
+            <div class="avatar avatar-gradient-3">C</div>
+            <div>
+              <span class="author-name">Carol</span>
+              <div class="author-handle">@carol@local</div>
+            </div>
+          </div>
+          <time class="status-time">3h ago</time>
+        </header>
+        <div class="status-content">
+          <p><a href="#">@bob</a> <a href="#">@alice</a> This is the nuance that's often missing. Context matters. A startup with 2 devs has different needs than a 500-person enterprise. 💡</p>
+        </div>
+        <div class="status-actions">
+          <button class="action-btn"><span class="action-icon">💬</span> Reply</button>
+          <button class="action-btn"><span class="action-icon">🔄</span> 2</button>
+          <button class="action-btn"><span class="action-icon">❤️</span> 15</button>
+        </div>
+      </article>
+
+      <!-- Reply 2 nested -->
+      <article class="status-card glass thread-reply" style="margin-left: 60px;">
+        <header class="status-header">
+          <div class="status-author">
+            <div class="avatar avatar-gradient-2">A</div>
+            <div>
+              <span class="author-name">Alice</span>
+              <div class="author-handle">@alice@example.com</div>
+            </div>
+          </div>
+          <time class="status-time">2h ago</time>
+        </header>
+        <div class="status-content">
+          <p><a href="#">@carol</a> <a href="#">@bob</a> Fair points both. I should have been more specific—I meant practices applied without thought. ✨</p>
+        </div>
+        <div class="status-actions">
+          <button class="action-btn"><span class="action-icon">💬</span> Reply</button>
+          <button class="action-btn"><span class="action-icon">🔄</span> 1</button>
+          <button class="action-btn"><span class="action-icon">❤️</span> 8</button>
+        </div>
+      </article>
+
+      <!-- Reply composer -->
+      <div class="composer glass" style="margin-left: 30px; margin-top: 16px;">
+        <div class="composer-header">
+          <div class="composer-avatar">A</div>
+          <div class="composer-input">
+            <textarea class="composer-textarea" placeholder="Add to the conversation..."></textarea>
+          </div>
+        </div>
+        <div class="composer-actions">
+          <div class="composer-tools">
+            <button class="tool-btn">🖼️</button>
+            <button class="tool-btn">😊</button>
+          </div>
+          <button class="btn-gradient">Reply</button>
+        </div>
+      </div>
+    </main>
+
+    <!-- ASIDE -->
+    <aside class="aside" style="position: relative;">
+      <div class="aside-card glass">
+        <h3 class="aside-title">Participants</h3>
+        <div class="suggested-user">
+          <div class="suggested-avatar avatar-gradient-2">A</div>
+          <div class="suggested-info">
+            <div class="suggested-name">Alice</div>
+            <div class="suggested-handle">OP • 2 posts</div>
+          </div>
+        </div>
+        <div class="suggested-user">
+          <div class="suggested-avatar avatar-gradient-1">B</div>
+          <div class="suggested-info">
+            <div class="suggested-name">Bob</div>
+            <div class="suggested-handle">1 post</div>
+          </div>
+        </div>
+        <div class="suggested-user">
+          <div class="suggested-avatar avatar-gradient-3">C</div>
+          <div class="suggested-info">
+            <div class="suggested-name">Carol</div>
+            <div class="suggested-handle">1 post</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    function toggleTheme() {
+      document.body.dataset.theme = document.body.dataset.theme === 'dark' ? '' : 'dark';
+    }
+  </script>
+</body>
+</html>

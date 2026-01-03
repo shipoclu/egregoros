@@ -1,0 +1,1384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mockup 8: Corporate Enterprise - Pleroma Redux</title>
+  <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --corp-red: #c74634;
+      --corp-red-dark: #a03020;
+      --corp-red-light: #f5e6e4;
+      --corp-black: #1a1a1a;
+      --corp-gray-900: #2d2d2d;
+      --corp-gray-800: #3d3d3d;
+      --corp-gray-700: #4d4d4d;
+      --corp-gray-600: #5d5d5d;
+      --corp-gray-500: #7d7d7d;
+      --corp-gray-400: #9d9d9d;
+      --corp-gray-300: #bdbdbd;
+      --corp-gray-200: #e0e0e0;
+      --corp-gray-100: #f0f0f0;
+      --corp-white: #ffffff;
+      --corp-blue: #0066cc;
+      --corp-green: #2e7d32;
+      --corp-orange: #ed6c02;
+      --header-gradient: linear-gradient(180deg, #4d4d4d 0%, #2d2d2d 100%);
+      --panel-gradient: linear-gradient(180deg, #f8f8f8 0%, #e8e8e8 100%);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Source Sans 3', 'Segoe UI', Tahoma, sans-serif;
+      font-size: 13px;
+      background: var(--corp-gray-200);
+      color: var(--corp-black);
+      line-height: 1.4;
+    }
+
+    /* GLOBAL HEADER */
+    .global-header {
+      background: var(--header-gradient);
+      color: var(--corp-white);
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      height: 48px;
+      border-bottom: 3px solid var(--corp-red);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-logo {
+      width: 32px;
+      height: 32px;
+      background: var(--corp-red);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 18px;
+    }
+
+    .brand-name {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+
+    .brand-suite {
+      font-size: 11px;
+      color: var(--corp-gray-400);
+      margin-left: 8px;
+    }
+
+    .global-nav {
+      display: flex;
+      margin-left: 40px;
+      height: 100%;
+    }
+
+    .global-nav-item {
+      padding: 0 16px;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      color: var(--corp-gray-300);
+      text-decoration: none;
+      font-size: 13px;
+      border-bottom: 3px solid transparent;
+      margin-bottom: -3px;
+      transition: all 0.15s;
+    }
+
+    .global-nav-item:hover {
+      color: var(--corp-white);
+      background: rgba(255,255,255,0.05);
+    }
+
+    .global-nav-item.active {
+      color: var(--corp-white);
+      border-bottom-color: var(--corp-red);
+      background: rgba(255,255,255,0.1);
+    }
+
+    .global-actions {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .notification-badge {
+      position: relative;
+    }
+
+    .notification-badge::after {
+      content: '3';
+      position: absolute;
+      top: -6px;
+      right: -6px;
+      background: var(--corp-red);
+      color: white;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 1px 5px;
+      border-radius: 10px;
+    }
+
+    .user-menu {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .user-avatar {
+      width: 28px;
+      height: 28px;
+      background: var(--corp-red);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 12px;
+    }
+
+    .user-name {
+      font-size: 12px;
+    }
+
+    /* PAGE HEADER */
+    .page-header {
+      background: var(--corp-white);
+      border-bottom: 1px solid var(--corp-gray-300);
+      padding: 16px 24px;
+    }
+
+    .breadcrumb {
+      display: flex;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--corp-gray-500);
+      margin-bottom: 8px;
+    }
+
+    .breadcrumb a {
+      color: var(--corp-blue);
+      text-decoration: none;
+    }
+
+    .breadcrumb a:hover {
+      text-decoration: underline;
+    }
+
+    .page-title-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .page-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--corp-gray-900);
+    }
+
+    .page-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    /* BUTTONS */
+    .btn {
+      padding: 8px 16px;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: 4px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s;
+    }
+
+    .btn-primary {
+      background: var(--corp-red);
+      color: var(--corp-white);
+      border: 1px solid var(--corp-red-dark);
+    }
+
+    .btn-primary:hover {
+      background: var(--corp-red-dark);
+    }
+
+    .btn-secondary {
+      background: var(--corp-white);
+      color: var(--corp-gray-700);
+      border: 1px solid var(--corp-gray-300);
+    }
+
+    .btn-secondary:hover {
+      background: var(--corp-gray-100);
+      border-color: var(--corp-gray-400);
+    }
+
+    .btn-link {
+      background: transparent;
+      color: var(--corp-blue);
+      border: none;
+      padding: 8px 12px;
+    }
+
+    .btn-link:hover {
+      text-decoration: underline;
+    }
+
+    /* MAIN LAYOUT */
+    .main-container {
+      display: grid;
+      grid-template-columns: 220px 1fr 280px;
+      gap: 1px;
+      background: var(--corp-gray-300);
+      min-height: calc(100vh - 48px);
+    }
+
+    /* SIDEBAR */
+    .sidebar {
+      background: var(--corp-white);
+      padding: 16px 0;
+    }
+
+    .sidebar-section {
+      margin-bottom: 20px;
+    }
+
+    .sidebar-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--corp-gray-500);
+      padding: 0 16px 8px;
+      border-bottom: 1px solid var(--corp-gray-200);
+      margin-bottom: 4px;
+    }
+
+    .sidebar-nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 16px;
+      color: var(--corp-gray-700);
+      text-decoration: none;
+      font-size: 13px;
+      border-left: 3px solid transparent;
+      transition: all 0.15s;
+    }
+
+    .sidebar-nav-item:hover {
+      background: var(--corp-gray-100);
+      color: var(--corp-gray-900);
+    }
+
+    .sidebar-nav-item.active {
+      background: var(--corp-red-light);
+      color: var(--corp-red);
+      border-left-color: var(--corp-red);
+      font-weight: 600;
+    }
+
+    .sidebar-nav-icon {
+      width: 18px;
+      text-align: center;
+    }
+
+    .sidebar-nav-badge {
+      margin-left: auto;
+      background: var(--corp-red);
+      color: white;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 10px;
+    }
+
+    .sidebar-user-card {
+      margin: 16px;
+      padding: 12px;
+      background: var(--corp-gray-100);
+      border-radius: 4px;
+      border: 1px solid var(--corp-gray-200);
+    }
+
+    .sidebar-user-info {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .sidebar-user-avatar {
+      width: 36px;
+      height: 36px;
+      background: var(--corp-red);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 700;
+    }
+
+    .sidebar-user-name {
+      font-weight: 600;
+      font-size: 13px;
+    }
+
+    .sidebar-user-handle {
+      font-size: 11px;
+      color: var(--corp-gray-500);
+    }
+
+    /* MAIN CONTENT */
+    .main-content {
+      background: var(--corp-gray-100);
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* TAB CONTROL */
+    .tab-control {
+      background: var(--corp-white);
+      border-bottom: 1px solid var(--corp-gray-300);
+      display: flex;
+      padding: 0 16px;
+    }
+
+    .tab-item {
+      padding: 12px 20px;
+      font-size: 13px;
+      color: var(--corp-gray-600);
+      text-decoration: none;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      transition: all 0.15s;
+    }
+
+    .tab-item:hover {
+      color: var(--corp-gray-900);
+      background: var(--corp-gray-100);
+    }
+
+    .tab-item.active {
+      color: var(--corp-red);
+      border-bottom-color: var(--corp-red);
+      font-weight: 600;
+    }
+
+    /* COMPOSER PANEL */
+    .composer-panel {
+      background: var(--corp-white);
+      border-bottom: 1px solid var(--corp-gray-300);
+      padding: 16px;
+    }
+
+    .composer-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--corp-gray-700);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .composer-label .required {
+      color: var(--corp-red);
+    }
+
+    .composer-textarea {
+      width: 100%;
+      min-height: 80px;
+      padding: 10px 12px;
+      border: 1px solid var(--corp-gray-300);
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 13px;
+      resize: vertical;
+      transition: border-color 0.15s;
+    }
+
+    .composer-textarea:focus {
+      outline: none;
+      border-color: var(--corp-red);
+      box-shadow: 0 0 0 2px var(--corp-red-light);
+    }
+
+    .composer-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 12px;
+    }
+
+    .composer-tools {
+      display: flex;
+      gap: 4px;
+    }
+
+    .tool-btn {
+      width: 32px;
+      height: 32px;
+      background: var(--corp-white);
+      border: 1px solid var(--corp-gray-300);
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+    }
+
+    .tool-btn:hover {
+      background: var(--corp-gray-100);
+      border-color: var(--corp-gray-400);
+    }
+
+    .char-counter {
+      font-size: 11px;
+      color: var(--corp-gray-500);
+    }
+
+    /* POST LIST */
+    .post-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+    }
+
+    .post-card {
+      background: var(--corp-white);
+      border: 1px solid var(--corp-gray-300);
+      border-radius: 4px;
+      margin-bottom: 12px;
+      transition: box-shadow 0.15s;
+    }
+
+    .post-card:hover {
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .post-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--corp-gray-200);
+      background: var(--corp-gray-100);
+    }
+
+    .post-author {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .post-avatar {
+      width: 40px;
+      height: 40px;
+      background: var(--corp-gray-400);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 700;
+      font-size: 16px;
+    }
+
+    .post-avatar.red { background: var(--corp-red); }
+    .post-avatar.green { background: var(--corp-green); }
+    .post-avatar.blue { background: var(--corp-blue); }
+    .post-avatar.orange { background: var(--corp-orange); }
+
+    .post-name {
+      font-weight: 600;
+      font-size: 14px;
+      color: var(--corp-gray-900);
+    }
+
+    .post-handle {
+      font-size: 12px;
+      color: var(--corp-gray-500);
+    }
+
+    .post-badge {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-weight: 600;
+      margin-left: 8px;
+    }
+
+    .post-badge.local {
+      background: #e8f5e9;
+      color: var(--corp-green);
+    }
+
+    .post-badge.remote {
+      background: var(--corp-gray-200);
+      color: var(--corp-gray-600);
+    }
+
+    .post-meta {
+      text-align: right;
+    }
+
+    .post-time {
+      font-size: 11px;
+      color: var(--corp-gray-500);
+    }
+
+    .post-id {
+      font-size: 10px;
+      color: var(--corp-gray-400);
+      font-family: monospace;
+    }
+
+    .post-body {
+      padding: 16px;
+    }
+
+    .post-content {
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--corp-gray-800);
+    }
+
+    .post-content a {
+      color: var(--corp-blue);
+    }
+
+    .post-content .hashtag {
+      color: var(--corp-red);
+    }
+
+    .post-media {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .post-media img {
+      width: 100%;
+      height: 120px;
+      object-fit: cover;
+      border: 1px solid var(--corp-gray-300);
+      border-radius: 4px;
+    }
+
+    .post-footer {
+      display: flex;
+      gap: 8px;
+      padding: 12px 16px;
+      border-top: 1px solid var(--corp-gray-200);
+      background: var(--corp-gray-100);
+    }
+
+    .post-action {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 6px 12px;
+      background: var(--corp-white);
+      border: 1px solid var(--corp-gray-300);
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 12px;
+      color: var(--corp-gray-600);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .post-action:hover {
+      background: var(--corp-gray-100);
+      border-color: var(--corp-gray-400);
+    }
+
+    .post-action.active {
+      background: var(--corp-red-light);
+      border-color: var(--corp-red);
+      color: var(--corp-red);
+    }
+
+    .post-action.active.green {
+      background: #e8f5e9;
+      border-color: var(--corp-green);
+      color: var(--corp-green);
+    }
+
+    /* CONTENT WARNING */
+    .content-warning {
+      background: #fff8e1;
+      border: 1px solid #ffcc80;
+      border-radius: 4px;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+
+    .cw-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+      color: #e65100;
+      margin-bottom: 4px;
+    }
+
+    .cw-text {
+      font-size: 13px;
+      color: var(--corp-gray-700);
+    }
+
+    .cw-toggle {
+      margin-top: 8px;
+    }
+
+    /* RIGHT PANEL */
+    .right-panel {
+      background: var(--corp-white);
+      padding: 16px;
+      overflow-y: auto;
+    }
+
+    .panel-section {
+      margin-bottom: 24px;
+    }
+
+    .panel-title {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--corp-gray-600);
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--corp-red);
+      margin-bottom: 12px;
+    }
+
+    .data-table {
+      width: 100%;
+      font-size: 12px;
+      border-collapse: collapse;
+    }
+
+    .data-table th {
+      text-align: left;
+      padding: 6px 8px;
+      background: var(--corp-gray-100);
+      border: 1px solid var(--corp-gray-200);
+      font-weight: 600;
+      color: var(--corp-gray-700);
+    }
+
+    .data-table td {
+      padding: 6px 8px;
+      border: 1px solid var(--corp-gray-200);
+    }
+
+    .data-table td a {
+      color: var(--corp-blue);
+      text-decoration: none;
+    }
+
+    .data-table td a:hover {
+      text-decoration: underline;
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+
+    .stat-card {
+      background: var(--corp-gray-100);
+      border: 1px solid var(--corp-gray-200);
+      border-radius: 4px;
+      padding: 12px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--corp-red);
+    }
+
+    .stat-label {
+      font-size: 10px;
+      color: var(--corp-gray-500);
+      text-transform: uppercase;
+    }
+
+    /* STATUS INDICATOR */
+    .status-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .status-dot.online { background: var(--corp-green); }
+    .status-dot.offline { background: var(--corp-gray-400); }
+
+    /* FOOTER */
+    .global-footer {
+      background: var(--corp-gray-900);
+      color: var(--corp-gray-400);
+      padding: 12px 24px;
+      font-size: 11px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .footer-links a {
+      color: var(--corp-gray-400);
+      text-decoration: none;
+      margin-right: 16px;
+    }
+
+    .footer-links a:hover {
+      color: var(--corp-white);
+    }
+
+    /* PAGE INDICATOR */
+    .page-indicator {
+      position: fixed;
+      top: 48px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--corp-red);
+      color: white;
+      padding: 4px 16px;
+      font-size: 11px;
+      font-weight: 600;
+      z-index: 100;
+    }
+
+    /* THREAD STYLES */
+    .post-card.ancestor {
+      opacity: 0.7;
+      border-left: 3px solid var(--corp-gray-400);
+    }
+
+    .post-card.main-post {
+      border-left: 3px solid var(--corp-red);
+      box-shadow: 0 2px 8px rgba(199, 70, 52, 0.2);
+    }
+
+    .post-card.reply {
+      margin-left: 24px;
+      border-left: 2px solid var(--corp-gray-300);
+    }
+
+    .post-card.reply.nested {
+      margin-left: 48px;
+    }
+
+    .thread-connector {
+      width: 24px;
+      height: 20px;
+      border-left: 2px solid var(--corp-gray-300);
+      margin-left: 32px;
+    }
+
+    /* DIVIDER */
+    .section-divider {
+      background: var(--corp-gray-300);
+      padding: 20px;
+      text-align: center;
+      margin: 40px 0;
+    }
+
+    .section-divider-text {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--corp-gray-600);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+  </style>
+</head>
+<body>
+  <!-- GLOBAL HEADER -->
+  <header class="global-header">
+    <div class="brand">
+      <div class="brand-logo">P</div>
+      <span class="brand-name">PLEROMA</span>
+      <span class="brand-suite">Enterprise Social Platform</span>
+    </div>
+    <nav class="global-nav">
+      <a href="#" class="global-nav-item active">Home</a>
+      <a href="#" class="global-nav-item">Local</a>
+      <a href="#" class="global-nav-item">Federated</a>
+      <a href="#" class="global-nav-item">Search</a>
+      <a href="#" class="global-nav-item">Reports</a>
+    </nav>
+    <div class="global-actions">
+      <span class="notification-badge" style="cursor: pointer;">🔔</span>
+      <span style="cursor: pointer;">✉️</span>
+      <div class="user-menu">
+        <div class="user-avatar">A</div>
+        <span class="user-name">Alice</span>
+        <span>▼</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="page-indicator">Timeline View</div>
+
+  <div class="main-container">
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="sidebar-section">
+        <div class="sidebar-title">Navigation</div>
+        <a href="#" class="sidebar-nav-item active">
+          <span class="sidebar-nav-icon">📥</span>
+          Home Timeline
+        </a>
+        <a href="#" class="sidebar-nav-item">
+          <span class="sidebar-nav-icon">🏢</span>
+          Local Feed
+        </a>
+        <a href="#" class="sidebar-nav-item">
+          <span class="sidebar-nav-icon">🌐</span>
+          Federated Feed
+        </a>
+        <a href="#" class="sidebar-nav-item">
+          <span class="sidebar-nav-icon">🔔</span>
+          Notifications
+          <span class="sidebar-nav-badge">3</span>
+        </a>
+        <a href="#" class="sidebar-nav-item">
+          <span class="sidebar-nav-icon">✉️</span>
+          Direct Messages
+        </a>
+        <a href="#" class="sidebar-nav-item">
+          <span class="sidebar-nav-icon">📑</span>
+          Saved Posts
+        </a>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-title">Management</div>
+        <a href="#" class="sidebar-nav-item">
+          <span class="sidebar-nav-icon">👤</span>
+          My Profile
+        </a>
+        <a href="#" class="sidebar-nav-item">
+          <span class="sidebar-nav-icon">📊</span>
+          Analytics
+        </a>
+        <a href="#" class="sidebar-nav-item">
+          <span class="sidebar-nav-icon">⚙️</span>
+          Settings
+        </a>
+      </div>
+
+      <div class="sidebar-user-card">
+        <div class="sidebar-user-info">
+          <div class="sidebar-user-avatar">A</div>
+          <div>
+            <div class="sidebar-user-name">Alice</div>
+            <div class="sidebar-user-handle">@alice@example.com</div>
+          </div>
+        </div>
+        <div style="margin-top: 8px;">
+          <span class="status-indicator">
+            <span class="status-dot online"></span>
+            Online
+          </span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+      <div class="tab-control">
+        <a href="#" class="tab-item active">All Posts</a>
+        <a href="#" class="tab-item">Media Only</a>
+        <a href="#" class="tab-item">Links</a>
+        <a href="#" class="tab-item">Polls</a>
+      </div>
+
+      <div class="composer-panel">
+        <div class="composer-label">
+          New Post <span class="required">*</span>
+        </div>
+        <textarea class="composer-textarea" placeholder="Enter your post content..."></textarea>
+        <div class="composer-toolbar">
+          <div class="composer-tools">
+            <button class="tool-btn" title="Attach Image">🖼️</button>
+            <button class="tool-btn" title="Attach Video">🎬</button>
+            <button class="tool-btn" title="Create Poll">📊</button>
+            <button class="tool-btn" title="Add Warning">⚠️</button>
+            <button class="tool-btn" title="Insert Emoji">😊</button>
+            <button class="tool-btn" title="Visibility">🔒</button>
+          </div>
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <span class="char-counter">0 / 500</span>
+            <button class="btn btn-secondary">Save Draft</button>
+            <button class="btn btn-primary">Submit Post</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="post-list">
+        <!-- Post 1 -->
+        <article class="post-card">
+          <div class="post-header">
+            <div class="post-author">
+              <div class="post-avatar red">B</div>
+              <div>
+                <span class="post-name">Bob Smith</span>
+                <span class="post-badge remote">REMOTE</span>
+                <div class="post-handle">@bob@remote.server</div>
+              </div>
+            </div>
+            <div class="post-meta">
+              <div class="post-time">Jan 15, 2024 2:32 PM</div>
+              <div class="post-id">ID: 1847293847</div>
+            </div>
+          </div>
+          <div class="post-body">
+            <div class="post-content">
+              Just finished reading "Gödel, Escher, Bach" for the third time. Each reading reveals new layers I completely missed before.<br><br>
+              The way Hofstadter weaves together music, art, and mathematics to explore consciousness is unparalleled. <span class="hashtag">#books</span> <span class="hashtag">#philosophy</span>
+            </div>
+          </div>
+          <div class="post-footer">
+            <button class="post-action">💬 Reply</button>
+            <button class="post-action active green">🔄 12</button>
+            <button class="post-action active">❤️ 47</button>
+            <button class="post-action">📑 Save</button>
+            <button class="post-action">⋯ More</button>
+          </div>
+        </article>
+
+        <!-- Post 2 with CW -->
+        <article class="post-card">
+          <div class="post-header">
+            <div class="post-author">
+              <div class="post-avatar green">C</div>
+              <div>
+                <span class="post-name">Carol</span>
+                <span class="post-badge local">LOCAL</span>
+                <div class="post-handle">@carol@local</div>
+              </div>
+            </div>
+            <div class="post-meta">
+              <div class="post-time">Jan 15, 2024 2:28 PM</div>
+              <div class="post-id">ID: 1847293846</div>
+            </div>
+          </div>
+          <div class="post-body">
+            <div class="content-warning">
+              <div class="cw-header">⚠️ Content Warning</div>
+              <div class="cw-text">Discussion of current events</div>
+              <button class="btn btn-secondary cw-toggle" style="padding: 4px 12px; font-size: 11px;">Show Content</button>
+            </div>
+          </div>
+          <div class="post-footer">
+            <button class="post-action">💬 Reply</button>
+            <button class="post-action">🔄 3</button>
+            <button class="post-action">❤️ 8</button>
+          </div>
+        </article>
+
+        <!-- Post 3 with media -->
+        <article class="post-card">
+          <div class="post-header">
+            <div class="post-author">
+              <div class="post-avatar orange">D</div>
+              <div>
+                <span class="post-name">Dave</span>
+                <span class="post-badge remote">REMOTE</span>
+                <div class="post-handle">@dave@photos.social</div>
+              </div>
+            </div>
+            <div class="post-meta">
+              <div class="post-time">Jan 15, 2024 2:15 PM</div>
+              <div class="post-id">ID: 1847293845</div>
+            </div>
+          </div>
+          <div class="post-body">
+            <div class="post-content">
+              Morning light through the fog. Shot on Leica M6 with Portra 400.
+            </div>
+            <div class="post-media">
+              <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='200'%3E%3Crect fill='%23e0e0e0' width='300' height='200'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%237d7d7d' font-family='sans-serif' font-size='12'%3EIMG_001.JPG%3C/text%3E%3C/svg%3E" alt="Photo 1">
+              <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='200'%3E%3Crect fill='%23e0e0e0' width='300' height='200'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%237d7d7d' font-family='sans-serif' font-size='12'%3EIMG_002.JPG%3C/text%3E%3C/svg%3E" alt="Photo 2">
+            </div>
+          </div>
+          <div class="post-footer">
+            <button class="post-action">💬 Reply</button>
+            <button class="post-action">🔄 28</button>
+            <button class="post-action active">❤️ 142</button>
+            <button class="post-action">📑 Save</button>
+          </div>
+        </article>
+
+        <!-- Post 4 -->
+        <article class="post-card">
+          <div class="post-header">
+            <div class="post-author">
+              <div class="post-avatar blue">E</div>
+              <div>
+                <span class="post-name">Eve</span>
+                <span class="post-badge remote">REMOTE</span>
+                <div class="post-handle">@eve@tech.zone</div>
+              </div>
+            </div>
+            <div class="post-meta">
+              <div class="post-time">Jan 15, 2024 1:55 PM</div>
+              <div class="post-id">ID: 1847293844</div>
+            </div>
+          </div>
+          <div class="post-body">
+            <div class="post-content">
+              TIL: The original UNIX philosophy of "do one thing well" came from Ken Thompson's frustration with over-engineered systems at Bell Labs. Simple tools, powerful combinations.
+            </div>
+          </div>
+          <div class="post-footer">
+            <button class="post-action">💬 Reply</button>
+            <button class="post-action">🔄 5</button>
+            <button class="post-action">❤️ 23</button>
+          </div>
+        </article>
+      </div>
+    </main>
+
+    <!-- RIGHT PANEL -->
+    <aside class="right-panel">
+      <div class="panel-section">
+        <div class="panel-title">Trending Topics</div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Topic</th>
+              <th>Posts</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><a href="#">#rust</a></td>
+              <td>1,234</td>
+            </tr>
+            <tr>
+              <td><a href="#">#photography</a></td>
+              <td>892</td>
+            </tr>
+            <tr>
+              <td><a href="#">#books</a></td>
+              <td>567</td>
+            </tr>
+            <tr>
+              <td><a href="#">#opensource</a></td>
+              <td>445</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="panel-section">
+        <div class="panel-title">Instance Statistics</div>
+        <div class="stat-grid">
+          <div class="stat-card">
+            <div class="stat-value">1,234</div>
+            <div class="stat-label">Users</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">45.6K</div>
+            <div class="stat-label">Posts</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">99.9%</div>
+            <div class="stat-label">Uptime</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">2.6.0</div>
+            <div class="stat-label">Version</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel-section">
+        <div class="panel-title">System Status</div>
+        <table class="data-table">
+          <tbody>
+            <tr>
+              <td>Database</td>
+              <td><span class="status-indicator"><span class="status-dot online"></span> Online</span></td>
+            </tr>
+            <tr>
+              <td>Federation</td>
+              <td><span class="status-indicator"><span class="status-dot online"></span> Active</span></td>
+            </tr>
+            <tr>
+              <td>Media Storage</td>
+              <td><span class="status-indicator"><span class="status-dot online"></span> 72% Used</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </aside>
+  </div>
+
+  <!-- ============================================== -->
+  <!-- THREAD VIEW -->
+  <!-- ============================================== -->
+
+  <div class="section-divider">
+    <span class="section-divider-text">Thread View</span>
+  </div>
+
+  <div class="page-indicator" style="position: relative; top: 0; left: 0; transform: none; display: block; width: fit-content; margin: 0 auto 16px;">Thread View</div>
+
+  <div class="main-container" style="min-height: auto;">
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="sidebar-section">
+        <div class="sidebar-title">Navigation</div>
+        <a href="#" class="sidebar-nav-item">
+          <span class="sidebar-nav-icon">←</span>
+          Back to Timeline
+        </a>
+        <a href="#" class="sidebar-nav-item">
+          <span class="sidebar-nav-icon">🔔</span>
+          Notifications
+          <span class="sidebar-nav-badge">3</span>
+        </a>
+      </div>
+    </aside>
+
+    <!-- THREAD CONTENT -->
+    <main class="main-content">
+      <div class="tab-control">
+        <a href="#" class="tab-item active">Thread View</a>
+        <a href="#" class="tab-item">Flat View</a>
+      </div>
+
+      <div class="post-list">
+        <!-- Ancestor -->
+        <article class="post-card ancestor">
+          <div class="post-header">
+            <div class="post-author">
+              <div class="post-avatar orange">A</div>
+              <div>
+                <span class="post-name">Alice</span>
+                <span class="post-badge local">LOCAL</span>
+                <div class="post-handle">@alice@example.com</div>
+              </div>
+            </div>
+            <div class="post-meta">
+              <div class="post-time">Jan 15, 2024 12:00 PM</div>
+            </div>
+          </div>
+          <div class="post-body">
+            <div class="post-content">
+              Hot take: Most "best practices" in software development are just cargo culting.
+            </div>
+          </div>
+          <div class="post-footer">
+            <button class="post-action">💬 5</button>
+            <button class="post-action">🔄 8</button>
+            <button class="post-action">❤️ 34</button>
+          </div>
+        </article>
+
+        <div class="thread-connector"></div>
+
+        <!-- Main -->
+        <article class="post-card main-post">
+          <div class="post-header">
+            <div class="post-author">
+              <div class="post-avatar red">B</div>
+              <div>
+                <span class="post-name">Bob Smith</span>
+                <span class="post-badge remote">REMOTE</span>
+                <div class="post-handle">@bob@remote.server</div>
+              </div>
+            </div>
+            <div class="post-meta">
+              <div class="post-time">Jan 15, 2024 12:15 PM</div>
+            </div>
+          </div>
+          <div class="post-body">
+            <div class="post-content">
+              <a href="#">@alice</a> I'd push back on this. Best practices emerge from collective experience. The problem isn't the practices themselves—it's applying them without understanding the underlying reasoning.<br><br>
+              TDD isn't cargo cult. Neither is code review. But blindly following them without adapting to context? That's the real issue.
+            </div>
+          </div>
+          <div class="post-footer">
+            <button class="post-action">💬 Reply</button>
+            <button class="post-action active green">🔄 12</button>
+            <button class="post-action active">❤️ 47</button>
+            <button class="post-action">📑 Save</button>
+          </div>
+        </article>
+
+        <div class="thread-connector"></div>
+
+        <!-- Reply 1 -->
+        <article class="post-card reply">
+          <div class="post-header">
+            <div class="post-author">
+              <div class="post-avatar green">C</div>
+              <div>
+                <span class="post-name">Carol</span>
+                <span class="post-badge local">LOCAL</span>
+                <div class="post-handle">@carol@local</div>
+              </div>
+            </div>
+            <div class="post-meta">
+              <div class="post-time">Jan 15, 2024 12:22 PM</div>
+            </div>
+          </div>
+          <div class="post-body">
+            <div class="post-content">
+              <a href="#">@bob</a> <a href="#">@alice</a> This is the nuance that's often missing. Context matters. A startup with 2 devs has different needs than a 500-person enterprise.
+            </div>
+          </div>
+          <div class="post-footer">
+            <button class="post-action">💬 Reply</button>
+            <button class="post-action">🔄 2</button>
+            <button class="post-action">❤️ 15</button>
+          </div>
+        </article>
+
+        <!-- Reply 2 nested -->
+        <article class="post-card reply nested">
+          <div class="post-header">
+            <div class="post-author">
+              <div class="post-avatar orange">A</div>
+              <div>
+                <span class="post-name">Alice</span>
+                <span class="post-badge local">LOCAL</span>
+                <div class="post-handle">@alice@example.com</div>
+              </div>
+            </div>
+            <div class="post-meta">
+              <div class="post-time">Jan 15, 2024 12:30 PM</div>
+            </div>
+          </div>
+          <div class="post-body">
+            <div class="post-content">
+              <a href="#">@carol</a> <a href="#">@bob</a> Fair points both. I should have been more specific. I meant the practices that get applied without any thought—like "always use microservices" or "never use global state."
+            </div>
+          </div>
+          <div class="post-footer">
+            <button class="post-action">💬 Reply</button>
+            <button class="post-action">🔄 1</button>
+            <button class="post-action">❤️ 8</button>
+          </div>
+        </article>
+
+        <!-- Reply composer -->
+        <div class="composer-panel" style="margin-left: 24px; margin-top: 12px; border: 1px solid var(--corp-gray-300); border-radius: 4px;">
+          <div class="composer-label">Reply to Thread</div>
+          <textarea class="composer-textarea" placeholder="Enter your reply..." style="min-height: 60px;"></textarea>
+          <div class="composer-toolbar">
+            <div class="composer-tools">
+              <button class="tool-btn">🖼️</button>
+              <button class="tool-btn">😊</button>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn btn-secondary">Cancel</button>
+              <button class="btn btn-primary">Submit Reply</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- RIGHT PANEL -->
+    <aside class="right-panel">
+      <div class="panel-section">
+        <div class="panel-title">Thread Participants</div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>User</th>
+              <th>Posts</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><a href="#">@alice</a></td>
+              <td>2 (OP)</td>
+            </tr>
+            <tr>
+              <td><a href="#">@bob</a></td>
+              <td>1</td>
+            </tr>
+            <tr>
+              <td><a href="#">@carol</a></td>
+              <td>1</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="panel-section">
+        <div class="panel-title">Thread Statistics</div>
+        <div class="stat-grid">
+          <div class="stat-card">
+            <div class="stat-value">4</div>
+            <div class="stat-label">Posts</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">3</div>
+            <div class="stat-label">Participants</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <footer class="global-footer">
+    <div class="footer-links">
+      <a href="#">Terms of Service</a>
+      <a href="#">Privacy Policy</a>
+      <a href="#">API Documentation</a>
+      <a href="#">Support</a>
+    </div>
+    <div>
+      © 2024 Pleroma Enterprise Platform. All rights reserved.
+    </div>
+  </footer>
+</body>
+</html>

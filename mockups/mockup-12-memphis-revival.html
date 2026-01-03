@@ -1,0 +1,1323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pleroma - Memphis Revival Design</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --cream: #faf7f2;
+            --black: #1a1a1a;
+            --coral: #ff6b5b;
+            --mint: #7dd3c0;
+            --lavender: #b8a9e8;
+            --mustard: #f4d35e;
+            --terracotta: #d4775c;
+            --blue: #5b8def;
+            --pink: #ffb4c1;
+            --gray: #8a8a8a;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Syne', sans-serif;
+            background: var(--cream);
+            color: var(--black);
+            line-height: 1.5;
+            font-size: 15px;
+            overflow-x: hidden;
+        }
+
+        /* === GEOMETRIC DECORATIONS === */
+        .geo-circle {
+            position: absolute;
+            border-radius: 50%;
+            pointer-events: none;
+        }
+
+        .geo-triangle {
+            position: absolute;
+            width: 0;
+            height: 0;
+            pointer-events: none;
+        }
+
+        .geo-squiggle {
+            position: absolute;
+            pointer-events: none;
+        }
+
+        /* === HEADER === */
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 70px;
+            background: var(--black);
+            color: var(--cream);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 32px;
+            z-index: 1000;
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .logo-dot {
+            width: 12px;
+            height: 12px;
+            background: var(--coral);
+            border-radius: 50%;
+        }
+
+        .logo-tri {
+            width: 0;
+            height: 0;
+            border-left: 8px solid transparent;
+            border-right: 8px solid transparent;
+            border-bottom: 14px solid var(--mint);
+        }
+
+        .header-nav {
+            display: flex;
+            gap: 8px;
+        }
+
+        .nav-pill {
+            padding: 8px 20px;
+            border-radius: 50px;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.2s;
+            color: var(--cream);
+            border: 2px solid transparent;
+        }
+
+        .nav-pill:hover {
+            border-color: var(--cream);
+        }
+
+        .nav-pill.active {
+            background: var(--coral);
+            color: var(--black);
+        }
+
+        .user-area {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, var(--lavender) 0%, var(--pink) 100%);
+            border-radius: 50%;
+            border: 3px solid var(--cream);
+        }
+
+        /* === MAIN LAYOUT === */
+        .main-container {
+            margin-top: 70px;
+            display: grid;
+            grid-template-columns: 260px 1fr 300px;
+            min-height: calc(100vh - 70px);
+        }
+
+        /* === LEFT SIDEBAR === */
+        .sidebar-left {
+            padding: 24px;
+            position: sticky;
+            top: 70px;
+            height: calc(100vh - 70px);
+            overflow-y: auto;
+            background: var(--cream);
+            border-right: 3px solid var(--black);
+        }
+
+        .sidebar-section {
+            margin-bottom: 32px;
+        }
+
+        .sidebar-title {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            color: var(--gray);
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .sidebar-title::after {
+            content: '';
+            flex: 1;
+            height: 2px;
+            background: repeating-linear-gradient(
+                90deg,
+                var(--gray) 0px,
+                var(--gray) 4px,
+                transparent 4px,
+                transparent 8px
+            );
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            color: var(--black);
+            text-decoration: none;
+            font-size: 15px;
+            font-weight: 500;
+            border-radius: 12px;
+            margin-bottom: 4px;
+            transition: all 0.15s;
+            position: relative;
+        }
+
+        .nav-item:hover {
+            background: var(--mustard);
+        }
+
+        .nav-item.active {
+            background: var(--black);
+            color: var(--cream);
+        }
+
+        .nav-icon {
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+
+        .nav-badge {
+            margin-left: auto;
+            background: var(--coral);
+            color: var(--black);
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 50px;
+        }
+
+        .compose-btn {
+            width: 100%;
+            background: var(--coral);
+            color: var(--black);
+            border: 3px solid var(--black);
+            padding: 16px 24px;
+            font-family: inherit;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            border-radius: 16px;
+            transition: all 0.15s;
+            position: relative;
+            top: 0;
+            box-shadow: 4px 4px 0 var(--black);
+        }
+
+        .compose-btn:hover {
+            top: 2px;
+            box-shadow: 2px 2px 0 var(--black);
+        }
+
+        .compose-btn:active {
+            top: 4px;
+            box-shadow: none;
+        }
+
+        /* === MAIN CONTENT === */
+        .main-content {
+            background: var(--cream);
+            border-right: 3px solid var(--black);
+            position: relative;
+        }
+
+        .content-header {
+            padding: 24px 32px;
+            border-bottom: 3px solid var(--black);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .content-header::before {
+            content: '';
+            position: absolute;
+            right: -20px;
+            top: -20px;
+            width: 100px;
+            height: 100px;
+            background: var(--mustard);
+            border-radius: 50%;
+            opacity: 0.5;
+        }
+
+        .content-title {
+            font-size: 32px;
+            font-weight: 800;
+            position: relative;
+        }
+
+        .content-title::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            left: 0;
+            width: 60%;
+            height: 4px;
+            background: var(--coral);
+        }
+
+        .filter-pills {
+            display: flex;
+            gap: 8px;
+        }
+
+        .filter-pill {
+            padding: 6px 16px;
+            border: 2px solid var(--black);
+            border-radius: 50px;
+            font-size: 12px;
+            font-weight: 600;
+            background: var(--cream);
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .filter-pill:hover {
+            background: var(--mint);
+        }
+
+        .filter-pill.active {
+            background: var(--black);
+            color: var(--cream);
+        }
+
+        /* === COMPOSER === */
+        .composer {
+            padding: 24px 32px;
+            border-bottom: 3px solid var(--black);
+            background: var(--lavender);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .composer::before {
+            content: '';
+            position: absolute;
+            left: 20px;
+            bottom: -30px;
+            width: 80px;
+            height: 80px;
+            border: 4px solid var(--black);
+            border-radius: 50%;
+            opacity: 0.3;
+        }
+
+        .composer-inner {
+            display: flex;
+            gap: 16px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .composer-avatar {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, var(--coral) 0%, var(--mustard) 100%);
+            border-radius: 50%;
+            border: 3px solid var(--black);
+            flex-shrink: 0;
+        }
+
+        .composer-body {
+            flex: 1;
+        }
+
+        .composer-input {
+            width: 100%;
+            min-height: 80px;
+            padding: 16px;
+            border: 3px solid var(--black);
+            border-radius: 16px;
+            background: var(--cream);
+            font-family: inherit;
+            font-size: 15px;
+            resize: none;
+            margin-bottom: 12px;
+        }
+
+        .composer-input:focus {
+            outline: none;
+            box-shadow: 4px 4px 0 var(--black);
+        }
+
+        .composer-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .composer-tools {
+            display: flex;
+            gap: 8px;
+        }
+
+        .tool-btn {
+            width: 36px;
+            height: 36px;
+            border: 2px solid var(--black);
+            border-radius: 50%;
+            background: var(--cream);
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s;
+        }
+
+        .tool-btn:hover {
+            background: var(--mint);
+            transform: rotate(10deg);
+        }
+
+        .post-btn {
+            background: var(--black);
+            color: var(--cream);
+            border: none;
+            padding: 12px 32px;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 700;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .post-btn:hover {
+            background: var(--coral);
+            color: var(--black);
+        }
+
+        /* === STATUS CARD === */
+        .status-card {
+            padding: 24px 32px;
+            border-bottom: 2px solid var(--black);
+            display: grid;
+            grid-template-columns: 48px 1fr;
+            gap: 16px;
+            transition: background 0.15s;
+            position: relative;
+        }
+
+        .status-card:hover {
+            background: rgba(255, 255, 255, 0.5);
+        }
+
+        .status-card:nth-child(3n+1) .status-avatar {
+            background: linear-gradient(135deg, var(--coral) 0%, var(--pink) 100%);
+        }
+
+        .status-card:nth-child(3n+2) .status-avatar {
+            background: linear-gradient(135deg, var(--mint) 0%, var(--blue) 100%);
+        }
+
+        .status-card:nth-child(3n) .status-avatar {
+            background: linear-gradient(135deg, var(--lavender) 0%, var(--mustard) 100%);
+        }
+
+        .status-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            border: 3px solid var(--black);
+        }
+
+        .status-header {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+        }
+
+        .status-author {
+            font-weight: 700;
+            font-size: 15px;
+        }
+
+        .status-handle {
+            font-size: 13px;
+            color: var(--gray);
+            font-family: 'Space Mono', monospace;
+        }
+
+        .status-time {
+            font-size: 12px;
+            color: var(--gray);
+            font-family: 'Space Mono', monospace;
+            margin-left: auto;
+        }
+
+        .status-content {
+            font-size: 15px;
+            line-height: 1.6;
+            margin-bottom: 16px;
+        }
+
+        .status-content a {
+            color: var(--blue);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .status-content a:hover {
+            text-decoration: underline;
+            text-decoration-style: wavy;
+        }
+
+        .status-actions {
+            display: flex;
+            gap: 24px;
+        }
+
+        .action-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: none;
+            border: none;
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--gray);
+            cursor: pointer;
+            padding: 6px 0;
+            transition: all 0.15s;
+        }
+
+        .action-btn:hover {
+            color: var(--black);
+        }
+
+        .action-btn:hover .action-icon {
+            transform: scale(1.2);
+        }
+
+        .action-icon {
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.15s;
+        }
+
+        .action-btn.liked {
+            color: var(--coral);
+        }
+
+        .action-btn.boosted {
+            color: var(--mint);
+        }
+
+        /* === MEDIA IN STATUS === */
+        .status-media {
+            margin: 12px 0;
+            border: 3px solid var(--black);
+            border-radius: 16px;
+            overflow: hidden;
+        }
+
+        .status-media-placeholder {
+            height: 200px;
+            background:
+                linear-gradient(45deg, var(--pink) 25%, transparent 25%),
+                linear-gradient(-45deg, var(--pink) 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, var(--mint) 75%),
+                linear-gradient(-45deg, transparent 75%, var(--mustard) 75%);
+            background-size: 40px 40px;
+            background-position: 0 0, 0 20px, 20px -20px, -20px 0px;
+        }
+
+        /* === RIGHT SIDEBAR === */
+        .sidebar-right {
+            padding: 24px;
+            position: sticky;
+            top: 70px;
+            height: calc(100vh - 70px);
+            overflow-y: auto;
+            background: var(--mustard);
+        }
+
+        .widget {
+            margin-bottom: 24px;
+            background: var(--cream);
+            border: 3px solid var(--black);
+            border-radius: 20px;
+            padding: 20px;
+            position: relative;
+        }
+
+        .widget::before {
+            content: '';
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            width: 24px;
+            height: 24px;
+            background: var(--coral);
+            border-radius: 50%;
+            border: 3px solid var(--black);
+        }
+
+        .widget-title {
+            font-size: 14px;
+            font-weight: 800;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .widget-title-icon {
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .trending-item {
+            padding: 12px 0;
+            border-bottom: 2px dashed var(--gray);
+        }
+
+        .trending-item:last-child {
+            border-bottom: none;
+        }
+
+        .trending-tag {
+            font-weight: 700;
+            font-size: 15px;
+            color: var(--black);
+            text-decoration: none;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .trending-tag:hover {
+            color: var(--coral);
+        }
+
+        .trending-count {
+            font-size: 12px;
+            color: var(--gray);
+            font-family: 'Space Mono', monospace;
+        }
+
+        .who-to-follow {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 0;
+            border-bottom: 2px dashed var(--gray);
+        }
+
+        .who-to-follow:last-child {
+            border-bottom: none;
+        }
+
+        .wtf-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 2px solid var(--black);
+        }
+
+        .wtf-info {
+            flex: 1;
+        }
+
+        .wtf-name {
+            font-weight: 700;
+            font-size: 14px;
+        }
+
+        .wtf-handle {
+            font-size: 11px;
+            color: var(--gray);
+            font-family: 'Space Mono', monospace;
+        }
+
+        .follow-btn {
+            background: var(--mint);
+            border: 2px solid var(--black);
+            padding: 6px 14px;
+            font-size: 11px;
+            font-weight: 700;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .follow-btn:hover {
+            background: var(--black);
+            color: var(--cream);
+        }
+
+        /* === DECORATIVE SHAPES === */
+        .deco-circle-1 {
+            position: fixed;
+            top: 150px;
+            left: -50px;
+            width: 120px;
+            height: 120px;
+            background: var(--mint);
+            border-radius: 50%;
+            opacity: 0.4;
+            z-index: -1;
+        }
+
+        .deco-circle-2 {
+            position: fixed;
+            bottom: 100px;
+            right: -30px;
+            width: 80px;
+            height: 80px;
+            background: var(--coral);
+            border-radius: 50%;
+            opacity: 0.4;
+            z-index: -1;
+        }
+
+        .deco-triangle {
+            position: fixed;
+            top: 300px;
+            right: 50px;
+            width: 0;
+            height: 0;
+            border-left: 40px solid transparent;
+            border-right: 40px solid transparent;
+            border-bottom: 70px solid var(--lavender);
+            opacity: 0.3;
+            z-index: -1;
+        }
+
+        /* === THREAD VIEW === */
+        .thread-view {
+            margin-top: 80px;
+            border-top: 6px solid var(--black);
+            position: relative;
+        }
+
+        .thread-view::before {
+            content: 'THREAD';
+            position: absolute;
+            top: -14px;
+            left: 32px;
+            background: var(--coral);
+            padding: 4px 16px;
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.1em;
+            border: 3px solid var(--black);
+        }
+
+        .thread-header {
+            padding: 32px;
+            background: var(--pink);
+            border-bottom: 3px solid var(--black);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .thread-header::after {
+            content: '';
+            position: absolute;
+            right: -30px;
+            bottom: -30px;
+            width: 120px;
+            height: 120px;
+            border: 6px solid var(--black);
+            border-radius: 50%;
+            opacity: 0.2;
+        }
+
+        .back-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            background: var(--cream);
+            border: 3px solid var(--black);
+            border-radius: 50px;
+            font-size: 13px;
+            font-weight: 700;
+            text-decoration: none;
+            color: var(--black);
+            margin-bottom: 20px;
+            transition: all 0.15s;
+        }
+
+        .back-btn:hover {
+            background: var(--black);
+            color: var(--cream);
+        }
+
+        .main-post {
+            padding: 32px;
+            background: var(--cream);
+            border-bottom: 3px solid var(--black);
+        }
+
+        .main-post .status-avatar {
+            width: 64px;
+            height: 64px;
+        }
+
+        .main-post .status-content {
+            font-size: 20px;
+            line-height: 1.5;
+            margin: 20px 0;
+        }
+
+        .post-stats {
+            display: flex;
+            gap: 24px;
+            padding: 16px 0;
+            border-top: 2px dashed var(--gray);
+            border-bottom: 2px dashed var(--gray);
+            margin: 16px 0;
+        }
+
+        .stat-item {
+            font-family: 'Space Mono', monospace;
+            font-size: 13px;
+        }
+
+        .stat-item strong {
+            font-weight: 700;
+            color: var(--black);
+        }
+
+        .stat-item span {
+            color: var(--gray);
+        }
+
+        .replies-section {
+            background: var(--lavender);
+        }
+
+        .replies-header {
+            padding: 16px 32px;
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            border-bottom: 2px solid var(--black);
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .reply-card {
+            background: var(--cream);
+            margin: 16px 32px;
+            border: 3px solid var(--black);
+            border-radius: 20px;
+            padding: 20px;
+        }
+
+        .reply-card .status-avatar {
+            width: 40px;
+            height: 40px;
+        }
+
+        /* === SQUIGGLE PATTERN === */
+        .squiggle-pattern {
+            background-image: url("data:image/svg+xml,%3Csvg width='52' height='26' viewBox='0 0 52 26' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M10 10c0-2.21-1.79-4-4-4-3.314 0-6-2.686-6-6h2c0 2.21 1.79 4 4 4 3.314 0 6 2.686 6 6 0 2.21 1.79 4 4 4 3.314 0 6 2.686 6 6 0 2.21 1.79 4 4 4v2c-3.314 0-6-2.686-6-6 0-2.21-1.79-4-4-4-3.314 0-6-2.686-6-6zm25.464-1.95l8.486 8.486-1.414 1.414-8.486-8.486 1.414-1.414z' fill='%231a1a1a' fill-opacity='0.05' fill-rule='evenodd'/%3E%3C/svg%3E");
+        }
+
+        /* === FOOTER === */
+        .footer {
+            padding: 32px;
+            background: var(--black);
+            color: var(--cream);
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .footer::before {
+            content: '';
+            position: absolute;
+            left: 50px;
+            top: -20px;
+            width: 60px;
+            height: 60px;
+            background: var(--coral);
+            border-radius: 50%;
+            opacity: 0.5;
+        }
+
+        .footer::after {
+            content: '';
+            position: absolute;
+            right: 80px;
+            bottom: -15px;
+            width: 0;
+            height: 0;
+            border-left: 30px solid transparent;
+            border-right: 30px solid transparent;
+            border-top: 50px solid var(--mint);
+            opacity: 0.4;
+        }
+
+        .footer-text {
+            font-size: 13px;
+            font-weight: 500;
+            position: relative;
+            z-index: 1;
+        }
+
+        .footer-text a {
+            color: var(--mustard);
+            text-decoration: none;
+        }
+
+        .footer-text a:hover {
+            text-decoration: underline;
+            text-decoration-style: wavy;
+        }
+    </style>
+</head>
+<body>
+    <div class="deco-circle-1"></div>
+    <div class="deco-circle-2"></div>
+    <div class="deco-triangle"></div>
+
+    <!-- HEADER -->
+    <header class="header">
+        <div class="logo">
+            <span class="logo-dot"></span>
+            <span class="logo-tri"></span>
+            Pleroma
+        </div>
+        <nav class="header-nav">
+            <a href="#" class="nav-pill active">Home</a>
+            <a href="#" class="nav-pill">Local</a>
+            <a href="#" class="nav-pill">Federated</a>
+            <a href="#" class="nav-pill">Search</a>
+        </nav>
+        <div class="user-area">
+            <div class="user-avatar"></div>
+        </div>
+    </header>
+
+    <!-- MAIN CONTAINER -->
+    <div class="main-container">
+        <!-- LEFT SIDEBAR -->
+        <aside class="sidebar-left">
+            <div class="sidebar-section">
+                <div class="sidebar-title">Menu</div>
+                <a href="#" class="nav-item active">
+                    <span class="nav-icon">~</span>
+                    Home
+                </a>
+                <a href="#" class="nav-item">
+                    <span class="nav-icon">*</span>
+                    Notifications
+                    <span class="nav-badge">7</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <span class="nav-icon">@</span>
+                    Messages
+                    <span class="nav-badge">2</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <span class="nav-icon">#</span>
+                    Bookmarks
+                </a>
+                <a href="#" class="nav-item">
+                    <span class="nav-icon">=</span>
+                    Lists
+                </a>
+                <a href="#" class="nav-item">
+                    <span class="nav-icon">o</span>
+                    Profile
+                </a>
+            </div>
+
+            <button class="compose-btn">+ New Post</button>
+
+            <div class="sidebar-section" style="margin-top: 32px;">
+                <div class="sidebar-title">Lists</div>
+                <a href="#" class="nav-item">Design Folks</a>
+                <a href="#" class="nav-item">Tech News</a>
+                <a href="#" class="nav-item">Close Friends</a>
+            </div>
+        </aside>
+
+        <!-- MAIN CONTENT -->
+        <main class="main-content">
+            <div class="content-header">
+                <h1 class="content-title">Timeline</h1>
+                <div class="filter-pills">
+                    <button class="filter-pill active">All</button>
+                    <button class="filter-pill">Original</button>
+                    <button class="filter-pill">Media</button>
+                </div>
+            </div>
+
+            <!-- COMPOSER -->
+            <div class="composer">
+                <div class="composer-inner">
+                    <div class="composer-avatar"></div>
+                    <div class="composer-body">
+                        <textarea class="composer-input" placeholder="What's happening?"></textarea>
+                        <div class="composer-actions">
+                            <div class="composer-tools">
+                                <button class="tool-btn" title="Image">img</button>
+                                <button class="tool-btn" title="Poll">%</button>
+                                <button class="tool-btn" title="Emoji">:)</button>
+                                <button class="tool-btn" title="CW">!</button>
+                            </div>
+                            <button class="post-btn">Post</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- STATUS CARDS -->
+            <article class="status-card">
+                <div class="status-avatar"></div>
+                <div class="status-body">
+                    <div class="status-header">
+                        <span class="status-author">Memphis Design</span>
+                        <span class="status-handle">@memphis</span>
+                        <span class="status-time">5m</span>
+                    </div>
+                    <div class="status-content">
+                        Pattern is not a crime! The 80s are calling and they want their geometric shapes back. Who said design needs to be serious? <a href="#">#MemphisGroup</a>
+                    </div>
+                    <div class="status-actions">
+                        <button class="action-btn">
+                            <span class="action-icon">~</span> 12
+                        </button>
+                        <button class="action-btn boosted">
+                            <span class="action-icon">R</span> 8
+                        </button>
+                        <button class="action-btn liked">
+                            <span class="action-icon">*</span> 45
+                        </button>
+                        <button class="action-btn">
+                            <span class="action-icon">...</span>
+                        </button>
+                    </div>
+                </div>
+            </article>
+
+            <article class="status-card">
+                <div class="status-avatar"></div>
+                <div class="status-body">
+                    <div class="status-header">
+                        <span class="status-author">Sottsass Fan</span>
+                        <span class="status-handle">@ettore_forever</span>
+                        <span class="status-time">22m</span>
+                    </div>
+                    <div class="status-content">
+                        Just visited the Memphis Milano exhibition. The Carlton bookcase is even more striking in person. That combination of colors shouldn't work, but it absolutely does.
+                    </div>
+                    <div class="status-media">
+                        <div class="status-media-placeholder"></div>
+                    </div>
+                    <div class="status-actions">
+                        <button class="action-btn">
+                            <span class="action-icon">~</span> 34
+                        </button>
+                        <button class="action-btn">
+                            <span class="action-icon">R</span> 21
+                        </button>
+                        <button class="action-btn liked">
+                            <span class="action-icon">*</span> 89
+                        </button>
+                        <button class="action-btn">
+                            <span class="action-icon">...</span>
+                        </button>
+                    </div>
+                </div>
+            </article>
+
+            <article class="status-card">
+                <div class="status-avatar"></div>
+                <div class="status-body">
+                    <div class="status-header">
+                        <span class="status-author">Nathalie</span>
+                        <span class="status-handle">@nathalie_design</span>
+                        <span class="status-time">45m</span>
+                    </div>
+                    <div class="status-content">
+                        Postmodernism in architecture gets so much hate but honestly I love buildings that make you smile. Not everything needs to be a glass box.
+                    </div>
+                    <div class="status-actions">
+                        <button class="action-btn">
+                            <span class="action-icon">~</span> 8
+                        </button>
+                        <button class="action-btn">
+                            <span class="action-icon">R</span> 3
+                        </button>
+                        <button class="action-btn">
+                            <span class="action-icon">*</span> 27
+                        </button>
+                        <button class="action-btn">
+                            <span class="action-icon">...</span>
+                        </button>
+                    </div>
+                </div>
+            </article>
+
+            <article class="status-card">
+                <div class="status-avatar"></div>
+                <div class="status-body">
+                    <div class="status-header">
+                        <span class="status-author">Color Theory</span>
+                        <span class="status-handle">@colortheory</span>
+                        <span class="status-time">1h</span>
+                    </div>
+                    <div class="status-content">
+                        Today's palette inspiration: terracotta + mint + lavender
+                        <br><br>
+                        Unexpected combinations create visual interest. Don't be afraid to clash!
+                    </div>
+                    <div class="status-actions">
+                        <button class="action-btn">
+                            <span class="action-icon">~</span> 56
+                        </button>
+                        <button class="action-btn boosted">
+                            <span class="action-icon">R</span> 42
+                        </button>
+                        <button class="action-btn liked">
+                            <span class="action-icon">*</span> 134
+                        </button>
+                        <button class="action-btn">
+                            <span class="action-icon">...</span>
+                        </button>
+                    </div>
+                </div>
+            </article>
+
+            <!-- THREAD VIEW -->
+            <div class="thread-view">
+                <div class="thread-header">
+                    <a href="#" class="back-btn">< Back to Timeline</a>
+                    <h2 style="font-size: 24px; font-weight: 800;">Thread</h2>
+                </div>
+
+                <div class="main-post">
+                    <div style="display: grid; grid-template-columns: 64px 1fr; gap: 16px;">
+                        <div class="status-avatar" style="background: linear-gradient(135deg, var(--coral) 0%, var(--mustard) 100%);"></div>
+                        <div>
+                            <div class="status-header">
+                                <span class="status-author">Memphis Design</span>
+                                <span class="status-handle">@memphis</span>
+                            </div>
+                            <div class="status-content">
+                                <strong>A thread on why the Memphis Group matters:</strong>
+                                <br><br>
+                                1/ In 1981, Ettore Sottsass gathered a group of designers in Milan and created something revolutionary. They rejected the minimalist dogma of "good taste" and embraced chaos, color, and playfulness.
+                            </div>
+                            <div class="post-stats">
+                                <div class="stat-item"><strong>12:34</strong> <span>PM</span></div>
+                                <div class="stat-item"><strong>Jan 4,</strong> <span>2026</span></div>
+                                <div class="stat-item"><strong>2,341</strong> <span>views</span></div>
+                            </div>
+                            <div class="status-actions">
+                                <button class="action-btn">
+                                    <span class="action-icon">~</span> Reply
+                                </button>
+                                <button class="action-btn boosted">
+                                    <span class="action-icon">R</span> 89
+                                </button>
+                                <button class="action-btn liked">
+                                    <span class="action-icon">*</span> 234
+                                </button>
+                                <button class="action-btn">
+                                    <span class="action-icon">...</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="replies-section squiggle-pattern">
+                    <div class="replies-header">Replies (3)</div>
+
+                    <article class="reply-card">
+                        <div style="display: grid; grid-template-columns: 40px 1fr; gap: 12px;">
+                            <div class="status-avatar" style="background: linear-gradient(135deg, var(--mint) 0%, var(--blue) 100%);"></div>
+                            <div>
+                                <div class="status-header">
+                                    <span class="status-author">Design History</span>
+                                    <span class="status-handle">@designhistory</span>
+                                    <span class="status-time">45m</span>
+                                </div>
+                                <div class="status-content">
+                                    The name "Memphis" came from a Bob Dylan song playing during their first meeting. That kind of spontaneity defined everything they did.
+                                </div>
+                                <div class="status-actions">
+                                    <button class="action-btn"><span class="action-icon">~</span> 5</button>
+                                    <button class="action-btn"><span class="action-icon">R</span> 3</button>
+                                    <button class="action-btn liked"><span class="action-icon">*</span> 18</button>
+                                </div>
+                            </div>
+                        </div>
+                    </article>
+
+                    <article class="reply-card">
+                        <div style="display: grid; grid-template-columns: 40px 1fr; gap: 12px;">
+                            <div class="status-avatar" style="background: linear-gradient(135deg, var(--lavender) 0%, var(--pink) 100%);"></div>
+                            <div>
+                                <div class="status-header">
+                                    <span class="status-author">Barbara R.</span>
+                                    <span class="status-handle">@barbara_rad</span>
+                                    <span class="status-time">32m</span>
+                                </div>
+                                <div class="status-content">
+                                    Don't forget Barbara Radice! She was instrumental in documenting and promoting the movement. Her writings gave Memphis its intellectual foundation.
+                                </div>
+                                <div class="status-actions">
+                                    <button class="action-btn"><span class="action-icon">~</span> 12</button>
+                                    <button class="action-btn boosted"><span class="action-icon">R</span> 8</button>
+                                    <button class="action-btn liked"><span class="action-icon">*</span> 34</button>
+                                </div>
+                            </div>
+                        </div>
+                    </article>
+
+                    <article class="reply-card">
+                        <div style="display: grid; grid-template-columns: 40px 1fr; gap: 12px;">
+                            <div class="status-avatar" style="background: linear-gradient(135deg, var(--mustard) 0%, var(--coral) 100%);"></div>
+                            <div>
+                                <div class="status-header">
+                                    <span class="status-author">Modern Maximalist</span>
+                                    <span class="status-handle">@maximalist</span>
+                                    <span class="status-time">15m</span>
+                                </div>
+                                <div class="status-content">
+                                    The influence is everywhere now. From album covers to web design. We're in a Memphis revival and I'm here for it!
+                                </div>
+                                <div class="status-actions">
+                                    <button class="action-btn"><span class="action-icon">~</span> 3</button>
+                                    <button class="action-btn"><span class="action-icon">R</span> 2</button>
+                                    <button class="action-btn liked"><span class="action-icon">*</span> 21</button>
+                                </div>
+                            </div>
+                        </div>
+                    </article>
+                </div>
+            </div>
+
+            <footer class="footer">
+                <p class="footer-text">Pleroma ~ <a href="#">About</a> ~ <a href="#">Source</a> ~ Made with shapes and colors</p>
+            </footer>
+        </main>
+
+        <!-- RIGHT SIDEBAR -->
+        <aside class="sidebar-right">
+            <div class="widget">
+                <h3 class="widget-title">
+                    <span class="widget-title-icon">#</span>
+                    Trending
+                </h3>
+                <div class="trending-item">
+                    <a href="#" class="trending-tag">#MemphisDesign</a>
+                    <span class="trending-count">1,892 posts</span>
+                </div>
+                <div class="trending-item">
+                    <a href="#" class="trending-tag">#Postmodern</a>
+                    <span class="trending-count">1,234 posts</span>
+                </div>
+                <div class="trending-item">
+                    <a href="#" class="trending-tag">#Sottsass</a>
+                    <span class="trending-count">876 posts</span>
+                </div>
+                <div class="trending-item">
+                    <a href="#" class="trending-tag">#ColorTheory</a>
+                    <span class="trending-count">654 posts</span>
+                </div>
+            </div>
+
+            <div class="widget">
+                <h3 class="widget-title">
+                    <span class="widget-title-icon">+</span>
+                    Suggested
+                </h3>
+                <div class="who-to-follow">
+                    <div class="wtf-avatar" style="background: linear-gradient(135deg, var(--coral) 0%, var(--pink) 100%);"></div>
+                    <div class="wtf-info">
+                        <div class="wtf-name">Pattern Club</div>
+                        <div class="wtf-handle">@patternclub</div>
+                    </div>
+                    <button class="follow-btn">Follow</button>
+                </div>
+                <div class="who-to-follow">
+                    <div class="wtf-avatar" style="background: linear-gradient(135deg, var(--mint) 0%, var(--blue) 100%);"></div>
+                    <div class="wtf-info">
+                        <div class="wtf-name">Geo Shapes</div>
+                        <div class="wtf-handle">@geoshapes</div>
+                    </div>
+                    <button class="follow-btn">Follow</button>
+                </div>
+                <div class="who-to-follow">
+                    <div class="wtf-avatar" style="background: linear-gradient(135deg, var(--lavender) 0%, var(--mustard) 100%);"></div>
+                    <div class="wtf-info">
+                        <div class="wtf-name">80s Revival</div>
+                        <div class="wtf-handle">@80srevival</div>
+                    </div>
+                    <button class="follow-btn">Follow</button>
+                </div>
+            </div>
+
+            <div class="widget" style="background: var(--black); color: var(--cream);">
+                <h3 class="widget-title" style="color: var(--cream);">
+                    <span class="widget-title-icon">!</span>
+                    Instance
+                </h3>
+                <p style="font-size: 13px; line-height: 1.6;">
+                    <strong>pleroma.social</strong><br>
+                    A federated social network<br>
+                    <span style="font-family: 'Space Mono', monospace; font-size: 11px; color: var(--mustard);">v2.6.0</span>
+                </p>
+            </div>
+        </aside>
+    </div>
+</body>
+</html>

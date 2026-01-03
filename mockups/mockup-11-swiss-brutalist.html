@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pleroma - Swiss Brutalist Design</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --black: #000000;
+            --white: #ffffff;
+            --accent: #ff3b00;
+            --gray-100: #f5f5f5;
+            --gray-200: #e5e5e5;
+            --gray-400: #a3a3a3;
+            --gray-600: #525252;
+            --gray-800: #262626;
+            --unit: 8px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Space Grotesk', -apple-system, sans-serif;
+            background: var(--white);
+            color: var(--black);
+            line-height: 1.4;
+            font-size: 15px;
+        }
+
+        /* === HEADER === */
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: calc(var(--unit) * 8);
+            background: var(--black);
+            color: var(--white);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 calc(var(--unit) * 4);
+            z-index: 1000;
+            border-bottom: 4px solid var(--accent);
+        }
+
+        .logo {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+        }
+
+        .logo span {
+            color: var(--accent);
+        }
+
+        .header-nav {
+            display: flex;
+            gap: calc(var(--unit) * 4);
+        }
+
+        .header-nav a {
+            color: var(--white);
+            text-decoration: none;
+            font-size: 11px;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            font-weight: 500;
+            position: relative;
+        }
+
+        .header-nav a:hover {
+            color: var(--accent);
+        }
+
+        .header-nav a.active::after {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: var(--accent);
+        }
+
+        .user-badge {
+            display: flex;
+            align-items: center;
+            gap: calc(var(--unit) * 1.5);
+        }
+
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            background: var(--gray-600);
+            border: 2px solid var(--white);
+        }
+
+        .user-name {
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        /* === MAIN LAYOUT === */
+        .main-container {
+            margin-top: calc(var(--unit) * 8);
+            display: grid;
+            grid-template-columns: 240px 1fr 280px;
+            min-height: calc(100vh - var(--unit) * 8);
+        }
+
+        /* === LEFT SIDEBAR === */
+        .sidebar-left {
+            background: var(--gray-100);
+            border-right: 1px solid var(--black);
+            padding: calc(var(--unit) * 4);
+            position: sticky;
+            top: calc(var(--unit) * 8);
+            height: calc(100vh - var(--unit) * 8);
+            overflow-y: auto;
+        }
+
+        .sidebar-section {
+            margin-bottom: calc(var(--unit) * 4);
+        }
+
+        .sidebar-title {
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 0.25em;
+            text-transform: uppercase;
+            color: var(--gray-600);
+            margin-bottom: calc(var(--unit) * 2);
+            padding-bottom: calc(var(--unit) * 1);
+            border-bottom: 1px solid var(--gray-400);
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: calc(var(--unit) * 1.5);
+            padding: calc(var(--unit) * 1.5) 0;
+            color: var(--black);
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 500;
+            transition: color 0.1s;
+        }
+
+        .nav-item:hover {
+            color: var(--accent);
+        }
+
+        .nav-item.active {
+            color: var(--accent);
+        }
+
+        .nav-icon {
+            width: 18px;
+            height: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+
+        .nav-count {
+            margin-left: auto;
+            font-size: 11px;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--gray-600);
+        }
+
+        .compose-btn {
+            width: 100%;
+            background: var(--black);
+            color: var(--white);
+            border: none;
+            padding: calc(var(--unit) * 2);
+            font-family: inherit;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            cursor: pointer;
+            margin-top: calc(var(--unit) * 2);
+            transition: background 0.1s;
+        }
+
+        .compose-btn:hover {
+            background: var(--accent);
+        }
+
+        /* === MAIN CONTENT === */
+        .main-content {
+            border-right: 1px solid var(--black);
+        }
+
+        .content-header {
+            padding: calc(var(--unit) * 3) calc(var(--unit) * 4);
+            border-bottom: 1px solid var(--black);
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+        }
+
+        .content-title {
+            font-size: 32px;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+
+        .content-meta {
+            font-size: 11px;
+            color: var(--gray-600);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* === COMPOSER === */
+        .composer {
+            padding: calc(var(--unit) * 3) calc(var(--unit) * 4);
+            border-bottom: 4px solid var(--black);
+            background: var(--gray-100);
+        }
+
+        .composer-label {
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 0.25em;
+            text-transform: uppercase;
+            color: var(--gray-600);
+            margin-bottom: calc(var(--unit) * 1.5);
+        }
+
+        .composer-input {
+            width: 100%;
+            min-height: 80px;
+            padding: calc(var(--unit) * 2);
+            border: 1px solid var(--black);
+            background: var(--white);
+            font-family: inherit;
+            font-size: 14px;
+            resize: vertical;
+            margin-bottom: calc(var(--unit) * 2);
+        }
+
+        .composer-input:focus {
+            outline: 2px solid var(--accent);
+            outline-offset: -2px;
+        }
+
+        .composer-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .composer-tools {
+            display: flex;
+            gap: calc(var(--unit) * 2);
+        }
+
+        .tool-btn {
+            background: none;
+            border: 1px solid var(--gray-400);
+            width: 32px;
+            height: 32px;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.1s;
+        }
+
+        .tool-btn:hover {
+            border-color: var(--black);
+            background: var(--white);
+        }
+
+        .post-btn {
+            background: var(--accent);
+            color: var(--white);
+            border: none;
+            padding: calc(var(--unit) * 1.5) calc(var(--unit) * 4);
+            font-family: inherit;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: background 0.1s;
+        }
+
+        .post-btn:hover {
+            background: var(--black);
+        }
+
+        /* === STATUS CARD === */
+        .status-card {
+            padding: calc(var(--unit) * 3) calc(var(--unit) * 4);
+            border-bottom: 1px solid var(--gray-200);
+            display: grid;
+            grid-template-columns: 48px 1fr;
+            gap: calc(var(--unit) * 2);
+            transition: background 0.1s;
+        }
+
+        .status-card:hover {
+            background: var(--gray-100);
+        }
+
+        .status-avatar {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, var(--gray-400) 0%, var(--gray-600) 100%);
+        }
+
+        .status-header {
+            display: flex;
+            align-items: baseline;
+            gap: calc(var(--unit) * 1.5);
+            margin-bottom: calc(var(--unit) * 1);
+        }
+
+        .status-author {
+            font-weight: 700;
+            font-size: 14px;
+        }
+
+        .status-handle {
+            font-size: 12px;
+            color: var(--gray-600);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .status-time {
+            font-size: 11px;
+            color: var(--gray-400);
+            font-family: 'JetBrains Mono', monospace;
+            margin-left: auto;
+        }
+
+        .status-content {
+            font-size: 15px;
+            line-height: 1.5;
+            margin-bottom: calc(var(--unit) * 2);
+        }
+
+        .status-content a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        .status-content a:hover {
+            text-decoration: underline;
+        }
+
+        .status-actions {
+            display: flex;
+            gap: calc(var(--unit) * 4);
+        }
+
+        .action-btn {
+            display: flex;
+            align-items: center;
+            gap: calc(var(--unit) * 0.75);
+            background: none;
+            border: none;
+            font-family: inherit;
+            font-size: 12px;
+            color: var(--gray-600);
+            cursor: pointer;
+            padding: calc(var(--unit) * 0.5) 0;
+            transition: color 0.1s;
+        }
+
+        .action-btn:hover {
+            color: var(--accent);
+        }
+
+        .action-btn .icon {
+            font-size: 14px;
+        }
+
+        /* === MEDIA IN STATUS === */
+        .status-media {
+            margin: calc(var(--unit) * 2) 0;
+            border: 1px solid var(--black);
+        }
+
+        .status-media img {
+            width: 100%;
+            display: block;
+        }
+
+        /* === RIGHT SIDEBAR === */
+        .sidebar-right {
+            background: var(--white);
+            padding: calc(var(--unit) * 4);
+            position: sticky;
+            top: calc(var(--unit) * 8);
+            height: calc(100vh - var(--unit) * 8);
+            overflow-y: auto;
+        }
+
+        .widget {
+            margin-bottom: calc(var(--unit) * 4);
+        }
+
+        .widget-title {
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 0.25em;
+            text-transform: uppercase;
+            color: var(--black);
+            margin-bottom: calc(var(--unit) * 2);
+            padding-bottom: calc(var(--unit) * 1);
+            border-bottom: 2px solid var(--black);
+        }
+
+        .trending-item {
+            padding: calc(var(--unit) * 1.5) 0;
+            border-bottom: 1px solid var(--gray-200);
+        }
+
+        .trending-tag {
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--black);
+            text-decoration: none;
+            display: block;
+            margin-bottom: 2px;
+        }
+
+        .trending-tag:hover {
+            color: var(--accent);
+        }
+
+        .trending-count {
+            font-size: 11px;
+            color: var(--gray-600);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .who-to-follow {
+            display: flex;
+            align-items: center;
+            gap: calc(var(--unit) * 1.5);
+            padding: calc(var(--unit) * 1.5) 0;
+            border-bottom: 1px solid var(--gray-200);
+        }
+
+        .wtf-avatar {
+            width: 36px;
+            height: 36px;
+            background: var(--gray-400);
+        }
+
+        .wtf-info {
+            flex: 1;
+        }
+
+        .wtf-name {
+            font-weight: 600;
+            font-size: 13px;
+        }
+
+        .wtf-handle {
+            font-size: 11px;
+            color: var(--gray-600);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .follow-btn {
+            background: none;
+            border: 1px solid var(--black);
+            padding: calc(var(--unit) * 0.75) calc(var(--unit) * 1.5);
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.1s;
+        }
+
+        .follow-btn:hover {
+            background: var(--black);
+            color: var(--white);
+        }
+
+        /* === OVERSIZED TYPOGRAPHY ACCENTS === */
+        .section-number {
+            font-size: 120px;
+            font-weight: 700;
+            line-height: 0.8;
+            color: var(--gray-200);
+            position: absolute;
+            right: calc(var(--unit) * 4);
+            top: calc(var(--unit) * 2);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .sidebar-left .section-number {
+            font-size: 80px;
+            right: calc(var(--unit) * 2);
+        }
+
+        /* === THREAD VIEW === */
+        .thread-view {
+            margin-top: calc(var(--unit) * 16);
+            border-top: 8px solid var(--black);
+        }
+
+        .thread-header {
+            padding: calc(var(--unit) * 4);
+            border-bottom: 1px solid var(--black);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .thread-header .section-number {
+            font-size: 200px;
+            top: -40px;
+            right: calc(var(--unit) * 2);
+            opacity: 0.1;
+        }
+
+        .thread-nav {
+            display: flex;
+            gap: calc(var(--unit) * 2);
+            margin-bottom: calc(var(--unit) * 3);
+        }
+
+        .back-btn {
+            display: flex;
+            align-items: center;
+            gap: calc(var(--unit) * 1);
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: var(--black);
+            text-decoration: none;
+            padding: calc(var(--unit) * 1) calc(var(--unit) * 2);
+            border: 1px solid var(--black);
+            transition: all 0.1s;
+        }
+
+        .back-btn:hover {
+            background: var(--black);
+            color: var(--white);
+        }
+
+        .thread-title {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--gray-600);
+        }
+
+        /* === MAIN POST IN THREAD === */
+        .main-post {
+            padding: calc(var(--unit) * 4);
+            border-bottom: 4px solid var(--black);
+            background: var(--gray-100);
+        }
+
+        .main-post .status-avatar {
+            width: 64px;
+            height: 64px;
+        }
+
+        .main-post .status-content {
+            font-size: 20px;
+            line-height: 1.4;
+            margin: calc(var(--unit) * 3) 0;
+        }
+
+        .main-post-meta {
+            display: flex;
+            gap: calc(var(--unit) * 4);
+            padding: calc(var(--unit) * 2) 0;
+            border-top: 1px solid var(--gray-400);
+            border-bottom: 1px solid var(--gray-400);
+            margin: calc(var(--unit) * 2) 0;
+        }
+
+        .meta-item {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+        }
+
+        .meta-item strong {
+            font-weight: 700;
+            color: var(--black);
+        }
+
+        .meta-item span {
+            color: var(--gray-600);
+        }
+
+        /* === REPLY INDICATOR === */
+        .reply-indicator {
+            position: relative;
+            padding-left: calc(var(--unit) * 3);
+        }
+
+        .reply-indicator::before {
+            content: '';
+            position: absolute;
+            left: calc(var(--unit) * 3);
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: var(--accent);
+        }
+
+        .reply-card {
+            padding-left: calc(var(--unit) * 6);
+        }
+
+        .replies-section {
+            position: relative;
+        }
+
+        .replies-header {
+            padding: calc(var(--unit) * 2) calc(var(--unit) * 4);
+            background: var(--white);
+            border-bottom: 1px solid var(--gray-200);
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: var(--gray-600);
+        }
+
+        /* === GRID OVERLAY (decorative) === */
+        .grid-lines {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+            z-index: 9999;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        body.show-grid .grid-lines {
+            opacity: 1;
+        }
+
+        .grid-lines::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image:
+                linear-gradient(to right, rgba(255, 59, 0, 0.1) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255, 59, 0, 0.1) 1px, transparent 1px);
+            background-size: var(--unit) var(--unit);
+        }
+
+        /* === ASYMMETRIC HIGHLIGHT === */
+        .highlight-block {
+            background: var(--accent);
+            color: var(--white);
+            padding: calc(var(--unit) * 0.5) calc(var(--unit) * 1);
+            display: inline;
+        }
+
+        /* === FOOTER === */
+        .footer {
+            padding: calc(var(--unit) * 4);
+            border-top: 2px solid var(--black);
+            margin-top: calc(var(--unit) * 8);
+            text-align: center;
+        }
+
+        .footer-text {
+            font-size: 10px;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--gray-600);
+        }
+
+        .footer-text a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        /* === KEYBOARD HINT === */
+        kbd {
+            display: inline-block;
+            padding: 2px 6px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            background: var(--gray-200);
+            border: 1px solid var(--gray-400);
+            border-radius: 2px;
+        }
+    </style>
+</head>
+<body>
+    <div class="grid-lines"></div>
+
+    <!-- HEADER -->
+    <header class="header">
+        <div class="logo">Pleroma<span>/</span>Social</div>
+        <nav class="header-nav">
+            <a href="#" class="active">Timeline</a>
+            <a href="#">Local</a>
+            <a href="#">Federated</a>
+            <a href="#">Search</a>
+        </nav>
+        <div class="user-badge">
+            <div class="user-avatar"></div>
+            <span class="user-name">@user</span>
+        </div>
+    </header>
+
+    <!-- MAIN CONTAINER -->
+    <div class="main-container">
+        <!-- LEFT SIDEBAR -->
+        <aside class="sidebar-left">
+            <div class="sidebar-section">
+                <div class="sidebar-title">Navigation</div>
+                <a href="#" class="nav-item active">
+                    <span class="nav-icon">H</span>
+                    Home
+                </a>
+                <a href="#" class="nav-item">
+                    <span class="nav-icon">N</span>
+                    Notifications
+                    <span class="nav-count">12</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <span class="nav-icon">M</span>
+                    Messages
+                    <span class="nav-count">3</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <span class="nav-icon">B</span>
+                    Bookmarks
+                </a>
+                <a href="#" class="nav-item">
+                    <span class="nav-icon">L</span>
+                    Lists
+                </a>
+                <a href="#" class="nav-item">
+                    <span class="nav-icon">P</span>
+                    Profile
+                </a>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="sidebar-title">Lists</div>
+                <a href="#" class="nav-item">Tech News</a>
+                <a href="#" class="nav-item">Friends</a>
+                <a href="#" class="nav-item">Art & Design</a>
+            </div>
+
+            <button class="compose-btn">+ New Post</button>
+
+            <div class="sidebar-section" style="margin-top: calc(var(--unit) * 4);">
+                <div class="sidebar-title">Shortcuts</div>
+                <div style="font-size: 11px; color: var(--gray-600); line-height: 1.8;">
+                    <kbd>N</kbd> New post<br>
+                    <kbd>J</kbd> Next<br>
+                    <kbd>K</kbd> Previous<br>
+                    <kbd>?</kbd> Help
+                </div>
+            </div>
+        </aside>
+
+        <!-- MAIN CONTENT -->
+        <main class="main-content">
+            <div class="content-header">
+                <h1 class="content-title">Timeline</h1>
+                <span class="content-meta">Updated 2m ago</span>
+            </div>
+
+            <!-- COMPOSER -->
+            <div class="composer">
+                <div class="composer-label">Compose New Post</div>
+                <textarea class="composer-input" placeholder="What's on your mind?"></textarea>
+                <div class="composer-actions">
+                    <div class="composer-tools">
+                        <button class="tool-btn" title="Attach image">IMG</button>
+                        <button class="tool-btn" title="Add poll">POLL</button>
+                        <button class="tool-btn" title="Add emoji">:)</button>
+                        <button class="tool-btn" title="Content warning">CW</button>
+                    </div>
+                    <button class="post-btn">Publish</button>
+                </div>
+            </div>
+
+            <!-- STATUS CARDS -->
+            <article class="status-card">
+                <div class="status-avatar"></div>
+                <div class="status-body">
+                    <div class="status-header">
+                        <span class="status-author">Design Systems</span>
+                        <span class="status-handle">@designsystems</span>
+                        <span class="status-time">4m</span>
+                    </div>
+                    <div class="status-content">
+                        The beauty of <span class="highlight-block">Swiss design</span> lies in its restraint. Every element serves a purpose. Nothing is decorative for decoration's sake.
+                    </div>
+                    <div class="status-actions">
+                        <button class="action-btn"><span class="icon">R</span> 12</button>
+                        <button class="action-btn"><span class="icon">B</span> 8</button>
+                        <button class="action-btn"><span class="icon">*</span> 34</button>
+                        <button class="action-btn"><span class="icon">...</span></button>
+                    </div>
+                </div>
+            </article>
+
+            <article class="status-card">
+                <div class="status-avatar" style="background: linear-gradient(135deg, #ff3b00 0%, #000 100%);"></div>
+                <div class="status-body">
+                    <div class="status-header">
+                        <span class="status-author">Typography Daily</span>
+                        <span class="status-handle">@typographydaily</span>
+                        <span class="status-time">18m</span>
+                    </div>
+                    <div class="status-content">
+                        Grid systems are the backbone of good design. They create rhythm, establish hierarchy, and guide the eye. But rules are made to be broken intelligently.
+                    </div>
+                    <div class="status-media">
+                        <div style="height: 200px; background: linear-gradient(45deg, var(--gray-200) 25%, var(--gray-300) 25%, var(--gray-300) 50%, var(--gray-200) 50%, var(--gray-200) 75%, var(--gray-300) 75%); background-size: 40px 40px;"></div>
+                    </div>
+                    <div class="status-actions">
+                        <button class="action-btn"><span class="icon">R</span> 45</button>
+                        <button class="action-btn"><span class="icon">B</span> 23</button>
+                        <button class="action-btn"><span class="icon">*</span> 89</button>
+                        <button class="action-btn"><span class="icon">...</span></button>
+                    </div>
+                </div>
+            </article>
+
+            <article class="status-card">
+                <div class="status-avatar" style="background: var(--gray-800);"></div>
+                <div class="status-body">
+                    <div class="status-header">
+                        <span class="status-author">Minimalist</span>
+                        <span class="status-handle">@minimal</span>
+                        <span class="status-time">42m</span>
+                    </div>
+                    <div class="status-content">
+                        Less, but better. — Dieter Rams
+                    </div>
+                    <div class="status-actions">
+                        <button class="action-btn"><span class="icon">R</span> 67</button>
+                        <button class="action-btn"><span class="icon">B</span> 89</button>
+                        <button class="action-btn"><span class="icon">*</span> 234</button>
+                        <button class="action-btn"><span class="icon">...</span></button>
+                    </div>
+                </div>
+            </article>
+
+            <article class="status-card">
+                <div class="status-avatar" style="background: linear-gradient(180deg, #666 0%, #333 100%);"></div>
+                <div class="status-body">
+                    <div class="status-header">
+                        <span class="status-author">Wolfgang W.</span>
+                        <span class="status-handle">@wolfgang_type</span>
+                        <span class="status-time">1h</span>
+                    </div>
+                    <div class="status-content">
+                        Working on a new experimental layout. Breaking the grid to create tension, but maintaining readability. The challenge is finding that balance between chaos and order.
+                        <br><br>
+                        Thoughts? <a href="#">#typography</a> <a href="#">#design</a>
+                    </div>
+                    <div class="status-actions">
+                        <button class="action-btn"><span class="icon">R</span> 28</button>
+                        <button class="action-btn"><span class="icon">B</span> 15</button>
+                        <button class="action-btn"><span class="icon">*</span> 56</button>
+                        <button class="action-btn"><span class="icon">...</span></button>
+                    </div>
+                </div>
+            </article>
+
+            <!-- THREAD VIEW -->
+            <div class="thread-view">
+                <div class="thread-header">
+                    <span class="section-number">02</span>
+                    <div class="thread-nav">
+                        <a href="#" class="back-btn">< Back</a>
+                    </div>
+                    <div class="thread-title">Thread View</div>
+                </div>
+
+                <div class="main-post">
+                    <div style="display: grid; grid-template-columns: 64px 1fr; gap: calc(var(--unit) * 3);">
+                        <div class="status-avatar" style="background: linear-gradient(135deg, #ff3b00 0%, #000 100%);"></div>
+                        <div>
+                            <div class="status-header">
+                                <span class="status-author">Typography Daily</span>
+                                <span class="status-handle">@typographydaily</span>
+                            </div>
+                            <div class="status-content">
+                                <strong>The International Typographic Style</strong> (also known as Swiss Style) emerged in the 1950s and remains influential today.
+                                <br><br>
+                                Key principles:<br>
+                                1. Objective photography<br>
+                                2. Mathematical grids<br>
+                                3. Asymmetric layouts<br>
+                                4. Sans-serif typography<br>
+                                5. Flush left, ragged right text
+                            </div>
+                            <div class="main-post-meta">
+                                <div class="meta-item"><strong>12:34</strong> <span>PM</span></div>
+                                <div class="meta-item"><strong>Jan 4</strong> <span>2026</span></div>
+                                <div class="meta-item"><strong>1,234</strong> <span>views</span></div>
+                            </div>
+                            <div class="status-actions" style="padding-top: calc(var(--unit) * 2);">
+                                <button class="action-btn"><span class="icon">R</span> Reply</button>
+                                <button class="action-btn"><span class="icon">B</span> Boost</button>
+                                <button class="action-btn"><span class="icon">*</span> 89 Favorites</button>
+                                <button class="action-btn"><span class="icon">...</span></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="replies-section">
+                    <div class="replies-header">Replies (4)</div>
+
+                    <article class="status-card reply-card">
+                        <div class="status-avatar" style="background: var(--gray-600);"></div>
+                        <div class="status-body">
+                            <div class="status-header">
+                                <span class="status-author">Grid Theory</span>
+                                <span class="status-handle">@gridtheory</span>
+                                <span class="status-time">45m</span>
+                            </div>
+                            <div class="status-content">
+                                Muller-Brockmann's grid systems book should be required reading. The mathematical precision combined with aesthetic sensitivity is unmatched.
+                            </div>
+                            <div class="status-actions">
+                                <button class="action-btn"><span class="icon">R</span> 3</button>
+                                <button class="action-btn"><span class="icon">B</span> 5</button>
+                                <button class="action-btn"><span class="icon">*</span> 12</button>
+                            </div>
+                        </div>
+                    </article>
+
+                    <article class="status-card reply-card">
+                        <div class="status-avatar" style="background: linear-gradient(135deg, #333 0%, #666 100%);"></div>
+                        <div class="status-body">
+                            <div class="status-header">
+                                <span class="status-author">Post Modern</span>
+                                <span class="status-handle">@postmodern</span>
+                                <span class="status-time">38m</span>
+                            </div>
+                            <div class="status-content">
+                                Interesting how Swiss Style influenced so much of what we see in digital interfaces today. The emphasis on clarity and function translates perfectly to UI/UX.
+                            </div>
+                            <div class="status-actions">
+                                <button class="action-btn"><span class="icon">R</span> 8</button>
+                                <button class="action-btn"><span class="icon">B</span> 2</button>
+                                <button class="action-btn"><span class="icon">*</span> 23</button>
+                            </div>
+                        </div>
+                    </article>
+
+                    <article class="status-card reply-card">
+                        <div class="status-avatar" style="background: var(--accent);"></div>
+                        <div class="status-body">
+                            <div class="status-header">
+                                <span class="status-author">Type Rebel</span>
+                                <span class="status-handle">@typerebel</span>
+                                <span class="status-time">22m</span>
+                            </div>
+                            <div class="status-content">
+                                Don't forget Wolfgang Weingart who pushed back against the rigidity! The "New Wave" or "Swiss Punk" typography showed that these rules could be bent creatively.
+                            </div>
+                            <div class="status-actions">
+                                <button class="action-btn"><span class="icon">R</span> 15</button>
+                                <button class="action-btn"><span class="icon">B</span> 11</button>
+                                <button class="action-btn"><span class="icon">*</span> 34</button>
+                            </div>
+                        </div>
+                    </article>
+                </div>
+            </div>
+
+            <footer class="footer">
+                <p class="footer-text">Pleroma/Social &mdash; <a href="#">About</a> &mdash; <a href="#">Source</a> &mdash; Built with precision</p>
+            </footer>
+        </main>
+
+        <!-- RIGHT SIDEBAR -->
+        <aside class="sidebar-right">
+            <div class="widget">
+                <div class="widget-title">Trending</div>
+                <div class="trending-item">
+                    <a href="#" class="trending-tag">#SwissDesign</a>
+                    <span class="trending-count">2,341 posts</span>
+                </div>
+                <div class="trending-item">
+                    <a href="#" class="trending-tag">#Typography</a>
+                    <span class="trending-count">1,892 posts</span>
+                </div>
+                <div class="trending-item">
+                    <a href="#" class="trending-tag">#GridSystems</a>
+                    <span class="trending-count">987 posts</span>
+                </div>
+                <div class="trending-item">
+                    <a href="#" class="trending-tag">#Brutalism</a>
+                    <span class="trending-count">654 posts</span>
+                </div>
+            </div>
+
+            <div class="widget">
+                <div class="widget-title">Suggested</div>
+                <div class="who-to-follow">
+                    <div class="wtf-avatar"></div>
+                    <div class="wtf-info">
+                        <div class="wtf-name">Helvetica Fan</div>
+                        <div class="wtf-handle">@helvetica</div>
+                    </div>
+                    <button class="follow-btn">Follow</button>
+                </div>
+                <div class="who-to-follow">
+                    <div class="wtf-avatar" style="background: var(--accent);"></div>
+                    <div class="wtf-info">
+                        <div class="wtf-name">Grid Master</div>
+                        <div class="wtf-handle">@gridmaster</div>
+                    </div>
+                    <button class="follow-btn">Follow</button>
+                </div>
+                <div class="who-to-follow">
+                    <div class="wtf-avatar" style="background: var(--gray-800);"></div>
+                    <div class="wtf-info">
+                        <div class="wtf-name">Mono Type</div>
+                        <div class="wtf-handle">@monotype</div>
+                    </div>
+                    <button class="follow-btn">Follow</button>
+                </div>
+            </div>
+
+            <div class="widget">
+                <div class="widget-title">Instance Info</div>
+                <div style="font-size: 12px; line-height: 1.6; color: var(--gray-600);">
+                    <strong style="color: var(--black);">pleroma.social</strong><br>
+                    A federated social network.<br>
+                    <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px;">v2.6.0</span>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <script>
+        // Toggle grid overlay with 'G' key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'g' && !e.ctrlKey && !e.metaKey) {
+                document.body.classList.toggle('show-grid');
+            }
+        });
+    </script>
+</body>
+</html>

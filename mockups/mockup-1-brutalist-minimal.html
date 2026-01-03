@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mockup 1: Brutalist Minimal - Pleroma Redux</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #ffffff;
+      --bg-secondary: #f5f5f5;
+      --bg-hover: #ebebeb;
+      --text-primary: #000000;
+      --text-secondary: #555555;
+      --text-muted: #888888;
+      --border: #000000;
+      --accent: #000000;
+      --accent-hover: #333333;
+      --link: #0000ee;
+      --danger: #cc0000;
+      --success: #008800;
+    }
+
+    [data-theme="dark"] {
+      --bg-primary: #0a0a0a;
+      --bg-secondary: #141414;
+      --bg-hover: #1f1f1f;
+      --text-primary: #ffffff;
+      --text-secondary: #aaaaaa;
+      --text-muted: #666666;
+      --border: #ffffff;
+      --accent: #ffffff;
+      --accent-hover: #cccccc;
+      --link: #88aaff;
+      --danger: #ff4444;
+      --success: #44cc44;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.5;
+      font-size: 15px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 200px 1fr 280px;
+      gap: 0;
+      min-height: 100vh;
+    }
+
+    /* SIDEBAR */
+    .sidebar {
+      border-right: 2px solid var(--border);
+      padding: 20px;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .logo {
+      font-size: 24px;
+      font-weight: 900;
+      letter-spacing: -1px;
+      margin-bottom: 40px;
+      text-transform: uppercase;
+    }
+
+    .nav-link {
+      display: block;
+      padding: 8px 0;
+      color: var(--text-primary);
+      text-decoration: none;
+      font-weight: 500;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid transparent;
+    }
+
+    .nav-link:hover {
+      text-decoration: underline;
+      text-underline-offset: 4px;
+    }
+
+    .nav-link.active {
+      font-weight: 700;
+    }
+
+    .nav-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      background: var(--text-primary);
+      color: var(--bg-primary);
+      padding: 1px 5px;
+      margin-left: 6px;
+    }
+
+    .user-info {
+      margin-top: auto;
+      padding-top: 20px;
+      border-top: 1px solid var(--text-muted);
+    }
+
+    .user-name {
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    .user-handle {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    /* MAIN CONTENT */
+    .main {
+      border-right: 2px solid var(--border);
+    }
+
+    .page-header {
+      padding: 20px;
+      border-bottom: 2px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .page-title {
+      font-size: 14px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .tab-nav {
+      display: flex;
+      gap: 20px;
+    }
+
+    .tab {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      text-decoration: none;
+      padding-bottom: 2px;
+    }
+
+    .tab.active {
+      color: var(--text-primary);
+      border-bottom: 2px solid var(--border);
+    }
+
+    /* COMPOSER */
+    .composer {
+      padding: 20px;
+      border-bottom: 2px solid var(--border);
+      background: var(--bg-secondary);
+    }
+
+    .composer-textarea {
+      width: 100%;
+      min-height: 80px;
+      padding: 12px;
+      border: 2px solid var(--border);
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: inherit;
+      font-size: 15px;
+      resize: vertical;
+    }
+
+    .composer-textarea:focus {
+      outline: none;
+      box-shadow: 4px 4px 0 var(--border);
+    }
+
+    .composer-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 12px;
+    }
+
+    .composer-tools {
+      display: flex;
+      gap: 8px;
+    }
+
+    .tool-btn {
+      padding: 6px 10px;
+      border: 1px solid var(--border);
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-size: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      cursor: pointer;
+    }
+
+    .tool-btn:hover {
+      background: var(--text-primary);
+      color: var(--bg-primary);
+    }
+
+    .btn-primary {
+      padding: 8px 20px;
+      border: 2px solid var(--border);
+      background: var(--text-primary);
+      color: var(--bg-primary);
+      font-weight: 700;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      cursor: pointer;
+    }
+
+    .btn-primary:hover {
+      box-shadow: 4px 4px 0 var(--border);
+      transform: translate(-2px, -2px);
+    }
+
+    /* STATUS CARDS */
+    .status {
+      padding: 20px;
+      border-bottom: 1px solid var(--text-muted);
+    }
+
+    .status:hover {
+      background: var(--bg-secondary);
+    }
+
+    .status-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 10px;
+    }
+
+    .status-author {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .avatar {
+      width: 40px;
+      height: 40px;
+      border: 2px solid var(--border);
+      background: var(--bg-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    .author-info {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .author-name {
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    .author-handle {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .status-time {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .status-content {
+      margin-left: 52px;
+      margin-bottom: 12px;
+    }
+
+    .status-content p {
+      margin-bottom: 10px;
+    }
+
+    .status-content a {
+      color: var(--link);
+    }
+
+    .status-media {
+      margin-top: 12px;
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 4px;
+    }
+
+    .status-media img {
+      width: 100%;
+      height: 150px;
+      object-fit: cover;
+      border: 1px solid var(--border);
+      filter: grayscale(30%);
+    }
+
+    .status-media img:hover {
+      filter: none;
+    }
+
+    .status-actions {
+      margin-left: 52px;
+      display: flex;
+      gap: 24px;
+    }
+
+    .action-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--text-muted);
+      background: none;
+      border: none;
+      cursor: pointer;
+    }
+
+    .action-btn:hover {
+      color: var(--text-primary);
+      text-decoration: underline;
+    }
+
+    .action-btn.liked {
+      color: var(--danger);
+    }
+
+    .action-btn.reposted {
+      color: var(--success);
+    }
+
+    .content-warning {
+      margin-left: 52px;
+      padding: 10px 14px;
+      border: 2px solid var(--border);
+      background: var(--bg-secondary);
+      margin-bottom: 10px;
+    }
+
+    .cw-label {
+      font-weight: 700;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .cw-text {
+      font-size: 14px;
+      margin-top: 4px;
+    }
+
+    .cw-toggle {
+      margin-top: 8px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--link);
+      cursor: pointer;
+      text-decoration: underline;
+    }
+
+    /* ASIDE */
+    .aside {
+      padding: 20px;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+    }
+
+    .aside-section {
+      margin-bottom: 30px;
+    }
+
+    .aside-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--text-muted);
+    }
+
+    .trending-item {
+      padding: 8px 0;
+      border-bottom: 1px solid var(--bg-hover);
+    }
+
+    .trending-tag {
+      font-weight: 500;
+      font-size: 14px;
+      color: var(--text-primary);
+      text-decoration: none;
+    }
+
+    .trending-tag:hover {
+      text-decoration: underline;
+    }
+
+    .trending-count {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    /* THREAD VIEW */
+    .thread-ancestor {
+      opacity: 0.7;
+      border-left: 4px solid var(--text-muted);
+    }
+
+    .thread-main {
+      border-left: 4px solid var(--text-primary);
+      background: var(--bg-secondary);
+    }
+
+    .thread-reply {
+      margin-left: 20px;
+      border-left: 2px solid var(--text-muted);
+    }
+
+    .thread-connector {
+      width: 2px;
+      height: 20px;
+      background: var(--text-muted);
+      margin-left: 71px;
+    }
+
+    /* THEME TOGGLE */
+    .theme-toggle {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      padding: 10px 16px;
+      border: 2px solid var(--border);
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      cursor: pointer;
+    }
+
+    .theme-toggle:hover {
+      background: var(--text-primary);
+      color: var(--bg-primary);
+    }
+
+    /* PAGE INDICATOR */
+    .page-indicator {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 8px 16px;
+      background: var(--text-primary);
+      color: var(--bg-primary);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+  </style>
+</head>
+<body>
+  <div class="page-indicator">TIMELINE VIEW</div>
+
+  <div class="container">
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="logo">Pleroma</div>
+
+      <nav>
+        <a href="#" class="nav-link active">Timeline</a>
+        <a href="#" class="nav-link">Local</a>
+        <a href="#" class="nav-link">Federated</a>
+        <a href="#" class="nav-link">Notifications <span class="nav-badge">3</span></a>
+        <a href="#" class="nav-link">Messages</a>
+        <a href="#" class="nav-link">Bookmarks</a>
+        <a href="#" class="nav-link">Profile</a>
+        <a href="#" class="nav-link">Settings</a>
+      </nav>
+
+      <div class="user-info">
+        <div class="user-name">Alice</div>
+        <div class="user-handle">@alice@example.com</div>
+      </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="main">
+      <header class="page-header">
+        <h1 class="page-title">Home Timeline</h1>
+        <div class="tab-nav">
+          <a href="#" class="tab active">All</a>
+          <a href="#" class="tab">Media</a>
+          <a href="#" class="tab">Links</a>
+        </div>
+      </header>
+
+      <div class="composer">
+        <textarea class="composer-textarea" placeholder="What's on your mind?"></textarea>
+        <div class="composer-actions">
+          <div class="composer-tools">
+            <button class="tool-btn">IMG</button>
+            <button class="tool-btn">VID</button>
+            <button class="tool-btn">POLL</button>
+            <button class="tool-btn">CW</button>
+          </div>
+          <button class="btn-primary">Post</button>
+        </div>
+      </div>
+
+      <!-- Status 1 -->
+      <article class="status">
+        <header class="status-header">
+          <div class="status-author">
+            <div class="avatar">B</div>
+            <div class="author-info">
+              <span class="author-name">Bob Smith</span>
+              <span class="author-handle">@bob@remote.server</span>
+            </div>
+          </div>
+          <time class="status-time">2024-01-15 14:32</time>
+        </header>
+        <div class="status-content">
+          <p>Just finished reading "Gödel, Escher, Bach" for the third time. Each reading reveals new layers I completely missed before.</p>
+          <p>The way Hofstadter weaves together music, art, and mathematics to explore consciousness is unparalleled. <a href="#">#books</a> <a href="#">#philosophy</a></p>
+        </div>
+        <div class="status-actions">
+          <button class="action-btn">↩ Reply</button>
+          <button class="action-btn reposted">↻ 12</button>
+          <button class="action-btn liked">♥ 47</button>
+          <button class="action-btn">⋯</button>
+        </div>
+      </article>
+
+      <!-- Status 2 with CW -->
+      <article class="status">
+        <header class="status-header">
+          <div class="status-author">
+            <div class="avatar">C</div>
+            <div class="author-info">
+              <span class="author-name">Carol</span>
+              <span class="author-handle">@carol@local</span>
+            </div>
+          </div>
+          <time class="status-time">2024-01-15 14:28</time>
+        </header>
+        <div class="content-warning">
+          <div class="cw-label">Content Warning</div>
+          <div class="cw-text">Discussion of current events</div>
+          <div class="cw-toggle">[Show Content]</div>
+        </div>
+        <div class="status-actions">
+          <button class="action-btn">↩ Reply</button>
+          <button class="action-btn">↻ 3</button>
+          <button class="action-btn">♥ 8</button>
+          <button class="action-btn">⋯</button>
+        </div>
+      </article>
+
+      <!-- Status 3 with media -->
+      <article class="status">
+        <header class="status-header">
+          <div class="status-author">
+            <div class="avatar">D</div>
+            <div class="author-info">
+              <span class="author-name">Dave</span>
+              <span class="author-handle">@dave@photos.social</span>
+            </div>
+          </div>
+          <time class="status-time">2024-01-15 14:15</time>
+        </header>
+        <div class="status-content">
+          <p>Morning light through the fog. Shot on Leica M6 with Portra 400.</p>
+          <div class="status-media">
+            <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300'%3E%3Crect fill='%23ddd' width='400' height='300'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23999' font-family='monospace'%3EIMAGE 1%3C/text%3E%3C/svg%3E" alt="Photo 1">
+            <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300'%3E%3Crect fill='%23ccc' width='400' height='300'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23888' font-family='monospace'%3EIMAGE 2%3C/text%3E%3C/svg%3E" alt="Photo 2">
+          </div>
+        </div>
+        <div class="status-actions">
+          <button class="action-btn">↩ Reply</button>
+          <button class="action-btn">↻ 28</button>
+          <button class="action-btn liked">♥ 142</button>
+          <button class="action-btn">⋯</button>
+        </div>
+      </article>
+
+      <!-- Status 4 -->
+      <article class="status">
+        <header class="status-header">
+          <div class="status-author">
+            <div class="avatar">E</div>
+            <div class="author-info">
+              <span class="author-name">Eve</span>
+              <span class="author-handle">@eve@tech.zone</span>
+            </div>
+          </div>
+          <time class="status-time">2024-01-15 13:55</time>
+        </header>
+        <div class="status-content">
+          <p>TIL: The original UNIX philosophy of "do one thing well" came from Ken Thompson's frustration with over-engineered systems at Bell Labs. Simple tools, powerful combinations.</p>
+        </div>
+        <div class="status-actions">
+          <button class="action-btn">↩ Reply</button>
+          <button class="action-btn">↻ 5</button>
+          <button class="action-btn">♥ 23</button>
+          <button class="action-btn">⋯</button>
+        </div>
+      </article>
+    </main>
+
+    <!-- ASIDE -->
+    <aside class="aside">
+      <section class="aside-section">
+        <h3 class="aside-title">Trending</h3>
+        <div class="trending-item">
+          <a href="#" class="trending-tag">#rust</a>
+          <div class="trending-count">1,234 posts</div>
+        </div>
+        <div class="trending-item">
+          <a href="#" class="trending-tag">#photography</a>
+          <div class="trending-count">892 posts</div>
+        </div>
+        <div class="trending-item">
+          <a href="#" class="trending-tag">#books</a>
+          <div class="trending-count">567 posts</div>
+        </div>
+        <div class="trending-item">
+          <a href="#" class="trending-tag">#opensource</a>
+          <div class="trending-count">445 posts</div>
+        </div>
+      </section>
+
+      <section class="aside-section">
+        <h3 class="aside-title">Instance Info</h3>
+        <p style="font-size: 13px; color: var(--text-secondary);">
+          <strong>example.com</strong><br>
+          Users: 1,234<br>
+          Posts: 45,678<br>
+          Uptime: 99.9%
+        </p>
+      </section>
+    </aside>
+  </div>
+
+  <button class="theme-toggle" onclick="toggleTheme()">◐ THEME</button>
+
+  <!-- ============================================== -->
+  <!-- THREAD VIEW (scroll down to see) -->
+  <!-- ============================================== -->
+
+  <div style="height: 100px; background: repeating-linear-gradient(45deg, #000, #000 10px, #fff 10px, #fff 20px); margin-top: 100px;"></div>
+
+  <div class="page-indicator" style="position: relative; top: 0; right: 0; width: 100%; text-align: center; margin: 40px 0;">THREAD VIEW</div>
+
+  <div class="container" style="margin-top: 20px;">
+    <!-- SIDEBAR (same) -->
+    <aside class="sidebar" style="position: relative; height: auto;">
+      <div class="logo">Pleroma</div>
+      <nav>
+        <a href="#" class="nav-link">Timeline</a>
+        <a href="#" class="nav-link">Local</a>
+        <a href="#" class="nav-link">Federated</a>
+        <a href="#" class="nav-link">Notifications <span class="nav-badge">3</span></a>
+        <a href="#" class="nav-link">Messages</a>
+        <a href="#" class="nav-link">Bookmarks</a>
+        <a href="#" class="nav-link">Profile</a>
+        <a href="#" class="nav-link">Settings</a>
+      </nav>
+    </aside>
+
+    <!-- THREAD CONTENT -->
+    <main class="main">
+      <header class="page-header">
+        <h1 class="page-title">← Thread</h1>
+        <div class="tab-nav">
+          <span class="tab" style="color: var(--text-muted);">3 replies</span>
+        </div>
+      </header>
+
+      <!-- Ancestor post -->
+      <article class="status thread-ancestor">
+        <header class="status-header">
+          <div class="status-author">
+            <div class="avatar">A</div>
+            <div class="author-info">
+              <span class="author-name">Alice</span>
+              <span class="author-handle">@alice@example.com</span>
+            </div>
+          </div>
+          <time class="status-time">2024-01-15 12:00</time>
+        </header>
+        <div class="status-content">
+          <p>Hot take: Most "best practices" in software development are just cargo culting.</p>
+        </div>
+        <div class="status-actions">
+          <button class="action-btn">↩ 5</button>
+          <button class="action-btn">↻ 8</button>
+          <button class="action-btn">♥ 34</button>
+        </div>
+      </article>
+
+      <div class="thread-connector"></div>
+
+      <!-- MAIN POST (highlighted) -->
+      <article class="status thread-main">
+        <header class="status-header">
+          <div class="status-author">
+            <div class="avatar">B</div>
+            <div class="author-info">
+              <span class="author-name">Bob Smith</span>
+              <span class="author-handle">@bob@remote.server</span>
+            </div>
+          </div>
+          <time class="status-time">2024-01-15 12:15</time>
+        </header>
+        <div class="status-content">
+          <p><a href="#">@alice</a> I'd push back on this. Best practices emerge from collective experience. The problem isn't the practices themselves—it's applying them without understanding the underlying reasoning.</p>
+          <p>TDD isn't cargo cult. Neither is code review. But blindly following them without adapting to context? That's the real issue.</p>
+        </div>
+        <div class="status-actions">
+          <button class="action-btn">↩ Reply</button>
+          <button class="action-btn">↻ 12</button>
+          <button class="action-btn liked">♥ 47</button>
+          <button class="action-btn">⋯</button>
+        </div>
+      </article>
+
+      <div class="thread-connector"></div>
+
+      <!-- Reply 1 -->
+      <article class="status thread-reply">
+        <header class="status-header">
+          <div class="status-author">
+            <div class="avatar">C</div>
+            <div class="author-info">
+              <span class="author-name">Carol</span>
+              <span class="author-handle">@carol@local</span>
+            </div>
+          </div>
+          <time class="status-time">2024-01-15 12:22</time>
+        </header>
+        <div class="status-content">
+          <p><a href="#">@bob</a> <a href="#">@alice</a> This is the nuance that's often missing. Context matters. A startup with 2 devs has different needs than a 500-person enterprise.</p>
+        </div>
+        <div class="status-actions">
+          <button class="action-btn">↩ Reply</button>
+          <button class="action-btn">↻ 2</button>
+          <button class="action-btn">♥ 15</button>
+        </div>
+      </article>
+
+      <!-- Reply 2 (nested) -->
+      <article class="status thread-reply" style="margin-left: 40px;">
+        <header class="status-header">
+          <div class="status-author">
+            <div class="avatar">A</div>
+            <div class="author-info">
+              <span class="author-name">Alice</span>
+              <span class="author-handle">@alice@example.com</span>
+            </div>
+          </div>
+          <time class="status-time">2024-01-15 12:30</time>
+        </header>
+        <div class="status-content">
+          <p><a href="#">@carol</a> <a href="#">@bob</a> Fair points both. I should have been more specific. I meant the practices that get applied without any thought—like "always use microservices" or "never use global state."</p>
+        </div>
+        <div class="status-actions">
+          <button class="action-btn">↩ Reply</button>
+          <button class="action-btn">↻ 1</button>
+          <button class="action-btn">♥ 8</button>
+        </div>
+      </article>
+
+      <!-- Reply composer -->
+      <div class="composer" style="margin-left: 20px; border-left: 2px solid var(--text-muted);">
+        <textarea class="composer-textarea" placeholder="Add to the conversation..."></textarea>
+        <div class="composer-actions">
+          <div class="composer-tools">
+            <button class="tool-btn">IMG</button>
+            <button class="tool-btn">CW</button>
+          </div>
+          <button class="btn-primary">Reply</button>
+        </div>
+      </div>
+    </main>
+
+    <!-- ASIDE -->
+    <aside class="aside" style="position: relative; height: auto;">
+      <section class="aside-section">
+        <h3 class="aside-title">Thread Participants</h3>
+        <div class="trending-item">
+          <span style="font-weight: 500;">@alice</span>
+          <span class="trending-count">OP</span>
+        </div>
+        <div class="trending-item">
+          <span style="font-weight: 500;">@bob</span>
+          <span class="trending-count">2 posts</span>
+        </div>
+        <div class="trending-item">
+          <span style="font-weight: 500;">@carol</span>
+          <span class="trending-count">1 post</span>
+        </div>
+      </section>
+    </aside>
+  </div>
+
+  <script>
+    function toggleTheme() {
+      document.body.dataset.theme = document.body.dataset.theme === 'dark' ? '' : 'dark';
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,1603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mockup 10: Hypnospace Vaporwave - Pleroma Redux</title>
+  <link href="https://fonts.googleapis.com/css2?family=VT323&family=Press+Start+2P&family=Bungee&family=Fredoka:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    @font-face {
+      font-family: 'Comic Neue';
+      src: local('Comic Sans MS'), local('Comic Neue'), local('Chalkboard');
+    }
+
+    :root {
+      --hyper-bg: #1a0a2e;
+      --hyper-purple: #9b59b6;
+      --hyper-pink: #ff6b9d;
+      --hyper-cyan: #00d4ff;
+      --hyper-yellow: #ffed4a;
+      --hyper-orange: #ff9f43;
+      --hyper-green: #26de81;
+      --hyper-blue: #4a69bd;
+      --hyper-magenta: #e056fd;
+      --hyper-teal: #00cec9;
+      --star-gold: #ffd700;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Fredoka', 'Comic Neue', 'Comic Sans MS', cursive;
+      background: var(--hyper-bg);
+      color: #ffffff;
+      font-size: 14px;
+      line-height: 1.5;
+      min-height: 100vh;
+      background-image:
+        radial-gradient(ellipse at 20% 80%, rgba(155, 89, 182, 0.3) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 20%, rgba(0, 212, 255, 0.2) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 50%, rgba(255, 107, 157, 0.1) 0%, transparent 70%),
+        url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 5 L31 8 L34 8 L31.5 10 L32.5 13 L30 11 L27.5 13 L28.5 10 L26 8 L29 8 Z' fill='%23ffffff08'/%3E%3C/svg%3E");
+    }
+
+    /* STARS ANIMATION */
+    .stars {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      pointer-events: none;
+      z-index: 0;
+      overflow: hidden;
+    }
+
+    .star {
+      position: absolute;
+      width: 4px;
+      height: 4px;
+      background: white;
+      border-radius: 50%;
+      animation: twinkle 2s infinite;
+    }
+
+    @keyframes twinkle {
+      0%, 100% { opacity: 0.3; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.2); }
+    }
+
+    /* HEADER BANNER */
+    .site-banner {
+      background: linear-gradient(135deg, #2d1b4e 0%, #1a0a2e 50%, #0d0620 100%);
+      border-bottom: 4px solid;
+      border-image: linear-gradient(90deg, var(--hyper-cyan), var(--hyper-pink), var(--hyper-yellow), var(--hyper-cyan)) 1;
+      padding: 12px 20px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .site-banner::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 200%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+      animation: shine 3s infinite;
+    }
+
+    @keyframes shine {
+      100% { left: 100%; }
+    }
+
+    .banner-content {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: relative;
+      z-index: 1;
+    }
+
+    .site-logo {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
+    .logo-icon {
+      width: 60px;
+      height: 60px;
+      background: linear-gradient(135deg, var(--hyper-pink) 0%, var(--hyper-purple) 50%, var(--hyper-cyan) 100%);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Bungee', cursive;
+      font-size: 32px;
+      color: white;
+      text-shadow: 2px 2px 0 rgba(0,0,0,0.5);
+      box-shadow:
+        0 0 20px var(--hyper-pink),
+        inset 0 0 20px rgba(255,255,255,0.2);
+      animation: glow-pulse 2s infinite;
+    }
+
+    @keyframes glow-pulse {
+      0%, 100% { box-shadow: 0 0 20px var(--hyper-pink), inset 0 0 20px rgba(255,255,255,0.2); }
+      50% { box-shadow: 0 0 30px var(--hyper-cyan), inset 0 0 30px rgba(255,255,255,0.3); }
+    }
+
+    .logo-text {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .logo-title {
+      font-family: 'Bungee', cursive;
+      font-size: 28px;
+      background: linear-gradient(90deg, var(--hyper-cyan), var(--hyper-pink), var(--hyper-yellow));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-shadow: none;
+      filter: drop-shadow(2px 2px 0 rgba(0,0,0,0.5));
+    }
+
+    .logo-tagline {
+      font-family: 'VT323', monospace;
+      font-size: 14px;
+      color: var(--hyper-cyan);
+      letter-spacing: 2px;
+    }
+
+    .banner-nav {
+      display: flex;
+      gap: 8px;
+    }
+
+    .nav-btn {
+      padding: 10px 18px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.05) 100%);
+      border: 2px solid var(--hyper-cyan);
+      border-radius: 20px;
+      color: var(--hyper-cyan);
+      font-family: 'Fredoka', sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s;
+      position: relative;
+    }
+
+    .nav-btn:hover {
+      background: var(--hyper-cyan);
+      color: var(--hyper-bg);
+      box-shadow: 0 0 15px var(--hyper-cyan);
+      transform: translateY(-2px);
+    }
+
+    .nav-btn.active {
+      background: linear-gradient(135deg, var(--hyper-pink), var(--hyper-purple));
+      border-color: var(--hyper-pink);
+      color: white;
+      box-shadow: 0 0 15px var(--hyper-pink);
+    }
+
+    .nav-btn .badge {
+      position: absolute;
+      top: -8px;
+      right: -8px;
+      background: var(--hyper-yellow);
+      color: var(--hyper-bg);
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 10px;
+      animation: bounce 1s infinite;
+    }
+
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-3px); }
+    }
+
+    .user-area {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 16px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 25px;
+      border: 2px solid var(--hyper-purple);
+    }
+
+    .user-avatar {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, var(--hyper-yellow), var(--hyper-orange));
+      border-radius: 50%;
+      border: 3px solid var(--hyper-pink);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 18px;
+      color: var(--hyper-bg);
+    }
+
+    .user-info {
+      text-align: left;
+    }
+
+    .user-name {
+      font-weight: 600;
+      color: var(--hyper-yellow);
+    }
+
+    .user-handle {
+      font-size: 11px;
+      color: var(--hyper-cyan);
+      font-family: 'VT323', monospace;
+    }
+
+    /* MAIN CONTAINER */
+    .container {
+      display: grid;
+      grid-template-columns: 220px 1fr 240px;
+      gap: 16px;
+      padding: 16px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* PANEL STYLING */
+    .panel {
+      background: linear-gradient(180deg, rgba(45, 27, 78, 0.9) 0%, rgba(26, 10, 46, 0.95) 100%);
+      border: 3px solid;
+      border-image: linear-gradient(180deg, var(--hyper-purple), var(--hyper-pink)) 1;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow:
+        0 0 20px rgba(155, 89, 182, 0.3),
+        inset 0 1px 0 rgba(255,255,255,0.1);
+    }
+
+    .panel-header {
+      background: linear-gradient(90deg, var(--hyper-purple), var(--hyper-pink));
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      position: relative;
+    }
+
+    .panel-header::after {
+      content: '✧';
+      position: absolute;
+      right: 16px;
+      color: var(--hyper-yellow);
+      animation: spin 3s linear infinite;
+    }
+
+    @keyframes spin {
+      100% { transform: rotate(360deg); }
+    }
+
+    .panel-icon {
+      font-size: 20px;
+    }
+
+    .panel-title {
+      font-family: 'Bungee', cursive;
+      font-size: 14px;
+      letter-spacing: 1px;
+    }
+
+    .panel-content {
+      padding: 12px;
+    }
+
+    /* SIDEBAR */
+    .sidebar-section {
+      margin-bottom: 16px;
+    }
+
+    .sidebar-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .sidebar-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      color: #ccc;
+      text-decoration: none;
+      border-radius: 10px;
+      transition: all 0.2s;
+      font-size: 13px;
+      border: 2px solid transparent;
+    }
+
+    .sidebar-item:hover {
+      background: rgba(155, 89, 182, 0.3);
+      color: white;
+      border-color: var(--hyper-purple);
+      transform: translateX(5px);
+    }
+
+    .sidebar-item.active {
+      background: linear-gradient(90deg, rgba(255, 107, 157, 0.3), rgba(155, 89, 182, 0.3));
+      color: var(--hyper-pink);
+      border-color: var(--hyper-pink);
+      font-weight: 600;
+    }
+
+    .sidebar-item-icon {
+      font-size: 18px;
+    }
+
+    .sidebar-badge {
+      margin-left: auto;
+      background: var(--hyper-pink);
+      color: white;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 10px;
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+    }
+
+    /* USER CARD */
+    .user-card {
+      background: linear-gradient(135deg, rgba(255, 107, 157, 0.2), rgba(155, 89, 182, 0.2));
+      border: 2px solid var(--hyper-pink);
+      border-radius: 12px;
+      padding: 16px;
+      text-align: center;
+      position: relative;
+    }
+
+    .user-card::before,
+    .user-card::after {
+      content: '★';
+      position: absolute;
+      top: 8px;
+      color: var(--star-gold);
+      font-size: 12px;
+      animation: twinkle 1.5s infinite;
+    }
+
+    .user-card::before { left: 8px; }
+    .user-card::after { right: 8px; animation-delay: 0.5s; }
+
+    .user-card-avatar {
+      width: 64px;
+      height: 64px;
+      background: linear-gradient(135deg, var(--hyper-yellow), var(--hyper-orange), var(--hyper-pink));
+      border-radius: 50%;
+      border: 4px solid var(--hyper-cyan);
+      margin: 0 auto 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      font-weight: 600;
+      color: var(--hyper-bg);
+      box-shadow: 0 0 20px var(--hyper-cyan);
+    }
+
+    .user-card-name {
+      font-family: 'Bungee', cursive;
+      font-size: 16px;
+      color: var(--hyper-yellow);
+    }
+
+    .user-card-handle {
+      font-family: 'VT323', monospace;
+      font-size: 14px;
+      color: var(--hyper-cyan);
+    }
+
+    .user-card-stats {
+      display: flex;
+      justify-content: space-around;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px dashed var(--hyper-purple);
+    }
+
+    .stat {
+      text-align: center;
+    }
+
+    .stat-num {
+      font-family: 'VT323', monospace;
+      font-size: 20px;
+      color: var(--hyper-pink);
+    }
+
+    .stat-label {
+      font-size: 10px;
+      color: #999;
+    }
+
+    /* MAIN CONTENT */
+    .main-area {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* TABS */
+    .tab-bar {
+      display: flex;
+      gap: 8px;
+      padding: 12px 16px;
+      background: rgba(0,0,0,0.3);
+      border-radius: 16px 16px 0 0;
+    }
+
+    .tab {
+      padding: 10px 20px;
+      background: rgba(255,255,255,0.05);
+      border: 2px solid transparent;
+      border-radius: 20px;
+      color: #999;
+      font-family: 'Fredoka', sans-serif;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .tab:hover {
+      background: rgba(255,255,255,0.1);
+      color: white;
+    }
+
+    .tab.active {
+      background: linear-gradient(135deg, var(--hyper-cyan), var(--hyper-blue));
+      border-color: var(--hyper-cyan);
+      color: white;
+      box-shadow: 0 0 15px var(--hyper-cyan);
+    }
+
+    /* COMPOSER */
+    .composer {
+      background: linear-gradient(180deg, rgba(0, 212, 255, 0.1) 0%, rgba(155, 89, 182, 0.1) 100%);
+      border: 2px dashed var(--hyper-cyan);
+      border-radius: 16px;
+      padding: 20px;
+      position: relative;
+    }
+
+    .composer-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .composer-avatar {
+      width: 48px;
+      height: 48px;
+      background: linear-gradient(135deg, var(--hyper-yellow), var(--hyper-orange));
+      border-radius: 50%;
+      border: 3px solid var(--hyper-pink);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--hyper-bg);
+    }
+
+    .composer-prompt {
+      font-family: 'Bungee', cursive;
+      font-size: 16px;
+      color: var(--hyper-cyan);
+    }
+
+    .composer-textarea {
+      width: 100%;
+      min-height: 80px;
+      padding: 14px;
+      background: rgba(0, 0, 0, 0.4);
+      border: 2px solid var(--hyper-purple);
+      border-radius: 12px;
+      color: white;
+      font-family: 'Fredoka', sans-serif;
+      font-size: 14px;
+      resize: vertical;
+      transition: all 0.2s;
+    }
+
+    .composer-textarea:focus {
+      outline: none;
+      border-color: var(--hyper-pink);
+      box-shadow: 0 0 20px rgba(255, 107, 157, 0.3);
+    }
+
+    .composer-textarea::placeholder {
+      color: #666;
+    }
+
+    .composer-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 12px;
+    }
+
+    .composer-tools {
+      display: flex;
+      gap: 6px;
+    }
+
+    .tool-btn {
+      width: 40px;
+      height: 40px;
+      background: rgba(255,255,255,0.1);
+      border: 2px solid var(--hyper-purple);
+      border-radius: 10px;
+      color: var(--hyper-cyan);
+      font-size: 18px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .tool-btn:hover {
+      background: var(--hyper-purple);
+      border-color: var(--hyper-pink);
+      transform: scale(1.1) rotate(5deg);
+      box-shadow: 0 0 15px var(--hyper-purple);
+    }
+
+    .btn-post {
+      padding: 12px 28px;
+      background: linear-gradient(135deg, var(--hyper-pink), var(--hyper-purple));
+      border: none;
+      border-radius: 25px;
+      color: white;
+      font-family: 'Bungee', cursive;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+      box-shadow: 0 4px 15px rgba(255, 107, 157, 0.4);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn-post::before {
+      content: '✨';
+      position: absolute;
+      left: 12px;
+    }
+
+    .btn-post::after {
+      content: '✨';
+      position: absolute;
+      right: 12px;
+    }
+
+    .btn-post:hover {
+      transform: translateY(-3px) scale(1.05);
+      box-shadow: 0 6px 25px rgba(255, 107, 157, 0.6);
+    }
+
+    /* POST CARDS */
+    .post-list {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .post-card {
+      background: linear-gradient(180deg, rgba(45, 27, 78, 0.8) 0%, rgba(26, 10, 46, 0.9) 100%);
+      border: 3px solid var(--hyper-purple);
+      border-radius: 16px;
+      overflow: hidden;
+      transition: all 0.3s;
+      position: relative;
+    }
+
+    .post-card:hover {
+      border-color: var(--hyper-pink);
+      transform: translateY(-4px);
+      box-shadow: 0 10px 30px rgba(255, 107, 157, 0.3);
+    }
+
+    .post-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--hyper-cyan), var(--hyper-pink), var(--hyper-yellow), var(--hyper-cyan));
+      background-size: 200% 100%;
+      animation: rainbow-slide 3s linear infinite;
+    }
+
+    @keyframes rainbow-slide {
+      100% { background-position: 200% 0; }
+    }
+
+    .post-header {
+      padding: 14px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(0,0,0,0.2);
+    }
+
+    .post-author {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .post-avatar {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      border: 3px solid;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 18px;
+    }
+
+    .post-avatar.pink {
+      background: linear-gradient(135deg, var(--hyper-pink), var(--hyper-magenta));
+      border-color: var(--hyper-pink);
+      color: white;
+    }
+
+    .post-avatar.cyan {
+      background: linear-gradient(135deg, var(--hyper-cyan), var(--hyper-teal));
+      border-color: var(--hyper-cyan);
+      color: var(--hyper-bg);
+    }
+
+    .post-avatar.yellow {
+      background: linear-gradient(135deg, var(--hyper-yellow), var(--hyper-orange));
+      border-color: var(--hyper-yellow);
+      color: var(--hyper-bg);
+    }
+
+    .post-avatar.purple {
+      background: linear-gradient(135deg, var(--hyper-purple), var(--hyper-blue));
+      border-color: var(--hyper-purple);
+      color: white;
+    }
+
+    .post-name {
+      font-family: 'Bungee', cursive;
+      font-size: 14px;
+      color: var(--hyper-yellow);
+    }
+
+    .post-handle {
+      font-family: 'VT323', monospace;
+      font-size: 13px;
+      color: var(--hyper-cyan);
+    }
+
+    .post-badge {
+      font-size: 9px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-weight: 600;
+      margin-left: 8px;
+    }
+
+    .post-badge.local {
+      background: var(--hyper-green);
+      color: var(--hyper-bg);
+    }
+
+    .post-badge.remote {
+      background: var(--hyper-purple);
+      color: white;
+    }
+
+    .post-time {
+      font-family: 'VT323', monospace;
+      font-size: 13px;
+      color: #888;
+    }
+
+    .post-body {
+      padding: 16px;
+    }
+
+    .post-content {
+      font-size: 14px;
+      line-height: 1.7;
+      color: #ddd;
+    }
+
+    .post-content a {
+      color: var(--hyper-cyan);
+      text-decoration: none;
+    }
+
+    .post-content a:hover {
+      text-decoration: underline;
+      text-shadow: 0 0 10px var(--hyper-cyan);
+    }
+
+    .post-content .hashtag {
+      color: var(--hyper-pink);
+      font-weight: 600;
+    }
+
+    .post-content .mention {
+      color: var(--hyper-yellow);
+    }
+
+    .post-media {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .post-media img {
+      width: 100%;
+      height: 120px;
+      object-fit: cover;
+      border-radius: 8px;
+      border: 2px solid var(--hyper-purple);
+      transition: all 0.2s;
+    }
+
+    .post-media img:hover {
+      border-color: var(--hyper-pink);
+      transform: scale(1.02);
+      box-shadow: 0 0 20px var(--hyper-pink);
+    }
+
+    .post-footer {
+      padding: 12px 16px;
+      display: flex;
+      gap: 8px;
+      background: rgba(0,0,0,0.2);
+      border-top: 1px solid rgba(155, 89, 182, 0.3);
+    }
+
+    .post-action {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      background: rgba(255,255,255,0.05);
+      border: 2px solid rgba(155, 89, 182, 0.5);
+      border-radius: 20px;
+      color: #999;
+      font-family: 'Fredoka', sans-serif;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .post-action:hover {
+      background: rgba(155, 89, 182, 0.3);
+      border-color: var(--hyper-purple);
+      color: white;
+      transform: scale(1.05);
+    }
+
+    .post-action.liked {
+      background: rgba(255, 107, 157, 0.3);
+      border-color: var(--hyper-pink);
+      color: var(--hyper-pink);
+    }
+
+    .post-action.shared {
+      background: rgba(0, 212, 255, 0.3);
+      border-color: var(--hyper-cyan);
+      color: var(--hyper-cyan);
+    }
+
+    .post-action-icon {
+      font-size: 16px;
+    }
+
+    /* CONTENT WARNING */
+    .content-warning {
+      background: linear-gradient(135deg, rgba(255, 159, 67, 0.2), rgba(255, 107, 157, 0.2));
+      border: 2px solid var(--hyper-orange);
+      border-radius: 12px;
+      padding: 14px;
+      position: relative;
+    }
+
+    .content-warning::before {
+      content: '⚠️';
+      position: absolute;
+      top: -12px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--hyper-bg);
+      padding: 0 8px;
+      font-size: 20px;
+    }
+
+    .cw-label {
+      font-family: 'Bungee', cursive;
+      font-size: 12px;
+      color: var(--hyper-orange);
+      margin-bottom: 4px;
+    }
+
+    .cw-text {
+      color: #ccc;
+      font-size: 13px;
+    }
+
+    .cw-toggle {
+      margin-top: 10px;
+      padding: 8px 16px;
+      background: var(--hyper-orange);
+      border: none;
+      border-radius: 15px;
+      color: var(--hyper-bg);
+      font-family: 'Fredoka', sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .cw-toggle:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 15px var(--hyper-orange);
+    }
+
+    /* RIGHT SIDEBAR */
+    .trending-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px dashed rgba(155, 89, 182, 0.3);
+    }
+
+    .trending-tag {
+      color: var(--hyper-pink);
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 13px;
+    }
+
+    .trending-tag:hover {
+      color: var(--hyper-cyan);
+      text-shadow: 0 0 10px var(--hyper-cyan);
+    }
+
+    .trending-count {
+      font-family: 'VT323', monospace;
+      font-size: 14px;
+      color: var(--hyper-cyan);
+    }
+
+    .stats-box {
+      background: rgba(0,0,0,0.3);
+      border: 2px solid var(--hyper-purple);
+      border-radius: 12px;
+      padding: 16px;
+      text-align: center;
+    }
+
+    .stats-title {
+      font-family: 'VT323', monospace;
+      font-size: 12px;
+      color: #888;
+      margin-bottom: 8px;
+    }
+
+    .stats-value {
+      font-family: 'Bungee', cursive;
+      font-size: 24px;
+      background: linear-gradient(90deg, var(--hyper-cyan), var(--hyper-pink));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .visitor-counter {
+      background: #000;
+      border: 3px inset var(--hyper-purple);
+      padding: 8px 16px;
+      text-align: center;
+      margin-top: 16px;
+    }
+
+    .visitor-counter-label {
+      font-family: 'VT323', monospace;
+      font-size: 12px;
+      color: var(--hyper-green);
+    }
+
+    .visitor-counter-num {
+      font-family: 'VT323', monospace;
+      font-size: 20px;
+      color: var(--hyper-green);
+      text-shadow: 0 0 10px var(--hyper-green);
+    }
+
+    .webring {
+      margin-top: 16px;
+      padding: 12px;
+      background: rgba(255, 107, 157, 0.1);
+      border: 2px dashed var(--hyper-pink);
+      border-radius: 12px;
+      text-align: center;
+    }
+
+    .webring-title {
+      font-family: 'Bungee', cursive;
+      font-size: 11px;
+      color: var(--hyper-pink);
+      margin-bottom: 8px;
+    }
+
+    .webring-nav {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+    }
+
+    .webring-link {
+      color: var(--hyper-cyan);
+      text-decoration: none;
+      font-size: 12px;
+    }
+
+    .webring-link:hover {
+      text-decoration: underline;
+    }
+
+    /* DECORATIVE ELEMENTS */
+    .sparkle {
+      position: absolute;
+      animation: sparkle-float 3s infinite;
+    }
+
+    @keyframes sparkle-float {
+      0%, 100% { transform: translateY(0) rotate(0deg); opacity: 1; }
+      50% { transform: translateY(-10px) rotate(180deg); opacity: 0.5; }
+    }
+
+    /* PAGE INDICATOR */
+    .page-indicator {
+      position: fixed;
+      top: 70px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(135deg, var(--hyper-pink), var(--hyper-purple));
+      color: white;
+      padding: 8px 24px;
+      font-family: 'Bungee', cursive;
+      font-size: 12px;
+      border-radius: 20px;
+      box-shadow: 0 0 20px var(--hyper-pink);
+      z-index: 100;
+      border: 2px solid var(--hyper-cyan);
+    }
+
+    /* THREAD STYLES */
+    .thread-line {
+      width: 4px;
+      height: 30px;
+      background: linear-gradient(180deg, var(--hyper-pink), var(--hyper-purple));
+      margin-left: 36px;
+      border-radius: 4px;
+      box-shadow: 0 0 10px var(--hyper-pink);
+    }
+
+    .post-card.ancestor {
+      opacity: 0.7;
+      border-color: #555;
+    }
+
+    .post-card.ancestor::before {
+      background: #555;
+    }
+
+    .post-card.main-post {
+      border-color: var(--hyper-yellow);
+      box-shadow: 0 0 30px rgba(255, 237, 74, 0.4);
+    }
+
+    .post-card.main-post::before {
+      background: linear-gradient(90deg, var(--hyper-yellow), var(--hyper-orange), var(--hyper-yellow));
+    }
+
+    .post-card.reply {
+      margin-left: 32px;
+      border-left: 4px solid var(--hyper-purple);
+    }
+
+    .post-card.reply.nested {
+      margin-left: 64px;
+    }
+
+    /* DIVIDER */
+    .section-divider {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      padding: 40px 0;
+      margin: 20px 0;
+    }
+
+    .divider-star {
+      font-size: 24px;
+      color: var(--hyper-yellow);
+      animation: spin 4s linear infinite;
+    }
+
+    .divider-text {
+      font-family: 'Bungee', cursive;
+      font-size: 18px;
+      background: linear-gradient(90deg, var(--hyper-cyan), var(--hyper-pink), var(--hyper-yellow));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* UNDER CONSTRUCTION */
+    .under-construction {
+      text-align: center;
+      padding: 12px;
+      background: repeating-linear-gradient(45deg, #000, #000 10px, var(--hyper-yellow) 10px, var(--hyper-yellow) 20px);
+      font-family: 'Bungee', cursive;
+      font-size: 11px;
+      color: var(--hyper-bg);
+      margin-top: 16px;
+    }
+
+    .under-construction span {
+      background: var(--hyper-yellow);
+      padding: 4px 12px;
+    }
+  </style>
+</head>
+<body>
+  <!-- STARS BACKGROUND -->
+  <div class="stars">
+    <div class="star" style="top: 10%; left: 15%; animation-delay: 0s;"></div>
+    <div class="star" style="top: 20%; left: 80%; animation-delay: 0.5s;"></div>
+    <div class="star" style="top: 40%; left: 25%; animation-delay: 1s;"></div>
+    <div class="star" style="top: 60%; left: 70%; animation-delay: 1.5s;"></div>
+    <div class="star" style="top: 80%; left: 40%; animation-delay: 2s;"></div>
+    <div class="star" style="top: 30%; left: 90%; animation-delay: 0.3s;"></div>
+    <div class="star" style="top: 70%; left: 10%; animation-delay: 0.8s;"></div>
+    <div class="star" style="top: 50%; left: 50%; animation-delay: 1.3s;"></div>
+  </div>
+
+  <!-- HEADER BANNER -->
+  <header class="site-banner">
+    <div class="banner-content">
+      <div class="site-logo">
+        <div class="logo-icon">P</div>
+        <div class="logo-text">
+          <div class="logo-title">PLEROMA</div>
+          <div class="logo-tagline">★ EXPLORE THE FEDIVERSE ★</div>
+        </div>
+      </div>
+
+      <nav class="banner-nav">
+        <a href="#" class="nav-btn active">🏠 Home</a>
+        <a href="#" class="nav-btn">🌍 Explore</a>
+        <a href="#" class="nav-btn">
+          🔔 Alerts
+          <span class="badge">3</span>
+        </a>
+        <a href="#" class="nav-btn">✉️ Mail</a>
+        <a href="#" class="nav-btn">⚙️ Settings</a>
+      </nav>
+
+      <div class="user-area">
+        <div class="user-avatar">A</div>
+        <div class="user-info">
+          <div class="user-name">Alice</div>
+          <div class="user-handle">@alice@example.com</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="page-indicator">✧ Timeline Zone ✧</div>
+
+  <div class="container">
+    <!-- SIDEBAR -->
+    <aside>
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-icon">📂</span>
+          <span class="panel-title">NAVIGATE</span>
+        </div>
+        <div class="panel-content">
+          <div class="sidebar-list">
+            <a href="#" class="sidebar-item active">
+              <span class="sidebar-item-icon">🏠</span>
+              Home Zone
+            </a>
+            <a href="#" class="sidebar-item">
+              <span class="sidebar-item-icon">🏘️</span>
+              Local Hub
+            </a>
+            <a href="#" class="sidebar-item">
+              <span class="sidebar-item-icon">🌌</span>
+              Federation
+            </a>
+            <a href="#" class="sidebar-item">
+              <span class="sidebar-item-icon">🔔</span>
+              Notifications
+              <span class="sidebar-badge">3</span>
+            </a>
+            <a href="#" class="sidebar-item">
+              <span class="sidebar-item-icon">💌</span>
+              Messages
+            </a>
+            <a href="#" class="sidebar-item">
+              <span class="sidebar-item-icon">⭐</span>
+              Favorites
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top: 16px;">
+        <div class="panel-header">
+          <span class="panel-icon">👤</span>
+          <span class="panel-title">MY ZONE</span>
+        </div>
+        <div class="panel-content">
+          <div class="user-card">
+            <div class="user-card-avatar">A</div>
+            <div class="user-card-name">Alice</div>
+            <div class="user-card-handle">@alice@example.com</div>
+            <div class="user-card-stats">
+              <div class="stat">
+                <div class="stat-num">142</div>
+                <div class="stat-label">Posts</div>
+              </div>
+              <div class="stat">
+                <div class="stat-num">89</div>
+                <div class="stat-label">Friends</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="main-area">
+      <div class="panel">
+        <div class="tab-bar">
+          <div class="tab active">✨ All Posts</div>
+          <div class="tab">🖼️ Media</div>
+          <div class="tab">🔗 Links</div>
+        </div>
+
+        <div class="panel-content">
+          <!-- COMPOSER -->
+          <div class="composer">
+            <div class="composer-header">
+              <div class="composer-avatar">A</div>
+              <span class="composer-prompt">What's on your mind? ✨</span>
+            </div>
+            <textarea class="composer-textarea" placeholder="Share something cool with the fediverse!"></textarea>
+            <div class="composer-toolbar">
+              <div class="composer-tools">
+                <button class="tool-btn">🖼️</button>
+                <button class="tool-btn">🎬</button>
+                <button class="tool-btn">📊</button>
+                <button class="tool-btn">⚠️</button>
+                <button class="tool-btn">😎</button>
+              </div>
+              <button class="btn-post">POST IT!</button>
+            </div>
+          </div>
+
+          <!-- POST LIST -->
+          <div class="post-list" style="margin-top: 20px;">
+            <!-- Post 1 -->
+            <article class="post-card">
+              <div class="post-header">
+                <div class="post-author">
+                  <div class="post-avatar pink">B</div>
+                  <div>
+                    <span class="post-name">Bob Smith</span>
+                    <span class="post-badge remote">REMOTE</span>
+                    <div class="post-handle">@bob@remote.server</div>
+                  </div>
+                </div>
+                <span class="post-time">2 hours ago</span>
+              </div>
+              <div class="post-body">
+                <div class="post-content">
+                  Just finished reading "Gödel, Escher, Bach" for the third time. Each reading reveals new layers I completely missed before. 📚✨<br><br>
+                  The way Hofstadter weaves together music, art, and mathematics to explore consciousness is unparalleled. <span class="hashtag">#books</span> <span class="hashtag">#philosophy</span>
+                </div>
+              </div>
+              <div class="post-footer">
+                <button class="post-action"><span class="post-action-icon">💬</span> Reply</button>
+                <button class="post-action shared"><span class="post-action-icon">🔄</span> 12</button>
+                <button class="post-action liked"><span class="post-action-icon">💖</span> 47</button>
+                <button class="post-action"><span class="post-action-icon">⭐</span></button>
+              </div>
+            </article>
+
+            <!-- Post 2 with CW -->
+            <article class="post-card">
+              <div class="post-header">
+                <div class="post-author">
+                  <div class="post-avatar cyan">C</div>
+                  <div>
+                    <span class="post-name">Carol</span>
+                    <span class="post-badge local">LOCAL</span>
+                    <div class="post-handle">@carol@local</div>
+                  </div>
+                </div>
+                <span class="post-time">3 hours ago</span>
+              </div>
+              <div class="post-body">
+                <div class="content-warning">
+                  <div class="cw-label">HEADS UP!</div>
+                  <div class="cw-text">Discussion of current events</div>
+                  <button class="cw-toggle">👁️ Show Content</button>
+                </div>
+              </div>
+              <div class="post-footer">
+                <button class="post-action"><span class="post-action-icon">💬</span> Reply</button>
+                <button class="post-action"><span class="post-action-icon">🔄</span> 3</button>
+                <button class="post-action"><span class="post-action-icon">💖</span> 8</button>
+              </div>
+            </article>
+
+            <!-- Post 3 with media -->
+            <article class="post-card">
+              <div class="post-header">
+                <div class="post-author">
+                  <div class="post-avatar yellow">D</div>
+                  <div>
+                    <span class="post-name">Dave</span>
+                    <span class="post-badge remote">REMOTE</span>
+                    <div class="post-handle">@dave@photos.social</div>
+                  </div>
+                </div>
+                <span class="post-time">4 hours ago</span>
+              </div>
+              <div class="post-body">
+                <div class="post-content">
+                  Morning light through the fog 🌄✨ Shot on Leica M6 with Portra 400.
+                </div>
+                <div class="post-media">
+                  <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='200'%3E%3Cdefs%3E%3ClinearGradient id='g1' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%239b59b6'/%3E%3Cstop offset='100%25' style='stop-color:%23ff6b9d'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect fill='url(%23g1)' width='300' height='200'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='white' font-family='sans-serif' font-size='14'%3E✨ IMG_001 ✨%3C/text%3E%3C/svg%3E" alt="Photo 1">
+                  <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='200'%3E%3Cdefs%3E%3ClinearGradient id='g2' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%2300d4ff'/%3E%3Cstop offset='100%25' style='stop-color:%234a69bd'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect fill='url(%23g2)' width='300' height='200'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='white' font-family='sans-serif' font-size='14'%3E✨ IMG_002 ✨%3C/text%3E%3C/svg%3E" alt="Photo 2">
+                </div>
+              </div>
+              <div class="post-footer">
+                <button class="post-action"><span class="post-action-icon">💬</span> Reply</button>
+                <button class="post-action"><span class="post-action-icon">🔄</span> 28</button>
+                <button class="post-action liked"><span class="post-action-icon">💖</span> 142</button>
+                <button class="post-action"><span class="post-action-icon">⭐</span></button>
+              </div>
+            </article>
+
+            <!-- Post 4 -->
+            <article class="post-card">
+              <div class="post-header">
+                <div class="post-author">
+                  <div class="post-avatar purple">E</div>
+                  <div>
+                    <span class="post-name">Eve</span>
+                    <span class="post-badge remote">REMOTE</span>
+                    <div class="post-handle">@eve@tech.zone</div>
+                  </div>
+                </div>
+                <span class="post-time">5 hours ago</span>
+              </div>
+              <div class="post-body">
+                <div class="post-content">
+                  TIL: The original UNIX philosophy of "do one thing well" came from Ken Thompson's frustration with over-engineered systems at Bell Labs. Simple tools, powerful combinations. 💻🔧
+                </div>
+              </div>
+              <div class="post-footer">
+                <button class="post-action"><span class="post-action-icon">💬</span> Reply</button>
+                <button class="post-action"><span class="post-action-icon">🔄</span> 5</button>
+                <button class="post-action"><span class="post-action-icon">💖</span> 23</button>
+              </div>
+            </article>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- RIGHT SIDEBAR -->
+    <aside>
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-icon">🔥</span>
+          <span class="panel-title">HOT TAGS</span>
+        </div>
+        <div class="panel-content">
+          <div class="trending-item">
+            <a href="#" class="trending-tag">#rust</a>
+            <span class="trending-count">1,234</span>
+          </div>
+          <div class="trending-item">
+            <a href="#" class="trending-tag">#photography</a>
+            <span class="trending-count">892</span>
+          </div>
+          <div class="trending-item">
+            <a href="#" class="trending-tag">#books</a>
+            <span class="trending-count">567</span>
+          </div>
+          <div class="trending-item">
+            <a href="#" class="trending-tag">#opensource</a>
+            <span class="trending-count">445</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top: 16px;">
+        <div class="panel-header">
+          <span class="panel-icon">📊</span>
+          <span class="panel-title">ZONE STATS</span>
+        </div>
+        <div class="panel-content">
+          <div class="stats-box">
+            <div class="stats-title">USERS ONLINE</div>
+            <div class="stats-value">1,337</div>
+          </div>
+          <div class="stats-box" style="margin-top: 8px;">
+            <div class="stats-title">TOTAL POSTS</div>
+            <div class="stats-value">45,678</div>
+          </div>
+
+          <div class="visitor-counter">
+            <div class="visitor-counter-label">YOU ARE VISITOR #</div>
+            <div class="visitor-counter-num">001337</div>
+          </div>
+
+          <div class="webring">
+            <div class="webring-title">🌐 FEDIVERSE RING 🌐</div>
+            <div class="webring-nav">
+              <a href="#" class="webring-link">← Prev</a>
+              <a href="#" class="webring-link">Random</a>
+              <a href="#" class="webring-link">Next →</a>
+            </div>
+          </div>
+
+          <div class="under-construction">
+            <span>🚧 MORE FEATURES SOON! 🚧</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- ============================================== -->
+  <!-- THREAD VIEW -->
+  <!-- ============================================== -->
+
+  <div class="section-divider">
+    <span class="divider-star">✦</span>
+    <span class="divider-text">THREAD ZONE</span>
+    <span class="divider-star">✦</span>
+  </div>
+
+  <div class="page-indicator" style="position: relative; top: 0; left: 0; transform: none; display: block; width: fit-content; margin: 0 auto 20px;">✧ Thread View ✧</div>
+
+  <div class="container" style="padding-bottom: 40px;">
+    <!-- SIDEBAR -->
+    <aside>
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-icon">📂</span>
+          <span class="panel-title">NAVIGATE</span>
+        </div>
+        <div class="panel-content">
+          <div class="sidebar-list">
+            <a href="#" class="sidebar-item">
+              <span class="sidebar-item-icon">⬅️</span>
+              Back to Timeline
+            </a>
+            <a href="#" class="sidebar-item">
+              <span class="sidebar-item-icon">🔔</span>
+              Notifications
+              <span class="sidebar-badge">3</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- THREAD CONTENT -->
+    <main class="main-area">
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-icon">💬</span>
+          <span class="panel-title">THREAD - 3 REPLIES</span>
+        </div>
+        <div class="panel-content">
+          <div class="post-list">
+            <!-- Ancestor -->
+            <article class="post-card ancestor">
+              <div class="post-header">
+                <div class="post-author">
+                  <div class="post-avatar yellow">A</div>
+                  <div>
+                    <span class="post-name">Alice</span>
+                    <span class="post-badge local">LOCAL</span>
+                    <div class="post-handle">@alice@example.com</div>
+                  </div>
+                </div>
+                <span class="post-time">5 hours ago</span>
+              </div>
+              <div class="post-body">
+                <div class="post-content">
+                  Hot take: Most "best practices" in software development are just cargo culting. 🤷
+                </div>
+              </div>
+              <div class="post-footer">
+                <button class="post-action"><span class="post-action-icon">💬</span> 5</button>
+                <button class="post-action"><span class="post-action-icon">🔄</span> 8</button>
+                <button class="post-action"><span class="post-action-icon">💖</span> 34</button>
+              </div>
+            </article>
+
+            <div class="thread-line"></div>
+
+            <!-- Main post -->
+            <article class="post-card main-post">
+              <div class="post-header">
+                <div class="post-author">
+                  <div class="post-avatar pink">B</div>
+                  <div>
+                    <span class="post-name">Bob Smith</span>
+                    <span class="post-badge remote">REMOTE</span>
+                    <div class="post-handle">@bob@remote.server</div>
+                  </div>
+                </div>
+                <span class="post-time">4 hours ago</span>
+              </div>
+              <div class="post-body">
+                <div class="post-content">
+                  <span class="mention">@alice</span> I'd push back on this. Best practices emerge from collective experience. The problem isn't the practices themselves—it's applying them without understanding the underlying reasoning. 🧠<br><br>
+                  TDD isn't cargo cult. Neither is code review. But blindly following them without adapting to context? That's the real issue. ✨
+                </div>
+              </div>
+              <div class="post-footer">
+                <button class="post-action"><span class="post-action-icon">💬</span> Reply</button>
+                <button class="post-action shared"><span class="post-action-icon">🔄</span> 12</button>
+                <button class="post-action liked"><span class="post-action-icon">💖</span> 47</button>
+                <button class="post-action"><span class="post-action-icon">⭐</span></button>
+              </div>
+            </article>
+
+            <div class="thread-line"></div>
+
+            <!-- Reply 1 -->
+            <article class="post-card reply">
+              <div class="post-header">
+                <div class="post-author">
+                  <div class="post-avatar cyan">C</div>
+                  <div>
+                    <span class="post-name">Carol</span>
+                    <span class="post-badge local">LOCAL</span>
+                    <div class="post-handle">@carol@local</div>
+                  </div>
+                </div>
+                <span class="post-time">3 hours ago</span>
+              </div>
+              <div class="post-body">
+                <div class="post-content">
+                  <span class="mention">@bob</span> <span class="mention">@alice</span> This is the nuance that's often missing. Context matters. A startup with 2 devs has different needs than a 500-person enterprise. 💡
+                </div>
+              </div>
+              <div class="post-footer">
+                <button class="post-action"><span class="post-action-icon">💬</span> Reply</button>
+                <button class="post-action"><span class="post-action-icon">🔄</span> 2</button>
+                <button class="post-action"><span class="post-action-icon">💖</span> 15</button>
+              </div>
+            </article>
+
+            <!-- Reply 2 nested -->
+            <article class="post-card reply nested">
+              <div class="post-header">
+                <div class="post-author">
+                  <div class="post-avatar yellow">A</div>
+                  <div>
+                    <span class="post-name">Alice</span>
+                    <span class="post-badge local">LOCAL</span>
+                    <div class="post-handle">@alice@example.com</div>
+                  </div>
+                </div>
+                <span class="post-time">2 hours ago</span>
+              </div>
+              <div class="post-body">
+                <div class="post-content">
+                  <span class="mention">@carol</span> <span class="mention">@bob</span> Fair points both. I should have been more specific. I meant the practices that get applied without any thought—like "always use microservices" or "never use global state." 😅
+                </div>
+              </div>
+              <div class="post-footer">
+                <button class="post-action"><span class="post-action-icon">💬</span> Reply</button>
+                <button class="post-action"><span class="post-action-icon">🔄</span> 1</button>
+                <button class="post-action"><span class="post-action-icon">💖</span> 8</button>
+              </div>
+            </article>
+
+            <!-- Reply composer -->
+            <div class="composer" style="margin-left: 32px; margin-top: 16px;">
+              <div class="composer-header">
+                <div class="composer-avatar">A</div>
+                <span class="composer-prompt">Join the conversation! 💬</span>
+              </div>
+              <textarea class="composer-textarea" placeholder="Add your thoughts..."></textarea>
+              <div class="composer-toolbar">
+                <div class="composer-tools">
+                  <button class="tool-btn">🖼️</button>
+                  <button class="tool-btn">😎</button>
+                </div>
+                <button class="btn-post">REPLY!</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- RIGHT SIDEBAR -->
+    <aside>
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-icon">👥</span>
+          <span class="panel-title">IN THIS THREAD</span>
+        </div>
+        <div class="panel-content">
+          <div class="trending-item">
+            <span style="color: var(--hyper-yellow);">👑 @alice</span>
+            <span class="trending-count">OP</span>
+          </div>
+          <div class="trending-item">
+            <span style="color: var(--hyper-pink);">@bob</span>
+            <span class="trending-count">1</span>
+          </div>
+          <div class="trending-item">
+            <span style="color: var(--hyper-cyan);">@carol</span>
+            <span class="trending-count">1</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+</body>
+</html>

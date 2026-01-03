@@ -1,0 +1,1147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mockup 7: Windows 95 Classic - Pleroma Redux</title>
+  <style>
+    @font-face {
+      font-family: 'MS Sans Serif';
+      src: local('Tahoma'), local('Segoe UI'), local('Arial');
+    }
+
+    :root {
+      --win-bg: #008080;
+      --win-gray: #c0c0c0;
+      --win-gray-dark: #808080;
+      --win-gray-light: #dfdfdf;
+      --win-white: #ffffff;
+      --win-black: #000000;
+      --win-blue: #000080;
+      --win-blue-light: #1084d0;
+      --win-title-active: linear-gradient(90deg, #000080, #1084d0);
+      --win-title-inactive: linear-gradient(90deg, #808080, #b0b0b0);
+      --text-primary: #000000;
+      --text-disabled: #808080;
+      --highlight: #000080;
+      --highlight-text: #ffffff;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Tahoma', 'Segoe UI', 'Arial', sans-serif;
+      font-size: 11px;
+      background: var(--win-bg);
+      color: var(--text-primary);
+      min-height: 100vh;
+      padding: 8px;
+    }
+
+    /* CLASSIC 3D BORDERS */
+    .outset {
+      border: 2px solid;
+      border-color: var(--win-white) var(--win-gray-dark) var(--win-gray-dark) var(--win-white);
+    }
+
+    .inset {
+      border: 2px solid;
+      border-color: var(--win-gray-dark) var(--win-white) var(--win-white) var(--win-gray-dark);
+    }
+
+    .groove {
+      border: 2px solid;
+      border-color: var(--win-gray-dark) var(--win-white) var(--win-white) var(--win-gray-dark);
+      padding: 2px;
+    }
+
+    .groove::before {
+      content: '';
+      display: block;
+      border: 2px solid;
+      border-color: var(--win-white) var(--win-gray-dark) var(--win-gray-dark) var(--win-white);
+    }
+
+    /* WINDOW */
+    .window {
+      background: var(--win-gray);
+      border: 2px solid;
+      border-color: var(--win-gray-light) var(--win-black) var(--win-black) var(--win-gray-light);
+      box-shadow: 1px 1px 0 var(--win-black);
+    }
+
+    .window-inner {
+      border: 2px solid;
+      border-color: var(--win-white) var(--win-gray-dark) var(--win-gray-dark) var(--win-white);
+    }
+
+    /* TITLE BAR */
+    .title-bar {
+      background: var(--win-title-active);
+      padding: 2px 3px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      color: white;
+      font-weight: bold;
+      user-select: none;
+    }
+
+    .title-bar.inactive {
+      background: var(--win-title-inactive);
+    }
+
+    .title-bar-icon {
+      width: 16px;
+      height: 16px;
+      background: var(--win-gray);
+      border: 1px solid var(--win-gray-dark);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+    }
+
+    .title-bar-text {
+      flex: 1;
+      font-size: 11px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .title-bar-controls {
+      display: flex;
+      gap: 2px;
+    }
+
+    .title-btn {
+      width: 16px;
+      height: 14px;
+      background: var(--win-gray);
+      border: 2px solid;
+      border-color: var(--win-white) var(--win-gray-dark) var(--win-gray-dark) var(--win-white);
+      font-family: 'Webdings', 'Marlett', sans-serif;
+      font-size: 9px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    .title-btn:active {
+      border-color: var(--win-gray-dark) var(--win-white) var(--win-white) var(--win-gray-dark);
+    }
+
+    /* MENU BAR */
+    .menu-bar {
+      background: var(--win-gray);
+      padding: 2px 0;
+      border-bottom: 1px solid var(--win-gray-dark);
+      display: flex;
+    }
+
+    .menu-item {
+      padding: 2px 8px;
+      cursor: pointer;
+    }
+
+    .menu-item:hover {
+      background: var(--highlight);
+      color: var(--highlight-text);
+    }
+
+    .menu-item-disabled {
+      color: var(--text-disabled);
+    }
+
+    /* BUTTONS */
+    .btn {
+      background: var(--win-gray);
+      border: 2px solid;
+      border-color: var(--win-white) var(--win-gray-dark) var(--win-gray-dark) var(--win-white);
+      padding: 4px 12px;
+      font-family: inherit;
+      font-size: 11px;
+      cursor: pointer;
+      min-width: 75px;
+    }
+
+    .btn:active {
+      border-color: var(--win-gray-dark) var(--win-white) var(--win-white) var(--win-gray-dark);
+      padding: 5px 11px 3px 13px;
+    }
+
+    .btn:focus {
+      outline: 1px dotted var(--win-black);
+      outline-offset: -4px;
+    }
+
+    .btn-default {
+      border: 3px solid;
+      border-color: var(--win-black);
+      padding: 3px 11px;
+    }
+
+    .btn-default::after {
+      content: '';
+      position: absolute;
+    }
+
+    /* TEXTBOX */
+    .textbox {
+      background: var(--win-white);
+      border: 2px solid;
+      border-color: var(--win-gray-dark) var(--win-white) var(--win-white) var(--win-gray-dark);
+      padding: 3px 4px;
+      font-family: inherit;
+      font-size: 11px;
+      color: var(--text-primary);
+    }
+
+    .textbox:focus {
+      outline: none;
+    }
+
+    textarea.textbox {
+      resize: vertical;
+      min-height: 60px;
+    }
+
+    /* LISTBOX */
+    .listbox {
+      background: var(--win-white);
+      border: 2px solid;
+      border-color: var(--win-gray-dark) var(--win-white) var(--win-white) var(--win-gray-dark);
+      overflow-y: auto;
+    }
+
+    .listbox-item {
+      padding: 2px 4px;
+      cursor: pointer;
+    }
+
+    .listbox-item:hover {
+      background: var(--highlight);
+      color: var(--highlight-text);
+    }
+
+    .listbox-item.selected {
+      background: var(--highlight);
+      color: var(--highlight-text);
+    }
+
+    /* STATUS BAR */
+    .status-bar {
+      background: var(--win-gray);
+      border-top: 2px solid;
+      border-color: var(--win-gray-dark) var(--win-white) var(--win-white) var(--win-gray-dark);
+      padding: 2px 4px;
+      display: flex;
+      gap: 4px;
+      font-size: 11px;
+    }
+
+    .status-section {
+      border: 1px solid;
+      border-color: var(--win-gray-dark) var(--win-white) var(--win-white) var(--win-gray-dark);
+      padding: 1px 6px;
+      flex: 1;
+    }
+
+    .status-section:first-child {
+      flex: 3;
+    }
+
+    /* GROUP BOX */
+    .group-box {
+      border: 2px solid;
+      border-color: var(--win-gray-dark) var(--win-white) var(--win-white) var(--win-gray-dark);
+      padding: 12px 8px 8px;
+      margin: 8px 0;
+      position: relative;
+    }
+
+    .group-box-title {
+      position: absolute;
+      top: -8px;
+      left: 8px;
+      background: var(--win-gray);
+      padding: 0 4px;
+      font-size: 11px;
+    }
+
+    /* TABS */
+    .tab-control {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .tab-headers {
+      display: flex;
+      padding-left: 4px;
+    }
+
+    .tab-header {
+      background: var(--win-gray);
+      border: 2px solid;
+      border-color: var(--win-white) var(--win-gray-dark) var(--win-gray) var(--win-white);
+      padding: 4px 12px;
+      margin-right: 2px;
+      cursor: pointer;
+      position: relative;
+      top: 2px;
+    }
+
+    .tab-header.active {
+      border-bottom-color: var(--win-gray);
+      z-index: 1;
+    }
+
+    .tab-content {
+      background: var(--win-gray);
+      border: 2px solid;
+      border-color: var(--win-white) var(--win-gray-dark) var(--win-gray-dark) var(--win-white);
+      padding: 12px;
+    }
+
+    /* LAYOUT */
+    .container {
+      display: grid;
+      grid-template-columns: 180px 1fr 200px;
+      gap: 8px;
+      height: calc(100vh - 16px);
+    }
+
+    .main-area {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      overflow: hidden;
+    }
+
+    /* POST STYLING */
+    .post-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 4px;
+    }
+
+    .post {
+      background: var(--win-white);
+      border: 1px solid var(--win-gray-dark);
+      padding: 8px;
+      margin-bottom: 8px;
+    }
+
+    .post-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 6px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid var(--win-gray);
+    }
+
+    .post-author {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .post-avatar {
+      width: 32px;
+      height: 32px;
+      background: var(--win-gray);
+      border: 1px solid var(--win-gray-dark);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 14px;
+    }
+
+    .post-name {
+      font-weight: bold;
+      color: var(--win-blue);
+    }
+
+    .post-handle {
+      color: var(--text-disabled);
+    }
+
+    .post-badge {
+      font-size: 9px;
+      padding: 1px 4px;
+      background: var(--win-gray);
+      border: 1px solid var(--win-gray-dark);
+      color: var(--text-disabled);
+    }
+
+    .post-badge.local {
+      background: #90EE90;
+      color: #006400;
+    }
+
+    .post-time {
+      color: var(--text-disabled);
+      font-size: 10px;
+    }
+
+    .post-content {
+      line-height: 1.5;
+      margin-bottom: 8px;
+    }
+
+    .post-content a {
+      color: var(--win-blue);
+    }
+
+    .post-media {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 4px;
+      margin-bottom: 8px;
+    }
+
+    .post-media img {
+      width: 100%;
+      height: 80px;
+      object-fit: cover;
+      border: 2px solid;
+      border-color: var(--win-gray-dark) var(--win-white) var(--win-white) var(--win-gray-dark);
+    }
+
+    .post-actions {
+      display: flex;
+      gap: 4px;
+      padding-top: 6px;
+      border-top: 1px solid var(--win-gray);
+    }
+
+    .post-action {
+      background: var(--win-gray);
+      border: 2px solid;
+      border-color: var(--win-white) var(--win-gray-dark) var(--win-gray-dark) var(--win-white);
+      padding: 2px 8px;
+      font-family: inherit;
+      font-size: 10px;
+      cursor: pointer;
+    }
+
+    .post-action:active {
+      border-color: var(--win-gray-dark) var(--win-white) var(--win-white) var(--win-gray-dark);
+    }
+
+    .post-action.active {
+      background: #ffffcc;
+    }
+
+    /* CONTENT WARNING */
+    .content-warning {
+      background: #ffffcc;
+      border: 2px solid;
+      border-color: var(--win-gray-dark) var(--win-white) var(--win-white) var(--win-gray-dark);
+      padding: 8px;
+      margin-bottom: 8px;
+    }
+
+    .cw-icon {
+      color: #cc0000;
+      font-weight: bold;
+    }
+
+    .cw-label {
+      font-weight: bold;
+      margin-left: 4px;
+    }
+
+    .cw-text {
+      margin: 4px 0;
+    }
+
+    /* COMPOSER */
+    .composer-area {
+      padding: 8px;
+    }
+
+    .composer-toolbar {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 8px;
+    }
+
+    .toolbar-btn {
+      width: 24px;
+      height: 22px;
+      background: var(--win-gray);
+      border: 2px solid;
+      border-color: var(--win-white) var(--win-gray-dark) var(--win-gray-dark) var(--win-white);
+      font-size: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .toolbar-btn:active {
+      border-color: var(--win-gray-dark) var(--win-white) var(--win-white) var(--win-gray-dark);
+    }
+
+    .toolbar-sep {
+      width: 2px;
+      background: var(--win-gray-dark);
+      margin: 0 4px;
+    }
+
+    /* TREE VIEW (sidebar) */
+    .tree-view {
+      font-size: 11px;
+    }
+
+    .tree-item {
+      padding: 2px 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .tree-item:hover {
+      background: var(--highlight);
+      color: var(--highlight-text);
+    }
+
+    .tree-item.selected {
+      background: var(--highlight);
+      color: var(--highlight-text);
+    }
+
+    .tree-icon {
+      width: 16px;
+      height: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+    }
+
+    .tree-badge {
+      margin-left: auto;
+      background: #ff0000;
+      color: white;
+      font-size: 9px;
+      padding: 0 4px;
+      font-weight: bold;
+    }
+
+    /* PAGE INDICATOR */
+    .page-indicator {
+      position: fixed;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--win-gray);
+      border: 2px solid;
+      border-color: var(--win-white) var(--win-gray-dark) var(--win-gray-dark) var(--win-white);
+      border-top: none;
+      padding: 2px 16px;
+      font-size: 10px;
+      z-index: 1000;
+    }
+
+    /* THREAD STYLES */
+    .post.ancestor {
+      opacity: 0.7;
+      border-left: 3px solid var(--win-gray-dark);
+    }
+
+    .post.main-post {
+      border-left: 3px solid var(--win-blue);
+      background: #e8e8ff;
+    }
+
+    .post.reply {
+      margin-left: 16px;
+      border-left: 2px solid var(--win-gray);
+    }
+
+    .post.reply.nested {
+      margin-left: 32px;
+    }
+
+    .thread-line {
+      width: 16px;
+      border-left: 2px dotted var(--win-gray-dark);
+      height: 16px;
+      margin-left: 24px;
+    }
+
+    /* TASKBAR (bottom) */
+    .taskbar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 28px;
+      background: var(--win-gray);
+      border-top: 2px solid;
+      border-color: var(--win-white) var(--win-gray-dark) var(--win-gray-dark) var(--win-white);
+      display: flex;
+      align-items: center;
+      padding: 2px 4px;
+      gap: 4px;
+      z-index: 1000;
+    }
+
+    .start-btn {
+      background: var(--win-gray);
+      border: 2px solid;
+      border-color: var(--win-white) var(--win-gray-dark) var(--win-gray-dark) var(--win-white);
+      padding: 2px 6px;
+      font-weight: bold;
+      font-size: 11px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .start-btn:active {
+      border-color: var(--win-gray-dark) var(--win-white) var(--win-white) var(--win-gray-dark);
+    }
+
+    .start-logo {
+      width: 16px;
+      height: 16px;
+      background: linear-gradient(135deg, #ff0000 25%, #00ff00 25%, #00ff00 50%, #0000ff 50%, #0000ff 75%, #ffff00 75%);
+    }
+
+    .taskbar-sep {
+      width: 2px;
+      height: 20px;
+      border-left: 1px solid var(--win-gray-dark);
+      border-right: 1px solid var(--win-white);
+      margin: 0 2px;
+    }
+
+    .task-btn {
+      background: var(--win-gray);
+      border: 2px solid;
+      border-color: var(--win-white) var(--win-gray-dark) var(--win-gray-dark) var(--win-white);
+      padding: 2px 8px;
+      font-size: 11px;
+      cursor: pointer;
+      max-width: 160px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .task-btn.active {
+      border-color: var(--win-gray-dark) var(--win-white) var(--win-white) var(--win-gray-dark);
+      background: repeating-linear-gradient(45deg, var(--win-gray), var(--win-gray) 2px, var(--win-white) 2px, var(--win-white) 4px);
+    }
+
+    .taskbar-tray {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border: 2px solid;
+      border-color: var(--win-gray-dark) var(--win-white) var(--win-white) var(--win-gray-dark);
+      padding: 2px 8px;
+      font-size: 11px;
+    }
+
+    body {
+      padding-bottom: 36px;
+    }
+  </style>
+</head>
+<body>
+  <div class="page-indicator">Timeline View - Pleroma 95</div>
+
+  <!-- TASKBAR -->
+  <div class="taskbar">
+    <button class="start-btn">
+      <div class="start-logo"></div>
+      Start
+    </button>
+    <div class="taskbar-sep"></div>
+    <button class="task-btn active">📧 Pleroma - Home</button>
+    <button class="task-btn">📁 My Computer</button>
+    <div class="taskbar-tray">
+      <span>🔊</span>
+      <span>3:14 PM</span>
+    </div>
+  </div>
+
+  <div class="container">
+    <!-- SIDEBAR WINDOW -->
+    <div class="window">
+      <div class="window-inner">
+        <div class="title-bar">
+          <div class="title-bar-icon">📁</div>
+          <span class="title-bar-text">Navigation</span>
+          <div class="title-bar-controls">
+            <button class="title-btn">_</button>
+            <button class="title-btn">□</button>
+            <button class="title-btn">×</button>
+          </div>
+        </div>
+        <div style="padding: 4px;">
+          <div class="listbox" style="height: calc(100vh - 140px);">
+            <div class="tree-view">
+              <div class="tree-item selected">
+                <span class="tree-icon">📥</span>
+                Home Timeline
+              </div>
+              <div class="tree-item">
+                <span class="tree-icon">🏠</span>
+                Local
+              </div>
+              <div class="tree-item">
+                <span class="tree-icon">🌐</span>
+                Federated
+              </div>
+              <div class="tree-item">
+                <span class="tree-icon">🔔</span>
+                Notifications
+                <span class="tree-badge">3</span>
+              </div>
+              <div class="tree-item">
+                <span class="tree-icon">✉️</span>
+                Messages
+              </div>
+              <div class="tree-item">
+                <span class="tree-icon">📑</span>
+                Bookmarks
+              </div>
+              <div class="tree-item" style="margin-top: 8px; border-top: 1px solid #c0c0c0; padding-top: 8px;">
+                <span class="tree-icon">👤</span>
+                My Profile
+              </div>
+              <div class="tree-item">
+                <span class="tree-icon">⚙️</span>
+                Settings
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="status-bar">
+          <div class="status-section">@alice@example.com</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MAIN WINDOW -->
+    <div class="window main-area">
+      <div class="window-inner" style="display: flex; flex-direction: column; height: 100%;">
+        <div class="title-bar">
+          <div class="title-bar-icon">📧</div>
+          <span class="title-bar-text">Pleroma - Home Timeline</span>
+          <div class="title-bar-controls">
+            <button class="title-btn">_</button>
+            <button class="title-btn">□</button>
+            <button class="title-btn">×</button>
+          </div>
+        </div>
+        <div class="menu-bar">
+          <span class="menu-item"><u>F</u>ile</span>
+          <span class="menu-item"><u>E</u>dit</span>
+          <span class="menu-item"><u>V</u>iew</span>
+          <span class="menu-item"><u>P</u>ost</span>
+          <span class="menu-item"><u>T</u>ools</span>
+          <span class="menu-item"><u>H</u>elp</span>
+        </div>
+
+        <!-- Composer -->
+        <div class="composer-area" style="background: var(--win-gray); border-bottom: 2px solid var(--win-gray-dark);">
+          <div class="group-box">
+            <span class="group-box-title">New Post</span>
+            <div class="composer-toolbar">
+              <button class="toolbar-btn" title="Insert Image">🖼️</button>
+              <button class="toolbar-btn" title="Insert Video">🎬</button>
+              <button class="toolbar-btn" title="Insert Poll">📊</button>
+              <div class="toolbar-sep"></div>
+              <button class="toolbar-btn" title="Content Warning">⚠️</button>
+              <button class="toolbar-btn" title="Emoji">😊</button>
+              <div class="toolbar-sep"></div>
+              <button class="toolbar-btn" title="Visibility">🔒</button>
+            </div>
+            <textarea class="textbox" style="width: 100%; height: 50px;" placeholder="What's on your mind?"></textarea>
+            <div style="display: flex; justify-content: flex-end; margin-top: 8px; gap: 8px;">
+              <span style="color: var(--text-disabled); font-size: 10px; align-self: center;">0/500 characters</span>
+              <button class="btn btn-default">Post</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Posts -->
+        <div class="post-list listbox" style="flex: 1;">
+          <!-- Post 1 -->
+          <div class="post">
+            <div class="post-header">
+              <div class="post-author">
+                <div class="post-avatar">B</div>
+                <div>
+                  <span class="post-name">Bob Smith</span>
+                  <span class="post-badge">REMOTE</span><br>
+                  <span class="post-handle">@bob@remote.server</span>
+                </div>
+              </div>
+              <span class="post-time">1/15/2024 2:32 PM</span>
+            </div>
+            <div class="post-content">
+              Just finished reading "Gödel, Escher, Bach" for the third time. Each reading reveals new layers I completely missed before.<br><br>
+              The way Hofstadter weaves together music, art, and mathematics to explore consciousness is unparalleled. <a href="#">#books</a> <a href="#">#philosophy</a>
+            </div>
+            <div class="post-actions">
+              <button class="post-action">💬 Reply</button>
+              <button class="post-action active">🔄 12</button>
+              <button class="post-action active">❤️ 47</button>
+              <button class="post-action">📑 Save</button>
+              <button class="post-action">⋮</button>
+            </div>
+          </div>
+
+          <!-- Post 2 with CW -->
+          <div class="post">
+            <div class="post-header">
+              <div class="post-author">
+                <div class="post-avatar">C</div>
+                <div>
+                  <span class="post-name">Carol</span>
+                  <span class="post-badge local">LOCAL</span><br>
+                  <span class="post-handle">@carol@local</span>
+                </div>
+              </div>
+              <span class="post-time">1/15/2024 2:28 PM</span>
+            </div>
+            <div class="content-warning">
+              <span class="cw-icon">⚠️</span>
+              <span class="cw-label">Content Warning:</span>
+              <div class="cw-text">Discussion of current events</div>
+              <button class="btn" style="margin-top: 8px; min-width: auto; padding: 2px 12px;">Show Content</button>
+            </div>
+            <div class="post-actions">
+              <button class="post-action">💬 Reply</button>
+              <button class="post-action">🔄 3</button>
+              <button class="post-action">❤️ 8</button>
+            </div>
+          </div>
+
+          <!-- Post 3 with media -->
+          <div class="post">
+            <div class="post-header">
+              <div class="post-author">
+                <div class="post-avatar">D</div>
+                <div>
+                  <span class="post-name">Dave</span>
+                  <span class="post-badge">REMOTE</span><br>
+                  <span class="post-handle">@dave@photos.social</span>
+                </div>
+              </div>
+              <span class="post-time">1/15/2024 2:15 PM</span>
+            </div>
+            <div class="post-content">
+              Morning light through the fog. Shot on Leica M6 with Portra 400.
+            </div>
+            <div class="post-media">
+              <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='150'%3E%3Crect fill='%23c0c0c0' width='200' height='150'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23808080' font-family='Tahoma' font-size='11'%3EIMG_001.BMP%3C/text%3E%3C/svg%3E" alt="Photo 1">
+              <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='150'%3E%3Crect fill='%23c0c0c0' width='200' height='150'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23808080' font-family='Tahoma' font-size='11'%3EIMG_002.BMP%3C/text%3E%3C/svg%3E" alt="Photo 2">
+            </div>
+            <div class="post-actions">
+              <button class="post-action">💬 Reply</button>
+              <button class="post-action">🔄 28</button>
+              <button class="post-action active">❤️ 142</button>
+              <button class="post-action">📑 Save</button>
+            </div>
+          </div>
+
+          <!-- Post 4 -->
+          <div class="post">
+            <div class="post-header">
+              <div class="post-author">
+                <div class="post-avatar">E</div>
+                <div>
+                  <span class="post-name">Eve</span>
+                  <span class="post-badge">REMOTE</span><br>
+                  <span class="post-handle">@eve@tech.zone</span>
+                </div>
+              </div>
+              <span class="post-time">1/15/2024 1:55 PM</span>
+            </div>
+            <div class="post-content">
+              TIL: The original UNIX philosophy of "do one thing well" came from Ken Thompson's frustration with over-engineered systems at Bell Labs. Simple tools, powerful combinations.
+            </div>
+            <div class="post-actions">
+              <button class="post-action">💬 Reply</button>
+              <button class="post-action">🔄 5</button>
+              <button class="post-action">❤️ 23</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="status-bar">
+          <div class="status-section">4 posts loaded</div>
+          <div class="status-section">Connected to example.com</div>
+          <div class="status-section">Online</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT SIDEBAR -->
+    <div class="window">
+      <div class="window-inner">
+        <div class="title-bar">
+          <div class="title-bar-icon">📊</div>
+          <span class="title-bar-text">Information</span>
+          <div class="title-bar-controls">
+            <button class="title-btn">_</button>
+            <button class="title-btn">□</button>
+            <button class="title-btn">×</button>
+          </div>
+        </div>
+        <div style="padding: 8px; height: calc(100vh - 140px); overflow-y: auto;">
+          <div class="group-box">
+            <span class="group-box-title">Trending Topics</span>
+            <div class="listbox" style="height: 120px;">
+              <div class="listbox-item">#rust (1,234)</div>
+              <div class="listbox-item">#photography (892)</div>
+              <div class="listbox-item">#books (567)</div>
+              <div class="listbox-item">#opensource (445)</div>
+            </div>
+          </div>
+
+          <div class="group-box">
+            <span class="group-box-title">Instance Information</span>
+            <div style="font-size: 11px; line-height: 1.8;">
+              <strong>Server:</strong> example.com<br>
+              <strong>Users:</strong> 1,234<br>
+              <strong>Posts:</strong> 45,678<br>
+              <strong>Uptime:</strong> 99.9%<br>
+              <strong>Version:</strong> 2.6.0
+            </div>
+          </div>
+
+          <div class="group-box">
+            <span class="group-box-title">Your Account</span>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <div class="post-avatar">A</div>
+              <div style="font-size: 11px;">
+                <strong>Alice</strong><br>
+                @alice@example.com
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="status-bar">
+          <div class="status-section">Ready</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================== -->
+  <!-- THREAD VIEW -->
+  <!-- ============================================== -->
+
+  <div style="height: 40px; margin: 60px 8px 20px; background: repeating-linear-gradient(90deg, var(--win-gray) 0px, var(--win-gray) 4px, var(--win-bg) 4px, var(--win-bg) 8px);"></div>
+
+  <div class="page-indicator" style="position: relative; top: 0; left: 0; transform: none; display: block; width: fit-content; margin: 0 auto 16px;">Thread View - Pleroma 95</div>
+
+  <div class="container" style="height: auto; padding: 0 8px;">
+    <!-- SIDEBAR -->
+    <div class="window">
+      <div class="window-inner">
+        <div class="title-bar">
+          <div class="title-bar-icon">📁</div>
+          <span class="title-bar-text">Navigation</span>
+          <div class="title-bar-controls">
+            <button class="title-btn">_</button>
+            <button class="title-btn">□</button>
+            <button class="title-btn">×</button>
+          </div>
+        </div>
+        <div style="padding: 4px;">
+          <div class="listbox" style="height: 200px;">
+            <div class="tree-view">
+              <div class="tree-item">
+                <span class="tree-icon">📥</span>
+                Home Timeline
+              </div>
+              <div class="tree-item">
+                <span class="tree-icon">🔔</span>
+                Notifications
+                <span class="tree-badge">3</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- THREAD WINDOW -->
+    <div class="window">
+      <div class="window-inner">
+        <div class="title-bar">
+          <div class="title-bar-icon">💬</div>
+          <span class="title-bar-text">Thread - 3 replies</span>
+          <div class="title-bar-controls">
+            <button class="title-btn">_</button>
+            <button class="title-btn">□</button>
+            <button class="title-btn">×</button>
+          </div>
+        </div>
+        <div class="menu-bar">
+          <span class="menu-item">← <u>B</u>ack</span>
+          <span class="menu-item"><u>R</u>efresh</span>
+          <span class="menu-item"><u>E</u>xpand All</span>
+        </div>
+
+        <div class="post-list listbox" style="height: auto; padding: 8px;">
+          <!-- Ancestor -->
+          <div class="post ancestor">
+            <div class="post-header">
+              <div class="post-author">
+                <div class="post-avatar">A</div>
+                <div>
+                  <span class="post-name">Alice</span>
+                  <span class="post-badge local">LOCAL</span><br>
+                  <span class="post-handle">@alice@example.com</span>
+                </div>
+              </div>
+              <span class="post-time">1/15/2024 12:00 PM</span>
+            </div>
+            <div class="post-content">
+              Hot take: Most "best practices" in software development are just cargo culting.
+            </div>
+            <div class="post-actions">
+              <button class="post-action">💬 5</button>
+              <button class="post-action">🔄 8</button>
+              <button class="post-action">❤️ 34</button>
+            </div>
+          </div>
+
+          <div class="thread-line"></div>
+
+          <!-- Main -->
+          <div class="post main-post">
+            <div class="post-header">
+              <div class="post-author">
+                <div class="post-avatar">B</div>
+                <div>
+                  <span class="post-name">Bob Smith</span>
+                  <span class="post-badge">REMOTE</span><br>
+                  <span class="post-handle">@bob@remote.server</span>
+                </div>
+              </div>
+              <span class="post-time">1/15/2024 12:15 PM</span>
+            </div>
+            <div class="post-content">
+              <a href="#">@alice</a> I'd push back on this. Best practices emerge from collective experience. The problem isn't the practices themselves—it's applying them without understanding the underlying reasoning.<br><br>
+              TDD isn't cargo cult. Neither is code review. But blindly following them without adapting to context? That's the real issue.
+            </div>
+            <div class="post-actions">
+              <button class="post-action">💬 Reply</button>
+              <button class="post-action active">🔄 12</button>
+              <button class="post-action active">❤️ 47</button>
+              <button class="post-action">📑 Save</button>
+            </div>
+          </div>
+
+          <div class="thread-line"></div>
+
+          <!-- Reply 1 -->
+          <div class="post reply">
+            <div class="post-header">
+              <div class="post-author">
+                <div class="post-avatar">C</div>
+                <div>
+                  <span class="post-name">Carol</span>
+                  <span class="post-badge local">LOCAL</span><br>
+                  <span class="post-handle">@carol@local</span>
+                </div>
+              </div>
+              <span class="post-time">1/15/2024 12:22 PM</span>
+            </div>
+            <div class="post-content">
+              <a href="#">@bob</a> <a href="#">@alice</a> This is the nuance that's often missing. Context matters. A startup with 2 devs has different needs than a 500-person enterprise.
+            </div>
+            <div class="post-actions">
+              <button class="post-action">💬 Reply</button>
+              <button class="post-action">🔄 2</button>
+              <button class="post-action">❤️ 15</button>
+            </div>
+          </div>
+
+          <!-- Reply 2 -->
+          <div class="post reply nested">
+            <div class="post-header">
+              <div class="post-author">
+                <div class="post-avatar">A</div>
+                <div>
+                  <span class="post-name">Alice</span>
+                  <span class="post-badge local">LOCAL</span><br>
+                  <span class="post-handle">@alice@example.com</span>
+                </div>
+              </div>
+              <span class="post-time">1/15/2024 12:30 PM</span>
+            </div>
+            <div class="post-content">
+              <a href="#">@carol</a> <a href="#">@bob</a> Fair points both. I should have been more specific. I meant the practices that get applied without any thought—like "always use microservices" or "never use global state."
+            </div>
+            <div class="post-actions">
+              <button class="post-action">💬 Reply</button>
+              <button class="post-action">🔄 1</button>
+              <button class="post-action">❤️ 8</button>
+            </div>
+          </div>
+
+          <!-- Reply composer -->
+          <div class="group-box" style="margin-left: 16px;">
+            <span class="group-box-title">Reply to Thread</span>
+            <textarea class="textbox" style="width: 100%; height: 50px;" placeholder="Write your reply..."></textarea>
+            <div style="display: flex; justify-content: flex-end; margin-top: 8px; gap: 8px;">
+              <button class="btn">Cancel</button>
+              <button class="btn btn-default">Reply</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="status-bar">
+          <div class="status-section">Thread: 4 posts, 3 participants</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT SIDEBAR -->
+    <div class="window">
+      <div class="window-inner">
+        <div class="title-bar">
+          <div class="title-bar-icon">👥</div>
+          <span class="title-bar-text">Participants</span>
+          <div class="title-bar-controls">
+            <button class="title-btn">_</button>
+            <button class="title-btn">□</button>
+            <button class="title-btn">×</button>
+          </div>
+        </div>
+        <div style="padding: 8px;">
+          <div class="listbox" style="height: 150px;">
+            <div class="listbox-item selected">👤 Alice (OP)</div>
+            <div class="listbox-item">👤 Bob Smith</div>
+            <div class="listbox-item">👤 Carol</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

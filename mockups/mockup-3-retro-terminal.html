@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mockup 3: Neo Retro Terminal - Pleroma Redux</title>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-base: #0c0c0c;
+      --bg-surface: #151515;
+      --bg-elevated: #1a1a1a;
+      --bg-hover: #222222;
+      --text-primary: #e0e0e0;
+      --text-secondary: #a0a0a0;
+      --text-muted: #606060;
+      --border: #2a2a2a;
+      --border-subtle: #1f1f1f;
+      --accent: #4ade80;
+      --accent-dim: #22c55e;
+      --accent-bg: rgba(74, 222, 128, 0.1);
+      --secondary: #facc15;
+      --secondary-bg: rgba(250, 204, 21, 0.1);
+      --danger: #f87171;
+      --info: #60a5fa;
+      --link: #93c5fd;
+    }
+
+    [data-theme="amber"] {
+      --accent: #fbbf24;
+      --accent-dim: #f59e0b;
+      --accent-bg: rgba(251, 191, 36, 0.1);
+      --secondary: #4ade80;
+      --secondary-bg: rgba(74, 222, 128, 0.1);
+    }
+
+    [data-theme="light"] {
+      --bg-base: #fafafa;
+      --bg-surface: #ffffff;
+      --bg-elevated: #f5f5f5;
+      --bg-hover: #ebebeb;
+      --text-primary: #171717;
+      --text-secondary: #525252;
+      --text-muted: #a3a3a3;
+      --border: #e5e5e5;
+      --border-subtle: #f0f0f0;
+      --accent: #16a34a;
+      --accent-dim: #15803d;
+      --accent-bg: rgba(22, 163, 74, 0.1);
+      --link: #2563eb;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'IBM Plex Mono', 'JetBrains Mono', monospace;
+      background: var(--bg-base);
+      color: var(--text-primary);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    /* Scanline effect */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 0, 0, 0.03) 2px,
+        rgba(0, 0, 0, 0.03) 4px
+      );
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    .container {
+      display: grid;
+      grid-template-columns: 180px 1fr 260px;
+      min-height: 100vh;
+    }
+
+    /* SIDEBAR */
+    .sidebar {
+      background: var(--bg-surface);
+      border-right: 1px solid var(--border);
+      padding: 16px 12px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .logo {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--accent);
+      margin-bottom: 20px;
+      padding: 8px;
+      border: 1px solid var(--accent);
+      text-align: center;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    .nav-section {
+      margin-bottom: 16px;
+    }
+
+    .nav-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      padding: 4px 8px;
+      margin-bottom: 4px;
+    }
+
+    .nav-link {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px;
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 12px;
+      border-left: 2px solid transparent;
+      transition: all 0.1s;
+    }
+
+    .nav-link:hover {
+      background: var(--bg-hover);
+      color: var(--text-primary);
+    }
+
+    .nav-link.active {
+      background: var(--accent-bg);
+      color: var(--accent);
+      border-left-color: var(--accent);
+    }
+
+    .nav-key {
+      font-size: 10px;
+      color: var(--text-muted);
+      padding: 2px 4px;
+      border: 1px solid var(--border);
+      border-radius: 2px;
+      margin-left: auto;
+    }
+
+    .nav-badge {
+      background: var(--accent);
+      color: var(--bg-base);
+      font-size: 10px;
+      font-weight: 600;
+      padding: 1px 5px;
+      border-radius: 2px;
+      margin-left: auto;
+    }
+
+    .user-block {
+      margin-top: auto;
+      padding: 10px 8px;
+      border-top: 1px solid var(--border);
+      font-size: 11px;
+    }
+
+    .user-name {
+      color: var(--accent);
+      font-weight: 500;
+    }
+
+    .user-handle {
+      color: var(--text-muted);
+    }
+
+    /* MAIN CONTENT */
+    .main {
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--border);
+    }
+
+    .header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--bg-surface);
+    }
+
+    .header-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .header-tabs {
+      display: flex;
+      gap: 4px;
+    }
+
+    .header-tab {
+      padding: 4px 10px;
+      font-size: 11px;
+      color: var(--text-muted);
+      text-decoration: none;
+      border: 1px solid transparent;
+    }
+
+    .header-tab:hover {
+      color: var(--text-primary);
+      border-color: var(--border);
+    }
+
+    .header-tab.active {
+      color: var(--accent);
+      border-color: var(--accent);
+      background: var(--accent-bg);
+    }
+
+    /* COMPOSER */
+    .composer {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-elevated);
+    }
+
+    .composer-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+    }
+
+    .composer-textarea {
+      width: 100%;
+      min-height: 60px;
+      padding: 10px;
+      background: var(--bg-base);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      font-family: inherit;
+      font-size: 13px;
+      resize: vertical;
+    }
+
+    .composer-textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .composer-textarea::placeholder {
+      color: var(--text-muted);
+    }
+
+    .composer-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 8px;
+    }
+
+    .composer-tools {
+      display: flex;
+      gap: 4px;
+    }
+
+    .tool-btn {
+      padding: 4px 8px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      font-family: inherit;
+      font-size: 10px;
+      cursor: pointer;
+    }
+
+    .tool-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .char-count {
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+
+    .btn-post {
+      padding: 6px 16px;
+      background: var(--accent);
+      border: none;
+      color: var(--bg-base);
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      cursor: pointer;
+    }
+
+    .btn-post:hover {
+      background: var(--accent-dim);
+    }
+
+    /* STATUS LIST */
+    .status-list {
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .status {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-subtle);
+      transition: background 0.1s;
+    }
+
+    .status:hover {
+      background: var(--bg-surface);
+    }
+
+    .status-meta {
+      display: flex;
+      gap: 8px;
+      align-items: baseline;
+      margin-bottom: 6px;
+      font-size: 11px;
+    }
+
+    .status-author {
+      color: var(--accent);
+      font-weight: 500;
+      text-decoration: none;
+    }
+
+    .status-author:hover {
+      text-decoration: underline;
+    }
+
+    .status-handle {
+      color: var(--text-muted);
+    }
+
+    .status-time {
+      color: var(--text-muted);
+      margin-left: auto;
+    }
+
+    .status-badge {
+      font-size: 9px;
+      padding: 1px 4px;
+      border: 1px solid var(--text-muted);
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+
+    .status-badge.local {
+      border-color: var(--secondary);
+      color: var(--secondary);
+    }
+
+    .status-content {
+      color: var(--text-primary);
+      margin-bottom: 8px;
+      word-wrap: break-word;
+    }
+
+    .status-content a {
+      color: var(--link);
+    }
+
+    .status-content .mention {
+      color: var(--accent);
+    }
+
+    .status-content .hashtag {
+      color: var(--secondary);
+    }
+
+    .status-media {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 4px;
+      margin-bottom: 8px;
+    }
+
+    .status-media img {
+      width: 100%;
+      height: 100px;
+      object-fit: cover;
+      border: 1px solid var(--border);
+      filter: grayscale(20%);
+    }
+
+    .status-media img:hover {
+      filter: none;
+      border-color: var(--accent);
+    }
+
+    .status-actions {
+      display: flex;
+      gap: 16px;
+      font-size: 11px;
+    }
+
+    .action {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      color: var(--text-muted);
+      background: none;
+      border: none;
+      font-family: inherit;
+      font-size: 11px;
+      cursor: pointer;
+      padding: 2px 0;
+    }
+
+    .action:hover {
+      color: var(--text-primary);
+    }
+
+    .action.liked {
+      color: var(--danger);
+    }
+
+    .action.reposted {
+      color: var(--accent);
+    }
+
+    .action-key {
+      font-size: 9px;
+      color: var(--text-muted);
+      opacity: 0.5;
+    }
+
+    /* CONTENT WARNING */
+    .content-warning {
+      padding: 8px 10px;
+      background: var(--secondary-bg);
+      border-left: 2px solid var(--secondary);
+      margin-bottom: 8px;
+      font-size: 12px;
+    }
+
+    .cw-label {
+      color: var(--secondary);
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+
+    .cw-text {
+      color: var(--text-secondary);
+    }
+
+    .cw-toggle {
+      margin-top: 6px;
+      padding: 3px 8px;
+      background: transparent;
+      border: 1px solid var(--secondary);
+      color: var(--secondary);
+      font-family: inherit;
+      font-size: 10px;
+      cursor: pointer;
+    }
+
+    .cw-toggle:hover {
+      background: var(--secondary-bg);
+    }
+
+    /* ASIDE */
+    .aside {
+      background: var(--bg-surface);
+      padding: 16px;
+      font-size: 11px;
+    }
+
+    .aside-section {
+      margin-bottom: 20px;
+    }
+
+    .aside-title {
+      font-size: 10px;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 10px;
+    }
+
+    .trending-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      color: var(--text-secondary);
+    }
+
+    .trending-tag {
+      color: var(--text-primary);
+      text-decoration: none;
+    }
+
+    .trending-tag:hover {
+      color: var(--accent);
+    }
+
+    .trending-count {
+      color: var(--text-muted);
+    }
+
+    .instance-info {
+      color: var(--text-secondary);
+      line-height: 1.8;
+    }
+
+    .instance-info strong {
+      color: var(--accent);
+    }
+
+    /* THEME TOGGLE */
+    .theme-controls {
+      position: fixed;
+      bottom: 16px;
+      right: 16px;
+      display: flex;
+      gap: 4px;
+    }
+
+    .theme-btn {
+      padding: 6px 10px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      font-family: inherit;
+      font-size: 10px;
+      cursor: pointer;
+    }
+
+    .theme-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .theme-btn.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: var(--bg-base);
+    }
+
+    /* PAGE INDICATOR */
+    .page-indicator {
+      position: fixed;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 4px 16px;
+      background: var(--accent);
+      color: var(--bg-base);
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      z-index: 100;
+    }
+
+    /* THREAD STYLES */
+    .thread-line {
+      width: 1px;
+      height: 24px;
+      background: var(--border);
+      margin-left: 20px;
+    }
+
+    .thread-line.active {
+      background: var(--accent);
+    }
+
+    .status.ancestor {
+      opacity: 0.7;
+      border-left: 2px solid var(--text-muted);
+      padding-left: 14px;
+    }
+
+    .status.main-post {
+      background: var(--accent-bg);
+      border-left: 2px solid var(--accent);
+      padding-left: 14px;
+    }
+
+    .status.reply {
+      margin-left: 24px;
+      border-left: 1px solid var(--border);
+      padding-left: 14px;
+    }
+
+    .status.reply.nested {
+      margin-left: 48px;
+    }
+
+    /* ASCII decorations */
+    .ascii-divider {
+      text-align: center;
+      color: var(--text-muted);
+      padding: 8px;
+      font-size: 11px;
+      letter-spacing: 2px;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--bg-base);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--border);
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="page-indicator">// TIMELINE //</div>
+
+  <div class="container">
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="logo">PLEROMA</div>
+
+      <div class="nav-section">
+        <div class="nav-label">Navigation</div>
+        <a href="#" class="nav-link active">
+          [H] Home
+          <span class="nav-key">g h</span>
+        </a>
+        <a href="#" class="nav-link">
+          [L] Local
+          <span class="nav-key">g l</span>
+        </a>
+        <a href="#" class="nav-link">
+          [F] Federated
+          <span class="nav-key">g f</span>
+        </a>
+        <a href="#" class="nav-link">
+          [N] Notifications
+          <span class="nav-badge">3</span>
+        </a>
+        <a href="#" class="nav-link">
+          [M] Messages
+        </a>
+        <a href="#" class="nav-link">
+          [B] Bookmarks
+        </a>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-label">Account</div>
+        <a href="#" class="nav-link">
+          [P] Profile
+        </a>
+        <a href="#" class="nav-link">
+          [S] Settings
+        </a>
+      </div>
+
+      <div class="user-block">
+        <div class="user-name">@alice</div>
+        <div class="user-handle">alice@example.com</div>
+      </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="main">
+      <header class="header">
+        <h1 class="header-title">&gt; Home Timeline</h1>
+        <div class="header-tabs">
+          <a href="#" class="header-tab active">ALL</a>
+          <a href="#" class="header-tab">MEDIA</a>
+          <a href="#" class="header-tab">LINKS</a>
+        </div>
+      </header>
+
+      <div class="composer">
+        <div class="composer-label">&gt; Compose new post</div>
+        <textarea class="composer-textarea" placeholder="What's on your mind? (Ctrl+Enter to post)"></textarea>
+        <div class="composer-footer">
+          <div class="composer-tools">
+            <button class="tool-btn">[IMG]</button>
+            <button class="tool-btn">[VID]</button>
+            <button class="tool-btn">[POLL]</button>
+            <button class="tool-btn">[CW]</button>
+            <button class="tool-btn">[EMOJI]</button>
+          </div>
+          <span class="char-count">0/500</span>
+          <button class="btn-post">POST</button>
+        </div>
+      </div>
+
+      <div class="status-list">
+        <div class="ascii-divider">━━━ latest updates ━━━</div>
+
+        <!-- Status 1 -->
+        <article class="status">
+          <div class="status-meta">
+            <a href="#" class="status-author">bob</a>
+            <span class="status-handle">@bob@remote.server</span>
+            <span class="status-badge">remote</span>
+            <span class="status-time">2024-01-15 14:32:00</span>
+          </div>
+          <div class="status-content">
+            Just finished reading "Gödel, Escher, Bach" for the third time. Each reading reveals new layers I completely missed before.
+
+            The way Hofstadter weaves together music, art, and mathematics to explore consciousness is unparalleled. <span class="hashtag">#books</span> <span class="hashtag">#philosophy</span>
+          </div>
+          <div class="status-actions">
+            <button class="action">↩ reply <span class="action-key">[r]</span></button>
+            <button class="action reposted">↻ 12 <span class="action-key">[t]</span></button>
+            <button class="action liked">♥ 47 <span class="action-key">[f]</span></button>
+            <button class="action">☆ <span class="action-key">[b]</span></button>
+            <button class="action">⋮</button>
+          </div>
+        </article>
+
+        <!-- Status 2 with CW -->
+        <article class="status">
+          <div class="status-meta">
+            <a href="#" class="status-author">carol</a>
+            <span class="status-handle">@carol@local</span>
+            <span class="status-badge local">local</span>
+            <span class="status-time">2024-01-15 14:28:15</span>
+          </div>
+          <div class="content-warning">
+            <div class="cw-label">⚠ CW: current events</div>
+            <div class="cw-text">Content hidden</div>
+            <button class="cw-toggle">[SHOW]</button>
+          </div>
+          <div class="status-actions">
+            <button class="action">↩ reply</button>
+            <button class="action">↻ 3</button>
+            <button class="action">♥ 8</button>
+            <button class="action">☆</button>
+          </div>
+        </article>
+
+        <!-- Status 3 with media -->
+        <article class="status">
+          <div class="status-meta">
+            <a href="#" class="status-author">dave</a>
+            <span class="status-handle">@dave@photos.social</span>
+            <span class="status-badge">remote</span>
+            <span class="status-time">2024-01-15 14:15:42</span>
+          </div>
+          <div class="status-content">
+            Morning light through the fog. Shot on Leica M6 with Portra 400.
+          </div>
+          <div class="status-media">
+            <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='200'%3E%3Crect fill='%231a1a1a' width='300' height='200'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%234ade80' font-family='monospace' font-size='12'%3E[ IMG_001.jpg ]%3C/text%3E%3C/svg%3E" alt="Photo 1">
+            <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='200'%3E%3Crect fill='%231a1a1a' width='300' height='200'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%234ade80' font-family='monospace' font-size='12'%3E[ IMG_002.jpg ]%3C/text%3E%3C/svg%3E" alt="Photo 2">
+          </div>
+          <div class="status-actions">
+            <button class="action">↩ reply</button>
+            <button class="action">↻ 28</button>
+            <button class="action liked">♥ 142</button>
+            <button class="action">☆</button>
+          </div>
+        </article>
+
+        <!-- Status 4 -->
+        <article class="status">
+          <div class="status-meta">
+            <a href="#" class="status-author">eve</a>
+            <span class="status-handle">@eve@tech.zone</span>
+            <span class="status-badge">remote</span>
+            <span class="status-time">2024-01-15 13:55:08</span>
+          </div>
+          <div class="status-content">
+            TIL: The original UNIX philosophy of "do one thing well" came from Ken Thompson's frustration with over-engineered systems at Bell Labs. Simple tools, powerful combinations.
+          </div>
+          <div class="status-actions">
+            <button class="action">↩ reply</button>
+            <button class="action">↻ 5</button>
+            <button class="action">♥ 23</button>
+            <button class="action">☆</button>
+          </div>
+        </article>
+
+        <div class="ascii-divider">━━━ load more [j/k to navigate] ━━━</div>
+      </div>
+    </main>
+
+    <!-- ASIDE -->
+    <aside class="aside">
+      <section class="aside-section">
+        <h3 class="aside-title">&gt; TRENDING</h3>
+        <div class="trending-item">
+          <a href="#" class="trending-tag">#rust</a>
+          <span class="trending-count">1,234</span>
+        </div>
+        <div class="trending-item">
+          <a href="#" class="trending-tag">#photography</a>
+          <span class="trending-count">892</span>
+        </div>
+        <div class="trending-item">
+          <a href="#" class="trending-tag">#books</a>
+          <span class="trending-count">567</span>
+        </div>
+        <div class="trending-item">
+          <a href="#" class="trending-tag">#opensource</a>
+          <span class="trending-count">445</span>
+        </div>
+      </section>
+
+      <section class="aside-section">
+        <h3 class="aside-title">&gt; INSTANCE</h3>
+        <div class="instance-info">
+          <strong>example.com</strong><br>
+          Users: 1,234<br>
+          Posts: 45,678<br>
+          Uptime: 99.9%<br>
+          Version: 2.6.0
+        </div>
+      </section>
+
+      <section class="aside-section">
+        <h3 class="aside-title">&gt; KEYBINDS</h3>
+        <div class="instance-info">
+          j/k - Navigate<br>
+          r - Reply<br>
+          t - Repost<br>
+          f - Favorite<br>
+          n - New post<br>
+          ? - Help
+        </div>
+      </section>
+    </aside>
+  </div>
+
+  <div class="theme-controls">
+    <button class="theme-btn active" onclick="setTheme('')">GREEN</button>
+    <button class="theme-btn" onclick="setTheme('amber')">AMBER</button>
+    <button class="theme-btn" onclick="setTheme('light')">LIGHT</button>
+  </div>
+
+  <!-- ============================================== -->
+  <!-- THREAD VIEW -->
+  <!-- ============================================== -->
+
+  <div style="height: 60px; margin: 60px 0; background: repeating-linear-gradient(90deg, var(--border), var(--border) 4px, transparent 4px, transparent 8px);"></div>
+
+  <div class="page-indicator" style="position: relative; top: 0; left: 0; transform: none; display: block; width: fit-content; margin: 0 auto 30px;">// THREAD VIEW //</div>
+
+  <div class="container">
+    <!-- SIDEBAR -->
+    <aside class="sidebar" style="height: auto;">
+      <div class="logo">PLEROMA</div>
+
+      <div class="nav-section">
+        <div class="nav-label">Navigation</div>
+        <a href="#" class="nav-link">
+          [H] Home
+        </a>
+        <a href="#" class="nav-link">
+          [N] Notifications
+          <span class="nav-badge">3</span>
+        </a>
+        <a href="#" class="nav-link">
+          [M] Messages
+        </a>
+      </div>
+    </aside>
+
+    <!-- THREAD CONTENT -->
+    <main class="main" style="min-height: auto;">
+      <header class="header">
+        <h1 class="header-title">&lt; Thread (3 replies)</h1>
+        <div class="header-tabs">
+          <a href="#" class="header-tab">EXPAND ALL</a>
+          <a href="#" class="header-tab">COLLAPSE</a>
+        </div>
+      </header>
+
+      <div class="status-list">
+        <!-- Ancestor -->
+        <article class="status ancestor">
+          <div class="status-meta">
+            <a href="#" class="status-author">alice</a>
+            <span class="status-handle">@alice@example.com</span>
+            <span class="status-badge local">local</span>
+            <span class="status-time">2024-01-15 12:00:00</span>
+          </div>
+          <div class="status-content">
+            Hot take: Most "best practices" in software development are just cargo culting.
+          </div>
+          <div class="status-actions">
+            <button class="action">↩ 5</button>
+            <button class="action">↻ 8</button>
+            <button class="action">♥ 34</button>
+          </div>
+        </article>
+
+        <div class="thread-line active"></div>
+
+        <!-- Main post -->
+        <article class="status main-post">
+          <div class="status-meta">
+            <a href="#" class="status-author">bob</a>
+            <span class="status-handle">@bob@remote.server</span>
+            <span class="status-badge">remote</span>
+            <span class="status-time">2024-01-15 12:15:00</span>
+          </div>
+          <div class="status-content">
+            <span class="mention">@alice</span> I'd push back on this. Best practices emerge from collective experience. The problem isn't the practices themselves—it's applying them without understanding the underlying reasoning.
+
+            TDD isn't cargo cult. Neither is code review. But blindly following them without adapting to context? That's the real issue.
+          </div>
+          <div class="status-actions">
+            <button class="action">↩ reply</button>
+            <button class="action reposted">↻ 12</button>
+            <button class="action liked">♥ 47</button>
+            <button class="action">☆</button>
+          </div>
+        </article>
+
+        <div class="thread-line"></div>
+
+        <!-- Reply 1 -->
+        <article class="status reply">
+          <div class="status-meta">
+            <a href="#" class="status-author">carol</a>
+            <span class="status-handle">@carol@local</span>
+            <span class="status-badge local">local</span>
+            <span class="status-time">2024-01-15 12:22:00</span>
+          </div>
+          <div class="status-content">
+            <span class="mention">@bob</span> <span class="mention">@alice</span> This is the nuance that's often missing. Context matters. A startup with 2 devs has different needs than a 500-person enterprise.
+          </div>
+          <div class="status-actions">
+            <button class="action">↩ reply</button>
+            <button class="action">↻ 2</button>
+            <button class="action">♥ 15</button>
+          </div>
+        </article>
+
+        <!-- Reply 2 nested -->
+        <article class="status reply nested">
+          <div class="status-meta">
+            <a href="#" class="status-author">alice</a>
+            <span class="status-handle">@alice@example.com</span>
+            <span class="status-badge local">local</span>
+            <span class="status-time">2024-01-15 12:30:00</span>
+          </div>
+          <div class="status-content">
+            <span class="mention">@carol</span> <span class="mention">@bob</span> Fair points both. I should have been more specific. I meant the practices that get applied without any thought—like "always use microservices" or "never use global state."
+          </div>
+          <div class="status-actions">
+            <button class="action">↩ reply</button>
+            <button class="action">↻ 1</button>
+            <button class="action">♥ 8</button>
+          </div>
+        </article>
+
+        <div class="ascii-divider">━━━ add reply ━━━</div>
+
+        <!-- Reply composer -->
+        <div class="composer" style="margin-left: 24px;">
+          <div class="composer-label">&gt; Reply to thread</div>
+          <textarea class="composer-textarea" placeholder="Add to the conversation..."></textarea>
+          <div class="composer-footer">
+            <div class="composer-tools">
+              <button class="tool-btn">[IMG]</button>
+              <button class="tool-btn">[CW]</button>
+              <button class="tool-btn">[EMOJI]</button>
+            </div>
+            <span class="char-count">0/500</span>
+            <button class="btn-post">REPLY</button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- ASIDE -->
+    <aside class="aside" style="height: auto;">
+      <section class="aside-section">
+        <h3 class="aside-title">&gt; PARTICIPANTS</h3>
+        <div class="trending-item">
+          <span class="trending-tag">@alice</span>
+          <span class="trending-count">OP</span>
+        </div>
+        <div class="trending-item">
+          <span class="trending-tag">@bob</span>
+          <span class="trending-count">1</span>
+        </div>
+        <div class="trending-item">
+          <span class="trending-tag">@carol</span>
+          <span class="trending-count">1</span>
+        </div>
+      </section>
+
+      <section class="aside-section">
+        <h3 class="aside-title">&gt; THREAD NAV</h3>
+        <div class="instance-info">
+          [  - Previous<br>
+          ]  - Next<br>
+          p - Parent<br>
+          o - Open in new tab
+        </div>
+      </section>
+    </aside>
+  </div>
+
+  <script>
+    function setTheme(theme) {
+      document.body.dataset.theme = theme;
+      document.querySelectorAll('.theme-btn').forEach(btn => btn.classList.remove('active'));
+      event.target.classList.add('active');
+    }
+  </script>
+</body>
+</html>
