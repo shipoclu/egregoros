@@ -152,7 +152,7 @@ This is a **web UI** checklist for Egregoros. Items are ordered roughly by depen
 ### Performance / perceived performance
 | Feature | Status | Notes |
 |---|---:|---|
-| Skeleton loading states | PARTIAL | Timeline infinite-scroll + thread fetch states render skeleton status cards; still missing for profiles/notifications and other list pages. |
+| Skeleton loading states | PARTIAL | Timeline infinite-scroll + thread fetch states render skeleton status cards; load-more buttons (profiles, notifications, messages, tags, bookmarks) show skeleton placeholders; still missing for relationship lists and other list pages. |
 | Optimistic UI (safe actions) | PARTIAL | Likes/reposts could be optimistic with rollback. |
 | Image lazy loading and sizing | PARTIAL | `loading="lazy"` exists; add aspect ratio, srcset, etc. |
 | Offline/failed network UI | TODO | “Retry” affordances for failed actions. |
