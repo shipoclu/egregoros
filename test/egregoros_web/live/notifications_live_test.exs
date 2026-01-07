@@ -73,6 +73,37 @@ defmodule EgregorosWeb.NotificationsLiveTest do
     assert has_element?(view, "#notification-#{oldest.id}")
   end
 
+  test "notifications include loading skeleton placeholders when more pages exist", %{
+    conn: conn,
+    user: user,
+    actor: actor
+  } do
+    for idx <- 1..21 do
+      ap_id = "http://localhost:4000/activities/follow/skeleton-#{idx}"
+
+      assert {:ok, _} =
+               Pipeline.ingest(
+                 %{
+                   "id" => ap_id,
+                   "type" => "Follow",
+                   "actor" => actor.ap_id,
+                   "object" => user.ap_id
+                 },
+                 local: true
+               )
+    end
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/notifications")
+
+    assert has_element?(view, "[data-role='notifications-loading-more']")
+
+    assert has_element?(
+             view,
+             "[data-role='notifications-loading-more'] [data-role='skeleton-status-card']"
+           )
+  end
+
   test "load more hides the button when there are no more notifications", %{
     conn: conn,
     user: user,

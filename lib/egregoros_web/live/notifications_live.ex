@@ -275,13 +275,26 @@ defmodule EgregorosWeb.NotificationsLive do
             <div :if={!@notifications_end?} class="flex justify-center py-2">
               <.button
                 data-role="notifications-load-more"
-                phx-click="load_more"
+                phx-click={JS.show(to: "#notifications-loading-more") |> JS.push("load_more")}
                 phx-disable-with="Loading..."
                 aria-label="Load more notifications"
                 variant="secondary"
               >
                 <.icon name="hero-chevron-down" class="size-4" /> Load more
               </.button>
+            </div>
+
+            <div
+              :if={!@notifications_end?}
+              id="notifications-loading-more"
+              data-role="notifications-loading-more"
+              class="hidden space-y-4"
+              aria-hidden="true"
+            >
+              <.skeleton_status_card
+                :for={_ <- 1..2}
+                class="border-2 border-[color:var(--border-default)]"
+              />
             </div>
           <% else %>
             <.card class="p-6">
