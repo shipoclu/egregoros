@@ -268,6 +268,43 @@ defmodule EgregorosWeb.CoreComponents do
   end
 
   @doc """
+  Renders a skeleton placeholder for a status card.
+
+  Useful for loading states where we know a list of posts will appear soon.
+  """
+  attr :rest, :global
+  attr :class, :any, default: nil
+
+  def skeleton_status_card(assigns) do
+    ~H"""
+    <article
+      data-role="skeleton-status-card"
+      class={[
+        "animate-pulse border-b border-[color:var(--border-muted)] bg-[color:var(--bg-base)] p-5",
+        @class
+      ]}
+      {@rest}
+    >
+      <div class="flex items-start gap-3">
+        <div class="h-11 w-11 shrink-0 rounded-full bg-[color:var(--bg-muted)]"></div>
+
+        <div class="min-w-0 flex-1 space-y-3">
+          <div class="space-y-2">
+            <div class="h-3 w-40 max-w-full bg-[color:var(--bg-muted)]"></div>
+            <div class="h-3 w-28 max-w-full bg-[color:var(--bg-muted)]"></div>
+          </div>
+
+          <div class="space-y-2">
+            <div class="h-3 w-full bg-[color:var(--bg-muted)]"></div>
+            <div class="h-3 w-5/6 bg-[color:var(--bg-muted)]"></div>
+          </div>
+        </div>
+      </div>
+    </article>
+    """
+  end
+
+  @doc """
   Renders a surface container (card/panel) with consistent styling.
   """
   attr :rest, :global
@@ -724,7 +761,10 @@ defmodule EgregorosWeb.CoreComponents do
 
   def header(assigns) do
     ~H"""
-    <header class={[@actions != [] && "flex items-center justify-between gap-6", "pb-4 border-b-2 border-[color:var(--border-default)]"]}>
+    <header class={[
+      @actions != [] && "flex items-center justify-between gap-6",
+      "pb-4 border-b-2 border-[color:var(--border-default)]"
+    ]}>
       <div>
         <h1 class="text-lg font-bold uppercase tracking-wide text-[color:var(--text-primary)]">
           {render_slot(@inner_block)}

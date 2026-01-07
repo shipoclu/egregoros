@@ -205,6 +205,29 @@ defmodule EgregorosWeb.StatusLive do
     {:noreply, put_flash(socket, :info, "Copied link to clipboard.")}
   end
 
+  def handle_event("fetch_thread_context", _params, socket) do
+    case socket.assigns do
+      %{status: %{object: %{type: "Note"} = note}} ->
+        _ = ThreadDiscovery.enqueue(note)
+        {:noreply, put_flash(socket, :info, "Queued a context fetch.")}
+
+      _ ->
+        {:noreply, socket}
+    end
+  end
+
+  def handle_event("fetch_thread_replies", _params, socket) do
+    case socket.assigns do
+      %{status: %{object: %{type: "Note"} = note}, descendants: descendants} ->
+        existing_descendants = descendants |> List.wrap() |> length()
+        _ = ThreadDiscovery.enqueue_replies(note, existing_descendants: existing_descendants)
+        {:noreply, put_flash(socket, :info, "Queued a replies fetch.")}
+
+      _ ->
+        {:noreply, socket}
+    end
+  end
+
   def handle_event("mention_search", %{"q" => q, "scope" => scope}, socket) do
     q = q |> to_string() |> String.trim() |> String.trim_leading("@")
     scope = scope |> to_string() |> String.trim()
@@ -626,6 +649,19 @@ defmodule EgregorosWeb.StatusLive do
                     This post replies to something we haven't fetched yet. We'll try to pull in the missing
                     thread context in the background.
                   </p>
+
+                  <div class="mt-4">
+                    <.button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      data-role="thread-fetch-context"
+                      phx-click="fetch_thread_context"
+                      phx-disable-with="Retrying…"
+                    >
+                      Retry
+                    </.button>
+                  </div>
                 </div>
               </div>
 
@@ -669,7 +705,27 @@ defmodule EgregorosWeb.StatusLive do
                   data-role="thread-replies-fetching"
                   class="border-2 border-[color:var(--border-default)] bg-[color:var(--bg-subtle)] p-6 text-sm text-[color:var(--text-secondary)]"
                 >
-                  Fetching replies…
+                  <p class="font-bold text-[color:var(--text-primary)]">Fetching replies…</p>
+
+                  <div class="mt-5 space-y-4">
+                    <.skeleton_status_card
+                      :for={_ <- 1..3}
+                      class="border-2 border-[color:var(--border-default)]"
+                    />
+                  </div>
+
+                  <div class="mt-5">
+                    <.button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      data-role="thread-fetch-replies"
+                      phx-click="fetch_thread_replies"
+                      phx-disable-with="Retrying…"
+                    >
+                      Retry
+                    </.button>
+                  </div>
                 </div>
 
                 <div

@@ -234,6 +234,29 @@ defmodule EgregorosWeb.StatusLiveTest do
     assert_enqueued(worker: FetchThreadAncestors, args: %{"start_ap_id" => reply.ap_id})
   end
 
+  test "thread view offers a retry button for missing context", %{conn: conn, user: user} do
+    parent_ap_id = "https://remote.example/objects/missing-parent-retry"
+
+    assert {:ok, reply} =
+             Pipeline.ingest(
+               Note.build(user, "Reply") |> Map.put("inReplyTo", parent_ap_id),
+               local: true
+             )
+
+    uuid = uuid_from_ap_id(reply.ap_id)
+
+    assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}")
+
+    assert has_element?(view, "button[data-role='thread-fetch-context']", "Retry")
+
+    _html =
+      view
+      |> element("button[data-role='thread-fetch-context']")
+      |> render_click()
+
+    assert render(view) =~ "Queued a context fetch."
+  end
+
   test "status view enqueues a thread replies fetch when the object advertises a replies collection",
        %{
          conn: conn,
@@ -291,6 +314,67 @@ defmodule EgregorosWeb.StatusLiveTest do
     assert {:ok, view, _html} = live(conn, "/@bob@remote.example/#{root.id}")
 
     assert has_element?(view, "[data-role='thread-replies-fetching']", "Fetching replies")
+  end
+
+  test "thread view shows skeleton placeholders while fetching replies", %{
+    conn: conn,
+    user: user
+  } do
+    root_id = "https://remote.example/objects/root-fetching-skeleton"
+    replies_url = root_id <> "/replies"
+
+    assert {:ok, root} =
+             Pipeline.ingest(
+               %{
+                 "id" => root_id,
+                 "type" => "Note",
+                 "attributedTo" => "https://remote.example/users/bob",
+                 "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+                 "cc" => [],
+                 "content" => "<p>Root</p>",
+                 "replies" => %{"id" => replies_url, "type" => "OrderedCollection"}
+               },
+               local: false
+             )
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    assert {:ok, view, _html} = live(conn, "/@bob@remote.example/#{root.id}")
+
+    assert has_element?(
+             view,
+             "[data-role='thread-replies-fetching'] [data-role='skeleton-status-card']"
+           )
+  end
+
+  test "thread view offers a retry button while fetching replies", %{conn: conn, user: user} do
+    root_id = "https://remote.example/objects/root-fetching-replies-retry"
+    replies_url = root_id <> "/replies"
+
+    assert {:ok, root} =
+             Pipeline.ingest(
+               %{
+                 "id" => root_id,
+                 "type" => "Note",
+                 "attributedTo" => "https://remote.example/users/bob",
+                 "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+                 "cc" => [],
+                 "content" => "<p>Root</p>",
+                 "replies" => %{"id" => replies_url, "type" => "OrderedCollection"}
+               },
+               local: false
+             )
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    assert {:ok, view, _html} = live(conn, "/@bob@remote.example/#{root.id}")
+
+    assert has_element?(view, "button[data-role='thread-fetch-replies']", "Retry")
+
+    _html =
+      view
+      |> element("button[data-role='thread-fetch-replies']")
+      |> render_click()
+
+    assert render(view) =~ "Queued a replies fetch."
   end
 
   test "thread view updates when new replies arrive", %{conn: conn, user: user} do
