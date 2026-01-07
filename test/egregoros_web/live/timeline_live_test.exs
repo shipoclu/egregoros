@@ -93,7 +93,10 @@ defmodule EgregorosWeb.TimelineLiveTest do
     refute has_element?(view, "#timeline-aside")
   end
 
-  test "timeline includes a scroll restore hook for returning from threads", %{conn: conn, user: user} do
+  test "timeline includes a scroll restore hook for returning from threads", %{
+    conn: conn,
+    user: user
+  } do
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     {:ok, view, _html} = live(conn, "/")
 
@@ -352,6 +355,25 @@ defmodule EgregorosWeb.TimelineLiveTest do
     assert has_element?(view, "[data-role='compose-visibility-menu'][data-placement='bottom']")
     assert has_element?(view, "[data-role='compose-language-menu'][data-placement='bottom']")
     assert has_element?(view, "[data-role='compose-emoji-menu'][data-placement='bottom']")
+  end
+
+  test "timeline includes loading skeleton placeholders for infinite scroll", %{
+    conn: conn,
+    user: user
+  } do
+    Enum.each(1..21, fn i ->
+      assert {:ok, _note} = Pipeline.ingest(Note.build(user, "Scroll post #{i}"), local: true)
+    end)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/")
+
+    assert has_element?(view, "[data-role='timeline-loading-more']")
+
+    assert has_element?(
+             view,
+             "[data-role='timeline-loading-more'] [data-role='skeleton-status-card']"
+           )
   end
 
   test "posting rejects content longer than 5000 characters", %{conn: conn, user: user} do

@@ -931,6 +931,19 @@ defmodule EgregorosWeb.TimelineLive do
             />
           </div>
 
+          <div
+            :if={!@posts_end?}
+            id="timeline-loading-more"
+            data-role="timeline-loading-more"
+            class="hidden space-y-4"
+            aria-hidden="true"
+          >
+            <.skeleton_status_card
+              :for={_ <- 1..2}
+              class="border-2 border-[color:var(--border-default)]"
+            />
+          </div>
+
           <div :if={!@posts_end?} class="flex justify-center py-2">
             <.button
               data-role="load-more"
