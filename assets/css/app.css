@@ -24,75 +24,81 @@
 [data-phx-session], [data-phx-teleported-src] { display: contents }
 
 /* ═══════════════════════════════════════════════════════════
-   MIDNIGHT SIGNAL DESIGN SYSTEM
-   A bold, high-contrast theme with vibrant accents
+   BRUTALIST MINIMAL DESIGN SYSTEM
+   A stark, utilitarian theme with high contrast
    ═══════════════════════════════════════════════════════════ */
 
 :root {
   --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
-  /* Light mode - crisp and clean */
+  /* Light mode - pure black and white */
   --bg-base: #ffffff;
-  --bg-subtle: #f8fafc;
-  --bg-muted: #f1f5f9;
-  --bg-emphasis: #e2e8f0;
+  --bg-subtle: #f5f5f5;
+  --bg-muted: #ebebeb;
+  --bg-emphasis: #000000;
 
-  --text-primary: #0f172a;
-  --text-secondary: #334155;
-  --text-muted: #64748b;
+  --text-primary: #000000;
+  --text-secondary: #555555;
+  --text-muted: #888888;
 
-  --border-default: #e2e8f0;
-  --border-muted: #f1f5f9;
+  --border-default: #000000;
+  --border-muted: #888888;
 
-  /* Accent - electric violet */
-  --accent-primary: #7c3aed;
-  --accent-primary-hover: #6d28d9;
-  --accent-primary-subtle: #ede9fe;
+  /* Accent - pure black */
+  --accent-primary: #000000;
+  --accent-primary-hover: #333333;
+  --accent-primary-subtle: #f5f5f5;
 
-  /* Secondary accent - vivid teal */
-  --accent-secondary: #14b8a6;
-  --accent-secondary-hover: #0d9488;
-  --accent-secondary-subtle: #ccfbf1;
+  /* Secondary accent - same as primary for brutalist */
+  --accent-secondary: #000000;
+  --accent-secondary-hover: #333333;
+  --accent-secondary-subtle: #f5f5f5;
 
-  /* Semantic colors */
-  --success: #10b981;
-  --success-subtle: #d1fae5;
-  --danger: #ef4444;
-  --danger-subtle: #fee2e2;
-  --warning: #f59e0b;
-  --warning-subtle: #fef3c7;
+  /* Semantic colors - stark */
+  --success: #008800;
+  --success-subtle: #e8f5e8;
+  --danger: #cc0000;
+  --danger-subtle: #ffe8e8;
+  --warning: #cc8800;
+  --warning-subtle: #fff5e8;
+
+  /* Link color */
+  --link: #0000ee;
 }
 
 [data-theme="dark"] {
-  /* Dark mode - deep and dramatic */
-  --bg-base: #0a0a0f;
-  --bg-subtle: #12121a;
-  --bg-muted: #1a1a24;
-  --bg-emphasis: #24242e;
+  /* Dark mode - inverted */
+  --bg-base: #0a0a0a;
+  --bg-subtle: #141414;
+  --bg-muted: #1f1f1f;
+  --bg-emphasis: #ffffff;
 
-  --text-primary: #f8fafc;
-  --text-secondary: #cbd5e1;
-  --text-muted: #94a3b8;
+  --text-primary: #ffffff;
+  --text-secondary: #aaaaaa;
+  --text-muted: #666666;
 
-  --border-default: #2e2e3a;
-  --border-muted: #1f1f28;
+  --border-default: #ffffff;
+  --border-muted: #666666;
 
-  /* Accent - brighter in dark mode */
-  --accent-primary: #a78bfa;
-  --accent-primary-hover: #c4b5fd;
-  --accent-primary-subtle: #1e1b2e;
+  /* Accent - pure white in dark mode */
+  --accent-primary: #ffffff;
+  --accent-primary-hover: #cccccc;
+  --accent-primary-subtle: #1f1f1f;
 
-  --accent-secondary: #2dd4bf;
-  --accent-secondary-hover: #5eead4;
-  --accent-secondary-subtle: #0d1f1c;
+  --accent-secondary: #ffffff;
+  --accent-secondary-hover: #cccccc;
+  --accent-secondary-subtle: #1f1f1f;
 
-  --success: #34d399;
-  --success-subtle: #052e1c;
-  --danger: #f87171;
-  --danger-subtle: #2d0f0f;
-  --warning: #fbbf24;
-  --warning-subtle: #292209;
+  --success: #44cc44;
+  --success-subtle: #0a200a;
+  --danger: #ff4444;
+  --danger-subtle: #200a0a;
+  --warning: #ffaa44;
+  --warning-subtle: #201a0a;
+
+  /* Link color */
+  --link: #88aaff;
 }
 
 body {
@@ -106,41 +112,26 @@ body {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   ANIMATIONS
+   ANIMATIONS (minimal for brutalist)
    ═══════════════════════════════════════════════════════════ */
 
 @keyframes rise-fade {
-  0% { opacity: 0; transform: translateY(8px); }
-  100% { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(124, 58, 237, 0.4); }
-  50% { box-shadow: 0 0 0 8px rgba(124, 58, 237, 0); }
-}
-
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% { opacity: 0; }
+  100% { opacity: 1; }
 }
 
 .animate-rise {
-  animation: rise-fade 0.4s ease-out both;
-}
-
-.animate-pulse-glow {
-  animation: pulse-glow 2s ease-in-out infinite;
+  animation: rise-fade 0.2s ease-out both;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .animate-rise,
-  .animate-pulse-glow {
+  .animate-rise {
     animation: none;
   }
 }
 
 /* ═══════════════════════════════════════════════════════════
-   CUSTOM COMPONENT STYLES
+   CUSTOM COMPONENT STYLES (Brutalist)
    ═══════════════════════════════════════════════════════════ */
 
 /* Custom emoji should behave like inline glyphs (Tailwind preflight sets img to display:block) */
@@ -149,43 +140,59 @@ img.emoji {
   vertical-align: -0.125em;
 }
 
-/* Mention links should stand out (Tailwind preflight resets <a> to inherit color) */
+/* Mention links - simple underline on hover */
 a.mention-link {
-  color: var(--accent-primary);
-  font-weight: 600;
+  color: var(--link);
+  font-weight: 500;
   text-decoration: none;
-  border-bottom: 1px solid transparent;
 }
 
 a.mention-link:hover {
-  border-bottom-color: currentColor;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
-/* Anchor navigation inside threads should land with context and visual feedback. */
+/* Anchor navigation inside threads */
 article[data-role="status-card"] {
   scroll-margin-top: 6rem;
 }
 
 article[data-role="status-card"]:target {
-  outline: 2px solid var(--accent-primary);
-  outline-offset: 0.5rem;
+  outline: 2px solid var(--border-default);
+  outline-offset: 4px;
 }
 
-/* Gradient text for branding */
-.text-gradient {
-  background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+/* Brutalist focus shadow */
+.focus-brutal:focus,
+.focus-brutal:focus-visible {
+  outline: none;
+  box-shadow: 4px 4px 0 var(--border-default);
 }
 
-/* Glow effect for primary actions */
-.glow-primary {
-  box-shadow: 0 0 20px -5px var(--accent-primary);
+/* Brutalist button hover effect */
+.btn-brutal {
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
 }
 
-.glow-secondary {
-  box-shadow: 0 0 20px -5px var(--accent-secondary);
+.btn-brutal:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 4px 4px 0 var(--border-default);
+}
+
+.btn-brutal:active {
+  transform: translate(0, 0);
+  box-shadow: none;
+}
+
+/* Inverted button style */
+.btn-inverted {
+  background: var(--text-primary);
+  color: var(--bg-base);
+  border: 2px solid var(--border-default);
+}
+
+.btn-inverted:hover {
+  background: var(--accent-primary-hover);
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -222,31 +229,32 @@ article[data-role="status-card"]:target {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   SCROLLBAR STYLING
+   SCROLLBAR STYLING (Brutalist - no rounded corners)
    ═══════════════════════════════════════════════════════════ */
 
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
 }
 
 ::-webkit-scrollbar-track {
   background: var(--bg-subtle);
+  border-left: 1px solid var(--border-muted);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--border-default);
-  border-radius: 4px;
+  background: var(--text-muted);
+  border: 1px solid var(--border-muted);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--text-muted);
+  background: var(--text-primary);
 }
 
 /* Firefox */
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--border-default) var(--bg-subtle);
+  scrollbar-color: var(--text-muted) var(--bg-subtle);
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -254,6 +262,6 @@ article[data-role="status-card"]:target {
    ═══════════════════════════════════════════════════════════ */
 
 ::selection {
-  background: var(--accent-primary);
-  color: white;
+  background: var(--text-primary);
+  color: var(--bg-base);
 }

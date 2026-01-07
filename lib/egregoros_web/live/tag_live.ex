@@ -477,11 +477,11 @@ defmodule EgregorosWeb.TagLive do
         notifications_count={@notifications_count}
       >
         <section class="space-y-4">
-          <.card class="px-5 py-4">
+          <.card class="px-4 py-3">
             <div class="flex flex-wrap items-center justify-between gap-3">
               <.link
                 navigate={timeline_href(@current_user)}
-                class="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/70 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700 transition hover:-translate-y-0.5 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:hover:bg-slate-950"
+                class="inline-flex items-center gap-2 border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-4 py-2 text-xs font-bold uppercase tracking-wide text-[color:var(--text-secondary)] transition hover:bg-[color:var(--text-primary)] hover:text-[color:var(--bg-base)] focus-visible:outline-none focus-brutal"
                 aria-label="Back to timeline"
               >
                 <.icon name="hero-arrow-left" class="size-4" /> Timeline
@@ -490,11 +490,11 @@ defmodule EgregorosWeb.TagLive do
               <div class="text-right">
                 <p
                   data-role="tag-title"
-                  class="font-display text-lg text-slate-900 dark:text-slate-100"
+                  class="text-lg font-bold text-[color:var(--text-primary)]"
                 >
                   #{to_string(@tag)}
                 </p>
-                <p class="mt-1 text-xs uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
+                <p class="mt-1 font-mono text-xs uppercase text-[color:var(--text-muted)]">
                   Hashtag
                 </p>
               </div>
@@ -504,7 +504,7 @@ defmodule EgregorosWeb.TagLive do
           <div class="space-y-4">
             <div
               :if={@posts == []}
-              class="rounded-3xl border border-slate-200/80 bg-white/70 p-6 text-sm text-slate-600 shadow-sm shadow-slate-200/20 dark:border-slate-700/70 dark:bg-slate-950/50 dark:text-slate-300 dark:shadow-slate-900/30"
+              class="border-2 border-[color:var(--border-default)] bg-[color:var(--bg-subtle)] p-6 text-sm text-[color:var(--text-secondary)]"
             >
               No posts yet.
             </div>

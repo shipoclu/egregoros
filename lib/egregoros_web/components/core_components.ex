@@ -47,40 +47,30 @@ defmodule EgregorosWeb.CoreComponents do
       role="alert"
       data-role="toast"
       class={[
-        "pointer-events-auto w-full max-w-sm motion-safe:animate-rise overflow-hidden rounded-xl border px-4 py-3 shadow-lg",
-        @kind == :info &&
-          "border-slate-200 bg-white text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white",
-        @kind == :error &&
-          "border-red-200 bg-red-50 text-red-900 dark:border-red-800 dark:bg-red-900/50 dark:text-red-100",
+        "pointer-events-auto w-full max-w-sm motion-safe:animate-rise overflow-hidden border-2 px-4 py-3",
+        "border-[color:var(--border-default)] bg-[color:var(--bg-base)] text-[color:var(--text-primary)]",
+        @kind == :error && "border-[color:var(--danger)]",
         @class
       ]}
       {@rest}
     >
       <div class="flex items-start gap-3">
-        <div class="mt-0.5 shrink-0">
-          <.icon
-            :if={@kind == :info}
-            name="hero-information-circle"
-            class="size-5 text-violet-600 dark:text-violet-400"
-          />
-          <.icon
-            :if={@kind == :error}
-            name="hero-exclamation-circle"
-            class="size-5 text-red-600 dark:text-red-400"
-          />
+        <div class="mt-0.5 shrink-0 font-mono text-xs font-bold uppercase">
+          <span :if={@kind == :info}>[INFO]</span>
+          <span :if={@kind == :error} class="text-[color:var(--danger)]">[ERROR]</span>
         </div>
 
         <div class="min-w-0 flex-1">
-          <p :if={@title} class="font-semibold leading-6">{@title}</p>
-          <p class="text-sm leading-6 text-slate-600 dark:text-slate-300">{msg}</p>
+          <p :if={@title} class="font-bold leading-6 uppercase text-sm">{@title}</p>
+          <p class="text-sm leading-6 text-[color:var(--text-secondary)]">{msg}</p>
         </div>
 
         <button
           type="button"
-          class="group -m-1 inline-flex items-center justify-center rounded-lg p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 dark:text-slate-500 dark:hover:bg-slate-700 dark:hover:text-slate-300"
+          class="group -m-1 inline-flex items-center justify-center p-1 text-[color:var(--text-muted)] transition hover:text-[color:var(--text-primary)] hover:underline focus-visible:outline-none"
           aria-label={gettext("close")}
         >
-          <.icon name="hero-x-mark" class="size-4 opacity-70 group-hover:opacity-100" />
+          <span class="font-mono text-xs">[X]</span>
         </button>
       </div>
     </div>
@@ -110,9 +100,9 @@ defmodule EgregorosWeb.CoreComponents do
     link? = rest[:href] || rest[:navigate] || rest[:patch]
 
     base_classes = [
-      "inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-lg font-semibold transition-all",
-      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2",
-      "disabled:pointer-events-none disabled:opacity-50 dark:focus-visible:ring-offset-slate-900"
+      "inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap font-semibold uppercase tracking-wide transition-all",
+      "focus-visible:outline-none focus-visible:-translate-x-0.5 focus-visible:-translate-y-0.5 focus-visible:shadow-[4px_4px_0_var(--border-default)]",
+      "disabled:pointer-events-none disabled:opacity-50"
     ]
 
     size_classes =
@@ -125,16 +115,16 @@ defmodule EgregorosWeb.CoreComponents do
     variant_classes =
       case assigns.variant do
         "secondary" ->
-          "border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:hover:text-white"
+          "border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] text-[color:var(--text-primary)] hover:bg-[color:var(--bg-muted)]"
 
         "ghost" ->
-          "bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+          "bg-transparent text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] hover:underline underline-offset-4"
 
         "destructive" ->
-          "bg-red-600 text-white shadow-sm hover:bg-red-500 dark:bg-red-600 dark:hover:bg-red-500"
+          "border-2 border-[color:var(--danger)] bg-[color:var(--danger)] text-white hover:bg-[color:var(--bg-base)] hover:text-[color:var(--danger)]"
 
         _ ->
-          "bg-violet-600 text-white shadow-sm hover:bg-violet-500 dark:bg-violet-600 dark:hover:bg-violet-500"
+          "border-2 border-[color:var(--border-default)] bg-[color:var(--text-primary)] text-[color:var(--bg-base)] hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[4px_4px_0_var(--border-default)]"
       end
 
     assigns =
@@ -179,24 +169,24 @@ defmodule EgregorosWeb.CoreComponents do
 
     base_classes = [
       "inline-flex cursor-pointer items-center justify-center transition",
-      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2",
-      "disabled:pointer-events-none disabled:opacity-50 dark:focus-visible:ring-offset-slate-900"
+      "focus-visible:outline-none focus-visible:-translate-x-0.5 focus-visible:-translate-y-0.5 focus-visible:shadow-[4px_4px_0_var(--border-default)]",
+      "disabled:pointer-events-none disabled:opacity-50"
     ]
 
     size_classes =
       case assigns.size do
-        "sm" -> "h-8 w-8 rounded-xl"
-        "lg" -> "h-12 w-12 rounded-2xl"
-        _ -> "h-10 w-10 rounded-2xl"
+        "sm" -> "h-8 w-8"
+        "lg" -> "h-12 w-12"
+        _ -> "h-10 w-10"
       end
 
     variant_classes =
       case assigns.variant do
         "overlay" ->
-          "bg-white/10 text-white hover:bg-white/20 focus-visible:ring-white/60"
+          "border-2 border-white/50 bg-black/50 text-white hover:bg-black/70"
 
         _ ->
-          "text-slate-500 hover:bg-slate-900/5 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
+          "text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--bg-muted)]"
       end
 
     assigns =
@@ -244,7 +234,7 @@ defmodule EgregorosWeb.CoreComponents do
         data-role="compose-emoji"
         aria-label="Emoji picker"
         aria-expanded="false"
-        class="inline-flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-200"
+        class="inline-flex h-10 w-10 items-center justify-center text-[color:var(--text-muted)] transition hover:bg-[color:var(--bg-muted)] hover:text-[color:var(--text-primary)] focus-visible:outline-none"
       >
         <.icon name="hero-face-smile" class="size-5" />
       </button>
@@ -253,11 +243,10 @@ defmodule EgregorosWeb.CoreComponents do
         data-role="compose-emoji-menu"
         data-state="closed"
         class={[
-          "absolute left-0 bottom-full z-30 mb-2 hidden w-64 rounded-xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-700 dark:bg-slate-800",
-          "focus-within:ring-2 focus-within:ring-violet-500"
+          "absolute left-1/2 top-full z-30 mt-2 hidden w-64 -translate-x-1/2 border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] p-4"
         ]}
       >
-        <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+        <p class="text-xs font-bold uppercase tracking-wider text-[color:var(--text-muted)]">
           Emoji
         </p>
 
@@ -267,7 +256,7 @@ defmodule EgregorosWeb.CoreComponents do
             type="button"
             data-role="compose-emoji-option"
             data-emoji={emoji}
-            class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-xl transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 dark:hover:bg-slate-700"
+            class="inline-flex h-9 w-9 items-center justify-center text-xl transition hover:bg-[color:var(--bg-muted)] focus-visible:outline-none"
           >
             {emoji}
           </button>
@@ -290,8 +279,7 @@ defmodule EgregorosWeb.CoreComponents do
     <section
       data-role={@data_role}
       class={[
-        "rounded-xl border border-slate-200 bg-white shadow-sm",
-        "dark:border-slate-700 dark:bg-slate-800/50",
+        "border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)]",
         @class
       ]}
       {@rest}
@@ -317,11 +305,11 @@ defmodule EgregorosWeb.CoreComponents do
 
     {box_classes, text_classes} =
       case assigns.size do
-        "xs" -> {"h-7 w-7 rounded-md", "text-xs"}
-        "sm" -> {"h-9 w-9 rounded-lg", "text-sm"}
-        "lg" -> {"h-14 w-14 rounded-xl", "text-base"}
-        "xl" -> {"h-16 w-16 rounded-xl", "text-lg"}
-        _ -> {"h-11 w-11 rounded-xl", "text-sm"}
+        "xs" -> {"h-7 w-7", "text-xs"}
+        "sm" -> {"h-9 w-9", "text-sm"}
+        "lg" -> {"h-14 w-14", "text-base"}
+        "xl" -> {"h-16 w-16", "text-lg"}
+        _ -> {"h-11 w-11", "text-sm"}
       end
 
     assigns =
@@ -334,8 +322,7 @@ defmodule EgregorosWeb.CoreComponents do
     <span
       data-role={@data_role}
       class={[
-        "inline-flex shrink-0 items-center justify-center overflow-hidden border-2 border-slate-200 bg-slate-100",
-        "dark:border-slate-600 dark:bg-slate-700",
+        "inline-flex shrink-0 items-center justify-center overflow-hidden border-2 border-[color:var(--border-default)] bg-[color:var(--bg-subtle)]",
         @box_classes,
         @class
       ]}
@@ -344,7 +331,7 @@ defmodule EgregorosWeb.CoreComponents do
       <%= if is_binary(@src) and @src != "" do %>
         <img src={@src} alt={@alt} class="h-full w-full object-cover" loading="lazy" />
       <% else %>
-        <span class={["font-bold text-slate-600 dark:text-slate-300", @text_classes]}>
+        <span class={["font-bold text-[color:var(--text-secondary)]", @text_classes]}>
           {@initial}
         </span>
       <% end %>
@@ -510,7 +497,7 @@ defmodule EgregorosWeb.CoreComponents do
       data-role={@data_role}
       datetime={@iso}
       title={@iso}
-      class={["text-xs font-medium text-slate-500 dark:text-slate-400", @class]}
+      class={["font-mono text-xs text-[color:var(--text-muted)]", @class]}
     >
       {@label}
     </time>
@@ -607,7 +594,7 @@ defmodule EgregorosWeb.CoreComponents do
 
     ~H"""
     <div class="space-y-1">
-      <label class="inline-flex items-center gap-3 text-sm text-slate-700 dark:text-slate-200">
+      <label class="inline-flex items-center gap-3 text-sm text-[color:var(--text-primary)]">
         <input
           type="hidden"
           name={@name}
@@ -623,8 +610,8 @@ defmodule EgregorosWeb.CoreComponents do
           checked={@checked}
           class={[
             @class ||
-              "h-4 w-4 rounded border-slate-300 text-violet-600 shadow-sm focus:ring-2 focus:ring-violet-500 dark:border-slate-600 dark:bg-slate-800 dark:focus:ring-violet-400",
-            @errors != [] && (@error_class || "border-red-400 dark:border-red-500")
+              "h-4 w-4 border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] accent-[color:var(--text-primary)] focus:outline-none",
+            @errors != [] && (@error_class || "border-[color:var(--danger)]")
           ]}
           {@rest}
         />
@@ -641,7 +628,7 @@ defmodule EgregorosWeb.CoreComponents do
       <label
         :if={@label}
         for={@id}
-        class="block text-sm font-semibold text-slate-700 dark:text-slate-200"
+        class="block text-sm font-bold uppercase tracking-wide text-[color:var(--text-primary)]"
       >
         {@label}
       </label>
@@ -650,8 +637,8 @@ defmodule EgregorosWeb.CoreComponents do
         name={@name}
         class={[
           @class ||
-            "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-violet-400",
-          @errors != [] && (@error_class || "border-red-400 dark:border-red-500")
+            "w-full border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-3 py-2 text-sm text-[color:var(--text-primary)] outline-none transition focus:shadow-[4px_4px_0_var(--border-default)] focus:-translate-x-0.5 focus:-translate-y-0.5",
+          @errors != [] && (@error_class || "border-[color:var(--danger)]")
         ]}
         multiple={@multiple}
         {@rest}
@@ -670,7 +657,7 @@ defmodule EgregorosWeb.CoreComponents do
       <label
         :if={@label}
         for={@id}
-        class="block text-sm font-semibold text-slate-700 dark:text-slate-200"
+        class="block text-sm font-bold uppercase tracking-wide text-[color:var(--text-primary)]"
       >
         {@label}
       </label>
@@ -679,8 +666,8 @@ defmodule EgregorosWeb.CoreComponents do
         name={@name}
         class={[
           @class ||
-            "w-full resize-none rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-violet-400",
-          @errors != [] && (@error_class || "border-red-400 dark:border-red-500")
+            "w-full resize-none border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-3 py-2 text-sm text-[color:var(--text-primary)] outline-none transition focus:shadow-[4px_4px_0_var(--border-default)] focus:-translate-x-0.5 focus:-translate-y-0.5",
+          @errors != [] && (@error_class || "border-[color:var(--danger)]")
         ]}
         {@rest}
       >{Phoenix.HTML.Form.normalize_value("textarea", @value)}</textarea>
@@ -696,7 +683,7 @@ defmodule EgregorosWeb.CoreComponents do
       <label
         :if={@label}
         for={@id}
-        class="block text-sm font-semibold text-slate-700 dark:text-slate-200"
+        class="block text-sm font-bold uppercase tracking-wide text-[color:var(--text-primary)]"
       >
         {@label}
       </label>
@@ -707,8 +694,8 @@ defmodule EgregorosWeb.CoreComponents do
         value={Phoenix.HTML.Form.normalize_value(@type, @value)}
         class={[
           @class ||
-            "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-violet-400",
-          @errors != [] && (@error_class || "border-red-400 dark:border-red-500")
+            "w-full border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-3 py-2 text-sm text-[color:var(--text-primary)] outline-none transition focus:shadow-[4px_4px_0_var(--border-default)] focus:-translate-x-0.5 focus:-translate-y-0.5",
+          @errors != [] && (@error_class || "border-[color:var(--danger)]")
         ]}
         {@rest}
       />
@@ -720,8 +707,8 @@ defmodule EgregorosWeb.CoreComponents do
   # Helper used by inputs to generate form errors
   defp error(assigns) do
     ~H"""
-    <p class="mt-1 flex items-center gap-2 text-sm font-medium text-red-600 dark:text-red-400">
-      <.icon name="hero-exclamation-circle" class="size-4" />
+    <p class="mt-1 flex items-center gap-2 text-sm font-bold text-[color:var(--danger)]">
+      <span class="font-mono">[!]</span>
       {render_slot(@inner_block)}
     </p>
     """
@@ -736,12 +723,12 @@ defmodule EgregorosWeb.CoreComponents do
 
   def header(assigns) do
     ~H"""
-    <header class={[@actions != [] && "flex items-center justify-between gap-6", "pb-4"]}>
+    <header class={[@actions != [] && "flex items-center justify-between gap-6", "pb-4 border-b-2 border-[color:var(--border-default)]"]}>
       <div>
-        <h1 class="text-lg font-bold text-slate-900 dark:text-white">
+        <h1 class="text-lg font-bold uppercase tracking-wide text-[color:var(--text-primary)]">
           {render_slot(@inner_block)}
         </h1>
-        <p :if={@subtitle != []} class="mt-1 text-sm text-slate-600 dark:text-slate-400">
+        <p :if={@subtitle != []} class="mt-1 text-sm text-[color:var(--text-secondary)]">
           {render_slot(@subtitle)}
         </p>
       </div>
@@ -782,21 +769,21 @@ defmodule EgregorosWeb.CoreComponents do
       end
 
     ~H"""
-    <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800/50">
-      <table class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
-        <thead class="bg-slate-50 dark:bg-slate-800">
+    <div class="overflow-x-auto border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)]">
+      <table class="min-w-full divide-y-2 divide-[color:var(--border-default)] text-sm">
+        <thead class="bg-[color:var(--bg-subtle)]">
           <tr>
             <th
               :for={col <- @col}
               scope="col"
-              class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400"
+              class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]"
             >
               {col[:label]}
             </th>
             <th
               :if={@action != []}
               scope="col"
-              class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400"
+              class="px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]"
             >
               <span class="sr-only">{gettext("Actions")}</span>
             </th>
@@ -805,18 +792,18 @@ defmodule EgregorosWeb.CoreComponents do
         <tbody
           id={@id}
           phx-update={is_struct(@rows, Phoenix.LiveView.LiveStream) && "stream"}
-          class="divide-y divide-slate-200 dark:divide-slate-700"
+          class="divide-y divide-[color:var(--border-muted)]"
         >
           <tr
             :for={row <- @rows}
             id={@row_id && @row_id.(row)}
-            class="transition hover:bg-slate-50 dark:hover:bg-slate-700/50"
+            class="transition hover:bg-[color:var(--bg-subtle)]"
           >
             <td
               :for={col <- @col}
               phx-click={@row_click && @row_click.(row)}
               class={[
-                "px-4 py-3 align-top text-slate-900 dark:text-slate-100",
+                "px-4 py-3 align-top text-[color:var(--text-primary)]",
                 @row_click && "cursor-pointer"
               ]}
             >
@@ -852,15 +839,15 @@ defmodule EgregorosWeb.CoreComponents do
 
   def list(assigns) do
     ~H"""
-    <dl class="divide-y divide-slate-200 rounded-xl border border-slate-200 bg-white text-sm shadow-sm dark:divide-slate-700 dark:border-slate-700 dark:bg-slate-800/50">
+    <dl class="divide-y divide-[color:var(--border-muted)] border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] text-sm">
       <div
         :for={item <- @item}
         class="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-start sm:justify-between"
       >
-        <dt class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+        <dt class="text-xs font-bold uppercase tracking-wider text-[color:var(--text-muted)]">
           {item.title}
         </dt>
-        <dd class="font-medium text-slate-900 dark:text-slate-100">{render_slot(item)}</dd>
+        <dd class="font-medium text-[color:var(--text-primary)]">{render_slot(item)}</dd>
       </div>
     </dl>
     """

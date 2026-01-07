@@ -21,7 +21,7 @@ defmodule EgregorosWeb.StatusCard do
     <article
       id={@id}
       data-role="status-card"
-      class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md dark:border-slate-700 dark:bg-slate-800/50 motion-safe:animate-rise"
+      class="border-b border-[color:var(--border-muted)] bg-[color:var(--bg-base)] p-5 transition hover:bg-[color:var(--bg-subtle)]"
     >
       <div class="flex items-start justify-between gap-3">
         <div class="flex min-w-0 items-start gap-3">
@@ -29,7 +29,7 @@ defmodule EgregorosWeb.StatusCard do
             <.link
               navigate={profile_path}
               data-role="actor-link"
-              class="group flex min-w-0 items-start gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 rounded-lg"
+              class="group flex min-w-0 items-start gap-3 focus-visible:outline-none"
             >
               <div class="shrink-0">
                 <.actor_avatar actor={@entry.actor} />
@@ -38,7 +38,7 @@ defmodule EgregorosWeb.StatusCard do
               <div class="min-w-0">
                 <p
                   data-role="post-actor-name"
-                  class="truncate font-semibold text-slate-900 group-hover:text-violet-600 dark:text-white dark:group-hover:text-violet-400"
+                  class="truncate font-bold text-[color:var(--text-primary)] group-hover:underline underline-offset-2"
                 >
                   {emoji_inline(
                     Map.get(@entry.actor, :display_name) || Map.get(@entry.actor, "display_name"),
@@ -48,17 +48,17 @@ defmodule EgregorosWeb.StatusCard do
                 <div class="mt-0.5 flex flex-wrap items-center gap-2">
                   <span
                     data-role="post-actor-handle"
-                    class="truncate text-sm text-slate-500 dark:text-slate-400"
+                    class="truncate font-mono text-sm text-[color:var(--text-muted)]"
                   >
                     {@entry.actor.handle}
                   </span>
 
                   <span class={[
-                    "inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                    "inline-flex items-center border px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wide",
                     @entry.object.local &&
-                      "bg-teal-100 text-teal-700 dark:bg-teal-900/50 dark:text-teal-300",
+                      "border-[color:var(--success)] text-[color:var(--success)]",
                     !@entry.object.local &&
-                      "bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400"
+                      "border-[color:var(--border-muted)] text-[color:var(--text-muted)]"
                   ]}>
                     {if @entry.object.local, do: "local", else: "remote"}
                   </span>
@@ -73,7 +73,7 @@ defmodule EgregorosWeb.StatusCard do
             <div class="min-w-0">
               <p
                 data-role="post-actor-name"
-                class="truncate font-semibold text-slate-900 dark:text-white"
+                class="truncate font-bold text-[color:var(--text-primary)]"
               >
                 {emoji_inline(
                   Map.get(@entry.actor, :display_name) || Map.get(@entry.actor, "display_name"),
@@ -83,17 +83,17 @@ defmodule EgregorosWeb.StatusCard do
               <div class="mt-0.5 flex flex-wrap items-center gap-2">
                 <span
                   data-role="post-actor-handle"
-                  class="truncate text-sm text-slate-500 dark:text-slate-400"
+                  class="truncate font-mono text-sm text-[color:var(--text-muted)]"
                 >
                   {@entry.actor.handle}
                 </span>
 
                 <span class={[
-                  "inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                  "inline-flex items-center border px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wide",
                   @entry.object.local &&
-                    "bg-teal-100 text-teal-700 dark:bg-teal-900/50 dark:text-teal-300",
+                    "border-[color:var(--success)] text-[color:var(--success)]",
                   !@entry.object.local &&
-                    "bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400"
+                    "border-[color:var(--border-muted)] text-[color:var(--text-muted)]"
                 ]}>
                   {if @entry.object.local, do: "local", else: "remote"}
                 </span>
@@ -107,7 +107,7 @@ defmodule EgregorosWeb.StatusCard do
             <.link
               navigate={with_back_timeline(permalink_path, @back_timeline)}
               data-role="post-permalink"
-              class="inline-flex focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 rounded"
+              class="inline-flex hover:underline underline-offset-2 focus-visible:outline-none focus-brutal"
               aria-label="Open post"
             >
               <.time_ago at={@entry.object.inserted_at} />
@@ -124,19 +124,19 @@ defmodule EgregorosWeb.StatusCard do
 
       <%= if is_binary(content_warning) do %>
         <details data-role="content-warning" class="group mt-4">
-          <summary class="flex cursor-pointer items-center justify-between gap-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-left transition hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 dark:border-amber-700/50 dark:bg-amber-900/20 dark:hover:bg-amber-900/30 list-none [&::-webkit-details-marker]:hidden">
+          <summary class="flex cursor-pointer items-center justify-between gap-4 border-2 border-[color:var(--warning)] bg-[color:var(--warning-subtle)] px-4 py-3 text-left transition hover:bg-[color:var(--bg-subtle)] focus-visible:outline-none focus-brutal list-none [&::-webkit-details-marker]:hidden">
             <div class="flex min-w-0 items-start gap-3">
-              <span class="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-200 text-amber-700 dark:bg-amber-800/50 dark:text-amber-300">
-                <.icon name="hero-exclamation-triangle" class="size-4" />
+              <span class="mt-0.5 font-mono text-sm font-bold text-[color:var(--warning)]">
+                [CW]
               </span>
 
               <div class="min-w-0">
-                <p class="text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                <p class="text-xs font-bold uppercase tracking-wide text-[color:var(--warning)]">
                   Content warning
                 </p>
                 <p
                   data-role="content-warning-text"
-                  class="mt-1 truncate font-medium text-slate-900 dark:text-slate-100"
+                  class="mt-1 truncate font-medium text-[color:var(--text-primary)]"
                   title={content_warning}
                 >
                   {content_warning}
@@ -144,7 +144,7 @@ defmodule EgregorosWeb.StatusCard do
               </div>
             </div>
 
-            <span class="inline-flex shrink-0 items-center gap-2 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm dark:bg-slate-800 dark:text-slate-200">
+            <span class="inline-flex shrink-0 items-center gap-2 border border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-3 py-1.5 text-xs font-bold uppercase text-[color:var(--text-primary)]">
               <span class="group-open:hidden">Show</span>
               <span class="hidden group-open:inline">Hide</span>
               <.icon name="hero-chevron-down" class="size-4 transition group-open:rotate-180" />
@@ -159,7 +159,7 @@ defmodule EgregorosWeb.StatusCard do
 
       <div
         :if={@current_user}
-        class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4 dark:border-slate-700"
+        class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[color:var(--border-muted)] pt-4"
       >
         <div class="flex flex-wrap items-center gap-2">
           <%= if @reply_mode == :modal do %>
@@ -181,7 +181,7 @@ defmodule EgregorosWeb.StatusCard do
                   }
                 )
               }
-              class="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600 dark:hover:text-white"
+              class="inline-flex cursor-pointer items-center gap-2 border border-[color:var(--border-muted)] bg-[color:var(--bg-base)] px-3 py-2 text-sm font-medium text-[color:var(--text-secondary)] transition hover:border-[color:var(--border-default)] hover:text-[color:var(--text-primary)] focus-visible:outline-none focus-brutal"
               aria-label="Reply"
             >
               <.icon name="hero-chat-bubble-left-right" class="size-5" />
@@ -192,7 +192,7 @@ defmodule EgregorosWeb.StatusCard do
               <.link
                 navigate={reply_path}
                 data-role="reply"
-                class="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600 dark:hover:text-white"
+                class="inline-flex cursor-pointer items-center gap-2 border border-[color:var(--border-muted)] bg-[color:var(--bg-base)] px-3 py-2 text-sm font-medium text-[color:var(--text-secondary)] transition hover:border-[color:var(--border-default)] hover:text-[color:var(--text-primary)] focus-visible:outline-none focus-brutal"
                 aria-label="Reply"
               >
                 <.icon name="hero-chat-bubble-left-right" class="size-5" />
@@ -211,9 +211,9 @@ defmodule EgregorosWeb.StatusCard do
               |> JS.push("toggle_like", value: %{"id" => @entry.object.id})
             }
             class={[
-              "inline-flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium shadow-sm transition",
-              "data-[pressed=true]:border-rose-200 data-[pressed=true]:bg-rose-50 data-[pressed=true]:text-rose-700 data-[pressed=true]:hover:bg-rose-100 data-[pressed=true]:dark:border-rose-700/50 data-[pressed=true]:dark:bg-rose-900/30 data-[pressed=true]:dark:text-rose-300 data-[pressed=true]:dark:hover:bg-rose-900/50",
-              "data-[pressed=false]:border-slate-200 data-[pressed=false]:bg-white data-[pressed=false]:text-slate-600 data-[pressed=false]:hover:bg-slate-50 data-[pressed=false]:hover:text-slate-900 data-[pressed=false]:dark:border-slate-600 data-[pressed=false]:dark:bg-slate-700 data-[pressed=false]:dark:text-slate-300 data-[pressed=false]:dark:hover:bg-slate-600 data-[pressed=false]:dark:hover:text-white"
+              "inline-flex cursor-pointer items-center gap-2 border px-3 py-2 text-sm font-medium transition focus-visible:outline-none focus-brutal",
+              "data-[pressed=true]:border-[color:var(--danger)] data-[pressed=true]:bg-[color:var(--danger-subtle)] data-[pressed=true]:text-[color:var(--danger)]",
+              "data-[pressed=false]:border-[color:var(--border-muted)] data-[pressed=false]:bg-[color:var(--bg-base)] data-[pressed=false]:text-[color:var(--text-secondary)] data-[pressed=false]:hover:border-[color:var(--border-default)] data-[pressed=false]:hover:text-[color:var(--text-primary)]"
             ]}
           >
             <.icon
@@ -221,7 +221,7 @@ defmodule EgregorosWeb.StatusCard do
               class="size-5"
             />
             <span class="sr-only">{if @entry.liked?, do: "Unlike", else: "Like"}</span>
-            <span class="text-xs font-semibold tabular-nums">
+            <span class="font-mono text-xs font-bold tabular-nums">
               {@entry.likes_count}
             </span>
           </button>
@@ -236,9 +236,9 @@ defmodule EgregorosWeb.StatusCard do
               |> JS.push("toggle_repost", value: %{"id" => @entry.object.id})
             }
             class={[
-              "inline-flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium shadow-sm transition",
-              "data-[pressed=true]:border-emerald-200 data-[pressed=true]:bg-emerald-50 data-[pressed=true]:text-emerald-700 data-[pressed=true]:hover:bg-emerald-100 data-[pressed=true]:dark:border-emerald-700/50 data-[pressed=true]:dark:bg-emerald-900/30 data-[pressed=true]:dark:text-emerald-300 data-[pressed=true]:dark:hover:bg-emerald-900/50",
-              "data-[pressed=false]:border-slate-200 data-[pressed=false]:bg-white data-[pressed=false]:text-slate-600 data-[pressed=false]:hover:bg-slate-50 data-[pressed=false]:hover:text-slate-900 data-[pressed=false]:dark:border-slate-600 data-[pressed=false]:dark:bg-slate-700 data-[pressed=false]:dark:text-slate-300 data-[pressed=false]:dark:hover:bg-slate-600 data-[pressed=false]:dark:hover:text-white"
+              "inline-flex cursor-pointer items-center gap-2 border px-3 py-2 text-sm font-medium transition focus-visible:outline-none focus-brutal",
+              "data-[pressed=true]:border-[color:var(--success)] data-[pressed=true]:bg-[color:var(--success-subtle)] data-[pressed=true]:text-[color:var(--success)]",
+              "data-[pressed=false]:border-[color:var(--border-muted)] data-[pressed=false]:bg-[color:var(--bg-base)] data-[pressed=false]:text-[color:var(--text-secondary)] data-[pressed=false]:hover:border-[color:var(--border-default)] data-[pressed=false]:hover:text-[color:var(--text-primary)]"
             ]}
           >
             <.icon
@@ -246,7 +246,7 @@ defmodule EgregorosWeb.StatusCard do
               class="size-5"
             />
             <span class="sr-only">{if @entry.reposted?, do: "Unrepost", else: "Repost"}</span>
-            <span class="text-xs font-semibold tabular-nums">
+            <span class="font-mono text-xs font-bold tabular-nums">
               {@entry.reposts_count}
             </span>
           </button>
@@ -273,9 +273,9 @@ defmodule EgregorosWeb.StatusCard do
                 )
               }
               class={[
-                "inline-flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium shadow-sm transition",
-                "data-[pressed=true]:border-emerald-200 data-[pressed=true]:bg-emerald-50 data-[pressed=true]:text-emerald-700 data-[pressed=true]:hover:bg-emerald-100 data-[pressed=true]:dark:border-emerald-700/50 data-[pressed=true]:dark:bg-emerald-900/30 data-[pressed=true]:dark:text-emerald-300 data-[pressed=true]:dark:hover:bg-emerald-900/50",
-                "data-[pressed=false]:border-slate-200 data-[pressed=false]:bg-white data-[pressed=false]:text-slate-600 data-[pressed=false]:hover:bg-slate-50 data-[pressed=false]:hover:text-slate-900 data-[pressed=false]:dark:border-slate-600 data-[pressed=false]:dark:bg-slate-700 data-[pressed=false]:dark:text-slate-300 data-[pressed=false]:dark:hover:bg-slate-600 data-[pressed=false]:dark:hover:text-white"
+                "inline-flex cursor-pointer items-center gap-2 border px-3 py-2 text-sm font-medium transition focus-visible:outline-none focus-brutal",
+                "data-[pressed=true]:border-[color:var(--success)] data-[pressed=true]:bg-[color:var(--success-subtle)] data-[pressed=true]:text-[color:var(--success)]",
+                "data-[pressed=false]:border-[color:var(--border-muted)] data-[pressed=false]:bg-[color:var(--bg-base)] data-[pressed=false]:text-[color:var(--text-secondary)] data-[pressed=false]:hover:border-[color:var(--border-default)] data-[pressed=false]:hover:text-[color:var(--text-primary)]"
               ]}
             >
               <span class="text-base leading-none">
@@ -286,7 +286,7 @@ defmodule EgregorosWeb.StatusCard do
                   {emoji}
                 <% end %>
               </span>
-              <span class="text-xs font-semibold tabular-nums">{reaction.count || 0}</span>
+              <span class="font-mono text-xs font-bold tabular-nums">{reaction.count || 0}</span>
             </button>
           <% end %>
 
@@ -296,17 +296,17 @@ defmodule EgregorosWeb.StatusCard do
             class="relative"
           >
             <summary class="list-none cursor-pointer [&::-webkit-details-marker]:hidden">
-              <span class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:bg-slate-50 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-400 dark:hover:bg-slate-600 dark:hover:text-slate-200">
+              <span class="inline-flex h-9 w-9 items-center justify-center border border-[color:var(--border-muted)] bg-[color:var(--bg-base)] text-[color:var(--text-muted)] transition hover:border-[color:var(--border-default)] hover:text-[color:var(--text-primary)] focus-visible:outline-none focus-brutal">
                 <.icon name="hero-face-smile" class="size-5" />
                 <span class="sr-only">Add reaction</span>
               </span>
             </summary>
 
             <div
-              class="absolute right-0 top-11 z-40 w-64 overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-700 dark:bg-slate-800"
+              class="absolute right-0 top-11 z-40 w-64 overflow-hidden border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] p-4"
               phx-click-away={JS.remove_attribute("open", to: "#reaction-picker-#{@entry.object.id}")}
             >
-              <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              <p class="text-xs font-bold uppercase tracking-wide text-[color:var(--text-muted)]">
                 React
               </p>
 
@@ -326,7 +326,7 @@ defmodule EgregorosWeb.StatusCard do
                     )
                     |> JS.remove_attribute("open", to: "#reaction-picker-#{@entry.object.id}")
                   }
-                  class="inline-flex cursor-pointer h-9 w-9 items-center justify-center rounded-lg text-xl transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 dark:hover:bg-slate-700"
+                  class="inline-flex cursor-pointer h-9 w-9 items-center justify-center text-xl transition hover:bg-[color:var(--bg-subtle)] focus-visible:outline-none focus-brutal"
                 >
                   {emoji}
                 </button>
@@ -378,7 +378,7 @@ defmodule EgregorosWeb.StatusCard do
       data-current-user-ap-id={current_user_ap_id}
       phx-hook={if is_binary(e2ee_payload), do: "E2EEDMMessage", else: nil}
       class={[
-        "mt-4 break-words text-base leading-relaxed text-slate-700 dark:text-slate-200 [&_a]:font-medium [&_a]:text-violet-600 [&_a]:underline [&_a]:underline-offset-2 [&_a:hover]:text-violet-700 dark:[&_a]:text-violet-300 dark:[&_a:hover]:text-violet-200",
+        "mt-4 break-words text-base leading-relaxed text-[color:var(--text-secondary)] [&_a]:font-medium [&_a]:text-[color:var(--link)] [&_a]:underline [&_a]:underline-offset-2 [&_a:hover]:text-[color:var(--text-primary)]",
         is_binary(e2ee_payload) && "whitespace-pre-wrap",
         collapsible_content && "relative max-h-64 overflow-hidden"
       ]}
@@ -392,12 +392,12 @@ defmodule EgregorosWeb.StatusCard do
       <div
         :if={is_binary(e2ee_payload)}
         data-role="e2ee-dm-actions"
-        class="mt-3 flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400"
+        class="mt-3 flex items-center gap-2 text-xs font-bold text-[color:var(--text-muted)]"
       >
         <button
           type="button"
           data-role="e2ee-dm-unlock"
-          class="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+          class="inline-flex cursor-pointer items-center gap-2 border border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-3 py-1.5 text-xs font-bold uppercase text-[color:var(--text-primary)] transition hover:bg-[color:var(--text-primary)] hover:text-[color:var(--bg-base)] focus-visible:outline-none focus-brutal"
         >
           <.icon name="hero-lock-open" class="size-4" /> Unlock
         </button>
@@ -406,7 +406,7 @@ defmodule EgregorosWeb.StatusCard do
       <div
         :if={collapsible_content}
         id={fade_id}
-        class="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-white to-transparent dark:from-slate-800/50"
+        class="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-[color:var(--bg-base)] to-transparent"
         aria-hidden="true"
       >
       </div>
@@ -426,7 +426,7 @@ defmodule EgregorosWeb.StatusCard do
         |> JS.toggle_class("rotate-180", to: "##{toggle_icon_id}")
         |> JS.toggle_attribute({"aria-expanded", "true", "false"})
       }
-      class="mt-3 inline-flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600"
+      class="mt-3 inline-flex items-center gap-2 border border-[color:var(--border-muted)] bg-[color:var(--bg-subtle)] px-3 py-1.5 text-xs font-bold uppercase text-[color:var(--text-secondary)] transition hover:border-[color:var(--border-default)] hover:text-[color:var(--text-primary)] focus-visible:outline-none focus-brutal"
     >
       <span id={toggle_more_id}>Show more</span>
       <span id={toggle_less_id} class="hidden">Show less</span>
@@ -439,16 +439,16 @@ defmodule EgregorosWeb.StatusCard do
       :if={sensitive_media and @entry.attachments != []}
       id={"sensitive-media-#{@entry.object.id}"}
       data-role="sensitive-media"
-      class="mt-4 flex items-center justify-between gap-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 dark:border-rose-700/50 dark:bg-rose-900/20"
+      class="mt-4 flex items-center justify-between gap-4 border-2 border-[color:var(--danger)] bg-[color:var(--danger-subtle)] px-4 py-3"
     >
       <div class="flex min-w-0 items-center gap-3">
-        <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-rose-200 text-rose-700 dark:bg-rose-800/50 dark:text-rose-300">
-          <.icon name="hero-eye-slash" class="size-4" />
+        <span class="font-mono text-sm font-bold text-[color:var(--danger)]">
+          [NSFW]
         </span>
 
         <div class="min-w-0">
-          <p class="font-semibold text-slate-900 dark:text-slate-100">Sensitive media</p>
-          <p class="mt-0.5 text-sm text-slate-600 dark:text-slate-400">Hidden by default.</p>
+          <p class="font-bold text-[color:var(--text-primary)]">Sensitive media</p>
+          <p class="mt-0.5 text-sm text-[color:var(--text-muted)]">Hidden by default.</p>
         </div>
       </div>
 
@@ -459,7 +459,7 @@ defmodule EgregorosWeb.StatusCard do
           JS.hide(to: "#sensitive-media-#{@entry.object.id}")
           |> JS.remove_class("hidden", to: "#attachments-#{@entry.object.id}")
         }
-        class="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
+        class="inline-flex items-center gap-2 border-2 border-[color:var(--border-default)] bg-[color:var(--text-primary)] px-4 py-2 text-sm font-bold uppercase text-[color:var(--bg-base)] transition hover:bg-[color:var(--accent-primary-hover)] focus-visible:outline-none focus-brutal"
       >
         <.icon name="hero-eye" class="size-4" /> Reveal
       </button>
@@ -476,7 +476,7 @@ defmodule EgregorosWeb.StatusCard do
     >
       <div
         :for={{attachment, index} <- Enum.with_index(@entry.attachments)}
-        class="group overflow-hidden rounded-lg border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800"
+        class="group overflow-hidden border border-[color:var(--border-muted)] bg-[color:var(--bg-subtle)]"
       >
         <.attachment_media attachment={attachment} post_id={@entry.object.id} index={index} />
       </div>
@@ -675,13 +675,13 @@ defmodule EgregorosWeb.StatusCard do
         aria-label="Post actions"
         class="list-none [&::-webkit-details-marker]:hidden"
       >
-        <span class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 dark:text-slate-500 dark:hover:bg-slate-700 dark:hover:text-slate-300">
+        <span class="inline-flex h-8 w-8 items-center justify-center text-[color:var(--text-muted)] transition hover:bg-[color:var(--bg-subtle)] hover:text-[color:var(--text-primary)] focus-visible:outline-none focus-brutal">
           <.icon name="hero-ellipsis-horizontal" class="size-5" />
         </span>
       </summary>
 
       <div
-        class="absolute right-0 top-9 z-40 w-48 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-800"
+        class="absolute right-0 top-9 z-40 w-48 overflow-hidden border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)]"
         phx-click-away={JS.remove_attribute("open", to: "##{@menu_id}")}
         phx-window-keydown={JS.remove_attribute("open", to: "##{@menu_id}")}
         phx-key="escape"
@@ -696,9 +696,9 @@ defmodule EgregorosWeb.StatusCard do
             |> JS.push("copied_link")
             |> JS.remove_attribute("open", to: "##{@menu_id}")
           }
-          class="flex w-full items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-700"
+          class="flex w-full items-center gap-3 px-4 py-2.5 text-sm font-medium text-[color:var(--text-primary)] transition hover:bg-[color:var(--bg-subtle)]"
         >
-          <.icon name="hero-clipboard-document" class="size-5 text-slate-500 dark:text-slate-400" />
+          <.icon name="hero-clipboard-document" class="size-5 text-[color:var(--text-muted)]" />
           Copy link
         </button>
 
@@ -708,11 +708,11 @@ defmodule EgregorosWeb.StatusCard do
           href={@share_url}
           target="_blank"
           rel="nofollow noopener noreferrer"
-          class="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-700"
+          class="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-[color:var(--text-primary)] transition hover:bg-[color:var(--bg-subtle)]"
         >
           <.icon
             name="hero-arrow-top-right-on-square"
-            class="size-5 text-slate-500 dark:text-slate-400"
+            class="size-5 text-[color:var(--text-muted)]"
           /> Open link
         </a>
 
@@ -724,29 +724,29 @@ defmodule EgregorosWeb.StatusCard do
           phx-value-id={@entry.object.id}
           phx-disable-with="..."
           class={[
-            "flex w-full items-center gap-3 px-4 py-2.5 text-sm font-medium transition hover:bg-slate-50 dark:hover:bg-slate-700",
-            @bookmarked? && "text-violet-700 dark:text-violet-400",
-            !@bookmarked? && "text-slate-700 dark:text-slate-200"
+            "flex w-full items-center gap-3 px-4 py-2.5 text-sm font-medium transition hover:bg-[color:var(--bg-subtle)]",
+            @bookmarked? && "text-[color:var(--text-primary)]",
+            !@bookmarked? && "text-[color:var(--text-primary)]"
           ]}
         >
           <.icon
             name={if @bookmarked?, do: "hero-bookmark-solid", else: "hero-bookmark"}
             class={[
               "size-5",
-              @bookmarked? && "text-violet-600 dark:text-violet-400",
-              !@bookmarked? && "text-slate-500 dark:text-slate-400"
+              @bookmarked? && "text-[color:var(--text-primary)]",
+              !@bookmarked? && "text-[color:var(--text-muted)]"
             ]}
           />
           {if @bookmarked?, do: "Unbookmark", else: "Bookmark"}
         </button>
 
         <%= if @can_delete? do %>
-          <div class="border-t border-slate-200 dark:border-slate-700">
+          <div class="border-t border-[color:var(--border-muted)]">
             <button
               type="button"
               data-role="delete-post"
               phx-click={JS.toggle(to: "#delete-post-confirm-#{@entry.object.id}")}
-              class="flex w-full items-center gap-3 px-4 py-2.5 text-sm font-medium text-red-600 transition hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+              class="flex w-full items-center gap-3 px-4 py-2.5 text-sm font-medium text-[color:var(--danger)] transition hover:bg-[color:var(--danger-subtle)]"
             >
               <.icon name="hero-trash" class="size-5" /> Delete post
             </button>
@@ -755,7 +755,7 @@ defmodule EgregorosWeb.StatusCard do
               id={"delete-post-confirm-#{@entry.object.id}"}
               class="hidden space-y-3 px-4 pb-4 pt-2 text-sm"
             >
-              <p class="text-slate-500 dark:text-slate-400">
+              <p class="text-[color:var(--text-muted)]">
                 This cannot be undone.
               </p>
 
@@ -764,7 +764,7 @@ defmodule EgregorosWeb.StatusCard do
                   type="button"
                   data-role="delete-post-cancel"
                   phx-click={JS.hide(to: "#delete-post-confirm-#{@entry.object.id}")}
-                  class="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600"
+                  class="inline-flex items-center justify-center border border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-3 py-1.5 text-xs font-bold uppercase text-[color:var(--text-primary)] transition hover:bg-[color:var(--bg-subtle)] focus-visible:outline-none focus-brutal"
                 >
                   Cancel
                 </button>
@@ -775,7 +775,7 @@ defmodule EgregorosWeb.StatusCard do
                   phx-click="delete_post"
                   phx-value-id={@entry.object.id}
                   phx-disable-with="Deleting..."
-                  class="inline-flex items-center justify-center rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-red-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                  class="inline-flex items-center justify-center border-2 border-[color:var(--danger)] bg-[color:var(--danger)] px-3 py-1.5 text-xs font-bold uppercase text-[color:var(--bg-base)] transition hover:bg-[color:var(--danger-subtle)] hover:text-[color:var(--danger)] focus-visible:outline-none focus-brutal"
                 >
                   Delete
                 </button>
@@ -803,11 +803,11 @@ defmodule EgregorosWeb.StatusCard do
       <img
         src={@actor.avatar_url}
         alt={@actor.display_name}
-        class="h-11 w-11 rounded-xl border-2 border-slate-200 bg-white object-cover dark:border-slate-600 dark:bg-slate-700"
+        class="h-11 w-11 border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] object-cover"
         loading="lazy"
       />
     <% else %>
-      <div class="flex h-11 w-11 items-center justify-center rounded-xl border-2 border-slate-200 bg-slate-100 font-bold text-slate-600 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300">
+      <div class="flex h-11 w-11 items-center justify-center border-2 border-[color:var(--border-default)] bg-[color:var(--bg-subtle)] font-bold text-[color:var(--text-secondary)]">
         {avatar_initial(@actor.display_name)}
       </div>
     <% end %>
@@ -827,7 +827,7 @@ defmodule EgregorosWeb.StatusCard do
           data-role="attachment-open"
           data-index={@index}
           phx-click={JS.dispatch("egregoros:media-open", to: "#media-viewer")}
-          class="block w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
+          class="block w-full text-left focus-visible:outline-none focus-brutal"
           aria-label={attachment_label(@attachment, "Open image")}
         >
           <img
@@ -861,7 +861,7 @@ defmodule EgregorosWeb.StatusCard do
             data-role="attachment-open"
             data-index={@index}
             phx-click={JS.dispatch("egregoros:media-open", to: "#media-viewer")}
-            class="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-lg bg-black/50 text-white transition hover:bg-black/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+            class="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center border border-[color:var(--bg-base)] bg-black/50 text-[color:var(--bg-base)] transition hover:bg-black/70 focus-visible:outline-none focus-brutal"
             aria-label={attachment_label(@attachment, "Open video")}
           >
             <.icon name="hero-arrows-pointing-out" class="size-4" />
@@ -888,7 +888,7 @@ defmodule EgregorosWeb.StatusCard do
             data-role="attachment-open"
             data-index={@index}
             phx-click={JS.dispatch("egregoros:media-open", to: "#media-viewer")}
-            class="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-lg bg-slate-200 text-slate-600 transition hover:bg-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600"
+            class="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center border border-[color:var(--border-default)] bg-[color:var(--bg-subtle)] text-[color:var(--text-secondary)] transition hover:bg-[color:var(--bg-muted)] hover:text-[color:var(--text-primary)] focus-visible:outline-none focus-brutal"
             aria-label={attachment_label(@attachment, "Open audio")}
           >
             <.icon name="hero-arrows-pointing-out" class="size-4" />
@@ -901,10 +901,10 @@ defmodule EgregorosWeb.StatusCard do
           href={@attachment.href}
           target="_blank"
           rel="nofollow noopener noreferrer"
-          class="flex h-44 w-full items-center justify-center gap-3 px-4 font-medium text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700"
+          class="flex h-44 w-full items-center justify-center gap-3 px-4 font-medium text-[color:var(--text-primary)] transition hover:bg-[color:var(--bg-muted)]"
           title={attachment_link_label(@attachment)}
         >
-          <.icon name="hero-arrow-down-tray" class="size-5 text-slate-500 dark:text-slate-400" />
+          <.icon name="hero-arrow-down-tray" class="size-5 text-[color:var(--text-muted)]" />
           <span class="truncate">{attachment_link_label(@attachment)}</span>
         </a>
     <% end %>

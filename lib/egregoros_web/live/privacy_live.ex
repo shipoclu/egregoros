@@ -119,10 +119,10 @@ defmodule EgregorosWeb.PrivacyLive do
           <.card class="p-6">
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p class="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
+                <p class="text-xs font-bold uppercase tracking-wide text-[color:var(--text-muted)]">
                   Settings
                 </p>
-                <h2 class="mt-2 font-display text-2xl text-slate-900 dark:text-slate-100">
+                <h2 class="mt-2 text-2xl font-bold text-[color:var(--text-primary)]">
                   Privacy
                 </h2>
               </div>
@@ -136,23 +136,23 @@ defmodule EgregorosWeb.PrivacyLive do
             <div class="grid gap-6 lg:grid-cols-2">
               <.card class="p-6">
                 <div class="flex items-center justify-between gap-4">
-                  <h3 class="font-display text-xl text-slate-900 dark:text-slate-100">
+                  <h3 class="text-xl font-bold text-[color:var(--text-primary)]">
                     Muted accounts
                   </h3>
-                  <span class="text-sm text-slate-500 dark:text-slate-400">
+                  <span class="font-mono text-sm text-[color:var(--text-muted)]">
                     {length(@mutes)}
                   </span>
                 </div>
 
                 <div class="mt-4 space-y-3">
-                  <p :if={@mutes == []} class="text-sm text-slate-600 dark:text-slate-300">
+                  <p :if={@mutes == []} class="text-sm text-[color:var(--text-secondary)]">
                     No muted accounts yet.
                   </p>
 
                   <div
                     :for={mute <- @mutes}
                     id={"mute-#{mute.id}"}
-                    class="flex items-center justify-between gap-4 rounded-2xl border border-slate-200/80 bg-white/70 px-4 py-3 text-sm shadow-sm shadow-slate-200/10 dark:border-slate-700/70 dark:bg-slate-950/50 dark:shadow-slate-900/30"
+                    class="flex items-center justify-between gap-4 border border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-4 py-3 text-sm"
                   >
                     <% target = Map.get(@targets_by_ap_id, mute.object) %>
                     <div class="flex min-w-0 items-center gap-3">
@@ -162,7 +162,7 @@ defmodule EgregorosWeb.PrivacyLive do
                         src={Map.get(target || %{}, :avatar_url)}
                       />
                       <div class="min-w-0">
-                        <p class="truncate font-semibold text-slate-900 dark:text-white">
+                        <p class="truncate font-bold text-[color:var(--text-primary)]">
                           {emoji_inline(
                             Map.get(target || %{}, :display_name, mute.object),
                             Map.get(target || %{}, :emojis, [])
@@ -170,7 +170,7 @@ defmodule EgregorosWeb.PrivacyLive do
                         </p>
                         <p
                           data-role="privacy-target-handle"
-                          class="truncate text-xs text-slate-500 dark:text-slate-400"
+                          class="truncate font-mono text-xs text-[color:var(--text-muted)]"
                         >
                           {Map.get(target || %{}, :handle, mute.object)}
                         </p>
@@ -181,7 +181,7 @@ defmodule EgregorosWeb.PrivacyLive do
                       data-role="privacy-unmute"
                       phx-click="privacy-unmute"
                       phx-value-id={mute.id}
-                      class="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700 transition hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-md hover:shadow-slate-200/30 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800 dark:hover:shadow-slate-900/30"
+                      class="border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-3 py-2 text-xs font-bold uppercase tracking-wide text-[color:var(--text-secondary)] transition hover:bg-[color:var(--text-primary)] hover:text-[color:var(--bg-base)]"
                     >
                       Unmute
                     </button>
@@ -191,23 +191,23 @@ defmodule EgregorosWeb.PrivacyLive do
 
               <.card class="p-6">
                 <div class="flex items-center justify-between gap-4">
-                  <h3 class="font-display text-xl text-slate-900 dark:text-slate-100">
+                  <h3 class="text-xl font-bold text-[color:var(--text-primary)]">
                     Blocked accounts
                   </h3>
-                  <span class="text-sm text-slate-500 dark:text-slate-400">
+                  <span class="font-mono text-sm text-[color:var(--text-muted)]">
                     {length(@blocks)}
                   </span>
                 </div>
 
                 <div class="mt-4 space-y-3">
-                  <p :if={@blocks == []} class="text-sm text-slate-600 dark:text-slate-300">
+                  <p :if={@blocks == []} class="text-sm text-[color:var(--text-secondary)]">
                     No blocked accounts yet.
                   </p>
 
                   <div
                     :for={block <- @blocks}
                     id={"block-#{block.id}"}
-                    class="flex items-center justify-between gap-4 rounded-2xl border border-slate-200/80 bg-white/70 px-4 py-3 text-sm shadow-sm shadow-slate-200/10 dark:border-slate-700/70 dark:bg-slate-950/50 dark:shadow-slate-900/30"
+                    class="flex items-center justify-between gap-4 border border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-4 py-3 text-sm"
                   >
                     <% target = Map.get(@targets_by_ap_id, block.object) %>
                     <div class="flex min-w-0 items-center gap-3">
@@ -217,7 +217,7 @@ defmodule EgregorosWeb.PrivacyLive do
                         src={Map.get(target || %{}, :avatar_url)}
                       />
                       <div class="min-w-0">
-                        <p class="truncate font-semibold text-slate-900 dark:text-white">
+                        <p class="truncate font-bold text-[color:var(--text-primary)]">
                           {emoji_inline(
                             Map.get(target || %{}, :display_name, block.object),
                             Map.get(target || %{}, :emojis, [])
@@ -225,7 +225,7 @@ defmodule EgregorosWeb.PrivacyLive do
                         </p>
                         <p
                           data-role="privacy-target-handle"
-                          class="truncate text-xs text-slate-500 dark:text-slate-400"
+                          class="truncate font-mono text-xs text-[color:var(--text-muted)]"
                         >
                           {Map.get(target || %{}, :handle, block.object)}
                         </p>
@@ -236,7 +236,7 @@ defmodule EgregorosWeb.PrivacyLive do
                       data-role="privacy-unblock"
                       phx-click="privacy-unblock"
                       phx-value-id={block.id}
-                      class="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700 transition hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-md hover:shadow-slate-200/30 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800 dark:hover:shadow-slate-900/30"
+                      class="border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-3 py-2 text-xs font-bold uppercase tracking-wide text-[color:var(--text-secondary)] transition hover:bg-[color:var(--text-primary)] hover:text-[color:var(--bg-base)]"
                     >
                       Unblock
                     </button>
@@ -246,7 +246,7 @@ defmodule EgregorosWeb.PrivacyLive do
             </div>
           <% else %>
             <.card class="p-6">
-              <p data-role="privacy-auth-required" class="text-sm text-slate-600 dark:text-slate-300">
+              <p data-role="privacy-auth-required" class="text-sm text-[color:var(--text-secondary)]">
                 Sign in to manage blocks and mutes.
               </p>
               <div class="mt-4 flex flex-wrap items-center gap-2">

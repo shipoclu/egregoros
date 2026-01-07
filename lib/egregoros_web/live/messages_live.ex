@@ -474,10 +474,10 @@ defmodule EgregorosWeb.MessagesLive do
       >
         <section class="space-y-4">
           <.card class="p-6">
-            <p class="text-xs uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
+            <p class="text-xs font-bold uppercase tracking-wide text-[color:var(--text-muted)]">
               Messages
             </p>
-            <h2 class="mt-2 font-display text-2xl text-slate-900 dark:text-slate-100">
+            <h2 class="mt-2 text-2xl font-bold text-[color:var(--text-primary)]">
               Direct
             </h2>
           </.card>
@@ -505,12 +505,12 @@ defmodule EgregorosWeb.MessagesLive do
 
                 <p
                   data-role="dm-e2ee-feedback"
-                  class="hidden rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-200"
+                  class="hidden border border-[color:var(--border-default)] bg-[color:var(--bg-subtle)] px-3 py-2 text-sm text-[color:var(--text-secondary)]"
                 >
                 </p>
 
                 <div class="space-y-2">
-                  <label class="block text-sm font-semibold text-slate-700 dark:text-slate-200">
+                  <label class="block text-sm font-bold text-[color:var(--text-primary)]">
                     To
                   </label>
                   <input
@@ -518,19 +518,19 @@ defmodule EgregorosWeb.MessagesLive do
                     name="dm[recipient]"
                     value={@dm_form.params["recipient"] || ""}
                     placeholder="@alice or @alice@remote.example"
-                    class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-violet-400 dark:focus:ring-violet-900/40"
+                    class="w-full border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-3 py-2 text-sm text-[color:var(--text-primary)] focus:outline-none focus-brutal placeholder:text-[color:var(--text-muted)]"
                   />
                 </div>
 
                 <div class="space-y-2">
-                  <label class="block text-sm font-semibold text-slate-700 dark:text-slate-200">
+                  <label class="block text-sm font-bold text-[color:var(--text-primary)]">
                     Message
                   </label>
                   <textarea
                     name="dm[content]"
                     rows="4"
                     placeholder="Write a direct message…"
-                    class="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-violet-400 dark:focus:ring-violet-900/40"
+                    class="w-full resize-none border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-3 py-2 text-sm text-[color:var(--text-primary)] focus:outline-none focus-brutal placeholder:text-[color:var(--text-muted)]"
                   ><%= @dm_form.params["content"] || "" %></textarea>
                 </div>
 
@@ -550,7 +550,7 @@ defmodule EgregorosWeb.MessagesLive do
             >
               <div
                 id="messages-empty"
-                class="hidden only:block rounded-3xl border border-slate-200/80 bg-white/70 p-6 text-sm text-slate-600 shadow-sm shadow-slate-200/20 dark:border-slate-700/70 dark:bg-slate-950/50 dark:text-slate-300 dark:shadow-slate-900/30"
+                class="hidden only:block border-2 border-[color:var(--border-default)] bg-[color:var(--bg-subtle)] p-6 text-sm text-[color:var(--text-secondary)]"
               >
                 No direct messages yet.
               </div>
@@ -579,7 +579,7 @@ defmodule EgregorosWeb.MessagesLive do
             <.card class="p-6">
               <p
                 data-role="messages-auth-required"
-                class="text-sm text-slate-600 dark:text-slate-300"
+                class="text-sm text-[color:var(--text-secondary)]"
               >
                 Sign in to view direct messages.
               </p>

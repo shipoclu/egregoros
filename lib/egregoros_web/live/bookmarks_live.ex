@@ -496,10 +496,10 @@ defmodule EgregorosWeb.BookmarksLive do
           <.card class="p-6">
             <div class="flex items-center justify-between gap-4">
               <div class="min-w-0">
-                <p class="text-xs uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
+                <p class="text-xs font-bold uppercase tracking-wide text-[color:var(--text-muted)]">
                   {@page_kicker}
                 </p>
-                <h2 class="mt-2 truncate font-display text-2xl text-slate-900 dark:text-slate-100">
+                <h2 class="mt-2 truncate text-2xl font-bold text-[color:var(--text-primary)]">
                   {@page_title}
                 </h2>
               </div>
@@ -508,11 +508,11 @@ defmodule EgregorosWeb.BookmarksLive do
                 <.link
                   patch={~p"/bookmarks"}
                   class={[
-                    "rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] transition",
+                    "border-2 px-4 py-2 text-xs font-bold uppercase tracking-wide transition",
                     @kind == :bookmarks &&
-                      "bg-slate-900 text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white",
+                      "border-[color:var(--border-default)] bg-[color:var(--text-primary)] text-[color:var(--bg-base)]",
                     @kind != :bookmarks &&
-                      "border border-slate-200/80 bg-white/70 text-slate-700 hover:-translate-y-0.5 hover:bg-white dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:hover:bg-slate-950"
+                      "border-[color:var(--border-default)] bg-[color:var(--bg-base)] text-[color:var(--text-secondary)] hover:bg-[color:var(--text-primary)] hover:text-[color:var(--bg-base)]"
                   ]}
                   aria-label="View bookmarks"
                 >
@@ -522,11 +522,11 @@ defmodule EgregorosWeb.BookmarksLive do
                 <.link
                   patch={~p"/favourites"}
                   class={[
-                    "rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] transition",
+                    "border-2 px-4 py-2 text-xs font-bold uppercase tracking-wide transition",
                     @kind == :favourites &&
-                      "bg-slate-900 text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white",
+                      "border-[color:var(--border-default)] bg-[color:var(--text-primary)] text-[color:var(--bg-base)]",
                     @kind != :favourites &&
-                      "border border-slate-200/80 bg-white/70 text-slate-700 hover:-translate-y-0.5 hover:bg-white dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:hover:bg-slate-950"
+                      "border-[color:var(--border-default)] bg-[color:var(--bg-base)] text-[color:var(--text-secondary)] hover:bg-[color:var(--text-primary)] hover:text-[color:var(--bg-base)]"
                   ]}
                   aria-label="View favourites"
                 >
@@ -540,7 +540,7 @@ defmodule EgregorosWeb.BookmarksLive do
             <div id="bookmarks-list" phx-update="stream" class="space-y-4">
               <div
                 id="bookmarks-empty"
-                class="hidden only:block rounded-3xl border border-slate-200/80 bg-white/70 p-6 text-sm text-slate-600 shadow-sm shadow-slate-200/20 dark:border-slate-700/70 dark:bg-slate-950/50 dark:text-slate-300 dark:shadow-slate-900/30"
+                class="hidden only:block border-2 border-[color:var(--border-default)] bg-[color:var(--bg-subtle)] p-6 text-sm text-[color:var(--text-secondary)]"
               >
                 {@empty_message}
               </div>
@@ -569,7 +569,7 @@ defmodule EgregorosWeb.BookmarksLive do
             <.card class="p-6">
               <p
                 data-role="bookmarks-auth-required"
-                class="text-sm text-slate-600 dark:text-slate-300"
+                class="text-sm text-[color:var(--text-secondary)]"
               >
                 Sign in to view saved posts.
               </p>

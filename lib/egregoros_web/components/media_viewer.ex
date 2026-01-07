@@ -28,14 +28,14 @@ defmodule EgregorosWeb.MediaViewer do
       aria-hidden={if @open, do: "false", else: "true"}
       phx-hook="MediaViewer"
       class={[
-        "fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur",
+        "fixed inset-0 z-50 flex items-center justify-center bg-[color:var(--text-primary)]/80 p-4",
         !@open && "hidden"
       ]}
     >
       <.focus_wrap
         id="media-viewer-dialog"
         phx-click-away={JS.dispatch("egregoros:media-close", to: "#media-viewer")}
-        class="relative w-full max-w-4xl overflow-hidden rounded-3xl bg-black shadow-2xl"
+        class="relative w-full max-w-4xl overflow-hidden border-2 border-[color:var(--border-default)] bg-black"
       >
         <.icon_button
           data-role="media-viewer-prev"

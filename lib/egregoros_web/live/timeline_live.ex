@@ -765,8 +765,9 @@ defmodule EgregorosWeb.TimelineLive do
             data-role="compose-panel"
             data-state={if @compose_open?, do: "open", else: "closed"}
             class={[
-              "rounded-3xl border border-white/80 bg-white/80 p-6 shadow-xl shadow-slate-200/40 backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/70 dark:shadow-slate-900/40",
-              "fixed inset-x-4 bottom-24 z-50 max-h-[78vh] overflow-y-auto lg:static lg:inset-auto lg:bottom-auto lg:z-auto lg:max-h-none lg:overflow-visible",
+              "bg-[color:var(--bg-base)]",
+              "fixed inset-x-4 bottom-24 z-50 max-h-[78vh] overflow-y-auto border-2 border-[color:var(--border-default)] p-4",
+              "lg:static lg:inset-auto lg:bottom-auto lg:z-auto lg:max-h-none lg:overflow-visible lg:border-0 lg:p-0",
               !@compose_open? && "hidden lg:block"
             ]}
           >
@@ -779,32 +780,18 @@ defmodule EgregorosWeb.TimelineLive do
                 !@compose_open? && "hidden"
               ]}
             >
-              <p class="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
+              <p class="text-xs font-bold uppercase tracking-wide text-[color:var(--text-muted)]">
                 Compose
               </p>
               <button
                 type="button"
                 data-role="compose-close"
                 phx-click={close_compose_js() |> JS.push("close_compose")}
-                class="inline-flex h-9 w-9 items-center justify-center rounded-2xl text-slate-500 transition hover:bg-slate-900/5 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
+                class="inline-flex h-9 w-9 items-center justify-center border-2 border-[color:var(--border-default)] text-[color:var(--text-muted)] transition hover:bg-[color:var(--text-primary)] hover:text-[color:var(--bg-base)] focus-visible:outline-none focus-brutal"
                 aria-label="Close composer"
               >
                 <.icon name="hero-x-mark" class="size-4" />
               </button>
-            </div>
-
-            <div class="flex items-center justify-between">
-              <div>
-                <p class="text-xs uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
-                  Compose
-                </p>
-                <h2 class="mt-2 font-display text-xl text-slate-900 dark:text-slate-100">
-                  New post
-                </h2>
-              </div>
-              <div class="hidden text-right text-xs text-slate-500 dark:text-slate-400 sm:block">
-                Live updates
-              </div>
             </div>
 
             <%= if @current_user do %>
@@ -827,7 +814,7 @@ defmodule EgregorosWeb.TimelineLive do
                 submit_label="Post"
               />
             <% else %>
-              <div class="mt-6 rounded-2xl border border-slate-200/80 bg-white/70 p-4 text-sm text-slate-600 dark:border-slate-700/70 dark:bg-slate-950/50 dark:text-slate-300">
+              <div class="border-2 border-[color:var(--border-default)] bg-[color:var(--bg-subtle)] p-4 text-sm text-[color:var(--text-secondary)]">
                 <p>Posting requires a local account.</p>
                 <div class="mt-4 flex flex-wrap items-center gap-2">
                   <.button navigate={~p"/login"} size="sm">Login</.button>
@@ -842,7 +829,7 @@ defmodule EgregorosWeb.TimelineLive do
           <div
             id="timeline-scroll-restore"
             phx-hook="ScrollRestore"
-            class="h-px w-px"
+            class="sr-only"
             aria-hidden="true"
           >
           </div>
@@ -850,15 +837,15 @@ defmodule EgregorosWeb.TimelineLive do
           <div
             id="timeline-top-sentinel"
             phx-hook="TimelineTopSentinel"
-            class="h-px w-px"
+            class="sr-only"
             aria-hidden="true"
           >
           </div>
 
-          <div class="flex flex-col gap-3 rounded-3xl border border-white/80 bg-white/80 p-5 shadow-lg shadow-slate-200/20 backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/70 dark:shadow-slate-900/40 sm:flex-row sm:items-center sm:justify-between">
+          <div class="flex flex-col gap-3 border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 class="font-display text-xl text-slate-900 dark:text-slate-100">Timeline</h2>
-              <p class="mt-1 text-xs uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
+              <h2 class="text-xl font-bold text-[color:var(--text-primary)]">Timeline</h2>
+              <p class="mt-1 font-mono text-xs uppercase text-[color:var(--text-muted)]">
                 {timeline_label(@timeline)}
               </p>
               <span data-role="timeline-current" class="sr-only">{@timeline}</span>
@@ -869,17 +856,17 @@ defmodule EgregorosWeb.TimelineLive do
                 <.link
                   patch={~p"/?timeline=home"}
                   class={[
-                    "rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] transition",
+                    "border-2 px-4 py-2 text-xs font-bold uppercase tracking-wide transition",
                     @timeline == :home &&
-                      "bg-slate-900 text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white",
+                      "border-[color:var(--border-default)] bg-[color:var(--text-primary)] text-[color:var(--bg-base)]",
                     @timeline != :home &&
-                      "border border-slate-200/80 bg-white/70 text-slate-700 hover:-translate-y-0.5 hover:bg-white dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:hover:bg-slate-950"
+                      "border-[color:var(--border-default)] bg-[color:var(--bg-base)] text-[color:var(--text-secondary)] hover:bg-[color:var(--text-primary)] hover:text-[color:var(--bg-base)]"
                   ]}
                 >
                   Home
                 </.link>
               <% else %>
-                <span class="rounded-full border border-slate-200/60 bg-white/40 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400 dark:border-slate-700/60 dark:bg-slate-950/40 dark:text-slate-500">
+                <span class="border-2 border-[color:var(--border-muted)] bg-[color:var(--bg-subtle)] px-4 py-2 text-xs font-bold uppercase tracking-wide text-[color:var(--text-muted)]">
                   Home
                 </span>
               <% end %>
@@ -887,11 +874,11 @@ defmodule EgregorosWeb.TimelineLive do
               <.link
                 patch={~p"/?timeline=local"}
                 class={[
-                  "rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] transition",
+                  "border-2 px-4 py-2 text-xs font-bold uppercase tracking-wide transition",
                   @timeline == :local &&
-                    "bg-slate-900 text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white",
+                    "border-[color:var(--border-default)] bg-[color:var(--text-primary)] text-[color:var(--bg-base)]",
                   @timeline != :local &&
-                    "border border-slate-200/80 bg-white/70 text-slate-700 hover:-translate-y-0.5 hover:bg-white dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:hover:bg-slate-950"
+                    "border-[color:var(--border-default)] bg-[color:var(--bg-base)] text-[color:var(--text-secondary)] hover:bg-[color:var(--text-primary)] hover:text-[color:var(--bg-base)]"
                 ]}
               >
                 Local
@@ -900,11 +887,11 @@ defmodule EgregorosWeb.TimelineLive do
               <.link
                 patch={~p"/?timeline=public"}
                 class={[
-                  "rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] transition",
+                  "border-2 px-4 py-2 text-xs font-bold uppercase tracking-wide transition",
                   @timeline == :public &&
-                    "bg-slate-900 text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white",
+                    "border-[color:var(--border-default)] bg-[color:var(--text-primary)] text-[color:var(--bg-base)]",
                   @timeline != :public &&
-                    "border border-slate-200/80 bg-white/70 text-slate-700 hover:-translate-y-0.5 hover:bg-white dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:hover:bg-slate-950"
+                    "border-[color:var(--border-default)] bg-[color:var(--bg-base)] text-[color:var(--text-secondary)] hover:bg-[color:var(--text-primary)] hover:text-[color:var(--bg-base)]"
                 ]}
               >
                 Public
@@ -919,7 +906,7 @@ defmodule EgregorosWeb.TimelineLive do
             type="button"
             data-role="new-posts"
             phx-click={JS.dispatch("egregoros:scroll-top")}
-            class="sticky top-4 z-30 inline-flex w-full items-center justify-center gap-2 rounded-full border border-slate-200/80 bg-white/90 px-6 py-3 text-sm font-semibold text-slate-700 shadow-lg shadow-slate-900/10 backdrop-blur transition hover:-translate-y-0.5 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:border-slate-700/80 dark:bg-slate-950/70 dark:text-slate-200 dark:shadow-slate-900/40 dark:hover:bg-slate-950"
+            class="sticky top-4 z-30 inline-flex w-full items-center justify-center gap-2 border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-6 py-3 text-sm font-bold uppercase text-[color:var(--text-primary)] transition hover:bg-[color:var(--text-primary)] hover:text-[color:var(--bg-base)] focus-visible:outline-none focus-brutal"
             aria-label="Scroll to new posts"
           >
             <.icon name="hero-arrow-up" class="size-4" />
@@ -929,7 +916,7 @@ defmodule EgregorosWeb.TimelineLive do
           <div id="timeline-posts" phx-update="stream" class="space-y-4">
             <div
               id="timeline-posts-empty"
-              class="hidden only:block rounded-3xl border border-slate-200/80 bg-white/70 p-6 text-sm text-slate-600 shadow-sm shadow-slate-200/20 dark:border-slate-700/70 dark:bg-slate-950/50 dark:text-slate-300 dark:shadow-slate-900/30"
+              class="hidden only:block border-2 border-[color:var(--border-default)] bg-[color:var(--bg-subtle)] p-6 text-sm text-[color:var(--text-secondary)]"
             >
               No posts yet.
             </div>
@@ -971,7 +958,7 @@ defmodule EgregorosWeb.TimelineLive do
           data-role="compose-overlay"
           data-state={if @compose_open?, do: "open", else: "closed"}
           class={[
-            "fixed inset-0 z-40 bg-slate-950/50 backdrop-blur-sm lg:hidden",
+            "fixed inset-0 z-40 bg-[color:var(--text-primary)]/50 lg:hidden",
             !@compose_open? && "hidden"
           ]}
           phx-click={close_compose_js() |> JS.push("close_compose")}
@@ -987,7 +974,7 @@ defmodule EgregorosWeb.TimelineLive do
           data-state={if @compose_open?, do: "hidden", else: "visible"}
           phx-click={open_compose_js() |> JS.push("open_compose")}
           class={[
-            "fixed bottom-24 right-6 z-40 inline-flex h-14 w-14 items-center justify-center rounded-full bg-slate-900 text-white shadow-xl shadow-slate-900/30 transition hover:-translate-y-0.5 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white lg:hidden",
+            "fixed bottom-24 right-6 z-40 inline-flex h-14 w-14 items-center justify-center border-2 border-[color:var(--border-default)] bg-[color:var(--text-primary)] text-[color:var(--bg-base)] shadow-[4px_4px_0_var(--border-default)] transition hover:shadow-none hover:translate-x-1 hover:translate-y-1 focus-visible:outline-none lg:hidden",
             @compose_open? && "hidden"
           ]}
           aria-label="Compose a new post"

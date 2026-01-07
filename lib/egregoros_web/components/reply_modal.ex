@@ -37,18 +37,18 @@ defmodule EgregorosWeb.ReplyModal do
       aria-hidden={if @open, do: "false", else: "true"}
       phx-hook="ReplyModal"
       class={[
-        "fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur",
+        "fixed inset-0 z-50 flex items-center justify-center bg-[color:var(--text-primary)]/60 p-4",
         !@open && "hidden"
       ]}
     >
       <.focus_wrap
         id={"#{@id}-dialog"}
         phx-click-away={close_js(@id, @close_event)}
-        class="relative w-full max-w-2xl overflow-visible rounded-3xl border border-white/80 bg-white/95 p-6 shadow-2xl shadow-slate-900/20 dark:border-slate-700/70 dark:bg-slate-950/80 dark:shadow-slate-900/50"
+        class="relative w-full max-w-2xl overflow-visible border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] p-6"
       >
         <div class="flex items-start justify-between gap-4">
           <div class="min-w-0">
-            <p class="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
+            <p class="text-xs font-bold uppercase tracking-wide text-[color:var(--text-muted)]">
               Reply
             </p>
 
@@ -57,7 +57,7 @@ defmodule EgregorosWeb.ReplyModal do
             <p
               data-role="reply-modal-target"
               class={[
-                "mt-2 truncate text-sm font-semibold text-slate-800 dark:text-slate-100",
+                "mt-2 truncate text-sm font-bold text-[color:var(--text-primary)]",
                 !has_target? && "hidden"
               ]}
             >

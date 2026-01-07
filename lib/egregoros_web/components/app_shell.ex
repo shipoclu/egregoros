@@ -45,7 +45,7 @@ defmodule EgregorosWeb.AppShell do
           "contents lg:block lg:space-y-6",
           @aside == [] && "lg:col-span-4",
           @aside != [] && "lg:col-span-3",
-          "lg:sticky lg:top-10 lg:max-h-[calc(100vh-5rem)] lg:overflow-y-auto"
+          "lg:sticky lg:top-10 lg:max-h-[calc(100vh-5rem)] lg:overflow-y-auto lg:overflow-x-clip"
         ]}
       >
         {render_slot(@nav_top)}
@@ -60,19 +60,19 @@ defmodule EgregorosWeb.AppShell do
                   src={avatar_src(@current_user)}
                 />
                 <div class="min-w-0">
-                  <p class="truncate font-semibold text-slate-900 dark:text-white">
+                  <p class="truncate font-bold text-[color:var(--text-primary)]">
                     {display_name(@current_user)}
                   </p>
-                  <p class="truncate text-sm text-slate-500 dark:text-slate-400">
+                  <p class="truncate font-mono text-sm text-[color:var(--text-muted)]">
                     @{to_string(nickname(@current_user))}
                   </p>
                 </div>
               </div>
             <% else %>
-              <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              <p class="text-xs font-bold uppercase tracking-wide text-[color:var(--text-muted)]">
                 Guest mode
               </p>
-              <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">
+              <p class="mt-2 text-sm text-[color:var(--text-secondary)]">
                 Public feed is available. Sign in for home, posting, and notifications.
               </p>
             <% end %>
@@ -82,16 +82,16 @@ defmodule EgregorosWeb.AppShell do
                 data-role="app-shell-search"
                 action={~p"/search"}
                 method="get"
-                class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-600 dark:bg-slate-700/50"
+                class="border-2 border-[color:var(--border-default)] bg-[color:var(--bg-subtle)] px-3 py-2"
               >
                 <div class="flex items-center gap-2">
-                  <.icon name="hero-magnifying-glass" class="size-4 text-slate-400" />
+                  <span class="font-mono text-xs text-[color:var(--text-muted)]">/</span>
                   <input
                     type="search"
                     name="q"
                     aria-label="Search"
                     placeholder="Search"
-                    class="w-full border-0 bg-transparent p-0 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:ring-0 dark:text-slate-100 dark:placeholder:text-slate-500"
+                    class="w-full border-0 bg-transparent p-0 text-sm text-[color:var(--text-primary)] outline-none placeholder:text-[color:var(--text-muted)] focus:ring-0"
                   />
                 </div>
               </form>
@@ -124,7 +124,7 @@ defmodule EgregorosWeb.AppShell do
                     <span
                       :if={@notifications_count > 0}
                       data-role="nav-notifications-count"
-                      class="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 py-0.5 text-xs font-semibold text-white"
+                      class="ml-auto inline-flex min-w-5 items-center justify-center bg-[color:var(--text-primary)] px-1.5 py-0.5 font-mono text-xs font-bold text-[color:var(--bg-base)]"
                     >
                       {@notifications_count}
                     </span>
@@ -214,7 +214,7 @@ defmodule EgregorosWeb.AppShell do
       </aside>
 
       <nav
-        class="fixed inset-x-4 bottom-4 z-40 rounded-xl border border-slate-200 bg-white px-2 py-2 shadow-lg dark:border-slate-700 dark:bg-slate-800 lg:hidden"
+        class="fixed inset-x-0 bottom-0 z-40 border-t-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-2 py-2 lg:hidden"
         data-role="bottom-nav"
         aria-label="Primary navigation"
       >
@@ -305,11 +305,11 @@ defmodule EgregorosWeb.AppShell do
       navigate={@navigate}
       aria-current={if @active, do: "page", else: nil}
       class={[
-        "group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition",
+        "group flex items-center gap-3 px-3 py-2 text-sm font-medium uppercase tracking-wide transition",
         @active &&
-          "bg-violet-600 text-white dark:bg-violet-500",
+          "bg-[color:var(--text-primary)] text-[color:var(--bg-base)]",
         !@active &&
-          "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-white"
+          "text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] hover:underline underline-offset-4"
       ]}
     >
       <.icon name={@icon} class="size-5" />
@@ -332,11 +332,11 @@ defmodule EgregorosWeb.AppShell do
       data-role={@role}
       navigate={@navigate}
       class={[
-        "relative flex flex-1 items-center justify-center rounded-lg px-3 py-2.5 transition",
+        "relative flex flex-1 items-center justify-center px-3 py-3 transition",
         @active &&
-          "bg-violet-600 text-white dark:bg-violet-500",
+          "bg-[color:var(--text-primary)] text-[color:var(--bg-base)]",
         !@active &&
-          "text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-200"
+          "text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] hover:bg-[color:var(--bg-subtle)]"
       ]}
       aria-label={@label}
       aria-current={if @active, do: "page", else: nil}
@@ -344,7 +344,7 @@ defmodule EgregorosWeb.AppShell do
       <.icon name={@icon} class="size-5" />
       <span
         :if={@badge > 0 and @role == "nav-notifications"}
-        class="absolute right-2 top-1 inline-flex min-w-4 items-center justify-center rounded-full bg-red-600 px-1 py-0.5 text-[10px] font-semibold text-white"
+        class="absolute right-2 top-1 inline-flex min-w-4 items-center justify-center bg-[color:var(--text-primary)] px-1 py-0.5 font-mono text-[10px] font-bold text-[color:var(--bg-base)]"
       >
         {@badge}
       </span>

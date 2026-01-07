@@ -174,10 +174,10 @@ defmodule EgregorosWeb.NotificationsLive do
           <.card class="p-6">
             <div class="flex items-center justify-between gap-4">
               <div>
-                <p class="text-xs uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
+                <p class="text-xs font-bold uppercase tracking-wide text-[color:var(--text-muted)]">
                   Notifications
                 </p>
-                <h2 class="mt-2 font-display text-2xl text-slate-900 dark:text-slate-100">
+                <h2 class="mt-2 text-2xl font-bold text-[color:var(--text-primary)]">
                   Activity
                 </h2>
               </div>
@@ -239,7 +239,7 @@ defmodule EgregorosWeb.NotificationsLive do
               <div data-role="follow-requests" class="space-y-4">
                 <div
                   id="follow-requests-empty"
-                  class="hidden only:block rounded-3xl border border-slate-200/80 bg-white/70 p-6 text-sm text-slate-600 shadow-sm shadow-slate-200/20 dark:border-slate-700/70 dark:bg-slate-950/50 dark:text-slate-300 dark:shadow-slate-900/30"
+                  class="hidden only:block border-2 border-[color:var(--border-default)] bg-[color:var(--bg-subtle)] p-6 text-sm text-[color:var(--text-secondary)]"
                 >
                   No follow requests yet.
                 </div>
@@ -259,7 +259,7 @@ defmodule EgregorosWeb.NotificationsLive do
               >
                 <div
                   id="notifications-empty"
-                  class="hidden only:block rounded-3xl border border-slate-200/80 bg-white/70 p-6 text-sm text-slate-600 shadow-sm shadow-slate-200/20 dark:border-slate-700/70 dark:bg-slate-950/50 dark:text-slate-300 dark:shadow-slate-900/30"
+                  class="hidden only:block border-2 border-[color:var(--border-default)] bg-[color:var(--bg-subtle)] p-6 text-sm text-[color:var(--text-secondary)]"
                 >
                   No notifications yet.
                 </div>
@@ -287,7 +287,7 @@ defmodule EgregorosWeb.NotificationsLive do
             <.card class="p-6">
               <p
                 data-role="notifications-auth-required"
-                class="text-sm text-slate-600 dark:text-slate-300"
+                class="text-sm text-[color:var(--text-secondary)]"
               >
                 Sign in to view notifications.
               </p>
@@ -320,9 +320,9 @@ defmodule EgregorosWeb.NotificationsLive do
       phx-click={set_filter_js(@filter)}
       aria-pressed={@active?}
       class={[
-        "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] transition",
-        "data-[active=true]:border-slate-900 data-[active=true]:bg-slate-900 data-[active=true]:text-white data-[active=true]:shadow-lg data-[active=true]:shadow-slate-900/20 data-[active=true]:hover:bg-slate-800 dark:data-[active=true]:border-slate-100 dark:data-[active=true]:bg-slate-100 dark:data-[active=true]:text-slate-900 dark:data-[active=true]:hover:bg-white",
-        "data-[active=false]:border-slate-200/80 data-[active=false]:bg-white/70 data-[active=false]:text-slate-700 data-[active=false]:hover:-translate-y-0.5 data-[active=false]:hover:bg-white dark:data-[active=false]:border-slate-700/80 dark:data-[active=false]:bg-slate-950/60 dark:data-[active=false]:text-slate-200 dark:data-[active=false]:hover:bg-slate-950"
+        "inline-flex items-center gap-2 border-2 px-4 py-2 text-xs font-bold uppercase tracking-wide transition",
+        "data-[active=true]:border-[color:var(--border-default)] data-[active=true]:bg-[color:var(--text-primary)] data-[active=true]:text-[color:var(--bg-base)]",
+        "data-[active=false]:border-[color:var(--border-default)] data-[active=false]:bg-[color:var(--bg-base)] data-[active=false]:text-[color:var(--text-secondary)] data-[active=false]:hover:bg-[color:var(--text-primary)] data-[active=false]:hover:text-[color:var(--bg-base)]"
       ]}
     >
       <.icon name={@icon} class="size-4" />
@@ -339,17 +339,17 @@ defmodule EgregorosWeb.NotificationsLive do
     <article
       id={@id}
       data-role="follow-request"
-      class="rounded-3xl border border-white/80 bg-white/80 p-6 shadow-lg shadow-slate-200/30 backdrop-blur transition hover:-translate-y-0.5 hover:shadow-xl dark:border-slate-700/60 dark:bg-slate-900/70 dark:shadow-slate-900/50 motion-safe:animate-rise"
+      class="border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] p-6 transition hover:bg-[color:var(--bg-subtle)]"
     >
       <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div class="flex items-start gap-4">
           <.avatar size="sm" name={@entry.actor.display_name} src={@entry.actor.avatar_url} />
 
           <div class="min-w-0">
-            <p class="text-sm font-semibold text-slate-900 dark:text-slate-100">
+            <p class="text-sm font-bold text-[color:var(--text-primary)]">
               {@entry.actor.display_name}
             </p>
-            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            <p class="mt-1 font-mono text-xs text-[color:var(--text-muted)]">
               {@entry.actor.handle}
             </p>
           </div>
@@ -390,7 +390,7 @@ defmodule EgregorosWeb.NotificationsLive do
       id={@id}
       data-role="notification"
       data-type={@entry.type}
-      class="rounded-3xl border border-white/80 bg-white/80 p-6 shadow-lg shadow-slate-200/30 backdrop-blur transition hover:-translate-y-0.5 hover:shadow-xl dark:border-slate-700/60 dark:bg-slate-900/70 dark:shadow-slate-900/50 motion-safe:animate-rise"
+      class="border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] p-6 transition hover:bg-[color:var(--bg-subtle)]"
     >
       <div class="flex items-start gap-4">
         <.avatar size="sm" name={@entry.actor.display_name} src={@entry.actor.avatar_url} />
@@ -398,11 +398,11 @@ defmodule EgregorosWeb.NotificationsLive do
         <div class="min-w-0 flex-1 space-y-3">
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
-              <p class="flex flex-wrap items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
-                <.icon name={@entry.icon} class="size-4 text-slate-500 dark:text-slate-400" />
+              <p class="flex flex-wrap items-center gap-2 text-sm font-bold text-[color:var(--text-primary)]">
+                <.icon name={@entry.icon} class="size-4 text-[color:var(--text-muted)]" />
                 <span class="truncate">{@entry.message}</span>
               </p>
-              <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              <p class="mt-1 font-mono text-xs text-[color:var(--text-muted)]">
                 {@entry.actor.handle}
               </p>
             </div>
@@ -414,7 +414,7 @@ defmodule EgregorosWeb.NotificationsLive do
 
           <div
             :if={@entry.preview_html}
-            class="rounded-2xl border border-slate-200/80 bg-white/70 p-4 text-sm text-slate-700 shadow-sm shadow-slate-200/20 dark:border-slate-700/70 dark:bg-slate-950/50 dark:text-slate-200 dark:shadow-slate-900/30"
+            class="border border-[color:var(--border-muted)] bg-[color:var(--bg-subtle)] p-4 text-sm text-[color:var(--text-secondary)]"
           >
             {@entry.preview_html}
           </div>

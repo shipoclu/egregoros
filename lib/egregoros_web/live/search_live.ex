@@ -456,10 +456,10 @@ defmodule EgregorosWeb.SearchLive do
           <.card class="p-6">
             <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p class="text-xs uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
+                <p class="text-xs font-bold uppercase tracking-wide text-[color:var(--text-muted)]">
                   Search
                 </p>
-                <h2 class="mt-2 font-display text-2xl text-slate-900 dark:text-slate-100">
+                <h2 class="mt-2 text-2xl font-bold text-[color:var(--text-primary)]">
                   Find people
                 </h2>
               </div>
@@ -491,11 +491,11 @@ defmodule EgregorosWeb.SearchLive do
               data_role="remote-follow"
               class="p-6"
             >
-              <p class="text-sm font-semibold text-slate-900 dark:text-slate-100">
+              <p class="text-sm font-bold text-[color:var(--text-primary)]">
                 Follow a remote account
               </p>
-              <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">
-                Login to follow <span class="font-semibold">{@remote_handle}</span>.
+              <p class="mt-2 text-sm text-[color:var(--text-secondary)]">
+                Login to follow <span class="font-bold">{@remote_handle}</span>.
               </p>
               <div class="mt-4 flex flex-wrap items-center gap-2">
                 <.button navigate={~p"/login"} size="sm">Login</.button>
@@ -508,11 +508,11 @@ defmodule EgregorosWeb.SearchLive do
               data_role="remote-follow"
               class="p-6"
             >
-              <p class="text-sm font-semibold text-slate-900 dark:text-slate-100">
+              <p class="text-sm font-bold text-[color:var(--text-primary)]">
                 Remote follow queued
               </p>
-              <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">
-                Fetching <span class="font-semibold">@{@remote_handle}</span>
+              <p class="mt-2 text-sm text-[color:var(--text-secondary)]">
+                Fetching <span class="font-bold">@{@remote_handle}</span>
                 and sending your follow request.
               </p>
             </.card>
@@ -525,11 +525,11 @@ defmodule EgregorosWeb.SearchLive do
               data_role="remote-follow"
               class="p-6"
             >
-              <p class="text-sm font-semibold text-slate-900 dark:text-slate-100">
+              <p class="text-sm font-bold text-[color:var(--text-primary)]">
                 Follow a remote account
               </p>
-              <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">
-                Follow <span class="font-semibold">{@remote_handle}</span> via ActivityPub.
+              <p class="mt-2 text-sm text-[color:var(--text-secondary)]">
+                Follow <span class="font-bold">{@remote_handle}</span> via ActivityPub.
               </p>
               <div class="mt-4">
                 <.button
@@ -549,22 +549,22 @@ defmodule EgregorosWeb.SearchLive do
               data_role="remote-follow"
               class="p-6"
             >
-              <p class="text-sm font-semibold text-slate-900 dark:text-slate-100">
+              <p class="text-sm font-bold text-[color:var(--text-primary)]">
                 Remote follow
               </p>
-              <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">
-                You are following <span class="font-semibold">{@remote_handle}</span>.
+              <p class="mt-2 text-sm text-[color:var(--text-secondary)]">
+                You are following <span class="font-bold">{@remote_handle}</span>.
               </p>
             </.card>
 
             <.card :if={@query != "" and @results == []} class="p-6">
-              <p class="text-sm text-slate-600 dark:text-slate-300">
+              <p class="text-sm text-[color:var(--text-secondary)]">
                 No matching accounts found.
               </p>
             </.card>
 
             <.card :if={@query == ""} class="p-6">
-              <p class="text-sm text-slate-600 dark:text-slate-300">
+              <p class="text-sm text-[color:var(--text-secondary)]">
                 Type a query to search for accounts and posts.
               </p>
             </.card>
@@ -572,7 +572,7 @@ defmodule EgregorosWeb.SearchLive do
             <.card :for={user <- @results} class="p-5">
               <.link
                 navigate={ProfilePaths.profile_path(user)}
-                class="flex items-center gap-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+                class="flex items-center gap-4 focus-visible:outline-none focus-brutal"
               >
                 <.avatar
                   name={user.name || user.nickname || user.ap_id}
@@ -581,12 +581,12 @@ defmodule EgregorosWeb.SearchLive do
                 />
 
                 <div class="min-w-0 flex-1">
-                  <p class="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  <p class="truncate text-sm font-bold text-[color:var(--text-primary)]">
                     {user.name || user.nickname || user.ap_id}
                   </p>
                   <p
                     data-role="search-result-handle"
-                    class="truncate text-xs text-slate-500 dark:text-slate-400"
+                    class="truncate font-mono text-xs text-[color:var(--text-muted)]"
                   >
                     {ActorVM.handle(user, user.ap_id)}
                   </p>
@@ -601,10 +601,10 @@ defmodule EgregorosWeb.SearchLive do
             class="space-y-3"
           >
             <.card class="p-6">
-              <p class="text-xs uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
+              <p class="text-xs font-bold uppercase tracking-wide text-[color:var(--text-muted)]">
                 Hashtags
               </p>
-              <h3 class="mt-2 font-display text-xl text-slate-900 dark:text-slate-100">
+              <h3 class="mt-2 text-xl font-bold text-[color:var(--text-primary)]">
                 Matching tags
               </h3>
             </.card>
@@ -613,24 +613,24 @@ defmodule EgregorosWeb.SearchLive do
               <.link
                 navigate={~p"/tags/#{@tag_query}"}
                 data-role="search-tag-link"
-                class="group flex items-center gap-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+                class="group flex items-center gap-4 focus-visible:outline-none focus-brutal"
               >
-                <span class="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-900/5 text-slate-700 dark:bg-white/10 dark:text-slate-200">
+                <span class="inline-flex h-11 w-11 items-center justify-center border border-[color:var(--border-default)] bg-[color:var(--bg-subtle)] text-[color:var(--text-secondary)]">
                   <.icon name="hero-hashtag" class="size-5" />
                 </span>
 
                 <div class="min-w-0 flex-1">
-                  <p class="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  <p class="truncate text-sm font-bold text-[color:var(--text-primary)]">
                     #{@tag_query}
                   </p>
-                  <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  <p class="mt-1 text-xs text-[color:var(--text-muted)]">
                     View tag timeline
                   </p>
                 </div>
 
                 <.icon
                   name="hero-chevron-right"
-                  class="size-5 text-slate-400 transition group-hover:translate-x-0.5 dark:text-slate-500"
+                  class="size-5 text-[color:var(--text-muted)] transition group-hover:translate-x-0.5"
                 />
               </.link>
             </.card>
@@ -642,16 +642,16 @@ defmodule EgregorosWeb.SearchLive do
             class="space-y-3"
           >
             <.card class="p-6">
-              <p class="text-xs uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
+              <p class="text-xs font-bold uppercase tracking-wide text-[color:var(--text-muted)]">
                 Posts
               </p>
-              <h3 class="mt-2 font-display text-xl text-slate-900 dark:text-slate-100">
+              <h3 class="mt-2 text-xl font-bold text-[color:var(--text-primary)]">
                 Matching notes
               </h3>
             </.card>
 
             <.card :if={@post_results == []} class="p-6">
-              <p class="text-sm text-slate-600 dark:text-slate-300">
+              <p class="text-sm text-[color:var(--text-secondary)]">
                 No matching posts found.
               </p>
             </.card>

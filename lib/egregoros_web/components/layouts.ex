@@ -39,19 +39,19 @@ defmodule EgregorosWeb.Layouts do
 
   def app(assigns) do
     ~H"""
-    <div class="min-h-screen bg-white text-slate-900 dark:bg-[#0a0a0f] dark:text-slate-100">
+    <div class="min-h-screen bg-[color:var(--bg-base)] text-[color:var(--text-primary)]">
       <div class="mx-auto max-w-[90rem] px-4 py-8 sm:px-6 lg:px-8">
-        <header class="flex flex-col gap-6 border-b border-slate-200 pb-6 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+        <header class="flex flex-col gap-6 border-b-2 border-[color:var(--border-default)] pb-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div class="flex items-center gap-3">
-              <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-600 dark:bg-violet-500">
-                <.icon name="hero-signal" class="size-5 text-white" />
+              <div class="flex h-10 w-10 items-center justify-center border-2 border-[color:var(--border-default)] bg-[color:var(--text-primary)]">
+                <.icon name="hero-signal" class="size-5 text-[color:var(--bg-base)]" />
               </div>
               <div>
-                <h1 class="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
+                <h1 class="text-xl font-bold tracking-tight text-[color:var(--text-primary)]">
                   Egregoros
                 </h1>
-                <p class="text-sm font-medium text-slate-500 dark:text-slate-400">
+                <p class="font-mono text-sm font-medium text-[color:var(--text-muted)]">
                   Signal feed
                 </p>
               </div>
@@ -63,7 +63,7 @@ defmodule EgregorosWeb.Layouts do
               href="https://docs.joinmastodon.org/client/intro/"
               target="_blank"
               rel="noopener"
-              class="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
+              class="px-3 py-2 text-sm font-medium uppercase text-[color:var(--text-secondary)] transition hover:text-[color:var(--text-primary)] hover:underline underline-offset-4"
             >
               API Docs
             </a>
@@ -71,38 +71,38 @@ defmodule EgregorosWeb.Layouts do
             <%= if @current_user do %>
               <a
                 href={~p"/settings"}
-                class="hidden rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white sm:block"
+                class="hidden px-3 py-2 text-sm font-medium uppercase text-[color:var(--text-secondary)] transition hover:text-[color:var(--text-primary)] hover:underline underline-offset-4 sm:block"
               >
                 Settings
               </a>
               <.form for={%{}} action={~p"/logout"} method="post" class="hidden sm:block">
                 <button
                   type="submit"
-                  class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
+                  class="flex items-center gap-2 px-3 py-2 text-sm font-medium uppercase text-[color:var(--text-secondary)] transition hover:text-[color:var(--text-primary)] hover:underline underline-offset-4"
                 >
-                  <span class="font-semibold text-slate-900 dark:text-white">
+                  <span class="font-mono font-bold text-[color:var(--text-primary)]">
                     {@current_user.nickname}
                   </span>
-                  <span class="text-slate-400 dark:text-slate-500">&middot;</span>
+                  <span class="text-[color:var(--text-muted)]">&middot;</span>
                   <span>Logout</span>
                 </button>
               </.form>
             <% else %>
               <a
                 href={~p"/login"}
-                class="hidden rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white sm:block"
+                class="hidden px-3 py-2 text-sm font-medium uppercase text-[color:var(--text-secondary)] transition hover:text-[color:var(--text-primary)] hover:underline underline-offset-4 sm:block"
               >
                 Login
               </a>
               <a
                 href={~p"/register"}
-                class="hidden rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-violet-500 dark:bg-violet-500 dark:hover:bg-violet-400 sm:block"
+                class="hidden border-2 border-[color:var(--border-default)] bg-[color:var(--text-primary)] px-4 py-2 text-sm font-bold uppercase text-[color:var(--bg-base)] transition hover:bg-[color:var(--accent-primary-hover)] sm:block"
               >
                 Register
               </a>
             <% end %>
 
-            <div class="ml-2 h-6 w-px bg-slate-200 dark:bg-slate-700"></div>
+            <div class="ml-2 h-6 w-px bg-[color:var(--border-muted)]"></div>
             <.theme_toggle />
           </div>
         </header>
@@ -171,10 +171,10 @@ defmodule EgregorosWeb.Layouts do
   """
   def theme_toggle(assigns) do
     ~H"""
-    <div class="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-800">
+    <div class="flex items-center gap-0 border border-[color:var(--border-default)] bg-[color:var(--bg-subtle)]">
       <button
         type="button"
-        class="flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition hover:bg-white hover:text-slate-900 hover:shadow-sm dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white [[data-theme-mode=system]_&]:bg-white [[data-theme-mode=system]_&]:text-violet-600 [[data-theme-mode=system]_&]:shadow-sm dark:[[data-theme-mode=system]_&]:bg-slate-700 dark:[[data-theme-mode=system]_&]:text-violet-400"
+        class="flex h-8 w-8 items-center justify-center text-[color:var(--text-muted)] transition hover:bg-[color:var(--bg-base)] hover:text-[color:var(--text-primary)] [[data-theme-mode=system]_&]:bg-[color:var(--text-primary)] [[data-theme-mode=system]_&]:text-[color:var(--bg-base)]"
         phx-click={JS.dispatch("phx:set-theme")}
         data-phx-theme="system"
         aria-label="Use system theme"
@@ -184,7 +184,7 @@ defmodule EgregorosWeb.Layouts do
 
       <button
         type="button"
-        class="flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition hover:bg-white hover:text-slate-900 hover:shadow-sm dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white [[data-theme-mode=light]_&]:bg-white [[data-theme-mode=light]_&]:text-amber-500 [[data-theme-mode=light]_&]:shadow-sm dark:[[data-theme-mode=light]_&]:bg-slate-700 dark:[[data-theme-mode=light]_&]:text-amber-400"
+        class="flex h-8 w-8 items-center justify-center text-[color:var(--text-muted)] transition hover:bg-[color:var(--bg-base)] hover:text-[color:var(--text-primary)] [[data-theme-mode=light]_&]:bg-[color:var(--text-primary)] [[data-theme-mode=light]_&]:text-[color:var(--bg-base)]"
         phx-click={JS.dispatch("phx:set-theme")}
         data-phx-theme="light"
         aria-label="Use light theme"
@@ -194,7 +194,7 @@ defmodule EgregorosWeb.Layouts do
 
       <button
         type="button"
-        class="flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition hover:bg-white hover:text-slate-900 hover:shadow-sm dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white [[data-theme-mode=dark]_&]:bg-white [[data-theme-mode=dark]_&]:text-indigo-600 [[data-theme-mode=dark]_&]:shadow-sm dark:[[data-theme-mode=dark]_&]:bg-slate-700 dark:[[data-theme-mode=dark]_&]:text-indigo-400"
+        class="flex h-8 w-8 items-center justify-center text-[color:var(--text-muted)] transition hover:bg-[color:var(--bg-base)] hover:text-[color:var(--text-primary)] [[data-theme-mode=dark]_&]:bg-[color:var(--text-primary)] [[data-theme-mode=dark]_&]:text-[color:var(--bg-base)]"
         phx-click={JS.dispatch("phx:set-theme")}
         data-phx-theme="dark"
         aria-label="Use dark theme"

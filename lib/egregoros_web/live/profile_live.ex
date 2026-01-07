@@ -741,13 +741,7 @@ defmodule EgregorosWeb.ProfileLive do
                   class="absolute inset-0 h-full w-full object-cover"
                   loading="lazy"
                 />
-                <div class="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-slate-950/10 to-transparent">
-                </div>
-                <div class="pointer-events-none absolute inset-0 opacity-70 mix-blend-overlay">
-                  <div class="absolute -left-14 -top-10 h-40 w-40 rounded-full bg-white/10 blur-2xl">
-                  </div>
-                  <div class="absolute -right-12 bottom-0 h-32 w-32 rounded-full bg-white/10 blur-2xl">
-                  </div>
+                <div class="absolute inset-0 bg-gradient-to-t from-[color:var(--bg-base)] via-transparent to-transparent">
                 </div>
 
                 <div class="absolute -bottom-10 left-6">
@@ -756,7 +750,7 @@ defmodule EgregorosWeb.ProfileLive do
                     size="xl"
                     name={@profile_user.name || @profile_user.nickname}
                     src={URL.absolute(@profile_user.avatar_url, @profile_user.ap_id)}
-                    class="ring-4 ring-white shadow-lg shadow-slate-900/10 dark:ring-slate-900 dark:shadow-slate-950/40"
+                    class="ring-4 ring-[color:var(--bg-base)]"
                   />
                 </div>
               </div>
@@ -766,7 +760,7 @@ defmodule EgregorosWeb.ProfileLive do
                   <div class="min-w-0">
                     <h2
                       data-role="profile-name"
-                      class="truncate font-display text-2xl text-slate-900 dark:text-slate-100"
+                      class="truncate text-2xl font-bold text-[color:var(--text-primary)]"
                     >
                       {emoji_inline(
                         @profile_user.name || @profile_user.nickname,
@@ -775,7 +769,7 @@ defmodule EgregorosWeb.ProfileLive do
                     </h2>
                     <p
                       data-role="profile-handle"
-                      class="mt-1 truncate text-sm text-slate-500 dark:text-slate-400"
+                      class="mt-1 truncate font-mono text-sm text-[color:var(--text-muted)]"
                     >
                       {@profile_handle}
                     </p>
@@ -791,7 +785,7 @@ defmodule EgregorosWeb.ProfileLive do
                       <span
                         :if={@follows_you? && @follow_relationship}
                         data-role="profile-mutual"
-                        class="inline-flex items-center rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200"
+                        class="inline-flex items-center border border-[color:var(--success)] bg-[color:var(--bg-base)] px-3 py-1 text-xs font-bold uppercase tracking-wide text-[color:var(--success)]"
                       >
                         Mutual
                       </span>
@@ -799,7 +793,7 @@ defmodule EgregorosWeb.ProfileLive do
                       <span
                         :if={@follows_you? && !@follow_relationship}
                         data-role="profile-follows-you"
-                        class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        class="inline-flex items-center border border-[color:var(--border-default)] bg-[color:var(--bg-subtle)] px-3 py-1 text-xs font-bold uppercase tracking-wide text-[color:var(--text-secondary)]"
                       >
                         Follows you
                       </span>
@@ -814,7 +808,7 @@ defmodule EgregorosWeb.ProfileLive do
                           data-role="profile-unmute"
                           phx-click="unmute"
                           phx-disable-with="Unmuting..."
-                          class="inline-flex items-center justify-center rounded-full border border-slate-200/80 bg-white/70 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700 shadow-sm shadow-slate-200/20 transition hover:-translate-y-0.5 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:shadow-slate-900/40 dark:hover:bg-slate-950"
+                          class="inline-flex items-center justify-center border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-4 py-2 text-xs font-bold uppercase tracking-wide text-[color:var(--text-secondary)] transition hover:bg-[color:var(--text-primary)] hover:text-[color:var(--bg-base)] focus-visible:outline-none focus-brutal"
                         >
                           Unmute
                         </button>
@@ -824,7 +818,7 @@ defmodule EgregorosWeb.ProfileLive do
                           data-role="profile-mute"
                           phx-click="mute"
                           phx-disable-with="Muting..."
-                          class="inline-flex items-center justify-center rounded-full border border-slate-200/80 bg-white/70 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700 shadow-sm shadow-slate-200/20 transition hover:-translate-y-0.5 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:shadow-slate-900/40 dark:hover:bg-slate-950"
+                          class="inline-flex items-center justify-center border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-4 py-2 text-xs font-bold uppercase tracking-wide text-[color:var(--text-secondary)] transition hover:bg-[color:var(--text-primary)] hover:text-[color:var(--bg-base)] focus-visible:outline-none focus-brutal"
                         >
                           Mute
                         </button>
@@ -836,7 +830,7 @@ defmodule EgregorosWeb.ProfileLive do
                           data-role="profile-unblock"
                           phx-click="unblock"
                           phx-disable-with="Unblocking..."
-                          class="inline-flex items-center justify-center rounded-full border border-red-200/80 bg-red-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-red-700 shadow-sm shadow-red-100/30 transition hover:-translate-y-0.5 hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 dark:border-red-800/70 dark:bg-red-900/30 dark:text-red-200 dark:shadow-red-900/30 dark:hover:bg-red-900/40"
+                          class="inline-flex items-center justify-center border-2 border-[color:var(--danger)] bg-[color:var(--bg-base)] px-4 py-2 text-xs font-bold uppercase tracking-wide text-[color:var(--danger)] transition hover:bg-[color:var(--danger)] hover:text-[color:var(--bg-base)] focus-visible:outline-none focus-brutal"
                         >
                           Unblock
                         </button>
@@ -846,7 +840,7 @@ defmodule EgregorosWeb.ProfileLive do
                           data-role="profile-block"
                           phx-click="block"
                           phx-disable-with="Blocking..."
-                          class="inline-flex items-center justify-center rounded-full border border-red-200/80 bg-red-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-red-700 shadow-sm shadow-red-100/30 transition hover:-translate-y-0.5 hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 dark:border-red-800/70 dark:bg-red-900/30 dark:text-red-200 dark:shadow-red-900/30 dark:hover:bg-red-900/40"
+                          class="inline-flex items-center justify-center border-2 border-[color:var(--danger)] bg-[color:var(--bg-base)] px-4 py-2 text-xs font-bold uppercase tracking-wide text-[color:var(--danger)] transition hover:bg-[color:var(--danger)] hover:text-[color:var(--bg-base)] focus-visible:outline-none focus-brutal"
                         >
                           Block
                         </button>
@@ -859,7 +853,7 @@ defmodule EgregorosWeb.ProfileLive do
                             data-role="profile-unfollow"
                             phx-click="unfollow"
                             phx-disable-with="Unfollowing..."
-                            class="inline-flex items-center justify-center rounded-full border border-slate-200/80 bg-white/70 px-5 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700 shadow-sm shadow-slate-200/20 transition hover:-translate-y-0.5 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:shadow-slate-900/40 dark:hover:bg-slate-950"
+                            class="inline-flex items-center justify-center border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-5 py-2 text-xs font-bold uppercase tracking-wide text-[color:var(--text-secondary)] transition hover:bg-[color:var(--text-primary)] hover:text-[color:var(--bg-base)] focus-visible:outline-none focus-brutal"
                           >
                             Unfollow
                           </button>
@@ -870,7 +864,7 @@ defmodule EgregorosWeb.ProfileLive do
                               data-role="profile-unfollow-request"
                               phx-click="unfollow_request"
                               phx-disable-with="Cancelling..."
-                              class="inline-flex items-center justify-center rounded-full border border-amber-200/80 bg-amber-50 px-5 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-amber-800 shadow-sm shadow-amber-100/40 transition hover:-translate-y-0.5 hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 dark:border-amber-800/60 dark:bg-amber-900/30 dark:text-amber-100 dark:shadow-amber-900/30 dark:hover:bg-amber-900/40"
+                              class="inline-flex items-center justify-center border-2 border-[color:var(--warning)] bg-[color:var(--bg-base)] px-5 py-2 text-xs font-bold uppercase tracking-wide text-[color:var(--warning)] transition hover:bg-[color:var(--warning)] hover:text-[color:var(--bg-base)] focus-visible:outline-none focus-brutal"
                             >
                               Requested
                             </button>
@@ -880,7 +874,7 @@ defmodule EgregorosWeb.ProfileLive do
                               data-role="profile-follow"
                               phx-click="follow"
                               phx-disable-with="Following..."
-                              class="inline-flex items-center justify-center rounded-full bg-slate-900 px-5 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white shadow-lg shadow-slate-900/25 transition hover:-translate-y-0.5 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+                              class="inline-flex items-center justify-center border-2 border-[color:var(--border-default)] bg-[color:var(--text-primary)] px-5 py-2 text-xs font-bold uppercase tracking-wide text-[color:var(--bg-base)] transition hover:bg-[color:var(--accent-primary-hover)] focus-visible:outline-none focus-brutal"
                             >
                               Follow
                             </button>
@@ -894,7 +888,7 @@ defmodule EgregorosWeb.ProfileLive do
                 <div
                   :if={is_binary(@profile_user.bio) and @profile_user.bio != ""}
                   data-role="profile-bio"
-                  class="mt-5 max-w-prose space-y-3 text-sm text-slate-700 dark:text-slate-200 [&_a]:underline [&_a]:decoration-slate-400/60 [&_a:hover]:decoration-slate-600 dark:[&_a]:decoration-slate-500/60 dark:[&_a:hover]:decoration-slate-200"
+                  class="mt-5 max-w-prose space-y-3 text-sm text-[color:var(--text-secondary)] [&_a]:text-[color:var(--link)] [&_a]:underline [&_a:hover]:text-[color:var(--text-primary)]"
                 >
                   {@profile_bio_html}
                 </div>
@@ -904,14 +898,14 @@ defmodule EgregorosWeb.ProfileLive do
 
                   <.link
                     navigate={ProfilePaths.followers_path(@profile_user)}
-                    class="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+                    class="block focus-visible:outline-none focus-brutal"
                   >
                     <.stat value={@followers_count} label="Followers" />
                   </.link>
 
                   <.link
                     navigate={ProfilePaths.following_path(@profile_user)}
-                    class="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+                    class="block focus-visible:outline-none focus-brutal"
                   >
                     <.stat value={@following_count} label="Following" />
                   </.link>
@@ -920,12 +914,12 @@ defmodule EgregorosWeb.ProfileLive do
             </.card>
 
             <section class="space-y-4">
-              <div class="flex flex-col gap-3 rounded-3xl border border-white/80 bg-white/80 p-5 shadow-lg shadow-slate-200/20 backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/70 dark:shadow-slate-900/40 sm:flex-row sm:items-center sm:justify-between">
+              <div class="flex flex-col gap-3 border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <h3 class="font-display text-xl text-slate-900 dark:text-slate-100">
+                  <h3 class="text-xl font-bold text-[color:var(--text-primary)]">
                     Posts
                   </h3>
-                  <p class="mt-1 text-xs uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
+                  <p class="mt-1 font-mono text-xs uppercase text-[color:var(--text-muted)]">
                     Latest notes
                   </p>
                 </div>
@@ -934,7 +928,7 @@ defmodule EgregorosWeb.ProfileLive do
               <div id="profile-posts" phx-update="stream" class="space-y-4">
                 <div
                   id="profile-posts-empty"
-                  class="hidden only:block rounded-3xl border border-slate-200/80 bg-white/70 p-6 text-sm text-slate-600 shadow-sm shadow-slate-200/20 dark:border-slate-700/70 dark:bg-slate-950/50 dark:text-slate-300 dark:shadow-slate-900/30"
+                  class="hidden only:block border-2 border-[color:var(--border-default)] bg-[color:var(--bg-subtle)] p-6 text-sm text-[color:var(--text-secondary)]"
                 >
                   No posts yet.
                 </div>
@@ -964,7 +958,7 @@ defmodule EgregorosWeb.ProfileLive do
         <% else %>
           <section class="space-y-4">
             <.card class="p-6">
-              <p class="text-sm text-slate-600 dark:text-slate-300">
+              <p class="text-sm text-[color:var(--text-secondary)]">
                 Profile not found.
               </p>
               <div class="mt-4 flex flex-wrap items-center gap-2">
@@ -1000,9 +994,9 @@ defmodule EgregorosWeb.ProfileLive do
 
   defp stat(assigns) do
     ~H"""
-    <div class="rounded-2xl border border-slate-200/80 bg-white/70 px-4 py-3 text-center shadow-sm shadow-slate-200/20 dark:border-slate-700/70 dark:bg-slate-950/50 dark:shadow-slate-900/30">
-      <p class="text-lg font-semibold text-slate-900 dark:text-slate-100">{@value}</p>
-      <p class="text-[10px] uppercase tracking-[0.25em] text-slate-500 dark:text-slate-400">
+    <div class="border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-4 py-3 text-center">
+      <p class="text-lg font-bold text-[color:var(--text-primary)]">{@value}</p>
+      <p class="text-[10px] font-bold uppercase tracking-wide text-[color:var(--text-muted)]">
         {@label}
       </p>
     </div>

@@ -573,18 +573,18 @@ defmodule EgregorosWeb.StatusLive do
       >
         <%= if @status do %>
           <section class="space-y-4">
-            <div class="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-white/80 bg-white/80 px-5 py-4 shadow-lg shadow-slate-200/20 backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/70 dark:shadow-slate-900/40">
+            <div class="flex flex-wrap items-center justify-between gap-3 border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-4 py-3">
               <.link
                 navigate={timeline_href(@current_user, @back_timeline)}
-                class="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/70 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700 transition hover:-translate-y-0.5 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:border-slate-700/80 dark:bg-slate-950/60 dark:text-slate-200 dark:hover:bg-slate-950"
+                class="inline-flex items-center gap-2 border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-4 py-2 text-xs font-bold uppercase tracking-wide text-[color:var(--text-secondary)] transition hover:bg-[color:var(--text-primary)] hover:text-[color:var(--bg-base)] focus-visible:outline-none focus-brutal"
                 aria-label="Back to timeline"
               >
                 <.icon name="hero-arrow-left" class="size-4" /> Timeline
               </.link>
 
               <div class="text-right">
-                <p class="font-display text-lg text-slate-900 dark:text-slate-100">Post</p>
-                <p class="mt-1 text-xs uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
+                <p class="text-lg font-bold text-[color:var(--text-primary)]">Post</p>
+                <p class="mt-1 font-mono text-xs uppercase text-[color:var(--text-muted)]">
                   {if @status.object.local, do: "Local status", else: "Remote status"}
                 </p>
               </div>
@@ -593,10 +593,10 @@ defmodule EgregorosWeb.StatusLive do
             <div class="space-y-6" data-role="status-thread">
               <div :if={@ancestors != []} data-role="thread-ancestors" class="space-y-4">
                 <div class="flex items-center justify-between gap-3 px-1">
-                  <p class="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
+                  <p class="text-xs font-bold uppercase tracking-wide text-[color:var(--text-muted)]">
                     Context
                   </p>
-                  <span class="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                  <span class="font-mono text-xs font-bold text-[color:var(--text-muted)]">
                     {length(@ancestors)}
                   </span>
                 </div>
@@ -615,15 +615,15 @@ defmodule EgregorosWeb.StatusLive do
               <div
                 :if={@thread_missing_context?}
                 data-role="thread-missing-context"
-                class="flex items-start gap-3 rounded-3xl border border-slate-200/80 bg-white/70 px-5 py-4 text-sm text-slate-600 shadow-sm shadow-slate-200/20 dark:border-slate-700/70 dark:bg-slate-950/50 dark:text-slate-300 dark:shadow-slate-900/30"
+                class="flex items-start gap-3 border-2 border-[color:var(--border-default)] bg-[color:var(--bg-subtle)] px-4 py-4 text-sm text-[color:var(--text-secondary)]"
               >
-                <span class="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-200">
+                <span class="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center border border-[color:var(--border-default)] bg-[color:var(--bg-base)] text-[color:var(--text-secondary)]">
                   <.icon name="hero-arrow-path" class="size-5" />
                 </span>
                 <div class="min-w-0">
-                  <p class="font-semibold text-slate-900 dark:text-slate-100">Fetching context…</p>
+                  <p class="font-bold text-[color:var(--text-primary)]">Fetching context…</p>
                   <p class="mt-1 leading-relaxed">
-                    This post replies to something we haven’t fetched yet. We’ll try to pull in the missing
+                    This post replies to something we haven't fetched yet. We'll try to pull in the missing
                     thread context in the background.
                   </p>
                 </div>
@@ -633,18 +633,18 @@ defmodule EgregorosWeb.StatusLive do
                 :if={is_map(status_parent)}
                 data-role="thread-replying-to"
                 data-parent-id={status_parent.dom_id}
-                class="flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/70 px-4 py-2 text-xs font-semibold text-slate-600 shadow-sm shadow-slate-200/20 dark:border-slate-700/70 dark:bg-slate-950/50 dark:text-slate-300 dark:shadow-slate-900/30"
+                class="flex items-center gap-2 border border-[color:var(--border-muted)] bg-[color:var(--bg-subtle)] px-4 py-2 text-xs font-bold text-[color:var(--text-secondary)]"
               >
                 <.icon name="hero-arrow-uturn-left" class="size-4" />
                 <a
                   href={"##{status_parent.dom_id}"}
-                  class="text-violet-600 underline underline-offset-2 transition hover:text-violet-700 dark:text-violet-300 dark:hover:text-violet-200"
+                  class="text-[color:var(--link)] underline underline-offset-2 transition hover:text-[color:var(--text-primary)]"
                 >
                   Replying to {status_parent.handle}
                 </a>
               </div>
 
-              <div class="rounded-3xl ring-2 ring-slate-900/10 dark:ring-white/10">
+              <div class="ring-2 ring-[color:var(--border-default)]">
                 <StatusCard.status_card
                   id={"post-#{@status.object.id}"}
                   entry={@status}
@@ -656,10 +656,10 @@ defmodule EgregorosWeb.StatusLive do
 
               <div data-role="thread-replies" class="space-y-4">
                 <div class="flex items-center justify-between gap-3 px-1">
-                  <p class="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
+                  <p class="text-xs font-bold uppercase tracking-wide text-[color:var(--text-muted)]">
                     Replies
                   </p>
-                  <span class="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                  <span class="font-mono text-xs font-bold text-[color:var(--text-muted)]">
                     {length(@descendants)}
                   </span>
                 </div>
@@ -667,7 +667,7 @@ defmodule EgregorosWeb.StatusLive do
                 <div
                   :if={@descendants == [] and @thread_fetching_replies?}
                   data-role="thread-replies-fetching"
-                  class="rounded-3xl border border-slate-200/80 bg-white/70 p-6 text-sm text-slate-600 shadow-sm shadow-slate-200/20 dark:border-slate-700/70 dark:bg-slate-950/50 dark:text-slate-300 dark:shadow-slate-900/30"
+                  class="border-2 border-[color:var(--border-default)] bg-[color:var(--bg-subtle)] p-6 text-sm text-[color:var(--text-secondary)]"
                 >
                   Fetching replies…
                 </div>
@@ -675,7 +675,7 @@ defmodule EgregorosWeb.StatusLive do
                 <div
                   :if={@descendants == [] and not @thread_fetching_replies?}
                   data-role="thread-replies-empty"
-                  class="rounded-3xl border border-slate-200/80 bg-white/70 p-6 text-sm text-slate-600 shadow-sm shadow-slate-200/20 dark:border-slate-700/70 dark:bg-slate-950/50 dark:text-slate-300 dark:shadow-slate-900/30"
+                  class="border-2 border-[color:var(--border-default)] bg-[color:var(--bg-subtle)] p-6 text-sm text-[color:var(--text-secondary)]"
                 >
                   No replies yet.
                 </div>
@@ -689,21 +689,21 @@ defmodule EgregorosWeb.StatusLive do
                 >
                   <span
                     data-role="thread-rail"
-                    class="absolute bottom-0 left-[var(--thread-indent)] top-0 w-px bg-slate-200/60 dark:bg-slate-700/60"
+                    class="absolute bottom-0 left-[var(--thread-indent)] top-0 w-px bg-[color:var(--border-muted)]"
                     aria-hidden="true"
                   >
                   </span>
 
                   <span
                     data-role="thread-node"
-                    class="absolute left-[calc(var(--thread-indent)-0.375rem)] top-10 h-3 w-3 rounded-full border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900"
+                    class="absolute left-[calc(var(--thread-indent)-0.375rem)] top-10 h-3 w-3 border border-[color:var(--border-default)] bg-[color:var(--bg-base)]"
                     aria-hidden="true"
                   >
                   </span>
 
                   <span
                     data-role="thread-connector"
-                    class="absolute left-[var(--thread-indent)] top-11 h-px w-6 bg-slate-200/60 dark:bg-slate-700/60"
+                    class="absolute left-[var(--thread-indent)] top-11 h-px w-6 bg-[color:var(--border-muted)]"
                     aria-hidden="true"
                   >
                   </span>
@@ -714,12 +714,12 @@ defmodule EgregorosWeb.StatusLive do
                     :if={is_map(parent_info)}
                     data-role="thread-replying-to"
                     data-parent-id={parent_info.dom_id}
-                    class="mb-2 flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400"
+                    class="mb-2 flex items-center gap-2 text-xs font-bold text-[color:var(--text-muted)]"
                   >
                     <.icon name="hero-arrow-uturn-left" class="size-4" />
                     <a
                       href={"##{parent_info.dom_id}"}
-                      class="text-violet-600 underline underline-offset-2 transition hover:text-violet-700 dark:text-violet-300 dark:hover:text-violet-200"
+                      class="text-[color:var(--link)] underline underline-offset-2 transition hover:text-[color:var(--text-primary)]"
                     >
                       Replying to {parent_info.handle}
                     </a>
@@ -737,15 +737,15 @@ defmodule EgregorosWeb.StatusLive do
             </div>
           </section>
         <% else %>
-          <section class="rounded-3xl border border-slate-200/80 bg-white/70 p-8 text-center shadow-sm shadow-slate-200/20 dark:border-slate-700/70 dark:bg-slate-950/50 dark:shadow-slate-900/30">
-            <p class="font-display text-xl text-slate-900 dark:text-slate-100">Post not found</p>
-            <p class="mt-3 text-sm text-slate-600 dark:text-slate-300">
+          <section class="border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] p-8 text-center">
+            <p class="text-xl font-bold text-[color:var(--text-primary)]">Post not found</p>
+            <p class="mt-3 text-sm text-[color:var(--text-secondary)]">
               This status may have been deleted or was never fetched by this instance.
             </p>
             <div class="mt-6 flex justify-center">
               <.link
                 navigate={timeline_href(@current_user, @back_timeline)}
-                class="inline-flex items-center gap-2 rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/20 transition hover:-translate-y-0.5 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+                class="inline-flex items-center gap-2 border-2 border-[color:var(--border-default)] bg-[color:var(--text-primary)] px-6 py-3 text-sm font-bold text-[color:var(--bg-base)] transition hover:bg-[color:var(--accent-primary-hover)] focus-visible:outline-none focus-brutal"
               >
                 <.icon name="hero-home" class="size-5" /> Go to timeline
               </.link>
