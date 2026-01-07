@@ -193,6 +193,25 @@ defmodule EgregorosWeb.TagLiveTest do
     assert has_element?(view, "#post-#{oldest.id}")
   end
 
+  test "tag pages include loading skeleton placeholders when more posts may load", %{
+    conn: conn,
+    user: user
+  } do
+    Enum.each(1..21, fn idx ->
+      assert {:ok, _} = Publish.post_note(user, "Post #{idx} #elixir")
+    end)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    assert {:ok, view, _html} = live(conn, "/tags/elixir")
+
+    assert has_element?(view, "[data-role='tag-loading-more']")
+
+    assert has_element?(
+             view,
+             "[data-role='tag-loading-more'] [data-role='skeleton-status-card']"
+           )
+  end
+
   test "tag pages show a copied-link toast", %{conn: conn} do
     assert {:ok, view, _html} = live(conn, "/tags/elixir")
 

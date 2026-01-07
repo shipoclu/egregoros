@@ -521,13 +521,26 @@ defmodule EgregorosWeb.TagLive do
           <div :if={!@posts_end?} class="flex justify-center py-2">
             <.button
               data-role="tag-load-more"
-              phx-click="load_more_posts"
+              phx-click={JS.show(to: "#tag-loading-more") |> JS.push("load_more_posts")}
               phx-disable-with="Loading..."
               aria-label="Load more posts"
               variant="secondary"
             >
               <.icon name="hero-chevron-down" class="size-4" /> Load more
             </.button>
+          </div>
+
+          <div
+            :if={!@posts_end?}
+            id="tag-loading-more"
+            data-role="tag-loading-more"
+            class="hidden space-y-4"
+            aria-hidden="true"
+          >
+            <.skeleton_status_card
+              :for={_ <- 1..2}
+              class="border-2 border-[color:var(--border-default)]"
+            />
           </div>
         </section>
       </AppShell.app_shell>
