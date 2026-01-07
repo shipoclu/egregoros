@@ -45,6 +45,26 @@ defmodule EgregorosWeb.MessagesLiveTest do
     assert has_element?(view, "article", "hi bob")
   end
 
+  test "messages include loading skeleton placeholders when more messages may load", %{
+    conn: conn,
+    alice: alice,
+    bob: bob
+  } do
+    Enum.each(1..21, fn idx ->
+      assert {:ok, _} = Publish.post_note(bob, "@alice DM #{idx}", visibility: "direct")
+    end)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: alice.id})
+    {:ok, view, _html} = live(conn, "/messages")
+
+    assert has_element?(view, "[data-role='messages-loading-more']")
+
+    assert has_element?(
+             view,
+             "[data-role='messages-loading-more'] [data-role='skeleton-status-card']"
+           )
+  end
+
   test "sending an encrypted DM stores the payload and uses a placeholder body", %{
     conn: conn,
     alice: alice,

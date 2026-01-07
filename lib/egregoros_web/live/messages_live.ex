@@ -567,13 +567,26 @@ defmodule EgregorosWeb.MessagesLive do
             <div :if={!@dm_end?} class="flex justify-center py-2">
               <.button
                 data-role="messages-load-more"
-                phx-click="load_more"
+                phx-click={JS.show(to: "#messages-loading-more") |> JS.push("load_more")}
                 phx-disable-with="Loading..."
                 aria-label="Load more messages"
                 variant="secondary"
               >
                 <.icon name="hero-chevron-down" class="size-4" /> Load more
               </.button>
+            </div>
+
+            <div
+              :if={!@dm_end?}
+              id="messages-loading-more"
+              data-role="messages-loading-more"
+              class="hidden space-y-4"
+              aria-hidden="true"
+            >
+              <.skeleton_status_card
+                :for={_ <- 1..2}
+                class="border-2 border-[color:var(--border-default)]"
+              />
             </div>
           <% else %>
             <.card class="p-6">
