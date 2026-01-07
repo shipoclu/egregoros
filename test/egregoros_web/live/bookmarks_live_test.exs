@@ -117,6 +117,26 @@ defmodule EgregorosWeb.BookmarksLiveTest do
     assert has_element?(view, "#post-#{oldest.id}")
   end
 
+  test "bookmarks include loading skeleton placeholders when more saved posts may load", %{
+    conn: conn,
+    user: user
+  } do
+    Enum.each(1..21, fn idx ->
+      {:ok, note} = Pipeline.ingest(Note.build(user, "Bookmark #{idx}"), local: true)
+      assert {:ok, :bookmarked} = Interactions.toggle_bookmark(user, note.id)
+    end)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/bookmarks")
+
+    assert has_element?(view, "[data-role='bookmarks-loading-more']")
+
+    assert has_element?(
+             view,
+             "[data-role='bookmarks-loading-more'] [data-role='skeleton-status-card']"
+           )
+  end
+
   test "favourites page can load more liked posts", %{conn: conn, user: user} do
     [oldest | _rest] =
       for idx <- 1..25 do

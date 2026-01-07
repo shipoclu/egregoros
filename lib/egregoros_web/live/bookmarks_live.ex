@@ -557,13 +557,26 @@ defmodule EgregorosWeb.BookmarksLive do
             <div :if={!@saved_end?} class="flex justify-center py-2">
               <.button
                 data-role="bookmarks-load-more"
-                phx-click="load_more"
+                phx-click={JS.show(to: "#bookmarks-loading-more") |> JS.push("load_more")}
                 phx-disable-with="Loading..."
                 aria-label="Load more saved posts"
                 variant="secondary"
               >
                 <.icon name="hero-chevron-down" class="size-4" /> Load more
               </.button>
+            </div>
+
+            <div
+              :if={!@saved_end?}
+              id="bookmarks-loading-more"
+              data-role="bookmarks-loading-more"
+              class="hidden space-y-4"
+              aria-hidden="true"
+            >
+              <.skeleton_status_card
+                :for={_ <- 1..2}
+                class="border-2 border-[color:var(--border-default)]"
+              />
             </div>
           <% else %>
             <.card class="p-6">
