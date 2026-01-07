@@ -86,6 +86,45 @@ defmodule EgregorosWeb.RelationshipsLiveTest do
            )
   end
 
+  test "followers page includes loading skeleton placeholders when more items may load", %{
+    conn: conn,
+    bob: bob
+  } do
+    for idx <- 1..41 do
+      nickname = "skeleton_follower#{idx}"
+
+      {:ok, user} =
+        Users.create_user(%{
+          nickname: nickname,
+          ap_id: "https://remote.example/users/#{nickname}",
+          inbox: "https://remote.example/users/#{nickname}/inbox",
+          outbox: "https://remote.example/users/#{nickname}/outbox",
+          public_key: "public-key",
+          local: false
+        })
+
+      follow = %{
+        "id" => "https://remote.example/activities/follow/skeleton/#{idx}",
+        "type" => "Follow",
+        "actor" => user.ap_id,
+        "object" => bob.ap_id,
+        "to" => [bob.ap_id],
+        "published" => DateTime.utc_now() |> DateTime.to_iso8601()
+      }
+
+      assert {:ok, _follow} = Pipeline.ingest(follow, local: false)
+    end
+
+    assert {:ok, view, _html} = live(conn, "/@#{bob.nickname}/followers")
+
+    assert has_element?(view, "[data-role='relationships-loading-more']")
+
+    assert has_element?(
+             view,
+             "[data-role='relationships-loading-more'] [data-role='skeleton-actor-row']"
+           )
+  end
+
   test "followers page lets you follow back from the list", %{conn: conn, bob: bob, alice: alice} do
     conn = Plug.Test.init_test_session(conn, %{user_id: bob.id})
     assert {:ok, view, _html} = live(conn, "/@#{bob.nickname}/followers")

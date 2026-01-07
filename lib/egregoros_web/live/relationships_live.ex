@@ -243,13 +243,23 @@ defmodule EgregorosWeb.RelationshipsLive do
             <div :if={!@items_end?} class="flex justify-center py-2">
               <.button
                 data-role="relationships-load-more"
-                phx-click="load_more"
+                phx-click={JS.show(to: "#relationships-loading-more") |> JS.push("load_more")}
                 phx-disable-with="Loading..."
                 aria-label="Load more"
                 variant="secondary"
               >
                 <.icon name="hero-chevron-down" class="size-4" /> Load more
               </.button>
+            </div>
+
+            <div
+              :if={!@items_end?}
+              id="relationships-loading-more"
+              data-role="relationships-loading-more"
+              class="hidden space-y-4"
+              aria-hidden="true"
+            >
+              <.skeleton_actor_row :for={_ <- 1..3} />
             </div>
           </section>
         <% else %>

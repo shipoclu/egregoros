@@ -305,6 +305,40 @@ defmodule EgregorosWeb.CoreComponents do
   end
 
   @doc """
+  Renders a skeleton placeholder for an actor row.
+
+  Useful for follower/following lists and other user lists.
+  """
+  attr :rest, :global
+  attr :class, :any, default: nil
+
+  def skeleton_actor_row(assigns) do
+    ~H"""
+    <.card
+      data_role="skeleton-actor-row"
+      class={[
+        "animate-pulse p-4",
+        @class
+      ]}
+      {@rest}
+    >
+      <div class="flex items-center justify-between gap-4">
+        <div class="flex min-w-0 flex-1 items-center gap-3">
+          <div class="h-9 w-9 shrink-0 rounded-full bg-[color:var(--bg-muted)]"></div>
+
+          <div class="min-w-0 flex-1 space-y-2">
+            <div class="h-3 w-40 max-w-full bg-[color:var(--bg-muted)]"></div>
+            <div class="h-3 w-28 max-w-full bg-[color:var(--bg-muted)]"></div>
+          </div>
+        </div>
+
+        <div class="h-9 w-24 shrink-0 bg-[color:var(--bg-muted)]"></div>
+      </div>
+    </.card>
+    """
+  end
+
+  @doc """
   Renders a surface container (card/panel) with consistent styling.
   """
   attr :rest, :global
