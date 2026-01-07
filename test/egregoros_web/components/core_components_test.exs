@@ -48,7 +48,7 @@ defmodule EgregorosWeb.CoreComponentsTest do
         inner_block: slot_text("Delete")
       })
 
-    assert html =~ "bg-red-600"
+    assert html =~ "bg-[color:var(--danger)]"
     assert html =~ "px-3 py-1.5 text-xs"
   end
 
@@ -109,8 +109,8 @@ defmodule EgregorosWeb.CoreComponentsTest do
         inner_block: slot_text("X")
       })
 
-    assert html =~ "bg-white/10"
-    assert html =~ "focus-visible:ring-white/60"
+    assert html =~ "bg-black/50"
+    assert html =~ "text-white"
   end
 
   test "card wraps content and exposes a stable data role" do
@@ -179,7 +179,7 @@ defmodule EgregorosWeb.CoreComponentsTest do
         inner_block: []
       })
 
-    assert html =~ "hero-exclamation-circle"
+    assert html =~ "[ERROR]"
     assert html =~ "Nope"
   end
 
