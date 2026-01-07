@@ -89,10 +89,11 @@ defmodule EgregorosWeb.Composer do
               id={@visibility_menu_id}
               data-role="compose-visibility-menu"
               data-state="closed"
+              data-placement="bottom"
               phx-click-away={close_menu_js(@visibility_menu_id)}
               phx-window-keydown={close_menu_js(@visibility_menu_id)}
               phx-key="escape"
-              class="absolute left-0 top-full z-40 mt-2 hidden w-72 border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] p-4"
+              class="absolute left-0 z-40 hidden w-72 border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] p-4 data-[placement=bottom]:top-full data-[placement=bottom]:mt-2 data-[placement=bottom]:bottom-auto data-[placement=bottom]:mb-0 data-[placement=top]:bottom-full data-[placement=top]:mb-2 data-[placement=top]:top-auto data-[placement=top]:mt-0"
             >
               <p class="text-xs font-bold uppercase tracking-wider text-[color:var(--text-muted)]">
                 Visibility
@@ -138,10 +139,11 @@ defmodule EgregorosWeb.Composer do
               id={@language_menu_id}
               data-role="compose-language-menu"
               data-state="closed"
+              data-placement="bottom"
               phx-click-away={close_menu_js(@language_menu_id)}
               phx-window-keydown={close_menu_js(@language_menu_id)}
               phx-key="escape"
-              class="absolute left-0 top-full z-40 mt-2 hidden w-72 border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] p-4"
+              class="absolute left-0 z-40 hidden w-72 border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] p-4 data-[placement=bottom]:top-full data-[placement=bottom]:mt-2 data-[placement=bottom]:bottom-auto data-[placement=bottom]:mb-0 data-[placement=top]:bottom-full data-[placement=top]:mb-2 data-[placement=top]:top-auto data-[placement=top]:mt-0"
             >
               <p class="text-xs font-bold uppercase tracking-wider text-[color:var(--text-muted)]">
                 Language

@@ -3,6 +3,26 @@ const ComposeSettings = {
     this.visibilityLabel = null
     this.languageLabel = null
 
+    this.updateMenuPlacement = (toggleButton, menuSelector) => {
+      if (!toggleButton) return
+
+      requestAnimationFrame(() => {
+        const menu = toggleButton.parentElement?.querySelector?.(menuSelector)
+        if (!menu) return
+        if (menu.classList.contains("hidden") || menu.dataset.state !== "open") return
+
+        const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0
+        const toggleRect = toggleButton.getBoundingClientRect()
+        const menuRect = menu.getBoundingClientRect()
+
+        const spaceBelow = viewportHeight - toggleRect.bottom
+        const spaceAbove = toggleRect.top
+        const shouldFlip = menuRect.height > spaceBelow && spaceAbove > spaceBelow
+
+        menu.dataset.placement = shouldFlip ? "top" : "bottom"
+      })
+    }
+
     this.onChange = e => {
       const target = e?.target
       if (!(target instanceof HTMLElement)) return
@@ -15,8 +35,24 @@ const ComposeSettings = {
       if (target.matches("input[name$='[language]']")) this.updateLanguageLabel()
     }
 
+    this.onClick = e => {
+      const target = e?.target
+      if (!(target instanceof HTMLElement)) return
+
+      const visibilityToggle = target.closest?.("[data-role='compose-visibility-pill']")
+      if (visibilityToggle && this.el.contains(visibilityToggle)) {
+        this.updateMenuPlacement(visibilityToggle, "[data-role='compose-visibility-menu']")
+      }
+
+      const languageToggle = target.closest?.("[data-role='compose-language-pill']")
+      if (languageToggle && this.el.contains(languageToggle)) {
+        this.updateMenuPlacement(languageToggle, "[data-role='compose-language-menu']")
+      }
+    }
+
     this.el.addEventListener("change", this.onChange)
     this.el.addEventListener("input", this.onInput)
+    this.el.addEventListener("click", this.onClick)
     this.updateVisibilityLabel()
     this.updateLanguageLabel()
   },
@@ -29,6 +65,7 @@ const ComposeSettings = {
   destroyed() {
     this.el.removeEventListener("change", this.onChange)
     this.el.removeEventListener("input", this.onInput)
+    this.el.removeEventListener("click", this.onClick)
   },
 
   updateVisibilityLabel() {

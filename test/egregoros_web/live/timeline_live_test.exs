@@ -342,6 +342,18 @@ defmodule EgregorosWeb.TimelineLiveTest do
     refute has_element?(view, "#compose-options input[name='post[language]']")
   end
 
+  test "compose dropdown menus declare placement defaults for viewport flipping", %{
+    conn: conn,
+    user: user
+  } do
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/")
+
+    assert has_element?(view, "[data-role='compose-visibility-menu'][data-placement='bottom']")
+    assert has_element?(view, "[data-role='compose-language-menu'][data-placement='bottom']")
+    assert has_element?(view, "[data-role='compose-emoji-menu'][data-placement='bottom']")
+  end
+
   test "posting rejects content longer than 5000 characters", %{conn: conn, user: user} do
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     {:ok, view, _html} = live(conn, "/")

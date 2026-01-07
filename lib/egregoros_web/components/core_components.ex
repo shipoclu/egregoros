@@ -242,8 +242,9 @@ defmodule EgregorosWeb.CoreComponents do
       <div
         data-role="compose-emoji-menu"
         data-state="closed"
+        data-placement="bottom"
         class={[
-          "absolute left-1/2 top-full z-30 mt-2 hidden w-64 -translate-x-1/2 border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] p-4"
+          "absolute left-1/2 z-30 hidden max-h-72 w-64 -translate-x-1/2 overflow-y-auto border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] p-4 data-[placement=bottom]:top-full data-[placement=bottom]:mt-2 data-[placement=bottom]:bottom-auto data-[placement=bottom]:mb-0 data-[placement=top]:bottom-full data-[placement=top]:mb-2 data-[placement=top]:top-auto data-[placement=top]:mt-0"
         ]}
       >
         <p class="text-xs font-bold uppercase tracking-wider text-[color:var(--text-muted)]">

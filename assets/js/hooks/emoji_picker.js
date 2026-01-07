@@ -3,6 +3,24 @@ const EmojiPicker = {
     this.menu = this.findMenu()
     this.toggleButton = this.findToggle()
 
+    this.updatePlacement = () => {
+      if (!this.menu || !this.toggleButton) return
+
+      requestAnimationFrame(() => {
+        if (!this.isOpen()) return
+
+        const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0
+        const toggleRect = this.toggleButton.getBoundingClientRect()
+        const menuRect = this.menu.getBoundingClientRect()
+
+        const spaceBelow = viewportHeight - toggleRect.bottom
+        const spaceAbove = toggleRect.top
+        const shouldFlip = menuRect.height > spaceBelow && spaceAbove > spaceBelow
+
+        this.menu.dataset.placement = shouldFlip ? "top" : "bottom"
+      })
+    }
+
     this.onClick = e => {
       const option = e.target?.closest?.("[data-role='compose-emoji-option']")
       if (option && this.el.contains(option)) {
@@ -44,6 +62,7 @@ const EmojiPicker = {
     this.menu = this.findMenu()
     this.toggleButton = this.findToggle()
     this.syncAria()
+    if (this.isOpen()) this.updatePlacement?.()
   },
 
   destroyed() {
@@ -72,6 +91,8 @@ const EmojiPicker = {
     this.menu.dataset.state = isOpen ? "open" : "closed"
     this.menu.classList.toggle("hidden", !isOpen)
     this.menu.setAttribute("aria-hidden", isOpen ? "false" : "true")
+
+    if (isOpen) this.updatePlacement?.()
 
     if (this.toggleButton) {
       this.toggleButton.setAttribute("aria-expanded", isOpen ? "true" : "false")
