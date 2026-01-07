@@ -233,6 +233,26 @@ defmodule EgregorosWeb.ProfileLiveTest do
     assert has_element?(view, "#post-#{oldest.id}")
   end
 
+  test "profile includes loading skeleton placeholders when more posts may load", %{
+    conn: conn,
+    viewer: viewer,
+    profile_user: profile_user
+  } do
+    Enum.each(1..21, fn idx ->
+      assert {:ok, _} = Pipeline.ingest(Note.build(profile_user, "Post #{idx}"), local: true)
+    end)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: viewer.id})
+    {:ok, view, _html} = live(conn, "/@#{profile_user.nickname}")
+
+    assert has_element?(view, "[data-role='profile-loading-more']")
+
+    assert has_element?(
+             view,
+             "[data-role='profile-loading-more'] [data-role='skeleton-status-card']"
+           )
+  end
+
   test "signed-out users do not see direct messages on profile pages", %{
     conn: conn,
     profile_user: profile_user
