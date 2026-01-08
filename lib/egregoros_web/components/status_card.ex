@@ -21,7 +21,7 @@ defmodule EgregorosWeb.StatusCard do
     <article
       id={@id}
       data-role="status-card"
-      class="border-b border-[color:var(--border-muted)] bg-[color:var(--bg-base)] p-5 transition hover:bg-[color:var(--bg-subtle)]"
+      class="scroll-mt-24 border-b border-[color:var(--border-muted)] bg-[color:var(--bg-base)] p-5 transition hover:bg-[color:var(--bg-subtle)] target:ring-2 target:ring-[color:var(--border-default)]"
     >
       <div class="flex items-start justify-between gap-3">
         <div class="flex min-w-0 items-start gap-3">
