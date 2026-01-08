@@ -81,7 +81,7 @@ For a self-contained stack (app + Postgres), use `docker-compose.yml`.
 ```sh
 cp .env.example .env
 # Set SECRET_KEY_BASE (generate one with: mix phx.gen.secret)
-docker compose up --build
+docker compose -f docker-compose.yml -f docker-compose.local.yml up --build
 ```
 
 For production, change `POSTGRES_PASSWORD` (and use URL-safe characters or URL-encode it in `DATABASE_URL`).
@@ -92,6 +92,8 @@ For multi-node deployments, run migrations as a one-off task instead of on every
 ### Coolify notes
 
 - Use the **Docker Compose** deployment type and point it at this repo.
+- Do not publish the app port with `ports:`; let Coolify/Traefik route to the container port instead.
+- Because the app listens on port `4000`, add the port in Coolify’s domain mapping (e.g. `https://example.com:4000`).
 - Set `PHX_HOST` / `PHX_SCHEME` / `PHX_PORT` to the public URL of your instance (important for federation).
 - Persist volumes `egregoros_db` and `egregoros_uploads` (Coolify will create named volumes automatically).
 

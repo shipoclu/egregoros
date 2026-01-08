@@ -30,8 +30,8 @@ services:
       EGREGOROS_UPLOADS_DIR: /data/uploads
     volumes:
       - egregoros_uploads:/data/uploads
-    ports:
-      - "4000:4000"
+    expose:
+      - "4000"
     command: >
       sh -lc 'bin/egregoros eval "Egregoros.Release.migrate()" && exec bin/egregoros start'
 
