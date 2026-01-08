@@ -34,6 +34,7 @@ import MediaViewer from "./hooks/media_viewer"
 import ReplyModal from "./hooks/reply_modal"
 import ScrollRestore from "./hooks/scroll_restore"
 import StatusAutoScroll from "./hooks/status_auto_scroll"
+import {initImageCropper} from "./hooks/image_cropper"
 
 const base64UrlEncode = bytes => {
   let binary = ""
@@ -1108,6 +1109,8 @@ document.addEventListener("DOMContentLoaded", initE2EESettings)
 window.addEventListener("phx:page-loading-stop", initE2EESettings)
 document.addEventListener("DOMContentLoaded", initPasskeyAuth)
 window.addEventListener("phx:page-loading-stop", initPasskeyAuth)
+document.addEventListener("DOMContentLoaded", initImageCropper)
+window.addEventListener("phx:page-loading-stop", initImageCropper)
 
 window.addEventListener("egregoros:scroll-top", () => {
   window.scrollTo({top: 0, behavior: "smooth"})

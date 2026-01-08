@@ -18,7 +18,11 @@
       </div>
 
       <div class="grid gap-6">
-        <section class="rounded-3xl border border-white/80 bg-white/80 p-8 shadow-lg shadow-slate-200/30 backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/70 dark:shadow-slate-900/50">
+        <section
+          id="profile-section"
+          data-role="image-cropper-section"
+          class="rounded-3xl border border-white/80 bg-white/80 p-8 shadow-lg shadow-slate-200/30 backdrop-blur dark:border-slate-700/60 dark:bg-slate-900/70 dark:shadow-slate-900/50"
+        >
           <h3 class="font-display text-xl text-slate-900 dark:text-slate-100">Profile</h3>
 
           <.form
@@ -182,6 +186,50 @@
             </.button>
           </div>
         </section>
+      </div>
+
+      <div
+        id="cropper-modal"
+        class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+      >
+        <div class="relative mx-4 w-full max-w-2xl rounded-2xl border border-white/20 bg-slate-900/95 p-6 shadow-2xl">
+          <h3 class="mb-4 text-lg font-semibold text-white">Crop image</h3>
+
+          <div class="relative flex items-center justify-center overflow-hidden rounded-lg bg-black/50" style="height: 400px;">
+            <img
+              data-role="cropper-image"
+              class="max-h-full max-w-full object-contain"
+              alt="Image to crop"
+            />
+            <div
+              data-role="crop-box"
+              class="absolute border-2 border-white bg-white/10 shadow-lg"
+              style="cursor: move;"
+            >
+              <div class="absolute -left-1 -top-1 h-3 w-3 rounded-full border-2 border-white bg-slate-900" style="cursor: nw-resize;"></div>
+              <div class="absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-white bg-slate-900" style="cursor: ne-resize;"></div>
+              <div class="absolute -bottom-1 -left-1 h-3 w-3 rounded-full border-2 border-white bg-slate-900" style="cursor: sw-resize;"></div>
+              <div class="absolute -bottom-1 -right-1 h-3 w-3 rounded-full border-2 border-white bg-slate-900" style="cursor: se-resize;"></div>
+            </div>
+          </div>
+
+          <div class="mt-4 flex justify-end gap-3">
+            <button
+              type="button"
+              data-role="cropper-cancel"
+              class="rounded-lg border border-slate-600 px-4 py-2 text-sm font-medium text-slate-300 transition hover:bg-slate-800"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              data-role="cropper-confirm"
+              class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-500"
+            >
+              Crop
+            </button>
+          </div>
+        </div>
       </div>
     </section>
   </AppShell.app_shell>
