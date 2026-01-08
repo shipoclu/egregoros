@@ -283,12 +283,8 @@ defmodule Egregoros.Users do
 
       activity_query =
         from(o in Object,
-          where: not is_nil(o.actor),
-          group_by: o.actor,
-          select: %{
-            actor: o.actor,
-            last_activity: max(coalesce(o.published, o.inserted_at))
-          }
+          where: o.actor == parent_as(:user).ap_id,
+          select: %{last_activity: max(coalesce(o.published, o.inserted_at))}
         )
 
       follow_query =
@@ -312,11 +308,12 @@ defmodule Egregoros.Users do
       contains = "%" <> query <> "%"
 
       from(u in User,
+        as: :user,
         where: ilike(u.nickname, ^pattern) or ilike(u.name, ^pattern),
         left_join: f in subquery(follow_query),
         on: f.object == u.ap_id,
-        left_join: a in subquery(activity_query),
-        on: a.actor == u.ap_id,
+        left_lateral_join: a in subquery(activity_query),
+        on: true,
         order_by: [
           asc:
             fragment(
@@ -437,12 +434,8 @@ defmodule Egregoros.Users do
 
     activity_query =
       from(o in Object,
-        where: not is_nil(o.actor),
-        group_by: o.actor,
-        select: %{
-          actor: o.actor,
-          last_activity: max(coalesce(o.published, o.inserted_at))
-        }
+        where: o.actor == parent_as(:user).ap_id,
+        select: %{last_activity: max(coalesce(o.published, o.inserted_at))}
       )
 
     follow_query =
@@ -463,12 +456,13 @@ defmodule Egregoros.Users do
 
     remote_matches =
       from(u in User,
+        as: :user,
         where:
           u.local == false and ilike(u.nickname, ^nickname_like) and ilike(u.domain, ^domain_like),
         left_join: f in subquery(follow_query),
         on: f.object == u.ap_id,
-        left_join: a in subquery(activity_query),
-        on: a.actor == u.ap_id,
+        left_lateral_join: a in subquery(activity_query),
+        on: true,
         order_by: [
           desc_nulls_last: f.followed,
           desc_nulls_last: a.last_activity,
@@ -481,11 +475,12 @@ defmodule Egregoros.Users do
     local_matches =
       if nickname_part != "" and local_domain_matches_prefix?(domain_part) do
         from(u in User,
+          as: :user,
           where: u.local == true and ilike(u.nickname, ^nickname_like),
           left_join: f in subquery(follow_query),
           on: f.object == u.ap_id,
-          left_join: a in subquery(activity_query),
-          on: a.actor == u.ap_id,
+          left_lateral_join: a in subquery(activity_query),
+          on: true,
           order_by: [
             desc_nulls_last: f.followed,
             desc_nulls_last: a.last_activity,
