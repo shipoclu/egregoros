@@ -84,6 +84,8 @@ cp .env.example .env
 docker compose up --build
 ```
 
+For production, change `POSTGRES_PASSWORD` (and use URL-safe characters or URL-encode it in `DATABASE_URL`).
+
 The container runs migrations automatically on startup via `Egregoros.Release.migrate/0`.
 For multi-node deployments, run migrations as a one-off task instead of on every boot.
 
