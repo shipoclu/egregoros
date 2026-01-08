@@ -2,7 +2,6 @@ defmodule Egregoros.Users do
   import Ecto.Query, only: [from: 2]
 
   alias Egregoros.Keys
-  alias Egregoros.Object
   alias Egregoros.Password
   alias Egregoros.Relationship
   alias Egregoros.Repo
@@ -271,6 +270,46 @@ defmodule Egregoros.Users do
     end
   end
 
+  def bump_last_activity_at(actor_ap_id, at \\ nil)
+
+  def bump_last_activity_at(actor_ap_id, at) when is_binary(actor_ap_id) do
+    actor_ap_id = String.trim(actor_ap_id)
+
+    cond do
+      actor_ap_id == "" ->
+        :ok
+
+      at == nil ->
+        bump_last_activity_at(actor_ap_id, DateTime.utc_now())
+
+      match?(%DateTime{}, at) ->
+        at = DateTime.truncate(at, :microsecond)
+
+        from(u in User,
+          where: u.ap_id == ^actor_ap_id,
+          update: [
+            set: [
+              last_activity_at:
+                fragment(
+                  "GREATEST(COALESCE(?, ?), ?)",
+                  u.last_activity_at,
+                  ^at,
+                  ^at
+                )
+            ]
+          ]
+        )
+        |> Repo.update_all([])
+
+        :ok
+
+      true ->
+        :ok
+    end
+  end
+
+  def bump_last_activity_at(_actor_ap_id, _at), do: :ok
+
   def search(query, opts \\ []) when is_binary(query) and is_list(opts) do
     query = String.trim(query)
     limit = opts |> Keyword.get(:limit, 20) |> normalize_limit()
@@ -280,12 +319,6 @@ defmodule Egregoros.Users do
       []
     else
       pattern = "%" <> query <> "%"
-
-      activity_query =
-        from(o in Object,
-          where: o.actor == parent_as(:user).ap_id,
-          select: %{last_activity: max(coalesce(o.published, o.inserted_at))}
-        )
 
       follow_query =
         if is_binary(current_user_ap_id) and current_user_ap_id != "" do
@@ -312,8 +345,6 @@ defmodule Egregoros.Users do
         where: ilike(u.nickname, ^pattern) or ilike(u.name, ^pattern),
         left_join: f in subquery(follow_query),
         on: f.object == u.ap_id,
-        left_lateral_join: a in subquery(activity_query),
-        on: true,
         order_by: [
           asc:
             fragment(
@@ -342,7 +373,7 @@ defmodule Egregoros.Users do
               ^contains
             ),
           desc_nulls_last: f.followed,
-          desc_nulls_last: a.last_activity,
+          desc_nulls_last: u.last_activity_at,
           asc: u.nickname
         ],
         limit: ^limit
@@ -432,12 +463,6 @@ defmodule Egregoros.Users do
     nickname_like = nickname_part <> "%"
     domain_like = domain_part <> "%"
 
-    activity_query =
-      from(o in Object,
-        where: o.actor == parent_as(:user).ap_id,
-        select: %{last_activity: max(coalesce(o.published, o.inserted_at))}
-      )
-
     follow_query =
       if is_binary(current_user_ap_id) and current_user_ap_id != "" do
         from(r in Relationship,
@@ -461,11 +486,9 @@ defmodule Egregoros.Users do
           u.local == false and ilike(u.nickname, ^nickname_like) and ilike(u.domain, ^domain_like),
         left_join: f in subquery(follow_query),
         on: f.object == u.ap_id,
-        left_lateral_join: a in subquery(activity_query),
-        on: true,
         order_by: [
           desc_nulls_last: f.followed,
-          desc_nulls_last: a.last_activity,
+          desc_nulls_last: u.last_activity_at,
           asc: u.nickname
         ],
         limit: ^limit
@@ -479,11 +502,9 @@ defmodule Egregoros.Users do
           where: u.local == true and ilike(u.nickname, ^nickname_like),
           left_join: f in subquery(follow_query),
           on: f.object == u.ap_id,
-          left_lateral_join: a in subquery(activity_query),
-          on: true,
           order_by: [
             desc_nulls_last: f.followed,
-            desc_nulls_last: a.last_activity,
+            desc_nulls_last: u.last_activity_at,
             asc: u.nickname
           ],
           limit: ^limit

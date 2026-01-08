@@ -5,6 +5,7 @@ defmodule Egregoros.Objects do
   alias Egregoros.Relationship
   alias Egregoros.Relationships
   alias Egregoros.Repo
+  alias Egregoros.Users
 
   @as_public "https://www.w3.org/ns/activitystreams#Public"
   @recipient_fields ~w(to cc bto bcc audience)
@@ -13,6 +14,14 @@ defmodule Egregoros.Objects do
     %Object{}
     |> Object.changeset(attrs)
     |> Repo.insert()
+    |> case do
+      {:ok, %Object{} = object} ->
+        _ = maybe_bump_actor_last_activity(object)
+        {:ok, object}
+
+      other ->
+        other
+    end
   end
 
   def update_object(%Object{} = object, attrs) do
@@ -20,6 +29,13 @@ defmodule Egregoros.Objects do
     |> Object.changeset(attrs)
     |> Repo.update()
   end
+
+  defp maybe_bump_actor_last_activity(%Object{actor: actor, inserted_at: inserted_at})
+       when is_binary(actor) and actor != "" and not is_nil(inserted_at) do
+    Users.bump_last_activity_at(actor, inserted_at)
+  end
+
+  defp maybe_bump_actor_last_activity(_object), do: :ok
 
   def upsert_object(attrs) do
     upsert_object(attrs, conflict: :nothing)

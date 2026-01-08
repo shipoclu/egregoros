@@ -2,6 +2,7 @@ defmodule Egregoros.UsersTest do
   use Egregoros.DataCase, async: true
 
   alias Egregoros.Objects
+  alias Egregoros.Repo
   alias Egregoros.Relationships
   alias Egregoros.User
   alias Egregoros.Users
@@ -265,6 +266,34 @@ defmodule Egregoros.UsersTest do
       })
 
     assert user.domain == "remote.example:8443"
+  end
+
+  test "create_object bumps user's last_activity_at when actor matches" do
+    {:ok, user} =
+      Users.create_user(%{
+        nickname: "toast",
+        domain: "donotsta.re",
+        ap_id: "https://donotsta.re/users/toast",
+        inbox: "https://donotsta.re/users/toast/inbox",
+        outbox: "https://donotsta.re/users/toast/outbox",
+        public_key: "PUB",
+        private_key: nil,
+        local: false
+      })
+
+    assert Repo.get(User, user.id).last_activity_at == nil
+
+    assert {:ok, _} =
+             Objects.create_object(%{
+               ap_id: "https://donotsta.re/objects/toast-note",
+               type: "Note",
+               actor: user.ap_id,
+               data: %{},
+               local: false
+             })
+
+    assert %User{} = reloaded = Repo.get(User, user.id)
+    assert reloaded.last_activity_at != nil
   end
 
   test "update_profile/2 strips admin from attrs while allowing other fields" do

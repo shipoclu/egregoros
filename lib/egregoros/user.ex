@@ -28,6 +28,7 @@ defmodule Egregoros.User do
     field :emojis, {:array, :map}, default: []
     field :moved_to_ap_id, :string
     field :also_known_as, {:array, :string}, default: []
+    field :last_activity_at, :utc_datetime_usec
 
     timestamps(type: :utc_datetime_usec)
   end
