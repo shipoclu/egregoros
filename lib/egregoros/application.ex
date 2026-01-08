@@ -23,7 +23,15 @@ defmodule Egregoros.Application do
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options
     opts = [strategy: :one_for_one, name: Egregoros.Supervisor]
-    Supervisor.start_link(children, opts)
+
+    case Supervisor.start_link(children, opts) do
+      {:ok, _pid} = ok ->
+        _ = Egregoros.Deployment.bootstrap()
+        ok
+
+      other ->
+        other
+    end
   end
 
   # Tell Phoenix to update the endpoint configuration

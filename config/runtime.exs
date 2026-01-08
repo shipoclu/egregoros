@@ -23,6 +23,12 @@ end
 config :egregoros, EgregorosWeb.Endpoint,
   http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 
+bootstrap_admin_nickname = System.get_env("EGREGOROS_BOOTSTRAP_ADMIN")
+
+if is_binary(bootstrap_admin_nickname) and bootstrap_admin_nickname != "" do
+  config :egregoros, :bootstrap_admin_nickname, bootstrap_admin_nickname
+end
+
 if config_env() != :test do
   external_host = System.get_env("PHX_HOST") || System.get_env("EGREGOROS_EXTERNAL_HOST")
 
