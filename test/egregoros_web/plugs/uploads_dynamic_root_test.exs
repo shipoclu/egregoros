@@ -42,4 +42,3 @@ defmodule EgregorosWeb.Plugs.UploadsDynamicRootTest do
     end
   end
 end
-

@@ -35,4 +35,3 @@ defmodule Egregoros.HTTPDateTest do
     end
   end
 end
-

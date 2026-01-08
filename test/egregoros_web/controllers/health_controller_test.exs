@@ -10,4 +10,3 @@ defmodule EgregorosWeb.HealthControllerTest do
     assert is_binary(body["version"])
   end
 end
-

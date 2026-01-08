@@ -195,7 +195,10 @@
         <div class="relative mx-4 w-full max-w-2xl rounded-2xl border border-white/20 bg-slate-900/95 p-6 shadow-2xl">
           <h3 class="mb-4 text-lg font-semibold text-white">Crop image</h3>
 
-          <div class="relative flex items-center justify-center overflow-hidden rounded-lg bg-black/50" style="height: 400px;">
+          <div
+            class="relative flex items-center justify-center overflow-hidden rounded-lg bg-black/50"
+            style="height: 400px;"
+          >
             <img
               data-role="cropper-image"
               class="max-h-full max-w-full object-contain"
@@ -206,10 +209,26 @@
               class="absolute border-2 border-white bg-white/10 shadow-lg"
               style="cursor: move;"
             >
-              <div class="absolute -left-1 -top-1 h-3 w-3 rounded-full border-2 border-white bg-slate-900" style="cursor: nw-resize;"></div>
-              <div class="absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-white bg-slate-900" style="cursor: ne-resize;"></div>
-              <div class="absolute -bottom-1 -left-1 h-3 w-3 rounded-full border-2 border-white bg-slate-900" style="cursor: sw-resize;"></div>
-              <div class="absolute -bottom-1 -right-1 h-3 w-3 rounded-full border-2 border-white bg-slate-900" style="cursor: se-resize;"></div>
+              <div
+                class="absolute -left-1 -top-1 h-3 w-3 rounded-full border-2 border-white bg-slate-900"
+                style="cursor: nw-resize;"
+              >
+              </div>
+              <div
+                class="absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-white bg-slate-900"
+                style="cursor: ne-resize;"
+              >
+              </div>
+              <div
+                class="absolute -bottom-1 -left-1 h-3 w-3 rounded-full border-2 border-white bg-slate-900"
+                style="cursor: sw-resize;"
+              >
+              </div>
+              <div
+                class="absolute -bottom-1 -right-1 h-3 w-3 rounded-full border-2 border-white bg-slate-900"
+                style="cursor: se-resize;"
+              >
+              </div>
             </div>
           </div>
 

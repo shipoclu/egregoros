@@ -128,7 +128,8 @@ defmodule EgregorosWeb.MediaViewer do
                     class="image-dark-filter max-h-[85vh] w-full object-contain"
                     loading="lazy"
                   />
-                  <div class="image-scanlines-overlay pointer-events-none absolute inset-0 z-10"></div>
+                  <div class="image-scanlines-overlay pointer-events-none absolute inset-0 z-10">
+                  </div>
                 </div>
             <% end %>
           </div>

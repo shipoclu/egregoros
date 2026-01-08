@@ -95,4 +95,3 @@ defmodule Egregoros.HTTPDate do
 
   defp parse_time(_value), do: {:error, :invalid_date}
 end
-

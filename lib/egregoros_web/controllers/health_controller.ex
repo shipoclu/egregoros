@@ -26,4 +26,3 @@ defmodule EgregorosWeb.HealthController do
     end
   end
 end
-

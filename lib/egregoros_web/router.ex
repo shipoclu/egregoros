@@ -98,7 +98,7 @@ defmodule EgregorosWeb.Router do
   scope "/admin" do
     pipe_through [:browser, :admin]
 
-    oban_dashboard "/oban", oban_name: Oban
+    oban_dashboard("/oban", oban_name: Oban)
   end
 
   scope "/", EgregorosWeb do

@@ -487,8 +487,7 @@ defmodule EgregorosWeb.StatusCard do
           }
           class="inline-flex items-center gap-2 border border-[color:var(--border-muted)] bg-[color:var(--bg-subtle)] px-3 py-2 text-xs font-bold uppercase text-[color:var(--text-secondary)] transition hover:border-[color:var(--border-default)] hover:text-[color:var(--text-primary)] focus-visible:outline-none focus-brutal"
         >
-          <.icon name="hero-eye-slash" class="size-4" />
-          Hide media
+          <.icon name="hero-eye-slash" class="size-4" /> Hide media
         </button>
       </div>
 

@@ -22,4 +22,3 @@ defmodule Egregoros.DeploymentTest do
     assert :ok = Deployment.bootstrap_admin("   ")
   end
 end
-

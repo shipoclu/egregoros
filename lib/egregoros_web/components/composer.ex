@@ -203,66 +203,69 @@ defmodule EgregorosWeb.Composer do
               style="top: 1.75rem"
               class="absolute left-0 right-0 z-30 overflow-hidden border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)]"
             >
-            <ul class="max-h-64 divide-y divide-[color:var(--border-muted)] overflow-y-auto">
-              <li :for={suggestion <- @mention_suggestions}>
-                <button
-                  type="button"
-                  data-role="mention-suggestion"
-                  data-handle={Map.get(suggestion, :handle) || Map.get(suggestion, "handle") || ""}
-                  phx-click={
-                    JS.dispatch("egregoros:mention-select",
-                      to: "##{@content_id}",
-                      detail: %{
-                        handle: Map.get(suggestion, :handle) || Map.get(suggestion, "handle") || ""
-                      }
-                    )
-                  }
-                  class="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-[color:var(--bg-subtle)] focus-visible:outline-none focus-brutal"
-                >
-                  <div class="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden border border-[color:var(--border-default)] bg-[color:var(--bg-subtle)] text-sm font-bold text-[color:var(--text-secondary)]">
-                    <img
-                      :if={
-                        is_binary(
+              <ul class="max-h-64 divide-y divide-[color:var(--border-muted)] overflow-y-auto">
+                <li :for={suggestion <- @mention_suggestions}>
+                  <button
+                    type="button"
+                    data-role="mention-suggestion"
+                    data-handle={Map.get(suggestion, :handle) || Map.get(suggestion, "handle") || ""}
+                    phx-click={
+                      JS.dispatch("egregoros:mention-select",
+                        to: "##{@content_id}",
+                        detail: %{
+                          handle: Map.get(suggestion, :handle) || Map.get(suggestion, "handle") || ""
+                        }
+                      )
+                    }
+                    class="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-[color:var(--bg-subtle)] focus-visible:outline-none focus-brutal"
+                  >
+                    <div class="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden border border-[color:var(--border-default)] bg-[color:var(--bg-subtle)] text-sm font-bold text-[color:var(--text-secondary)]">
+                      <img
+                        :if={
+                          is_binary(
+                            Map.get(suggestion, :avatar_url) || Map.get(suggestion, "avatar_url")
+                          ) and
+                            (Map.get(suggestion, :avatar_url) || Map.get(suggestion, "avatar_url")) !=
+                              ""
+                        }
+                        src={Map.get(suggestion, :avatar_url) || Map.get(suggestion, "avatar_url")}
+                        alt=""
+                        class="h-full w-full object-cover"
+                        loading="lazy"
+                        decoding="async"
+                        referrerpolicy="no-referrer"
+                      />
+                      <span :if={
+                        not is_binary(
                           Map.get(suggestion, :avatar_url) || Map.get(suggestion, "avatar_url")
-                        ) and
-                          (Map.get(suggestion, :avatar_url) || Map.get(suggestion, "avatar_url")) !=
+                        ) or
+                          (Map.get(suggestion, :avatar_url) || Map.get(suggestion, "avatar_url")) ==
                             ""
-                      }
-                      src={Map.get(suggestion, :avatar_url) || Map.get(suggestion, "avatar_url")}
-                      alt=""
-                      class="h-full w-full object-cover"
-                      loading="lazy"
-                      decoding="async"
-                      referrerpolicy="no-referrer"
-                    />
-                    <span :if={
-                      not is_binary(
-                        Map.get(suggestion, :avatar_url) || Map.get(suggestion, "avatar_url")
-                      ) or
-                        (Map.get(suggestion, :avatar_url) || Map.get(suggestion, "avatar_url")) == ""
-                    }>
-                      {String.first(
-                        to_string(
-                          Map.get(suggestion, :nickname) || Map.get(suggestion, "nickname") || "?"
-                        )
-                      )}
-                    </span>
-                  </div>
+                      }>
+                        {String.first(
+                          to_string(
+                            Map.get(suggestion, :nickname) || Map.get(suggestion, "nickname") || "?"
+                          )
+                        )}
+                      </span>
+                    </div>
 
-                  <div class="min-w-0 flex-1">
-                    <p class="truncate text-sm font-bold text-[color:var(--text-primary)]">
-                      {emoji_inline(
-                        Map.get(suggestion, :display_name) || Map.get(suggestion, "display_name"),
-                        Map.get(suggestion, :emojis) || Map.get(suggestion, "emojis") || []
-                      )}
-                    </p>
-                    <p class="truncate font-mono text-xs text-[color:var(--text-muted)]">
-                      {to_string(Map.get(suggestion, :handle) || Map.get(suggestion, "handle") || "")}
-                    </p>
-                  </div>
-                </button>
-              </li>
-            </ul>
+                    <div class="min-w-0 flex-1">
+                      <p class="truncate text-sm font-bold text-[color:var(--text-primary)]">
+                        {emoji_inline(
+                          Map.get(suggestion, :display_name) || Map.get(suggestion, "display_name"),
+                          Map.get(suggestion, :emojis) || Map.get(suggestion, "emojis") || []
+                        )}
+                      </p>
+                      <p class="truncate font-mono text-xs text-[color:var(--text-muted)]">
+                        {to_string(
+                          Map.get(suggestion, :handle) || Map.get(suggestion, "handle") || ""
+                        )}
+                      </p>
+                    </div>
+                  </button>
+                </li>
+              </ul>
             </div>
           </div>
         </div>
