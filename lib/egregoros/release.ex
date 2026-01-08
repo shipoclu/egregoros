@@ -7,20 +7,24 @@ defmodule Egregoros.Release do
     load_app()
 
     for repo <- repos() do
-      {:ok, _} =
-        Ecto.Migrator.with_repo(repo, fn repo ->
-          Ecto.Migrator.run(repo, :up, all: true)
-        end)
+      case Ecto.Migrator.with_repo(repo, fn repo ->
+             Ecto.Migrator.run(repo, :up, all: true)
+           end) do
+        {:ok, _migrations, _apps} -> :ok
+        {:error, reason} -> raise "Migration failed: #{inspect(reason)}"
+      end
     end
   end
 
   def rollback(repo, version) when is_atom(repo) and is_integer(version) do
     load_app()
 
-    {:ok, _} =
-      Ecto.Migrator.with_repo(repo, fn repo ->
-        Ecto.Migrator.run(repo, :down, to: version)
-      end)
+    case Ecto.Migrator.with_repo(repo, fn repo ->
+           Ecto.Migrator.run(repo, :down, to: version)
+         end) do
+      {:ok, _migrations, _apps} -> :ok
+      {:error, reason} -> raise "Rollback failed: #{inspect(reason)}"
+    end
   end
 
   defp repos do
