@@ -27,6 +27,14 @@ const volumeMuteIcon = `<svg viewBox="0 0 24 24" fill="currentColor" class="size
   <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
 </svg>`
 
+const crtIcon = `<svg viewBox="0 0 24 24" fill="currentColor" class="size-5">
+  <path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/>
+</svg>`
+
+const cleanIcon = `<svg viewBox="0 0 24 24" fill="currentColor" class="size-5">
+  <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14z"/>
+</svg>`
+
 const PLAYBACK_SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
 
 // Inject SVG filter for chromatic aberration (only once)
@@ -43,8 +51,8 @@ function ensureCRTFilter() {
   svg.innerHTML = `
     <defs>
       <filter id="crt-aberration" x="-10%" y="-10%" width="120%" height="120%">
-        <!-- Red channel offset -->
-        <feOffset in="SourceGraphic" dx="-1" dy="0" result="red-shifted">
+        <!-- Red channel offset (stronger shift) -->
+        <feOffset in="SourceGraphic" dx="-3" dy="0" result="red-shifted">
         </feOffset>
         <feColorMatrix in="red-shifted" type="matrix" result="red"
           values="1 0 0 0 0
@@ -52,8 +60,8 @@ function ensureCRTFilter() {
                   0 0 0 0 0
                   0 0 0 1 0"/>
 
-        <!-- Blue channel offset -->
-        <feOffset in="SourceGraphic" dx="1" dy="0" result="blue-shifted">
+        <!-- Blue channel offset (stronger shift) -->
+        <feOffset in="SourceGraphic" dx="3" dy="0" result="blue-shifted">
         </feOffset>
         <feColorMatrix in="blue-shifted" type="matrix" result="blue"
           values="0 0 0 0 0
@@ -191,6 +199,14 @@ export function initVideoPlayer(container) {
   speedBtn.setAttribute("aria-label", "Playback speed")
   speedBtn.textContent = "1x"
 
+  // CRT toggle button
+  const crtBtn = document.createElement("button")
+  crtBtn.type = "button"
+  crtBtn.className = "video-player-btn"
+  crtBtn.setAttribute("aria-label", "Toggle CRT effect")
+  crtBtn.setAttribute("title", "Toggle CRT effect")
+  crtBtn.innerHTML = crtIcon
+
   // Fullscreen button
   const fullscreenBtn = document.createElement("button")
   fullscreenBtn.type = "button"
@@ -202,6 +218,7 @@ export function initVideoPlayer(container) {
   controls.appendChild(progressContainer)
   controls.appendChild(volumeBtn)
   controls.appendChild(speedBtn)
+  controls.appendChild(crtBtn)
   controls.appendChild(fullscreenBtn)
 
   videoContainer.appendChild(controls)
@@ -250,6 +267,12 @@ export function initVideoPlayer(container) {
     const nextSpeed = PLAYBACK_SPEEDS[nextIndex]
     video.playbackRate = nextSpeed
     speedBtn.textContent = formatSpeed(nextSpeed)
+  }
+
+  function toggleCRT() {
+    const isClean = player.classList.toggle("video-player-clean")
+    crtBtn.innerHTML = isClean ? cleanIcon : crtIcon
+    crtBtn.setAttribute("aria-label", isClean ? "Enable CRT effect" : "Disable CRT effect")
   }
 
   function showControls() {
@@ -315,6 +338,11 @@ export function initVideoPlayer(container) {
   speedBtn.addEventListener("click", e => {
     e.stopPropagation()
     cycleSpeed()
+  })
+
+  crtBtn.addEventListener("click", e => {
+    e.stopPropagation()
+    toggleCRT()
   })
 
   fullscreenBtn.addEventListener("click", e => {
@@ -393,6 +421,9 @@ export function initVideoPlayer(container) {
       const prevSpeed = PLAYBACK_SPEEDS[prevIndex]
       video.playbackRate = prevSpeed
       speedBtn.textContent = formatSpeed(prevSpeed)
+    } else if (e.key === "c") {
+      e.preventDefault()
+      toggleCRT()
     }
   })
 

@@ -593,26 +593,27 @@ article[data-role="status-card"]:target {
 
 .video-player {
   overflow: hidden;
-  border-radius: 8px;
+  border-radius: 16px;
 }
 
 .video-player-container {
-  border-radius: 6px;
+  border-radius: 14px;
   overflow: hidden;
 }
 
-/* Slight curvature effect via pseudo-element */
+/* Curvature effect via pseudo-element */
 .video-player-container::before {
   content: "";
   position: absolute;
   inset: 0;
   z-index: 5;
   pointer-events: none;
-  /* Vignette + slight curve shadow */
+  /* Strong vignette for curved CRT look */
   box-shadow:
-    inset 0 0 80px 20px rgba(0, 0, 0, 0.3),
-    inset 0 0 20px 5px rgba(0, 0, 0, 0.2);
-  border-radius: 6px;
+    inset 0 0 120px 40px rgba(0, 0, 0, 0.5),
+    inset 0 0 60px 20px rgba(0, 0, 0, 0.4),
+    inset 0 0 20px 5px rgba(0, 0, 0, 0.3);
+  border-radius: 14px;
 }
 
 /* Scanlines overlay */
@@ -694,4 +695,27 @@ article[data-role="status-card"]:target {
   .video-player::before {
     animation: none;
   }
+}
+
+/* Clean mode - disable all CRT effects */
+.video-player-clean {
+  border-radius: 2px;
+}
+
+.video-player-clean .video-player-container {
+  border-radius: 0;
+}
+
+.video-player-clean .video-player-container::before,
+.video-player-clean .video-player-container::after {
+  display: none;
+}
+
+.video-player-clean .video-player-video {
+  animation: none;
+  filter: none;
+}
+
+.video-player-clean::before {
+  display: none;
 }
