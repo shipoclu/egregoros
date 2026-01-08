@@ -141,7 +141,7 @@ defmodule Egregoros.PerformanceRegressionsTest do
   test "critical composite indexes exist" do
     result =
       Repo.query!(
-        "SELECT indexname FROM pg_indexes WHERE schemaname = 'public' AND tablename IN ('objects', 'relationships')",
+        "SELECT indexname FROM pg_indexes WHERE schemaname = 'public' AND tablename IN ('objects', 'relationships', 'users')",
         []
       )
 
@@ -153,7 +153,10 @@ defmodule Egregoros.PerformanceRegressionsTest do
     for name <- [
           "objects_type_id_index",
           "objects_actor_type_id_index",
-          "relationships_object_type_index"
+          "relationships_object_type_index",
+          "users_nickname_trgm_index",
+          "users_name_trgm_index",
+          "users_domain_trgm_index"
         ] do
       assert MapSet.member?(index_names, name)
     end
