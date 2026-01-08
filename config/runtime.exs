@@ -44,6 +44,12 @@ if config_env() != :test do
 end
 
 if config_env() == :prod do
+  uploads_dir = System.get_env("EGREGOROS_UPLOADS_DIR") || System.get_env("UPLOADS_DIR")
+
+  if is_binary(uploads_dir) and uploads_dir != "" do
+    config :egregoros, :uploads_dir, uploads_dir
+  end
+
   database_url =
     System.get_env("DATABASE_URL") ||
       raise """
