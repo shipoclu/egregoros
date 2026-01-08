@@ -477,6 +477,21 @@ defmodule EgregorosWeb.StatusCard do
         sensitive_media && "hidden"
       ]}
     >
+      <div :if={sensitive_media} class="col-span-full flex justify-end">
+        <button
+          type="button"
+          data-role="sensitive-media-hide"
+          phx-click={
+            JS.show(to: "#sensitive-media-#{@entry.object.id}")
+            |> JS.add_class("hidden", to: "#attachments-#{@entry.object.id}")
+          }
+          class="inline-flex items-center gap-2 border border-[color:var(--border-muted)] bg-[color:var(--bg-subtle)] px-3 py-2 text-xs font-bold uppercase text-[color:var(--text-secondary)] transition hover:border-[color:var(--border-default)] hover:text-[color:var(--text-primary)] focus-visible:outline-none focus-brutal"
+        >
+          <.icon name="hero-eye-slash" class="size-4" />
+          Hide media
+        </button>
+      </div>
+
       <div
         :for={{attachment, index} <- Enum.with_index(@entry.attachments)}
         class="group overflow-hidden border border-[color:var(--border-muted)] bg-[color:var(--bg-subtle)]"

@@ -639,6 +639,7 @@ defmodule EgregorosWeb.StatusCardTest do
       })
 
     assert html =~ ~s(data-role="sensitive-media-reveal")
+    assert html =~ ~s(data-role="sensitive-media-hide")
     assert html =~ ~s(id="attachments-1")
     assert html =~ ~r/id="attachments-1"[^>]*class="[^"]*hidden/
   end
