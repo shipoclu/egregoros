@@ -7,12 +7,10 @@ defmodule EgregorosWeb.Plugs.Uploads do
   alias Egregoros.Users
 
   def init(_opts) do
-    uploads_root = uploads_root()
-
     static_opts =
       Plug.Static.init(
         at: "/uploads",
-        from: uploads_root,
+        from: {__MODULE__, :uploads_root, []},
         gzip: false,
         only_matching: ~w(avatars banners media)
       )
@@ -73,7 +71,8 @@ defmodule EgregorosWeb.Plugs.Uploads do
     |> halt()
   end
 
-  defp uploads_root do
+  @doc false
+  def uploads_root do
     priv_dir =
       :egregoros
       |> :code.priv_dir()
