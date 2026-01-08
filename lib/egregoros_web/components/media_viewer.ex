@@ -87,16 +87,21 @@ defmodule EgregorosWeb.MediaViewer do
           >
             <%= case Attachments.kind(item) do %>
               <% :video -> %>
-                <video
-                  data-role="media-viewer-item"
-                  controls
-                  preload="metadata"
-                  playsinline
-                  class="max-h-[85vh] w-full bg-black"
-                  aria-label={Map.get(item, :description, "Video attachment")}
+                <div
+                  id={"media-video-player-#{item.href |> :erlang.phash2() |> Integer.to_string()}"}
+                  phx-hook="VideoPlayer"
+                  phx-update="ignore"
+                  class="w-full"
                 >
-                  <source src={item.href} type={Attachments.source_type(item, "video/mp4")} />
-                </video>
+                  <video
+                    data-role="media-viewer-item"
+                    preload="metadata"
+                    playsinline
+                    aria-label={Map.get(item, :description, "Video attachment")}
+                  >
+                    <source src={item.href} type={Attachments.source_type(item, "video/mp4")} />
+                  </video>
+                </div>
               <% :audio -> %>
                 <div class="flex max-h-[85vh] w-full items-center justify-center bg-black/90 px-6 py-10">
                   <div

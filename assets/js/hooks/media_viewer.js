@@ -1,5 +1,6 @@
 import {lockScroll, unlockScroll} from "./scroll_lock"
 import {initAudioPlayer} from "./audio_player_util"
+import {initVideoPlayer} from "./video_player_util"
 
 const MediaViewer = {
   mounted() {
@@ -203,19 +204,26 @@ const MediaViewer = {
     slide.className = "w-full hidden"
 
     if (item.kind === "video") {
+      const playerContainer = document.createElement("div")
+      playerContainer.className = "w-full"
+
       const video = document.createElement("video")
       video.dataset.role = "media-viewer-item"
-      video.controls = true
       video.preload = "metadata"
       video.playsInline = true
-      video.className = "max-h-[85vh] w-full bg-black"
       if (item.description) video.setAttribute("aria-label", item.description)
 
       const source = document.createElement("source")
       source.setAttribute("src", item.href)
       if (item.sourceType) source.setAttribute("type", item.sourceType)
       video.appendChild(source)
-      slide.appendChild(video)
+
+      playerContainer.appendChild(video)
+      slide.appendChild(playerContainer)
+
+      // Initialize custom video player after adding to DOM
+      requestAnimationFrame(() => initVideoPlayer(playerContainer))
+
       return slide
     }
 

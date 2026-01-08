@@ -875,12 +875,15 @@ defmodule EgregorosWeb.StatusCard do
           />
         </button>
       <% :video -> %>
-        <div class="group relative">
+        <div
+          id={"video-player-#{@attachment.href |> :erlang.phash2() |> Integer.to_string()}"}
+          phx-hook="VideoPlayer"
+          phx-update="ignore"
+          class="w-full"
+        >
           <video
             data-role="attachment"
             data-kind="video"
-            class={[@height_class, "w-full bg-black object-cover"]}
-            controls
             preload="metadata"
             playsinline
             aria-label={attachment_label(@attachment, "Video attachment")}
@@ -890,17 +893,6 @@ defmodule EgregorosWeb.StatusCard do
               type={EgregorosWeb.Attachments.source_type(@attachment, "video/mp4")}
             />
           </video>
-
-          <button
-            type="button"
-            data-role="attachment-open"
-            data-index={@index}
-            phx-click={JS.dispatch("egregoros:media-open", to: "#media-viewer")}
-            class="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center border border-[color:var(--bg-base)] bg-black/50 text-[color:var(--bg-base)] transition hover:bg-black/70 focus-visible:outline-none focus-brutal"
-            aria-label={attachment_label(@attachment, "Open video")}
-          >
-            <.icon name="hero-arrows-pointing-out" class="size-4" />
-          </button>
         </div>
       <% :audio -> %>
         <div
