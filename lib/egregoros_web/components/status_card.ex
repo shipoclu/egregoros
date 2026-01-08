@@ -903,12 +903,15 @@ defmodule EgregorosWeb.StatusCard do
           </button>
         </div>
       <% :audio -> %>
-        <div class={["group relative flex w-full items-center px-4", @height_class]}>
+        <div
+          id={"audio-player-#{@attachment.href |> :erlang.phash2() |> Integer.to_string()}"}
+          phx-hook="AudioPlayer"
+          phx-update="ignore"
+          class="w-full px-4 py-3"
+        >
           <audio
             data-role="attachment"
             data-kind="audio"
-            controls
-            class="w-full"
             preload="metadata"
             aria-label={attachment_label(@attachment, "Audio attachment")}
           >
@@ -917,17 +920,6 @@ defmodule EgregorosWeb.StatusCard do
               type={EgregorosWeb.Attachments.source_type(@attachment, "audio/mpeg")}
             />
           </audio>
-
-          <button
-            type="button"
-            data-role="attachment-open"
-            data-index={@index}
-            phx-click={JS.dispatch("egregoros:media-open", to: "#media-viewer")}
-            class="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center border border-[color:var(--border-default)] bg-[color:var(--bg-subtle)] text-[color:var(--text-secondary)] transition hover:bg-[color:var(--bg-muted)] hover:text-[color:var(--text-primary)] focus-visible:outline-none focus-brutal"
-            aria-label={attachment_label(@attachment, "Open audio")}
-          >
-            <.icon name="hero-arrows-pointing-out" class="size-4" />
-          </button>
         </div>
       <% :link -> %>
         <a

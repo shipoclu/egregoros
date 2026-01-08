@@ -99,15 +99,20 @@ defmodule EgregorosWeb.MediaViewer do
                 </video>
               <% :audio -> %>
                 <div class="flex max-h-[85vh] w-full items-center justify-center bg-black/90 px-6 py-10">
-                  <audio
-                    data-role="media-viewer-item"
-                    controls
-                    preload="metadata"
-                    class="w-full"
-                    aria-label={Map.get(item, :description, "Audio attachment")}
+                  <div
+                    id={"media-audio-player-#{item.href |> :erlang.phash2() |> Integer.to_string()}"}
+                    phx-hook="AudioPlayer"
+                    phx-update="ignore"
+                    class="w-full max-w-xl"
                   >
-                    <source src={item.href} type={Attachments.source_type(item, "audio/mpeg")} />
-                  </audio>
+                    <audio
+                      data-role="media-viewer-item"
+                      preload="metadata"
+                      aria-label={Map.get(item, :description, "Audio attachment")}
+                    >
+                      <source src={item.href} type={Attachments.source_type(item, "audio/mpeg")} />
+                    </audio>
+                  </div>
                 </div>
               <% _ -> %>
                 <img

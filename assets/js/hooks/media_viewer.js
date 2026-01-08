@@ -1,4 +1,5 @@
 import {lockScroll, unlockScroll} from "./scroll_lock"
+import {initAudioPlayer} from "./audio_player_util"
 
 const MediaViewer = {
   mounted() {
@@ -222,11 +223,12 @@ const MediaViewer = {
       const wrapper = document.createElement("div")
       wrapper.className = "flex max-h-[85vh] w-full items-center justify-center bg-black/90 px-6 py-10"
 
+      const playerContainer = document.createElement("div")
+      playerContainer.className = "w-full max-w-xl"
+
       const audio = document.createElement("audio")
       audio.dataset.role = "media-viewer-item"
-      audio.controls = true
       audio.preload = "metadata"
-      audio.className = "w-full"
       if (item.description) audio.setAttribute("aria-label", item.description)
 
       const source = document.createElement("source")
@@ -234,8 +236,13 @@ const MediaViewer = {
       if (item.sourceType) source.setAttribute("type", item.sourceType)
       audio.appendChild(source)
 
-      wrapper.appendChild(audio)
+      playerContainer.appendChild(audio)
+      wrapper.appendChild(playerContainer)
       slide.appendChild(wrapper)
+
+      // Initialize custom audio player after adding to DOM
+      requestAnimationFrame(() => initAudioPlayer(playerContainer))
+
       return slide
     }
 

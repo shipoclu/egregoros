@@ -34,6 +34,7 @@ import MediaViewer from "./hooks/media_viewer"
 import ReplyModal from "./hooks/reply_modal"
 import ScrollRestore from "./hooks/scroll_restore"
 import StatusAutoScroll from "./hooks/status_auto_scroll"
+import AudioPlayer from "./hooks/audio_player"
 import {initImageCropper} from "./hooks/image_cropper"
 
 const base64UrlEncode = bytes => {
@@ -1100,6 +1101,7 @@ const liveSocket = new LiveSocket("/live", Socket, {
     ReplyModal,
     ScrollRestore,
     StatusAutoScroll,
+    AudioPlayer,
     E2EEDMComposer,
     E2EEDMMessage,
   },
