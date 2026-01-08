@@ -1,0 +1,10 @@
+/.git
+/.github
+/_build
+/cover
+/deps
+/tmp
+/priv/static/uploads
+/.DS_Store
+/.elixir_ls
+/mockups
