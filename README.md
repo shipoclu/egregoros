@@ -74,6 +74,25 @@ mix phx.server
 
 Visit `http://localhost:4000`.
 
+## Docker / Coolify
+
+For a self-contained stack (app + Postgres), use `docker-compose.yml`.
+
+```sh
+cp .env.example .env
+# Set SECRET_KEY_BASE (generate one with: mix phx.gen.secret)
+docker compose up --build
+```
+
+The container runs migrations automatically on startup via `Egregoros.Release.migrate/0`.
+For multi-node deployments, run migrations as a one-off task instead of on every boot.
+
+### Coolify notes
+
+- Use the **Docker Compose** deployment type and point it at this repo.
+- Set `PHX_HOST` / `PHX_SCHEME` / `PHX_PORT` to the public URL of your instance (important for federation).
+- Persist volumes `egregoros_db` and `egregoros_uploads` (Coolify will create named volumes automatically).
+
 ### External host (ngrok / reverse proxies)
 
 ActivityPub IDs and API URLs are generated from the configured endpoint URL. To run behind ngrok, set:
