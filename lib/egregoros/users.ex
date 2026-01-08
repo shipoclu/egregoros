@@ -2,7 +2,9 @@ defmodule Egregoros.Users do
   import Ecto.Query, only: [from: 2]
 
   alias Egregoros.Keys
+  alias Egregoros.Object
   alias Egregoros.Password
+  alias Egregoros.Relationship
   alias Egregoros.Repo
   alias Egregoros.User
   alias EgregorosWeb.Endpoint
@@ -272,15 +274,80 @@ defmodule Egregoros.Users do
   def search(query, opts \\ []) when is_binary(query) and is_list(opts) do
     query = String.trim(query)
     limit = opts |> Keyword.get(:limit, 20) |> normalize_limit()
+    current_user_ap_id = extract_current_user_ap_id(opts)
 
     if query == "" do
       []
     else
       pattern = "%" <> query <> "%"
 
+      activity_query =
+        from(o in Object,
+          where: not is_nil(o.actor),
+          group_by: o.actor,
+          select: %{
+            actor: o.actor,
+            last_activity: max(coalesce(o.published, o.inserted_at))
+          }
+        )
+
+      follow_query =
+        if is_binary(current_user_ap_id) and current_user_ap_id != "" do
+          from(r in Relationship,
+            where:
+              r.actor == ^current_user_ap_id and
+                r.type in ["Follow", "FollowRequest"],
+            distinct: r.object,
+            select: %{object: r.object, followed: true}
+          )
+        else
+          from(r in Relationship,
+            where: r.id == -1,
+            select: %{object: r.object, followed: true}
+          )
+        end
+
+      exact = query
+      prefix = query <> "%"
+      contains = "%" <> query <> "%"
+
       from(u in User,
         where: ilike(u.nickname, ^pattern) or ilike(u.name, ^pattern),
-        order_by: [asc: u.nickname],
+        left_join: f in subquery(follow_query),
+        on: f.object == u.ap_id,
+        left_join: a in subquery(activity_query),
+        on: a.actor == u.ap_id,
+        order_by: [
+          asc:
+            fragment(
+              """
+              CASE
+                WHEN lower(?) = lower(?) THEN 0
+                WHEN lower(?) LIKE lower(?) THEN 1
+                WHEN lower(coalesce(?, '')) = lower(?) THEN 2
+                WHEN lower(coalesce(?, '')) LIKE lower(?) THEN 3
+                WHEN lower(?) LIKE lower(?) THEN 4
+                WHEN lower(coalesce(?, '')) LIKE lower(?) THEN 5
+                ELSE 6
+              END
+              """,
+              u.nickname,
+              ^exact,
+              u.nickname,
+              ^prefix,
+              u.name,
+              ^exact,
+              u.name,
+              ^prefix,
+              u.nickname,
+              ^contains,
+              u.name,
+              ^contains
+            ),
+          desc_nulls_last: f.followed,
+          desc_nulls_last: a.last_activity,
+          asc: u.nickname
+        ],
         limit: ^limit
       )
       |> Repo.all()
@@ -325,6 +392,15 @@ defmodule Egregoros.Users do
     if value == "", do: nil, else: value
   end
 
+  defp extract_current_user_ap_id(opts) when is_list(opts) do
+    case Keyword.get(opts, :current_user) do
+      %User{ap_id: ap_id} when is_binary(ap_id) and ap_id != "" -> ap_id
+      _ -> nil
+    end
+  end
+
+  defp extract_current_user_ap_id(_opts), do: nil
+
   def search_mentions(query, opts \\ [])
 
   def search_mentions(query, opts) when is_binary(query) and is_list(opts) do
@@ -334,21 +410,23 @@ defmodule Egregoros.Users do
       |> String.trim_leading("@")
 
     limit = opts |> Keyword.get(:limit, 8) |> normalize_limit()
+    current_user_ap_id = extract_current_user_ap_id(opts)
 
     if query == "" do
       []
     else
       if String.contains?(query, "@") do
-        search_mentions_with_domain(query, limit)
+        search_mentions_with_domain(query, limit, current_user_ap_id)
       else
-        search(query, limit: limit)
+        search(query, limit: limit, current_user: Keyword.get(opts, :current_user))
       end
     end
   end
 
   def search_mentions(_query, _opts), do: []
 
-  defp search_mentions_with_domain(query, limit) when is_binary(query) and is_integer(limit) do
+  defp search_mentions_with_domain(query, limit, current_user_ap_id)
+       when is_binary(query) and is_integer(limit) do
     [nickname_part, domain_part] = String.split(query, "@", parts: 2)
 
     nickname_part = String.trim(nickname_part)
@@ -357,11 +435,45 @@ defmodule Egregoros.Users do
     nickname_like = nickname_part <> "%"
     domain_like = domain_part <> "%"
 
+    activity_query =
+      from(o in Object,
+        where: not is_nil(o.actor),
+        group_by: o.actor,
+        select: %{
+          actor: o.actor,
+          last_activity: max(coalesce(o.published, o.inserted_at))
+        }
+      )
+
+    follow_query =
+      if is_binary(current_user_ap_id) and current_user_ap_id != "" do
+        from(r in Relationship,
+          where:
+            r.actor == ^current_user_ap_id and
+              r.type in ["Follow", "FollowRequest"],
+          distinct: r.object,
+          select: %{object: r.object, followed: true}
+        )
+      else
+        from(r in Relationship,
+          where: r.id == -1,
+          select: %{object: r.object, followed: true}
+        )
+      end
+
     remote_matches =
       from(u in User,
         where:
           u.local == false and ilike(u.nickname, ^nickname_like) and ilike(u.domain, ^domain_like),
-        order_by: [asc: u.nickname],
+        left_join: f in subquery(follow_query),
+        on: f.object == u.ap_id,
+        left_join: a in subquery(activity_query),
+        on: a.actor == u.ap_id,
+        order_by: [
+          desc_nulls_last: f.followed,
+          desc_nulls_last: a.last_activity,
+          asc: u.nickname
+        ],
         limit: ^limit
       )
       |> Repo.all()
@@ -370,7 +482,15 @@ defmodule Egregoros.Users do
       if nickname_part != "" and local_domain_matches_prefix?(domain_part) do
         from(u in User,
           where: u.local == true and ilike(u.nickname, ^nickname_like),
-          order_by: [asc: u.nickname],
+          left_join: f in subquery(follow_query),
+          on: f.object == u.ap_id,
+          left_join: a in subquery(activity_query),
+          on: a.actor == u.ap_id,
+          order_by: [
+            desc_nulls_last: f.followed,
+            desc_nulls_last: a.last_activity,
+            asc: u.nickname
+          ],
           limit: ^limit
         )
         |> Repo.all()
@@ -383,7 +503,7 @@ defmodule Egregoros.Users do
     |> Enum.take(limit)
   end
 
-  defp search_mentions_with_domain(_query, _limit), do: []
+  defp search_mentions_with_domain(_query, _limit, _current_user_ap_id), do: []
 
   defp local_domain_matches_prefix?(domain_part) when is_binary(domain_part) do
     domain_part = domain_part |> String.trim() |> String.downcase()
