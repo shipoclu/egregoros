@@ -1,6 +1,8 @@
 defmodule EgregorosWeb.Router do
   use EgregorosWeb, :router
 
+  import Oban.Web.Router
+
   pipeline :health do
   end
 
@@ -91,6 +93,12 @@ defmodule EgregorosWeb.Router do
     get "/admin", AdminController, :index
     post "/admin/relays", AdminController, :create_relay
     delete "/admin/relays/:id", AdminController, :delete_relay
+  end
+
+  scope "/admin" do
+    pipe_through [:browser, :admin]
+
+    oban_dashboard "/oban", oban_name: Oban
   end
 
   scope "/", EgregorosWeb do
