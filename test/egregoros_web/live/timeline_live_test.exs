@@ -1584,6 +1584,40 @@ defmodule EgregorosWeb.TimelineLiveTest do
     refute has_element?(view, "[data-role='media-entry']")
   end
 
+  test "composer renders attachment previews in a grid", %{conn: conn, user: user} do
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/")
+
+    fixture_path = Fixtures.path!("DSCN0010.png")
+    content = File.read!(fixture_path)
+
+    upload =
+      file_input(view, "#timeline-form", :media, [
+        %{
+          last_modified: 1_694_171_879_000,
+          name: "first.png",
+          content: content,
+          size: byte_size(content),
+          type: "image/png"
+        },
+        %{
+          last_modified: 1_694_171_879_001,
+          name: "second.png",
+          content: content,
+          size: byte_size(content),
+          type: "image/png"
+        }
+      ])
+
+    assert render_upload(upload, "first.png") =~ "100%"
+    assert render_upload(upload, "second.png") =~ "100%"
+
+    assert has_element?(view, "[data-role='compose-media-grid']")
+
+    html = render(view)
+    assert length(Regex.scan(~r/data-role=\"media-entry\"/, html)) == 2
+  end
+
   test "posting reports upload failures from the media storage backend", %{conn: conn, user: user} do
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     {:ok, view, _html} = live(conn, "/")

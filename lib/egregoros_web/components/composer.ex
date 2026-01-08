@@ -287,7 +287,7 @@ defmodule EgregorosWeb.Composer do
           data-role="compose-media"
           class="border-t border-[color:var(--border-muted)] bg-[color:var(--bg-subtle)] px-4 py-4"
         >
-          <div class="grid gap-3">
+          <div data-role="compose-media-grid" class="grid gap-3 sm:grid-cols-2">
             <div
               :for={entry <- @upload.entries}
               id={"#{@id_prefix}-media-entry-#{entry.ref}"}
