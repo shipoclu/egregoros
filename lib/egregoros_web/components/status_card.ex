@@ -363,6 +363,7 @@ defmodule EgregorosWeb.StatusCard do
     ~H"""
     <% sensitive_media = sensitive_media?(@entry.object) %>
     <% collapsible_content = long_content?(@entry.object) %>
+    <% attachments_layout = attachments_layout(@entry.attachments) %>
     <% content_id = "post-content-#{@entry.object.id}" %>
     <% fade_id = "#{content_id}-fade" %>
     <% toggle_more_id = "#{content_id}-more" %>
@@ -469,8 +470,10 @@ defmodule EgregorosWeb.StatusCard do
       :if={@entry.attachments != []}
       id={"attachments-#{@entry.object.id}"}
       data-role="attachments"
+      data-layout={attachments_layout}
       class={[
-        "mt-4 grid gap-3 sm:grid-cols-2",
+        "mt-4 grid gap-3",
+        attachments_layout == "grid" && "sm:grid-cols-2",
         sensitive_media && "hidden"
       ]}
     >
@@ -478,7 +481,12 @@ defmodule EgregorosWeb.StatusCard do
         :for={{attachment, index} <- Enum.with_index(@entry.attachments)}
         class="group overflow-hidden border border-[color:var(--border-muted)] bg-[color:var(--bg-subtle)]"
       >
-        <.attachment_media attachment={attachment} post_id={@entry.object.id} index={index} />
+        <.attachment_media
+          attachment={attachment}
+          post_id={@entry.object.id}
+          index={index}
+          layout={attachments_layout}
+        />
       </div>
     </div>
     """
@@ -817,8 +825,17 @@ defmodule EgregorosWeb.StatusCard do
   attr :attachment, :map, required: true
   attr :post_id, :any, required: true
   attr :index, :integer, required: true
+  attr :layout, :string, default: "grid"
 
   defp attachment_media(assigns) do
+    assigns =
+      assign_new(assigns, :height_class, fn ->
+        case assigns.layout do
+          "single" -> "h-72 sm:h-96"
+          _ -> "h-44"
+        end
+      end)
+
     ~H"""
     <%= case EgregorosWeb.Attachments.kind(@attachment) do %>
       <% :image -> %>
@@ -835,7 +852,10 @@ defmodule EgregorosWeb.StatusCard do
             data-kind="image"
             src={@attachment.href}
             alt={@attachment.description}
-            class="h-44 w-full object-cover transition duration-300 group-hover:scale-105"
+            class={[
+              @height_class,
+              "w-full object-cover transition duration-300 group-hover:scale-105"
+            ]}
             loading="lazy"
           />
         </button>
@@ -844,7 +864,7 @@ defmodule EgregorosWeb.StatusCard do
           <video
             data-role="attachment"
             data-kind="video"
-            class="h-44 w-full bg-black object-cover"
+            class={[@height_class, "w-full bg-black object-cover"]}
             controls
             preload="metadata"
             playsinline
@@ -868,7 +888,7 @@ defmodule EgregorosWeb.StatusCard do
           </button>
         </div>
       <% :audio -> %>
-        <div class="group relative flex h-44 w-full items-center px-4">
+        <div class={["group relative flex w-full items-center px-4", @height_class]}>
           <audio
             data-role="attachment"
             data-kind="audio"
@@ -910,6 +930,12 @@ defmodule EgregorosWeb.StatusCard do
     <% end %>
     """
   end
+
+  defp attachments_layout(attachments) when is_list(attachments) do
+    if length(attachments) <= 1, do: "single", else: "grid"
+  end
+
+  defp attachments_layout(_attachments), do: "grid"
 
   defp attachment_label(%{description: description}, fallback) when is_binary(description) do
     description = String.trim(description)

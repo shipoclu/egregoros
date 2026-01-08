@@ -1031,6 +1031,58 @@ defmodule EgregorosWeb.StatusLiveTest do
     assert render(view) =~ "Copied link to clipboard."
   end
 
+  test "single-attachment statuses use a single-column attachment layout", %{
+    conn: conn,
+    user: user
+  } do
+    note =
+      Note.build(user, "With one image")
+      |> Map.put("attachment", [
+        %{
+          "mediaType" => "image/png",
+          "name" => "only",
+          "url" => [%{"href" => "/uploads/only.png", "mediaType" => "image/png"}]
+        }
+      ])
+
+    assert {:ok, object} = Pipeline.ingest(note, local: true)
+    uuid = uuid_from_ap_id(object.ap_id)
+
+    assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}")
+
+    assert has_element?(
+             view,
+             "#post-#{object.id} [data-role='attachments'][data-layout='single']"
+           )
+  end
+
+  test "multi-attachment statuses use a grid attachment layout", %{conn: conn, user: user} do
+    note =
+      Note.build(user, "With two images")
+      |> Map.put("attachment", [
+        %{
+          "mediaType" => "image/png",
+          "name" => "first",
+          "url" => [%{"href" => "/uploads/first.png", "mediaType" => "image/png"}]
+        },
+        %{
+          "mediaType" => "image/png",
+          "name" => "second",
+          "url" => [%{"href" => "/uploads/second.png", "mediaType" => "image/png"}]
+        }
+      ])
+
+    assert {:ok, object} = Pipeline.ingest(note, local: true)
+    uuid = uuid_from_ap_id(object.ap_id)
+
+    assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}")
+
+    assert has_element?(
+             view,
+             "#post-#{object.id} [data-role='attachments'][data-layout='grid']"
+           )
+  end
+
   test "status media viewer controls are wired client-side without server roundtrips", %{
     conn: conn,
     user: user
