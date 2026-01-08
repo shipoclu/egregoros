@@ -1,6 +1,9 @@
 defmodule EgregorosWeb.Router do
   use EgregorosWeb, :router
 
+  pipeline :health do
+  end
+
   pipeline :browser do
     plug :accepts, ["html"]
     plug :fetch_session
@@ -45,6 +48,12 @@ defmodule EgregorosWeb.Router do
 
   pipeline :oauth_follow do
     plug EgregorosWeb.Plugs.RequireScopes, ["follow"]
+  end
+
+  scope "/", EgregorosWeb do
+    pipe_through :health
+
+    get "/health", HealthController, :show
   end
 
   scope "/", EgregorosWeb do
