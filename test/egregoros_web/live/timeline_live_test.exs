@@ -1400,7 +1400,7 @@ defmodule EgregorosWeb.TimelineLiveTest do
     refute html =~ "open_media"
   end
 
-  test "audio attachments render a player and a media viewer affordance", %{conn: conn} do
+  test "audio attachments render a player without a fullscreen button", %{conn: conn} do
     assert {:ok, note} =
              Pipeline.ingest(
                %{
@@ -1431,13 +1431,10 @@ defmodule EgregorosWeb.TimelineLiveTest do
              "#post-#{note.id} audio[data-role='attachment'][data-kind='audio']"
            )
 
-    html =
-      view
-      |> element("#post-#{note.id} button[data-role='attachment-open'][data-index='0']")
-      |> render()
-
-    assert html =~ "egregoros:media-open"
-    refute html =~ "open_media"
+    refute has_element?(
+             view,
+             "#post-#{note.id} button[data-role='attachment-open'][data-index='0']"
+           )
   end
 
   test "media viewer renders navigation controls for multi-attachment posts", %{conn: conn} do
