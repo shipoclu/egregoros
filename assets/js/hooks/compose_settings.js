@@ -50,9 +50,34 @@ const ComposeSettings = {
       }
     }
 
+    this.onKeyDown = e => {
+      if (!(e instanceof KeyboardEvent)) return
+      if (e.isComposing) return
+
+      const key = e.key || ""
+      if (key !== "Enter") return
+      if (!(e.ctrlKey || e.metaKey)) return
+      if (e.altKey || e.shiftKey) return
+
+      const target = e.target
+      if (!(target instanceof HTMLElement)) return
+      if (!this.el.contains(target)) return
+      if (!target.matches("textarea[data-role='compose-content']")) return
+
+      e.preventDefault()
+
+      if (typeof this.el.requestSubmit === "function") {
+        this.el.requestSubmit()
+        return
+      }
+
+      this.el.querySelector("button[type='submit']")?.click?.()
+    }
+
     this.el.addEventListener("change", this.onChange)
     this.el.addEventListener("input", this.onInput)
     this.el.addEventListener("click", this.onClick)
+    this.el.addEventListener("keydown", this.onKeyDown)
     this.updateVisibilityLabel()
     this.updateLanguageLabel()
   },
@@ -66,6 +91,7 @@ const ComposeSettings = {
     this.el.removeEventListener("change", this.onChange)
     this.el.removeEventListener("input", this.onInput)
     this.el.removeEventListener("click", this.onClick)
+    this.el.removeEventListener("keydown", this.onKeyDown)
   },
 
   updateVisibilityLabel() {
