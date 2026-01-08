@@ -2,6 +2,7 @@ defmodule Egregoros.Signature.HTTPTest do
   use Egregoros.DataCase, async: true
 
   alias Egregoros.Signature.HTTP
+  alias Egregoros.HTTPDate
   alias Egregoros.Keys
   alias Egregoros.Users
 
@@ -120,7 +121,7 @@ defmodule Egregoros.Signature.HTTPTest do
           private_key: nil
         })
 
-      date = :httpd_util.rfc1123_date() |> List.to_string()
+      date = HTTPDate.format_rfc1123(DateTime.utc_now())
 
       conn =
         Plug.Test.conn(:post, "/users/frank/inbox", "")
@@ -231,7 +232,7 @@ defmodule Egregoros.Signature.HTTPTest do
 
       conn =
         Plug.Test.conn(:post, "/users/frank/inbox", "")
-        |> Plug.Conn.put_req_header("date", :httpd_util.rfc1123_date() |> List.to_string())
+        |> Plug.Conn.put_req_header("date", HTTPDate.format_rfc1123(DateTime.utc_now()))
         |> Plug.Conn.put_req_header(
           "signature",
           "Signature foo,keyId=\"#{user.ap_id}#main-key\",headers=\"(request-target) date\",signature=\"AA==\""

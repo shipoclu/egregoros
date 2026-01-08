@@ -1,6 +1,7 @@
 defmodule Egregoros.Signature.HTTP do
   @behaviour Egregoros.Signature
 
+  alias Egregoros.HTTPDate
   alias Egregoros.User
   alias Egregoros.Users
 
@@ -245,16 +246,7 @@ defmodule Egregoros.Signature.HTTP do
   end
 
   defp parse_http_date(date_header) when is_binary(date_header) do
-    case :httpd_util.convert_request_date(String.to_charlist(date_header)) do
-      {{year, month, day}, {hour, minute, second}} ->
-        with {:ok, naive} <- NaiveDateTime.from_erl({{year, month, day}, {hour, minute, second}}),
-             {:ok, dt} <- DateTime.from_naive(naive, "Etc/UTC") do
-          {:ok, dt}
-        end
-
-      :bad_date ->
-        {:error, :invalid_date}
-    end
+    HTTPDate.parse_rfc1123(date_header)
   end
 
   defp max_skew_seconds do
@@ -406,8 +398,7 @@ defmodule Egregoros.Signature.HTTP do
   end
 
   defp signed_date do
-    :httpd_util.rfc1123_date()
-    |> List.to_string()
+    HTTPDate.format_rfc1123(DateTime.utc_now())
   end
 
   defp private_key_from_user(%User{private_key: pem}) when is_binary(pem) do

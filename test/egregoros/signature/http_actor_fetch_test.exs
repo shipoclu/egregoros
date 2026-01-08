@@ -3,6 +3,7 @@ defmodule Egregoros.Signature.HTTPActorFetchTest do
 
   import Mox
 
+  alias Egregoros.HTTPDate
   alias Egregoros.Keys
   alias Egregoros.Users
 
@@ -34,7 +35,7 @@ defmodule Egregoros.Signature.HTTPActorFetchTest do
        }}
     end)
 
-    date = :httpd_util.rfc1123_date() |> List.to_string()
+    date = HTTPDate.format_rfc1123(DateTime.utc_now())
 
     signature_string =
       [
@@ -70,7 +71,7 @@ defmodule Egregoros.Signature.HTTPActorFetchTest do
       flunk("unexpected HTTP fetch for unsafe actor url")
     end)
 
-    date = :httpd_util.rfc1123_date() |> List.to_string()
+    date = HTTPDate.format_rfc1123(DateTime.utc_now())
 
     header =
       "Signature " <>
@@ -102,7 +103,7 @@ defmodule Egregoros.Signature.HTTPActorFetchTest do
         local: false
       })
 
-    date = :httpd_util.rfc1123_date() |> List.to_string()
+    date = HTTPDate.format_rfc1123(DateTime.utc_now())
 
     header =
       "Signature " <>
