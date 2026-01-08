@@ -181,26 +181,28 @@ defmodule EgregorosWeb.Composer do
           />
         </div>
 
-        <div class="relative px-4 pb-4 pt-3">
-          <.input
-            type="textarea"
-            id={@content_id}
-            field={@form[:content]}
-            data-role="compose-content"
-            data-max-chars={@max_chars}
-            phx-hook="ComposeCharCounter"
-            placeholder="What's on your mind?"
-            rows="6"
-            phx-debounce="blur"
-            class="min-h-[7rem] w-full resize-none border-0 bg-transparent p-0 text-base leading-6 text-[color:var(--text-primary)] outline-none placeholder:text-[color:var(--text-muted)] focus:ring-0"
-          />
+        <div class="px-4 pb-4 pt-3">
+          <div class="relative">
+            <.input
+              type="textarea"
+              id={@content_id}
+              field={@form[:content]}
+              data-role="compose-content"
+              data-max-chars={@max_chars}
+              phx-hook="ComposeCharCounter"
+              placeholder="What's on your mind?"
+              rows="6"
+              phx-debounce="blur"
+              class="min-h-[7rem] w-full resize-none border-0 bg-transparent p-0 text-base leading-6 text-[color:var(--text-primary)] outline-none placeholder:text-[color:var(--text-muted)] focus:ring-0"
+            />
 
-          <div
-            :if={@mention_suggestions != []}
-            id={@mentions_id}
-            data-role="compose-mention-suggestions"
-            class="absolute left-4 right-4 top-full z-30 mt-2 overflow-hidden border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)]"
-          >
+            <div
+              :if={@mention_suggestions != []}
+              id={@mentions_id}
+              data-role="compose-mention-suggestions"
+              style="top: 1.75rem"
+              class="absolute left-0 right-0 z-30 overflow-hidden border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)]"
+            >
             <ul class="max-h-64 divide-y divide-[color:var(--border-muted)] overflow-y-auto">
               <li :for={suggestion <- @mention_suggestions}>
                 <button
@@ -261,6 +263,7 @@ defmodule EgregorosWeb.Composer do
                 </button>
               </li>
             </ul>
+            </div>
           </div>
         </div>
 
