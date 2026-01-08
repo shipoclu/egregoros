@@ -859,7 +859,7 @@ defmodule EgregorosWeb.StatusCard do
           data-role="attachment-open"
           data-index={@index}
           phx-click={JS.dispatch("egregoros:media-open", to: "#media-viewer")}
-          class="block w-full text-left focus-visible:outline-none focus-brutal"
+          class="relative block w-full overflow-hidden text-left focus-visible:outline-none focus-brutal"
           aria-label={attachment_label(@attachment, "Open image")}
         >
           <img
@@ -869,10 +869,11 @@ defmodule EgregorosWeb.StatusCard do
             alt={@attachment.description}
             class={[
               @height_class,
-              "w-full object-cover transition duration-300 group-hover:scale-105"
+              "image-dark-filter w-full object-cover transition duration-300 group-hover:scale-105"
             ]}
             loading="lazy"
           />
+          <div class="image-scanlines-overlay pointer-events-none absolute inset-0 z-10"></div>
         </button>
       <% :video -> %>
         <div

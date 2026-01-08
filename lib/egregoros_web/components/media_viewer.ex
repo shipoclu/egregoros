@@ -120,13 +120,16 @@ defmodule EgregorosWeb.MediaViewer do
                   </div>
                 </div>
               <% _ -> %>
-                <img
-                  data-role="media-viewer-item"
-                  src={item.href}
-                  alt={Map.get(item, :description, "")}
-                  class="max-h-[85vh] w-full object-contain"
-                  loading="lazy"
-                />
+                <div class="relative w-full">
+                  <img
+                    data-role="media-viewer-item"
+                    src={item.href}
+                    alt={Map.get(item, :description, "")}
+                    class="image-dark-filter max-h-[85vh] w-full object-contain"
+                    loading="lazy"
+                  />
+                  <div class="image-scanlines-overlay pointer-events-none absolute inset-0 z-10"></div>
+                </div>
             <% end %>
           </div>
         </div>

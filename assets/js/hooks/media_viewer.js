@@ -254,13 +254,24 @@ const MediaViewer = {
       return slide
     }
 
+    // Wrapper for image + dark mode overlay
+    const wrapper = document.createElement("div")
+    wrapper.className = "relative w-full"
+
     const img = document.createElement("img")
     img.dataset.role = "media-viewer-item"
     img.setAttribute("src", item.href)
     img.setAttribute("alt", item.description || "")
     img.loading = "lazy"
-    img.className = "max-h-[85vh] w-full object-contain"
-    slide.appendChild(img)
+    img.className = "image-dark-filter max-h-[85vh] w-full object-contain"
+
+    // Scanlines overlay for dark mode
+    const overlay = document.createElement("div")
+    overlay.className = "image-scanlines-overlay pointer-events-none absolute inset-0 z-10"
+
+    wrapper.appendChild(img)
+    wrapper.appendChild(overlay)
+    slide.appendChild(wrapper)
     return slide
   },
 

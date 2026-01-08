@@ -719,3 +719,34 @@ article[data-role="status-card"]:target {
 .video-player-clean::before {
   display: none;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   DARK MODE IMAGE OVERLAY
+   Reduces brightness and adds scanlines to prevent flashbanging
+   Only active in dark theme
+   ═══════════════════════════════════════════════════════════ */
+
+/* Brightness/contrast filter applied directly to images - dark mode only */
+[data-theme="dark"] .image-dark-filter {
+  filter: brightness(0.82) contrast(1.05);
+}
+
+/* Scanlines overlay element - hidden by default, shown in dark mode */
+.image-scanlines-overlay {
+  display: none;
+}
+
+[data-theme="dark"] .image-scanlines-overlay {
+  display: block;
+  background:
+    repeating-linear-gradient(
+      0deg,
+      rgba(0, 0, 0, 0.12) 0px,
+      rgba(0, 0, 0, 0.12) 1px,
+      transparent 1px,
+      transparent 2px
+    );
+  box-shadow:
+    inset 0 0 80px 30px rgba(0, 0, 0, 0.25),
+    inset 0 0 30px 10px rgba(0, 0, 0, 0.15);
+}
