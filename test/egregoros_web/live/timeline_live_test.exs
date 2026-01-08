@@ -1360,7 +1360,7 @@ defmodule EgregorosWeb.TimelineLiveTest do
     refute close_html =~ "close_media"
   end
 
-  test "video attachments render a preview and a media viewer affordance", %{conn: conn} do
+  test "video attachments render a player without a fullscreen button", %{conn: conn} do
     assert {:ok, note} =
              Pipeline.ingest(
                %{
@@ -1391,13 +1391,15 @@ defmodule EgregorosWeb.TimelineLiveTest do
              "#post-#{note.id} video[data-role='attachment'][data-kind='video']"
            )
 
-    html =
-      view
-      |> element("#post-#{note.id} button[data-role='attachment-open'][data-index='0']")
-      |> render()
+    assert has_element?(
+             view,
+             "#post-#{note.id} [phx-hook='VideoPlayer'][phx-update='ignore']"
+           )
 
-    assert html =~ "egregoros:media-open"
-    refute html =~ "open_media"
+    refute has_element?(
+             view,
+             "#post-#{note.id} button[data-role='attachment-open'][data-index='0']"
+           )
   end
 
   test "audio attachments render a player without a fullscreen button", %{conn: conn} do
