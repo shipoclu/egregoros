@@ -128,7 +128,7 @@ defmodule EgregorosWeb.SearchLive do
       if q == "" or scope == "" do
         []
       else
-        MentionAutocomplete.suggestions(q, limit: 8)
+        MentionAutocomplete.suggestions(q, limit: 8, current_user: socket.assigns.current_user)
       end
 
     mention_suggestions =
@@ -717,7 +717,7 @@ defmodule EgregorosWeb.SearchLive do
       if search_query == "" do
         []
       else
-        Users.search(search_query, limit: @page_size)
+        Users.search(search_query, limit: @page_size, current_user: socket.assigns.current_user)
       end
 
     post_results =

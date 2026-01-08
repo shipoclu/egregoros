@@ -15,12 +15,13 @@ defmodule EgregorosWeb.MentionAutocomplete do
       |> String.trim_leading("@")
 
     limit = opts |> Keyword.get(:limit, 8) |> normalize_limit()
+    current_user = Keyword.get(opts, :current_user)
 
     if query == "" do
       []
     else
       query
-      |> Users.search_mentions(limit: limit)
+      |> Users.search_mentions(limit: limit, current_user: current_user)
       |> Enum.map(&to_suggestion/1)
     end
   end

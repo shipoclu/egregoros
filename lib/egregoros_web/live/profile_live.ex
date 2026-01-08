@@ -147,7 +147,7 @@ defmodule EgregorosWeb.ProfileLive do
       if q == "" or scope == "" do
         []
       else
-        MentionAutocomplete.suggestions(q, limit: 8)
+        MentionAutocomplete.suggestions(q, limit: 8, current_user: socket.assigns.current_user)
       end
 
     mention_suggestions =
