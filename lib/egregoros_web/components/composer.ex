@@ -294,66 +294,66 @@ defmodule EgregorosWeb.Composer do
               data-role="media-entry"
               class="border border-[color:var(--border-default)] bg-[color:var(--bg-base)] p-3"
             >
-              <div class="flex gap-3">
-                <div class="relative h-16 w-16 overflow-hidden border border-[color:var(--border-default)] bg-[color:var(--bg-base)]">
-                  <.upload_entry_preview entry={entry} />
-                </div>
-
-                <div class="min-w-0 flex-1 space-y-3">
-                  <div class="flex items-start justify-between gap-3">
-                    <p class="truncate text-sm font-bold text-[color:var(--text-primary)]">
-                      {entry.client_name}
-                    </p>
-                    <button
-                      type="button"
-                      phx-click={@cancel_event}
-                      phx-value-ref={entry.ref}
-                      class="inline-flex h-9 w-9 items-center justify-center text-[color:var(--text-muted)] transition hover:bg-[color:var(--bg-subtle)] hover:text-[color:var(--text-primary)] focus-visible:outline-none focus-brutal"
-                      aria-label="Remove attachment"
-                    >
-                      <.icon name="hero-x-mark" class="size-4" />
-                    </button>
+              <div class="space-y-3">
+                <div class="relative overflow-hidden border border-[color:var(--border-muted)] bg-[color:var(--bg-subtle)]">
+                  <div class="relative aspect-video w-full bg-[color:var(--bg-base)]">
+                    <.upload_entry_preview entry={entry} />
                   </div>
 
-                  <div class="h-2 overflow-hidden bg-[color:var(--bg-muted)]">
+                  <button
+                    type="button"
+                    phx-click={@cancel_event}
+                    phx-value-ref={entry.ref}
+                    class="absolute right-2 top-2 inline-flex h-9 w-9 items-center justify-center border border-[color:var(--border-default)] bg-[color:var(--bg-base)] text-[color:var(--text-muted)] shadow-sm transition hover:bg-[color:var(--bg-subtle)] hover:text-[color:var(--text-primary)] focus-visible:outline-none focus-brutal"
+                    aria-label="Remove attachment"
+                  >
+                    <.icon name="hero-x-mark" class="size-4" />
+                  </button>
+
+                  <div class="absolute inset-x-0 bottom-0 h-1 bg-black/10">
                     <div
                       class="h-full bg-[color:var(--text-primary)] transition-all"
                       style={"width: #{entry.progress}%"}
                     >
                     </div>
                   </div>
-                  <span class="sr-only" data-role="media-progress">{entry.progress}%</span>
-
-                  <details
-                    :if={upload_entry_kind(entry) in [:video, :audio]}
-                    class="border border-[color:var(--border-muted)] bg-[color:var(--bg-base)] px-4 py-3"
-                  >
-                    <summary class="cursor-pointer select-none text-xs font-bold uppercase tracking-[0.2em] text-[color:var(--text-secondary)] list-none [&::-webkit-details-marker]:hidden">
-                      Preview
-                    </summary>
-                    <div class="mt-3">
-                      <.upload_entry_player entry={entry} />
-                    </div>
-                  </details>
-
-                  <.input
-                    type="text"
-                    id={"#{@id_prefix}-media-alt-#{entry.ref}"}
-                    name={"#{@param_prefix}[media_alt][#{entry.ref}]"}
-                    label="Alt text"
-                    value={Map.get(@media_alt, entry.ref, "")}
-                    placeholder={upload_entry_description_placeholder(entry)}
-                    phx-debounce="blur"
-                  />
-
-                  <p
-                    :for={err <- upload_errors(@upload, entry)}
-                    data-role="upload-error"
-                    class="text-sm text-[color:var(--danger)]"
-                  >
-                    {upload_error_text(err)}
-                  </p>
                 </div>
+
+                <p class="truncate text-sm font-bold text-[color:var(--text-primary)]">
+                  {entry.client_name}
+                </p>
+
+                <span class="sr-only" data-role="media-progress">{entry.progress}%</span>
+
+                <details
+                  :if={upload_entry_kind(entry) in [:video, :audio]}
+                  class="border border-[color:var(--border-muted)] bg-[color:var(--bg-base)] px-4 py-3"
+                >
+                  <summary class="cursor-pointer select-none text-xs font-bold uppercase tracking-[0.2em] text-[color:var(--text-secondary)] list-none [&::-webkit-details-marker]:hidden">
+                    Preview
+                  </summary>
+                  <div class="mt-3">
+                    <.upload_entry_player entry={entry} />
+                  </div>
+                </details>
+
+                <.input
+                  type="text"
+                  id={"#{@id_prefix}-media-alt-#{entry.ref}"}
+                  name={"#{@param_prefix}[media_alt][#{entry.ref}]"}
+                  label="Alt text"
+                  value={Map.get(@media_alt, entry.ref, "")}
+                  placeholder={upload_entry_description_placeholder(entry)}
+                  phx-debounce="blur"
+                />
+
+                <p
+                  :for={err <- upload_errors(@upload, entry)}
+                  data-role="upload-error"
+                  class="text-sm text-[color:var(--danger)]"
+                >
+                  {upload_error_text(err)}
+                </p>
               </div>
             </div>
           </div>
