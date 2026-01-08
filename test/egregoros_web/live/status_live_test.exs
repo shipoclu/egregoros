@@ -149,6 +149,22 @@ defmodule EgregorosWeb.StatusLiveTest do
     assert reply_index < child_index
   end
 
+  test "thread view marks the focused post for auto-scroll", %{conn: conn, user: user} do
+    assert {:ok, root} = Pipeline.ingest(Note.build(user, "Root"), local: true)
+
+    assert {:ok, reply} =
+             Pipeline.ingest(
+               Note.build(user, "Reply") |> Map.put("inReplyTo", root.ap_id),
+               local: true
+             )
+
+    uuid = uuid_from_ap_id(reply.ap_id)
+
+    assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}")
+
+    assert has_element?(view, "[data-role='thread-focus'][phx-hook='StatusAutoScroll']")
+  end
+
   test "renders descendant replies with depth indicators", %{conn: conn, user: user} do
     assert {:ok, root} = Pipeline.ingest(Note.build(user, "Root"), local: true)
 

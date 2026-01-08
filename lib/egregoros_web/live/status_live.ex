@@ -680,7 +680,12 @@ defmodule EgregorosWeb.StatusLive do
                 </a>
               </div>
 
-              <div class="ring-2 ring-[color:var(--border-default)]">
+              <div
+                id="thread-focus"
+                data-role="thread-focus"
+                phx-hook="StatusAutoScroll"
+                class="ring-2 ring-[color:var(--border-default)]"
+              >
                 <StatusCard.status_card
                   id={"post-#{@status.object.id}"}
                   entry={@status}
