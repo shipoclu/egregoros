@@ -10,6 +10,7 @@ ENV MIX_ENV=prod
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     ca-certificates \
+    cmake \
     git \
     pkg-config \
     && rm -rf /var/lib/apt/lists/*
@@ -58,4 +59,3 @@ USER egregoros
 EXPOSE 4000
 
 CMD ["bin/egregoros", "start"]
-
