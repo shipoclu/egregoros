@@ -246,6 +246,7 @@ defmodule EgregorosWeb.StatusLiveTest do
     assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}")
 
     assert has_element?(view, "[data-role='thread-missing-context']", "Fetching context")
+    assert has_element?(view, "[data-role='thread-missing-context'] [data-role='skeleton-status-card']")
 
     assert_enqueued(worker: FetchThreadAncestors, args: %{"start_ap_id" => reply.ap_id})
   end

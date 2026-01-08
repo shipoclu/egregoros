@@ -650,6 +650,13 @@ defmodule EgregorosWeb.StatusLive do
                     thread context in the background.
                   </p>
 
+                  <div class="mt-5 space-y-4">
+                    <.skeleton_status_card
+                      :for={_ <- 1..2}
+                      class="border-2 border-[color:var(--border-default)]"
+                    />
+                  </div>
+
                   <div class="mt-4">
                     <.button
                       type="button"
