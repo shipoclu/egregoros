@@ -586,3 +586,112 @@ article[data-role="status-card"]:target {
 .video-player:fullscreen .video-player-progress {
   height: 8px;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   CRT EFFECT FOR VIDEO PLAYER
+   ═══════════════════════════════════════════════════════════ */
+
+.video-player {
+  overflow: hidden;
+  border-radius: 8px;
+}
+
+.video-player-container {
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+/* Slight curvature effect via pseudo-element */
+.video-player-container::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  /* Vignette + slight curve shadow */
+  box-shadow:
+    inset 0 0 80px 20px rgba(0, 0, 0, 0.3),
+    inset 0 0 20px 5px rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+}
+
+/* Scanlines overlay */
+.video-player-container::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.15) 0px,
+    rgba(0, 0, 0, 0.15) 1px,
+    transparent 1px,
+    transparent 2px
+  );
+  border-radius: 6px;
+}
+
+/* Chromatic aberration on the video itself */
+.video-player-video {
+  animation: crt-flicker 0.15s infinite;
+  filter: contrast(1.1) brightness(1.05);
+}
+
+/* Chromatic aberration container */
+.video-player-container {
+  position: relative;
+}
+
+/* RGB shift effect using shadows on a wrapper */
+.video-player-video {
+  text-shadow: none;
+  position: relative;
+}
+
+/* Create chromatic aberration with CSS filter trick */
+@supports (filter: url(#crt-aberration)) {
+  .video-player-video {
+    filter: url(#crt-aberration) contrast(1.1) brightness(1.05);
+  }
+}
+
+/* Subtle CRT flicker animation */
+@keyframes crt-flicker {
+  0% { opacity: 1; }
+  5% { opacity: 0.98; }
+  10% { opacity: 1; }
+  15% { opacity: 0.99; }
+  20% { opacity: 1; }
+  50% { opacity: 1; }
+  55% { opacity: 0.985; }
+  60% { opacity: 1; }
+  100% { opacity: 1; }
+}
+
+/* Screen glow effect */
+.video-player::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  z-index: -1;
+  background: rgba(100, 200, 255, 0.03);
+  filter: blur(8px);
+  border-radius: 12px;
+  animation: crt-glow 4s ease-in-out infinite;
+}
+
+@keyframes crt-glow {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 0.8; }
+}
+
+/* Disable animations for reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .video-player-video {
+    animation: none;
+  }
+  .video-player::before {
+    animation: none;
+  }
+}

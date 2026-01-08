@@ -29,6 +29,55 @@ const volumeMuteIcon = `<svg viewBox="0 0 24 24" fill="currentColor" class="size
 
 const PLAYBACK_SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
 
+// Inject SVG filter for chromatic aberration (only once)
+function ensureCRTFilter() {
+  if (document.getElementById("crt-svg-filters")) return
+
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg")
+  svg.id = "crt-svg-filters"
+  svg.setAttribute("width", "0")
+  svg.setAttribute("height", "0")
+  svg.style.position = "absolute"
+  svg.style.pointerEvents = "none"
+
+  svg.innerHTML = `
+    <defs>
+      <filter id="crt-aberration" x="-10%" y="-10%" width="120%" height="120%">
+        <!-- Red channel offset -->
+        <feOffset in="SourceGraphic" dx="-1" dy="0" result="red-shifted">
+        </feOffset>
+        <feColorMatrix in="red-shifted" type="matrix" result="red"
+          values="1 0 0 0 0
+                  0 0 0 0 0
+                  0 0 0 0 0
+                  0 0 0 1 0"/>
+
+        <!-- Blue channel offset -->
+        <feOffset in="SourceGraphic" dx="1" dy="0" result="blue-shifted">
+        </feOffset>
+        <feColorMatrix in="blue-shifted" type="matrix" result="blue"
+          values="0 0 0 0 0
+                  0 0 0 0 0
+                  0 0 1 0 0
+                  0 0 0 1 0"/>
+
+        <!-- Green channel (no offset) -->
+        <feColorMatrix in="SourceGraphic" type="matrix" result="green"
+          values="0 0 0 0 0
+                  0 1 0 0 0
+                  0 0 0 0 0
+                  0 0 0 1 0"/>
+
+        <!-- Blend channels together -->
+        <feBlend mode="screen" in="red" in2="green" result="rg"/>
+        <feBlend mode="screen" in="rg" in2="blue" result="rgb"/>
+      </filter>
+    </defs>
+  `
+
+  document.body.appendChild(svg)
+}
+
 function formatSpeed(speed) {
   return speed === 1 ? "1x" : `${speed}x`
 }
@@ -50,6 +99,9 @@ export function initVideoPlayer(container) {
 
   // Check if already initialized
   if (container.querySelector(".video-player")) return
+
+  // Inject CRT filter SVG if needed
+  ensureCRTFilter()
 
   // Hide native video controls
   video.removeAttribute("controls")
