@@ -4,10 +4,14 @@ defmodule EgregorosWeb.NotificationsLiveTest do
   import Phoenix.LiveViewTest
 
   alias Egregoros.Activities.Follow
+  alias Egregoros.Activities.EmojiReact
   alias Egregoros.Notifications
+  alias Egregoros.Objects
   alias Egregoros.Pipeline
+  alias Egregoros.Publish
   alias Egregoros.Relationships
   alias Egregoros.Users
+  alias EgregorosWeb.URL
 
   setup do
     {:ok, user} = Users.create_local_user("alice")
@@ -266,5 +270,56 @@ defmodule EgregorosWeb.NotificationsLiveTest do
     _html = render_click(view, "set_notifications_filter", %{"filter" => "nope"})
 
     assert has_element?(view, "#notifications-list[data-filter='all']")
+  end
+
+  test "emoji reaction notifications render custom emoji and link to the target post", %{
+    conn: conn,
+    user: user,
+    actor: actor
+  } do
+    assert {:ok, create} = Publish.post_note(user, "Hello")
+    note = Objects.get_by_ap_id(create.object)
+
+    assert {:ok, _} =
+             Pipeline.ingest(
+               EmojiReact.build(actor, note, ":flow_think:")
+               |> Map.put("tag", [
+                 %{
+                   "type" => "Emoji",
+                   "name" => ":flow_think:",
+                   "icon" => %{"url" => "https://cdn.example/emoji.png"}
+                 }
+               ]),
+               local: true
+             )
+
+    [notification] = Notifications.list_for_user(user, limit: 1)
+    note_uuid = URL.local_object_uuid(note.ap_id)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/notifications")
+
+    assert has_element?(view, "#notification-#{notification.id} img.emoji[alt=':flow_think:']")
+
+    assert has_element?(
+             view,
+             "#notification-#{notification.id} [data-role='notification-target'][href='/@alice/#{note_uuid}']"
+           )
+  end
+
+  test "mention notifications include a link to the mentioned status", %{conn: conn, user: user, actor: actor} do
+    assert {:ok, mention_create} = Publish.post_note(actor, "@alice Hello there")
+    mention_note = Objects.get_by_ap_id(mention_create.object)
+    mention_uuid = URL.local_object_uuid(mention_note.ap_id)
+
+    [notification] = Notifications.list_for_user(user, limit: 1)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/notifications")
+
+    assert has_element?(
+             view,
+             "#notification-#{notification.id} [data-role='notification-target'][href='/@bob/#{mention_uuid}']"
+           )
   end
 end

@@ -4,6 +4,7 @@ defmodule EgregorosWeb.NotificationsLive do
   alias Egregoros.Activities.Accept
   alias Egregoros.Activities.Reject
   alias Egregoros.CustomEmojis
+  alias Egregoros.EmojiReactions
   alias Egregoros.HTML
   alias Egregoros.Notifications
   alias Egregoros.Object
@@ -12,6 +13,8 @@ defmodule EgregorosWeb.NotificationsLive do
   alias Egregoros.Relationships
   alias Egregoros.User
   alias Egregoros.Users
+  alias EgregorosWeb.ProfilePaths
+  alias EgregorosWeb.URL
   alias EgregorosWeb.ViewModels.Actor, as: ActorVM
 
   @page_size 20
@@ -413,7 +416,9 @@ defmodule EgregorosWeb.NotificationsLive do
             <div class="min-w-0">
               <p class="flex flex-wrap items-center gap-2 text-sm font-bold text-[color:var(--text-primary)]">
                 <.icon name={@entry.icon} class="size-4 text-[color:var(--text-muted)]" />
-                <span class="truncate">{@entry.message}</span>
+                <span data-role="notification-message" class="truncate">
+                  {emoji_inline(@entry.message, @entry.message_emojis)}
+                </span>
               </p>
               <p class="mt-1 font-mono text-xs text-[color:var(--text-muted)]">
                 {@entry.actor.handle}
@@ -430,6 +435,20 @@ defmodule EgregorosWeb.NotificationsLive do
             class="border border-[color:var(--border-muted)] bg-[color:var(--bg-subtle)] p-4 text-sm text-[color:var(--text-secondary)]"
           >
             {@entry.preview_html}
+          </div>
+
+          <div
+            :if={is_binary(@entry.target_path) and @entry.target_path != ""}
+            class="flex justify-end"
+          >
+            <.link
+              navigate={@entry.target_path}
+              data-role="notification-target"
+              class="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wide text-[color:var(--text-muted)] transition hover:text-[color:var(--text-primary)] hover:underline underline-offset-2 focus-visible:outline-none focus-brutal"
+              aria-label="Open post"
+            >
+              Open post <.icon name="hero-arrow-right" class="size-4" />
+            </.link>
           </div>
         </div>
       </div>
@@ -484,37 +503,72 @@ defmodule EgregorosWeb.NotificationsLive do
   defp decorate_notification(%{type: type} = notification) when is_binary(type) do
     actor = ActorVM.card(notification.actor)
 
-    {icon, message, preview_html} =
+    note =
+      case type do
+        "Like" -> note_for_ap_id(notification.object)
+        "Announce" -> note_for_ap_id(notification.object)
+        "EmojiReact" -> note_for_ap_id(notification.object)
+        "Note" -> note_for_ap_id(notification.ap_id)
+        _ -> nil
+      end
+
+    target_path = status_path_for_note(note)
+    preview_html = note_preview(note)
+
+    {icon, message, message_emojis} =
       case type do
         "Follow" ->
-          {"hero-user-plus", "#{actor.display_name} followed you", nil}
+          {"hero-user-plus", "#{actor.display_name} followed you", actor.emojis}
 
         "Like" ->
-          {"hero-heart", "#{actor.display_name} liked your post",
-           note_preview(notification.object)}
+          {"hero-heart", "#{actor.display_name} liked your post", actor.emojis}
 
         "Announce" ->
-          {"hero-arrow-path", "#{actor.display_name} reposted your post",
-           note_preview(notification.object)}
+          {"hero-arrow-path", "#{actor.display_name} reposted your post", actor.emojis}
 
         "EmojiReact" ->
-          emoji = notification.data |> Map.get("content") |> to_string() |> String.trim()
+          emoji_raw =
+            notification.data
+            |> Map.get("content")
+            |> to_string()
+            |> String.trim()
 
-          message =
-            if emoji == "" do
-              "#{actor.display_name} reacted to your post"
-            else
-              "#{actor.display_name} reacted #{emoji} to your post"
+          emoji = EmojiReactions.normalize_content(emoji_raw) |> to_string() |> String.trim()
+
+          emoji_url =
+            EmojiReactions.find_custom_emoji_url(
+              emoji,
+              Map.get(notification.data, "tag")
+            )
+
+          {emoji_token, reaction_emojis} =
+            cond do
+              is_binary(emoji_url) and emoji_url != "" and emoji != "" ->
+                {":#{emoji}:", [%{shortcode: emoji, url: emoji_url}]}
+
+              emoji_raw != "" ->
+                {emoji_raw, []}
+
+              true ->
+                {"", []}
             end
 
-          {"hero-face-smile", message, note_preview(notification.object)}
+          message =
+            if emoji_token == "" do
+              "#{actor.display_name} reacted to your post"
+            else
+              "#{actor.display_name} reacted #{emoji_token} to your post"
+            end
+
+          message_emojis = merge_emojis(actor.emojis, reaction_emojis)
+
+          {"hero-face-smile", message, message_emojis}
 
         "Note" ->
-          {"hero-at-symbol", "#{actor.display_name} mentioned you",
-           note_preview(notification.ap_id)}
+          {"hero-at-symbol", "#{actor.display_name} mentioned you", actor.emojis}
 
         _ ->
-          {"hero-bell", "#{actor.display_name} sent activity", nil}
+          {"hero-bell", "#{actor.display_name} sent activity", actor.emojis}
       end
 
     %{
@@ -523,27 +577,70 @@ defmodule EgregorosWeb.NotificationsLive do
       actor: actor,
       icon: icon,
       message: message,
-      preview_html: preview_html
+      message_emojis: message_emojis,
+      preview_html: preview_html,
+      target_path: target_path
     }
   end
 
-  defp note_preview(note_ap_id) when is_binary(note_ap_id) do
-    case Objects.get_by_ap_id(note_ap_id) do
-      %{type: "Note"} = object ->
-        raw = object.data |> Map.get("content", "") |> to_string()
-        emojis = CustomEmojis.from_object(object)
-        ap_tags = Map.get(object.data, "tag", [])
+  defp note_preview(%Object{type: "Note"} = object) do
+    raw = object.data |> Map.get("content", "") |> to_string()
+    emojis = CustomEmojis.from_object(object)
+    ap_tags = Map.get(object.data, "tag", [])
 
-        raw
-        |> HTML.to_safe_html(format: :html, emojis: emojis, ap_tags: ap_tags)
-        |> Phoenix.HTML.raw()
+    raw
+    |> HTML.to_safe_html(format: :html, emojis: emojis, ap_tags: ap_tags)
+    |> Phoenix.HTML.raw()
+  end
 
-      _ ->
+  defp note_preview(_note), do: nil
+
+  defp note_for_ap_id(ap_id) when is_binary(ap_id) do
+    case Objects.get_by_ap_id(ap_id) do
+      %Object{type: "Note"} = note -> note
+      _ -> nil
+    end
+  end
+
+  defp note_for_ap_id(_ap_id), do: nil
+
+  defp status_path_for_note(%Object{} = note) do
+    actor = ActorVM.card(note.actor)
+
+    cond do
+      note.local == true ->
+        with uuid when is_binary(uuid) and uuid != "" <- URL.local_object_uuid(note.ap_id),
+             "/@" <> _rest = profile_path <- ProfilePaths.profile_path(actor.handle) do
+          profile_path <> "/" <> uuid
+        else
+          _ -> nil
+        end
+
+      is_integer(note.id) ->
+        with "/@" <> _rest = profile_path <- ProfilePaths.profile_path(actor.handle) do
+          profile_path <> "/" <> Integer.to_string(note.id)
+        else
+          _ -> nil
+        end
+
+      true ->
         nil
     end
   end
 
-  defp note_preview(_note_ap_id), do: nil
+  defp status_path_for_note(_note), do: nil
+
+  defp merge_emojis(list_a, list_b) when is_list(list_a) and is_list(list_b) do
+    (list_a ++ list_b)
+    |> Enum.filter(&is_map/1)
+    |> Enum.uniq_by(fn
+      %{shortcode: shortcode} when is_binary(shortcode) -> shortcode
+      %{"shortcode" => shortcode} when is_binary(shortcode) -> shortcode
+      other -> other
+    end)
+  end
+
+  defp merge_emojis(list_a, list_b), do: merge_emojis(List.wrap(list_a), List.wrap(list_b))
 
   defp notifications_count(nil), do: 0
 
