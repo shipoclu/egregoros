@@ -97,6 +97,19 @@ For multi-node deployments, run migrations as a one-off task instead of on every
 - Set `PHX_HOST` / `PHX_SCHEME` / `PHX_PORT` to the public URL of your instance (important for federation).
 - Persist volumes `egregoros_db` and `egregoros_uploads` (Coolify will create named volumes automatically).
 
+### Serving uploads from a separate subdomain
+
+To isolate user uploads on a separate origin (recommended defense-in-depth), you can serve them from a dedicated
+subdomain like `i.example.com`:
+
+- Point `i.example.com` at the same Coolify app/service as the main domain.
+- Set `EGREGOROS_UPLOADS_BASE_URL=https://i.example.com` so URLs for `/uploads/*` are generated on that host.
+- Set `EGREGOROS_SESSION_COOKIE_DOMAIN=example.com` (or `.example.com`) so the browser can send the session cookie
+  to the uploads host (required for followers-only/direct media visibility checks).
+
+When `EGREGOROS_UPLOADS_BASE_URL` is set, Egregoros will only serve `/uploads/*` when the request `Host` matches that
+uploads host, so uploads aren’t accessible on the main app origin.
+
 ### External host (ngrok / reverse proxies)
 
 ActivityPub IDs and API URLs are generated from the configured endpoint URL. To run behind ngrok, set:

@@ -34,6 +34,8 @@ services:
       PHX_SCHEME: ${PHX_SCHEME:-http}
       PHX_PORT: ${PHX_PORT:-4000}
       EGREGOROS_UPLOADS_DIR: /data/uploads
+      EGREGOROS_UPLOADS_BASE_URL: ${EGREGOROS_UPLOADS_BASE_URL:-}
+      EGREGOROS_SESSION_COOKIE_DOMAIN: ${EGREGOROS_SESSION_COOKIE_DOMAIN:-}
     volumes:
       - egregoros_uploads:/data/uploads
     expose:

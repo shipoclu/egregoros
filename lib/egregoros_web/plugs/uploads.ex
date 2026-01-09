@@ -5,6 +5,7 @@ defmodule EgregorosWeb.Plugs.Uploads do
 
   alias Egregoros.Media
   alias Egregoros.Users
+  alias EgregorosWeb.Endpoint
 
   def init(_opts) do
     static_opts =
@@ -19,26 +20,30 @@ defmodule EgregorosWeb.Plugs.Uploads do
   end
 
   def call(%Plug.Conn{request_path: "/uploads" <> _rest} = conn, %{static_opts: static_opts}) do
-    conn = fetch_session(conn)
+    if uploads_host_allowed?(conn) do
+      conn = fetch_session(conn)
 
-    case conn.request_path do
-      "/uploads/media/" <> _ ->
-        user = current_user(conn)
+      case conn.request_path do
+        "/uploads/media/" <> _ ->
+          user = current_user(conn)
 
-        if Media.local_href_visible_to?(conn.request_path, user) do
+          if Media.local_href_visible_to?(conn.request_path, user) do
+            serve_static(conn, static_opts)
+          else
+            not_found(conn)
+          end
+
+        "/uploads/avatars/" <> _ ->
           serve_static(conn, static_opts)
-        else
+
+        "/uploads/banners/" <> _ ->
+          serve_static(conn, static_opts)
+
+        _ ->
           not_found(conn)
-        end
-
-      "/uploads/avatars/" <> _ ->
-        serve_static(conn, static_opts)
-
-      "/uploads/banners/" <> _ ->
-        serve_static(conn, static_opts)
-
-      _ ->
-        not_found(conn)
+      end
+    else
+      not_found(conn)
     end
   end
 
@@ -81,5 +86,48 @@ defmodule EgregorosWeb.Plugs.Uploads do
     default = Path.join([priv_dir, "static", "uploads"])
 
     Application.get_env(:egregoros, :uploads_dir, default)
+  end
+
+  defp uploads_host_allowed?(%Plug.Conn{} = conn) do
+    if uploads_host_restricted?() do
+      case uploads_host() do
+        host when is_binary(host) and host != "" ->
+          is_binary(conn.host) and String.downcase(conn.host) == String.downcase(host)
+
+        _ ->
+          false
+      end
+    else
+      true
+    end
+  end
+
+  defp uploads_host_allowed?(_conn), do: true
+
+  defp uploads_host_restricted? do
+    with uploads_host when is_binary(uploads_host) and uploads_host != "" <- uploads_host(),
+         endpoint_host when is_binary(endpoint_host) and endpoint_host != "" <- endpoint_host() do
+      String.downcase(uploads_host) != String.downcase(endpoint_host)
+    else
+      _ -> false
+    end
+  end
+
+  defp uploads_host do
+    with base when is_binary(base) and base != "" <- Application.get_env(:egregoros, :uploads_base_url),
+         %URI{host: host} when is_binary(host) and host != "" <- URI.parse(base) do
+      host
+    else
+      _ -> nil
+    end
+  end
+
+  defp endpoint_host do
+    with url when is_binary(url) and url != "" <- Endpoint.url(),
+         %URI{host: host} when is_binary(host) and host != "" <- URI.parse(url) do
+      host
+    else
+      _ -> nil
+    end
   end
 end
