@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Notifications UX 2: Grouped/Batched - Pleroma Redux</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-base: #ffffff;
+      --bg-subtle: #f5f5f5;
+      --bg-muted: #ebebeb;
+      --text-primary: #000000;
+      --text-secondary: #555555;
+      --text-muted: #888888;
+      --border-default: #000000;
+      --border-muted: #cccccc;
+      --link: #0000ee;
+    }
+
+    [data-theme="dark"] {
+      --bg-base: #0a0a0a;
+      --bg-subtle: #141414;
+      --bg-muted: #1f1f1f;
+      --text-primary: #ffffff;
+      --text-secondary: #aaaaaa;
+      --text-muted: #666666;
+      --border-default: #ffffff;
+      --border-muted: #333333;
+      --link: #88aaff;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: var(--bg-base);
+      color: var(--text-primary);
+      line-height: 1.5;
+      font-size: 15px;
+    }
+
+    .container {
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+
+    h1 {
+      font-size: 24px;
+      font-weight: 900;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: -0.5px;
+    }
+
+    .description {
+      color: var(--text-secondary);
+      margin-bottom: 32px;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .description strong {
+      color: var(--text-primary);
+    }
+
+    .theme-toggle {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 8px 16px;
+      background: var(--text-primary);
+      color: var(--bg-base);
+      border: 2px solid var(--border-default);
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+
+    .notifications {
+      border: 2px solid var(--border-default);
+      background: var(--bg-base);
+    }
+
+    /* ===========================================
+       UNGROUPED: Mentions (always individual)
+       =========================================== */
+    .notification-single {
+      padding: 16px;
+      border-bottom: 1px solid var(--border-muted);
+      transition: background 0.1s;
+    }
+
+    .notification-single:hover {
+      background: var(--bg-subtle);
+    }
+
+    .notification-single .header {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .notification-single .avatar {
+      width: 40px;
+      height: 40px;
+      background: var(--bg-muted);
+      border: 1px solid var(--border-muted);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+
+    .notification-single .content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .notification-single .meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+
+    .notification-single .icon {
+      width: 16px;
+      height: 16px;
+      color: var(--text-muted);
+    }
+
+    .notification-single .message {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .notification-single .message .name {
+      color: var(--text-primary);
+    }
+
+    .notification-single .handle {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .notification-single .time {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-left: auto;
+      flex-shrink: 0;
+    }
+
+    .notification-single .preview {
+      margin-top: 12px;
+      padding: 12px;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border-muted);
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+
+    .notification-single .preview a {
+      color: var(--link);
+    }
+
+    .notification-single .target-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 12px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      text-decoration: none;
+    }
+
+    .notification-single .target-link:hover {
+      color: var(--text-primary);
+      text-decoration: underline;
+    }
+
+    /* ===========================================
+       GROUPED: Likes batched by post
+       =========================================== */
+    .notification-grouped {
+      padding: 16px;
+      border-bottom: 1px solid var(--border-muted);
+      transition: background 0.1s;
+    }
+
+    .notification-grouped:hover {
+      background: var(--bg-subtle);
+    }
+
+    .notification-grouped .header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .notification-grouped .avatar-stack {
+      display: flex;
+      flex-shrink: 0;
+    }
+
+    .notification-grouped .avatar-stack .avatar {
+      width: 28px;
+      height: 28px;
+      background: var(--bg-muted);
+      border: 2px solid var(--bg-base);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 10px;
+      color: var(--text-secondary);
+      margin-left: -10px;
+    }
+
+    .notification-grouped .avatar-stack .avatar:first-child {
+      margin-left: 0;
+    }
+
+    .notification-grouped .avatar-stack .avatar-overflow {
+      background: var(--text-primary);
+      color: var(--bg-base);
+      font-size: 9px;
+    }
+
+    .notification-grouped .icon {
+      width: 16px;
+      height: 16px;
+      color: var(--text-muted);
+      flex-shrink: 0;
+    }
+
+    .notification-grouped .content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .notification-grouped .message {
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+
+    .notification-grouped .message .name {
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .notification-grouped .message .count {
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .notification-grouped .time {
+      font-size: 12px;
+      color: var(--text-muted);
+      flex-shrink: 0;
+    }
+
+    .notification-grouped .preview {
+      padding: 12px;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border-muted);
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .notification-grouped .target-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 12px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      text-decoration: none;
+    }
+
+    .notification-grouped .target-link:hover {
+      color: var(--text-primary);
+      text-decoration: underline;
+    }
+
+    /* ===========================================
+       GROUPED: Reactions batched by emoji
+       =========================================== */
+    .notification-reactions {
+      padding: 16px;
+      border-bottom: 1px solid var(--border-muted);
+      transition: background 0.1s;
+    }
+
+    .notification-reactions:hover {
+      background: var(--bg-subtle);
+    }
+
+    .notification-reactions .header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .notification-reactions .emoji-group {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+
+    .notification-reactions .emoji {
+      font-size: 20px;
+    }
+
+    .notification-reactions .emoji-count {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-muted);
+      background: var(--bg-muted);
+      padding: 2px 6px;
+    }
+
+    .notification-reactions .content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .notification-reactions .message {
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+
+    .notification-reactions .message .name {
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .notification-reactions .time {
+      font-size: 12px;
+      color: var(--text-muted);
+      flex-shrink: 0;
+    }
+
+    .notification-reactions .preview {
+      padding: 12px;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border-muted);
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .notification-reactions .actors {
+      margin-top: 8px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .notification-reactions .actor-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      background: var(--bg-muted);
+      font-size: 12px;
+    }
+
+    .notification-reactions .actor-chip .mini-avatar {
+      width: 16px;
+      height: 16px;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border-muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 8px;
+      font-weight: 700;
+    }
+
+    .notification-reactions .target-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 12px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      text-decoration: none;
+    }
+
+    .notification-reactions .target-link:hover {
+      color: var(--text-primary);
+      text-decoration: underline;
+    }
+
+    /* Comparison box */
+    .comparison {
+      margin-top: 40px;
+      padding: 20px;
+      background: var(--bg-subtle);
+      border: 2px solid var(--border-default);
+    }
+
+    .comparison h2 {
+      font-size: 14px;
+      font-weight: 700;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+
+    .comparison ul {
+      list-style: none;
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .comparison li {
+      padding: 6px 0;
+      border-bottom: 1px solid var(--border-muted);
+    }
+
+    .comparison li:last-child {
+      border-bottom: none;
+    }
+
+    .comparison strong {
+      color: var(--text-primary);
+    }
+  </style>
+</head>
+<body data-theme="">
+  <button class="theme-toggle" onclick="document.documentElement.setAttribute('data-theme', document.documentElement.getAttribute('data-theme') === 'dark' ? '' : 'dark')">
+    Toggle Theme
+  </button>
+
+  <div class="container">
+    <h1>Grouped / Batched</h1>
+    <p class="description">
+      <strong>Concept:</strong> Aggregate similar low-importance notifications to reduce noise.
+      Multiple likes on the same post become one entry with stacked avatars.
+      Reactions are grouped by emoji with actor chips.
+      Mentions remain individual since each has unique content.
+    </p>
+
+    <div class="notifications">
+      <!-- Individual mention -->
+      <div class="notification-single">
+        <div class="header">
+          <div class="avatar">A</div>
+          <div class="content">
+            <div class="meta">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="4"/>
+                <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94"/>
+              </svg>
+              <span class="message"><span class="name">Alice Chen</span> mentioned you</span>
+              <span class="time">5m</span>
+            </div>
+            <div class="handle">@alice@example.social</div>
+          </div>
+        </div>
+        <div class="preview">
+          Hey <a href="#">@you</a>, have you seen the latest changes to the federation protocol? I think we should discuss this.
+        </div>
+        <a href="#" class="target-link">
+          Open post
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M5 12h14M12 5l7 7-7 7"/>
+          </svg>
+        </a>
+      </div>
+
+      <!-- Grouped likes on one post -->
+      <div class="notification-grouped">
+        <div class="header">
+          <div class="avatar-stack">
+            <div class="avatar">B</div>
+            <div class="avatar">C</div>
+            <div class="avatar">D</div>
+            <div class="avatar avatar-overflow">+4</div>
+          </div>
+          <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+          </svg>
+          <div class="content">
+            <span class="message"><span class="name">Bob</span>, <span class="name">Carol</span>, and <span class="count">5 others</span> liked your post</span>
+          </div>
+          <span class="time">2h</span>
+        </div>
+        <div class="preview">
+          "Just deployed the new ActivityPub implementation. Feeling pretty good about the federation layer..."
+        </div>
+        <a href="#" class="target-link">
+          Open post
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M5 12h14M12 5l7 7-7 7"/>
+          </svg>
+        </a>
+      </div>
+
+      <!-- Another individual mention -->
+      <div class="notification-single">
+        <div class="header">
+          <div class="avatar">E</div>
+          <div class="content">
+            <div class="meta">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              </svg>
+              <span class="message"><span class="name">Eve Thompson</span> replied to you</span>
+              <span class="time">3h</span>
+            </div>
+            <div class="handle">@eve</div>
+          </div>
+        </div>
+        <div class="preview">
+          That's a really interesting approach! Have you considered using WebSockets for the real-time updates?
+        </div>
+        <a href="#" class="target-link">
+          Open post
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M5 12h14M12 5l7 7-7 7"/>
+          </svg>
+        </a>
+      </div>
+
+      <!-- Grouped reactions by emoji -->
+      <div class="notification-reactions">
+        <div class="header">
+          <div class="emoji-group">
+            <span class="emoji">🔥</span>
+            <span class="emoji-count">x4</span>
+          </div>
+          <div class="content">
+            <span class="message">Reactions on your post</span>
+          </div>
+          <span class="time">4h</span>
+        </div>
+        <div class="preview">
+          "The new federation protocol is blazing fast now. 10x improvement in message delivery..."
+        </div>
+        <div class="actors">
+          <span class="actor-chip">
+            <span class="mini-avatar">F</span>
+            Frank
+          </span>
+          <span class="actor-chip">
+            <span class="mini-avatar">G</span>
+            Grace
+          </span>
+          <span class="actor-chip">
+            <span class="mini-avatar">H</span>
+            Henry
+          </span>
+          <span class="actor-chip">
+            <span class="mini-avatar">I</span>
+            Iris
+          </span>
+        </div>
+        <a href="#" class="target-link">
+          Open post
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M5 12h14M12 5l7 7-7 7"/>
+          </svg>
+        </a>
+      </div>
+
+      <!-- Grouped likes on another post -->
+      <div class="notification-grouped">
+        <div class="header">
+          <div class="avatar-stack">
+            <div class="avatar">J</div>
+            <div class="avatar">K</div>
+          </div>
+          <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+          </svg>
+          <div class="content">
+            <span class="message"><span class="name">Jack</span> and <span class="name">Kate</span> liked your post</span>
+          </div>
+          <span class="time">6h</span>
+        </div>
+        <div class="preview">
+          "Working on the notification system today. Thinking about how to make it less noisy..."
+        </div>
+        <a href="#" class="target-link">
+          Open post
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M5 12h14M12 5l7 7-7 7"/>
+          </svg>
+        </a>
+      </div>
+
+      <!-- Multiple emoji reactions grouped -->
+      <div class="notification-reactions">
+        <div class="header">
+          <div class="emoji-group">
+            <span class="emoji">👍</span>
+            <span class="emoji-count">x2</span>
+            <span class="emoji">❤️</span>
+            <span class="emoji-count">x1</span>
+          </div>
+          <div class="content">
+            <span class="message">Reactions on your post</span>
+          </div>
+          <span class="time">8h</span>
+        </div>
+        <div class="preview">
+          "Sometimes the simplest solution is the best one. No need to over-engineer."
+        </div>
+        <div class="actors">
+          <span class="actor-chip">
+            <span class="mini-avatar">L</span>
+            Leo 👍
+          </span>
+          <span class="actor-chip">
+            <span class="mini-avatar">M</span>
+            Mia 👍
+          </span>
+          <span class="actor-chip">
+            <span class="mini-avatar">N</span>
+            Nina ❤️
+          </span>
+        </div>
+        <a href="#" class="target-link">
+          Open post
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M5 12h14M12 5l7 7-7 7"/>
+          </svg>
+        </a>
+      </div>
+    </div>
+
+    <div class="comparison">
+      <h2>Design Rationale</h2>
+      <ul>
+        <li><strong>Mentions/Replies:</strong> Always individual. Each has unique content that deserves attention.</li>
+        <li><strong>Likes grouped by post:</strong> "Alice, Bob, and 5 others liked..." with stacked avatars. One row per post instead of one per like.</li>
+        <li><strong>Reactions grouped by emoji:</strong> Shows emoji with count, lists actors as chips. Visually distinct from likes.</li>
+        <li><strong>Space savings:</strong> 7 likes on one post = 1 notification row. Could reduce notification count by 60-80%.</li>
+        <li><strong>Trade-off:</strong> Requires backend aggregation logic. More complex implementation but dramatically cleaner UX.</li>
+      </ul>
+    </div>
+  </div>
+</body>
+</html>

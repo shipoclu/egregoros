@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Notifications UX 1: Compact Mode - Pleroma Redux</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-base: #ffffff;
+      --bg-subtle: #f5f5f5;
+      --bg-muted: #ebebeb;
+      --text-primary: #000000;
+      --text-secondary: #555555;
+      --text-muted: #888888;
+      --border-default: #000000;
+      --border-muted: #cccccc;
+      --link: #0000ee;
+    }
+
+    [data-theme="dark"] {
+      --bg-base: #0a0a0a;
+      --bg-subtle: #141414;
+      --bg-muted: #1f1f1f;
+      --text-primary: #ffffff;
+      --text-secondary: #aaaaaa;
+      --text-muted: #666666;
+      --border-default: #ffffff;
+      --border-muted: #333333;
+      --link: #88aaff;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: var(--bg-base);
+      color: var(--text-primary);
+      line-height: 1.5;
+      font-size: 15px;
+    }
+
+    .container {
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+
+    h1 {
+      font-size: 24px;
+      font-weight: 900;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: -0.5px;
+    }
+
+    .description {
+      color: var(--text-secondary);
+      margin-bottom: 32px;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .description strong {
+      color: var(--text-primary);
+    }
+
+    .theme-toggle {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 8px 16px;
+      background: var(--text-primary);
+      color: var(--bg-base);
+      border: 2px solid var(--border-default);
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+
+    .notifications {
+      border: 2px solid var(--border-default);
+      background: var(--bg-base);
+    }
+
+    .section-label {
+      padding: 12px 16px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      background: var(--bg-subtle);
+      border-bottom: 1px solid var(--border-muted);
+    }
+
+    /* ===========================================
+       HIGH IMPORTANCE: Mentions & Replies
+       Full card with preview, prominent display
+       =========================================== */
+    .notification-full {
+      padding: 16px;
+      border-bottom: 1px solid var(--border-muted);
+      transition: background 0.1s;
+    }
+
+    .notification-full:hover {
+      background: var(--bg-subtle);
+    }
+
+    .notification-full .header {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .notification-full .avatar {
+      width: 40px;
+      height: 40px;
+      background: var(--bg-muted);
+      border: 1px solid var(--border-muted);
+      border-radius: 0;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+
+    .notification-full .content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .notification-full .meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+
+    .notification-full .icon {
+      width: 16px;
+      height: 16px;
+      color: var(--text-muted);
+    }
+
+    .notification-full .message {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .notification-full .message .name {
+      color: var(--text-primary);
+    }
+
+    .notification-full .handle {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .notification-full .time {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-left: auto;
+      flex-shrink: 0;
+    }
+
+    .notification-full .preview {
+      margin-top: 12px;
+      padding: 12px;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border-muted);
+      font-size: 14px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+
+    .notification-full .preview a {
+      color: var(--link);
+    }
+
+    .notification-full .target-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 12px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      text-decoration: none;
+    }
+
+    .notification-full .target-link:hover {
+      color: var(--text-primary);
+      text-decoration: underline;
+    }
+
+    /* ===========================================
+       LOW IMPORTANCE: Likes & Reactions
+       Compact single-line display
+       =========================================== */
+    .notification-compact {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border-muted);
+      transition: background 0.1s;
+    }
+
+    .notification-compact:hover {
+      background: var(--bg-subtle);
+    }
+
+    .notification-compact .avatar {
+      width: 24px;
+      height: 24px;
+      background: var(--bg-muted);
+      border: 1px solid var(--border-muted);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 10px;
+      color: var(--text-secondary);
+    }
+
+    .notification-compact .icon {
+      width: 14px;
+      height: 14px;
+      color: var(--text-muted);
+      flex-shrink: 0;
+    }
+
+    .notification-compact .message {
+      flex: 1;
+      font-size: 13px;
+      color: var(--text-secondary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .notification-compact .message .name {
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .notification-compact .emoji {
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    .notification-compact .time {
+      font-size: 11px;
+      color: var(--text-muted);
+      flex-shrink: 0;
+    }
+
+    .notification-compact .post-preview {
+      max-width: 150px;
+      font-size: 12px;
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex-shrink: 0;
+    }
+
+    /* ===========================================
+       MEDIUM IMPORTANCE: Follows & Reposts
+       Medium-sized display
+       =========================================== */
+    .notification-medium {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-muted);
+      transition: background 0.1s;
+    }
+
+    .notification-medium:hover {
+      background: var(--bg-subtle);
+    }
+
+    .notification-medium .avatar {
+      width: 32px;
+      height: 32px;
+      background: var(--bg-muted);
+      border: 1px solid var(--border-muted);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .notification-medium .icon {
+      width: 16px;
+      height: 16px;
+      color: var(--text-muted);
+      flex-shrink: 0;
+    }
+
+    .notification-medium .content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .notification-medium .message {
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+
+    .notification-medium .message .name {
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .notification-medium .handle {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .notification-medium .time {
+      font-size: 12px;
+      color: var(--text-muted);
+      flex-shrink: 0;
+    }
+
+    /* Comparison box */
+    .comparison {
+      margin-top: 40px;
+      padding: 20px;
+      background: var(--bg-subtle);
+      border: 2px solid var(--border-default);
+    }
+
+    .comparison h2 {
+      font-size: 14px;
+      font-weight: 700;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+
+    .comparison ul {
+      list-style: none;
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .comparison li {
+      padding: 6px 0;
+      border-bottom: 1px solid var(--border-muted);
+    }
+
+    .comparison li:last-child {
+      border-bottom: none;
+    }
+
+    .comparison strong {
+      color: var(--text-primary);
+    }
+  </style>
+</head>
+<body>
+  <button class="theme-toggle" onclick="document.body.parentElement.toggleAttribute('data-theme') || document.documentElement.setAttribute('data-theme', document.documentElement.getAttribute('data-theme') === 'dark' ? '' : 'dark')">
+    Toggle Theme
+  </button>
+
+  <div class="container">
+    <h1>Compact Mode</h1>
+    <p class="description">
+      <strong>Concept:</strong> Differentiate notification importance through information density.
+      High-importance items (mentions, replies) get full cards with previews.
+      Low-importance items (likes, reactions) become compact single-line entries.
+      Medium-importance items (follows, reposts) get an intermediate treatment.
+    </p>
+
+    <div class="notifications">
+      <!-- High importance section -->
+      <div class="section-label">Mentions & Replies</div>
+
+      <div class="notification-full">
+        <div class="header">
+          <div class="avatar">A</div>
+          <div class="content">
+            <div class="meta">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="4"/>
+                <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94"/>
+              </svg>
+              <span class="message"><span class="name">Alice Chen</span> mentioned you</span>
+              <span class="time">5m</span>
+            </div>
+            <div class="handle">@alice@example.social</div>
+          </div>
+        </div>
+        <div class="preview">
+          Hey <a href="#">@you</a>, have you seen the latest changes to the federation protocol? I think we should discuss this at the next meeting.
+        </div>
+        <a href="#" class="target-link">
+          Open post
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M5 12h14M12 5l7 7-7 7"/>
+          </svg>
+        </a>
+      </div>
+
+      <div class="notification-full">
+        <div class="header">
+          <div class="avatar">B</div>
+          <div class="content">
+            <div class="meta">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              </svg>
+              <span class="message"><span class="name">Bob Martinez</span> replied to you</span>
+              <span class="time">12m</span>
+            </div>
+            <div class="handle">@bob</div>
+          </div>
+        </div>
+        <div class="preview">
+          I completely agree! The new approach makes much more sense for the use case we're targeting.
+        </div>
+        <a href="#" class="target-link">
+          Open post
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M5 12h14M12 5l7 7-7 7"/>
+          </svg>
+        </a>
+      </div>
+
+      <!-- Medium importance section -->
+      <div class="section-label">Follows & Reposts</div>
+
+      <div class="notification-medium">
+        <div class="avatar">C</div>
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+          <circle cx="8.5" cy="7" r="4"/>
+          <line x1="20" y1="8" x2="20" y2="14"/>
+          <line x1="23" y1="11" x2="17" y2="11"/>
+        </svg>
+        <div class="content">
+          <div class="message"><span class="name">Carol Davis</span> followed you</div>
+          <div class="handle">@carol@mastodon.social</div>
+        </div>
+        <span class="time">1h</span>
+      </div>
+
+      <div class="notification-medium">
+        <div class="avatar">D</div>
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M17 1l4 4-4 4"/>
+          <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+          <path d="M7 23l-4-4 4-4"/>
+          <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+        </svg>
+        <div class="content">
+          <div class="message"><span class="name">Dave Wilson</span> reposted your post</div>
+        </div>
+        <span class="time">2h</span>
+      </div>
+
+      <!-- Low importance section -->
+      <div class="section-label">Likes & Reactions</div>
+
+      <div class="notification-compact">
+        <div class="avatar">E</div>
+        <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+        </svg>
+        <span class="message"><span class="name">Eve Thompson</span> liked your post</span>
+        <span class="post-preview">"The new federation..."</span>
+        <span class="time">3h</span>
+      </div>
+
+      <div class="notification-compact">
+        <div class="avatar">F</div>
+        <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+        </svg>
+        <span class="message"><span class="name">Frank Lee</span> liked your post</span>
+        <span class="post-preview">"Just deployed the..."</span>
+        <span class="time">4h</span>
+      </div>
+
+      <div class="notification-compact">
+        <div class="avatar">G</div>
+        <span class="emoji">🔥</span>
+        <span class="message"><span class="name">Grace Kim</span> reacted to your post</span>
+        <span class="post-preview">"The new federation..."</span>
+        <span class="time">5h</span>
+      </div>
+
+      <div class="notification-compact">
+        <div class="avatar">H</div>
+        <span class="emoji">👍</span>
+        <span class="message"><span class="name">Henry Park</span> reacted to your post</span>
+        <span class="post-preview">"Just deployed the..."</span>
+        <span class="time">6h</span>
+      </div>
+
+      <div class="notification-compact">
+        <div class="avatar">I</div>
+        <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+        </svg>
+        <span class="message"><span class="name">Iris Wang</span> liked your post</span>
+        <span class="post-preview">"Working on some..."</span>
+        <span class="time">8h</span>
+      </div>
+    </div>
+
+    <div class="comparison">
+      <h2>Design Rationale</h2>
+      <ul>
+        <li><strong>Mentions & Replies (Full):</strong> 40px avatar, full preview box, ~120px height. These require attention and often action.</li>
+        <li><strong>Follows & Reposts (Medium):</strong> 32px avatar, no preview, ~56px height. Social signals worth noting but don't need response.</li>
+        <li><strong>Likes & Reactions (Compact):</strong> 24px avatar, single line, ~40px height. Acknowledgments that can be scanned quickly.</li>
+        <li><strong>Space savings:</strong> 5 likes take the same space as 1 mention. Users can scan 3x more low-priority notifications.</li>
+      </ul>
+    </div>
+  </div>
+</body>
+</html>
