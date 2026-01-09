@@ -310,6 +310,43 @@ defmodule EgregorosWeb.StatusLiveTest do
     )
   end
 
+  test "thread view treats replies with totalItems=0 as empty (no endless fetching state)", %{
+    conn: conn,
+    user: user
+  } do
+    root_id = "https://remote.example/objects/root-no-replies"
+    replies_url = root_id <> "/replies"
+
+    assert {:ok, root} =
+             Pipeline.ingest(
+               %{
+                 "id" => root_id,
+                 "type" => "Note",
+                 "attributedTo" => "https://remote.example/users/bob",
+                 "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+                 "cc" => [],
+                 "content" => "<p>Root</p>",
+                 "replies" => %{
+                   "id" => replies_url,
+                   "type" => "OrderedCollection",
+                   "totalItems" => 0
+                 }
+               },
+               local: false
+             )
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    assert {:ok, view, _html} = live(conn, "/@bob@remote.example/#{root.id}")
+
+    assert has_element?(view, "[data-role='thread-replies-empty']", "No replies yet.")
+    refute has_element?(view, "[data-role='thread-replies-fetching']")
+
+    refute_enqueued(
+      worker: FetchThreadReplies,
+      args: %{"root_ap_id" => root.ap_id}
+    )
+  end
+
   test "thread view shows a fetching state when replies are being discovered", %{
     conn: conn,
     user: user

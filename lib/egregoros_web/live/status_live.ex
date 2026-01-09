@@ -81,8 +81,7 @@ defmodule EgregorosWeb.StatusLive do
     fetching_replies? =
       case thread_note do
         %Egregoros.Object{type: "Note", local: false} = note ->
-          replies_url = note |> replies_url() |> normalize_binary()
-          replies_url != "" and descendant_entries == []
+          should_fetch_replies?(note, descendant_entries)
 
         _ ->
           false
@@ -984,8 +983,7 @@ defmodule EgregorosWeb.StatusLive do
         thread_index = build_thread_index(status_entry, ancestor_entries, descendant_entries)
 
         fetching_replies? =
-          note.local == false and descendant_entries == [] and
-            note |> replies_url() |> normalize_binary() != ""
+          note.local == false and should_fetch_replies?(note, descendant_entries)
 
         parent_ap_id =
           note.data
@@ -1220,6 +1218,25 @@ defmodule EgregorosWeb.StatusLive do
   end
 
   defp replies_url(_object), do: nil
+
+  defp should_fetch_replies?(%{data: %{} = data} = note, descendants)
+       when is_list(descendants) do
+    replies = Map.get(data, "replies")
+    replies_url = note |> replies_url() |> normalize_binary()
+    total_items = replies_total_items(replies)
+
+    note.local == false and replies_url != "" and descendants == [] and total_items != 0
+  end
+
+  defp should_fetch_replies?(_note, _descendants), do: false
+
+  defp replies_total_items(%{"totalItems" => total_items}) when is_integer(total_items),
+    do: total_items
+
+  defp replies_total_items(%{totalItems: total_items}) when is_integer(total_items),
+    do: total_items
+
+  defp replies_total_items(_value), do: nil
 
   defp extract_link(value) when is_binary(value), do: value
   defp extract_link(%{"id" => id}) when is_binary(id), do: id
