@@ -39,6 +39,7 @@ defmodule EgregorosWeb.MediaViewer do
       >
         <.icon_button
           data-role="media-viewer-prev"
+          hidden={@item_count < 2}
           phx-click={JS.dispatch("egregoros:media-prev", to: "#media-viewer")}
           label="Previous media"
           variant="overlay"
@@ -62,6 +63,7 @@ defmodule EgregorosWeb.MediaViewer do
 
         <.icon_button
           data-role="media-viewer-next"
+          hidden={@item_count < 2}
           phx-click={JS.dispatch("egregoros:media-next", to: "#media-viewer")}
           label="Next media"
           variant="overlay"

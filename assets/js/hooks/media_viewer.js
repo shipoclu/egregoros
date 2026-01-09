@@ -119,10 +119,12 @@ const MediaViewer = {
   },
 
   mediaButtons(dispatcher) {
-    const post = dispatcher.closest("article[id^='post-']")
-    if (!post) return []
+    const container =
+      dispatcher.closest("[data-role='attachments']") || dispatcher.closest("article[id^='post-']")
 
-    return Array.from(post.querySelectorAll("button[data-role='attachment-open']")).sort((a, b) => {
+    if (!container) return []
+
+    return Array.from(container.querySelectorAll("button[data-role='attachment-open']")).sort((a, b) => {
       const aIndex = parseInt(a.dataset.index || "0", 10)
       const bIndex = parseInt(b.dataset.index || "0", 10)
       return aIndex - bIndex
@@ -191,8 +193,16 @@ const MediaViewer = {
     const next = this.el.querySelector("[data-role='media-viewer-next']")
 
     const showNav = count > 1
-    if (prev) prev.classList.toggle("hidden", !showNav)
-    if (next) next.classList.toggle("hidden", !showNav)
+
+    if (prev) {
+      prev.classList.toggle("hidden", !showNav)
+      prev.toggleAttribute("hidden", !showNav)
+    }
+
+    if (next) {
+      next.classList.toggle("hidden", !showNav)
+      next.toggleAttribute("hidden", !showNav)
+    }
   },
 
   renderSlide(item, index) {

@@ -1495,6 +1495,14 @@ defmodule EgregorosWeb.TimelineLiveTest do
     refute next_html =~ "media_next"
   end
 
+  test "media viewer hides navigation controls when closed with no selected media", %{conn: conn} do
+    {:ok, view, _html} = live(conn, "/?timeline=public")
+
+    assert has_element?(view, "#media-viewer[data-role='media-viewer'][data-state='closed']")
+    assert has_element?(view, "#media-viewer button[data-role='media-viewer-prev'][hidden]")
+    assert has_element?(view, "#media-viewer button[data-role='media-viewer-next'][hidden]")
+  end
+
   test "timeline can be switched between home and public via patch", %{conn: conn, user: user} do
     assert {:ok, _public_post} = Pipeline.ingest(Note.build(user, "Public post"), local: true)
 

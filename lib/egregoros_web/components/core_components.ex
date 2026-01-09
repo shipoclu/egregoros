@@ -154,7 +154,7 @@ defmodule EgregorosWeb.CoreComponents do
   """
   attr :rest, :global,
     include:
-      ~w(href navigate patch method download disabled phx-click phx-disable-with phx-target data-role)
+      ~w(href navigate patch method download disabled hidden phx-click phx-disable-with phx-target data-role)
 
   attr :label, :string, required: true
   attr :class, :any, default: nil
