@@ -310,11 +310,12 @@ defmodule EgregorosWeb.StatusLiveTest do
     )
   end
 
-  test "thread view treats replies with totalItems=0 as empty (no endless fetching state)", %{
-    conn: conn,
-    user: user
-  } do
-    root_id = "https://remote.example/objects/root-no-replies"
+  test "status view does not enqueue a thread replies fetch when replies were checked recently",
+       %{
+         conn: conn,
+         user: user
+       } do
+    root_id = "https://remote.example/objects/root-checked-recently"
     replies_url = root_id <> "/replies"
 
     assert {:ok, root} =
@@ -326,14 +327,13 @@ defmodule EgregorosWeb.StatusLiveTest do
                  "to" => ["https://www.w3.org/ns/activitystreams#Public"],
                  "cc" => [],
                  "content" => "<p>Root</p>",
-                 "replies" => %{
-                   "id" => replies_url,
-                   "type" => "OrderedCollection",
-                   "totalItems" => 0
-                 }
+                 "replies" => %{"id" => replies_url, "type" => "OrderedCollection"}
                },
                local: false
              )
+
+    assert {:ok, root} =
+             Objects.update_object(root, %{thread_replies_checked_at: DateTime.utc_now()})
 
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     assert {:ok, view, _html} = live(conn, "/@bob@remote.example/#{root.id}")
@@ -344,6 +344,42 @@ defmodule EgregorosWeb.StatusLiveTest do
     refute_enqueued(
       worker: FetchThreadReplies,
       args: %{"root_ap_id" => root.ap_id}
+    )
+  end
+
+  test "status view enqueues a thread replies refresh when the last check is stale", %{
+    conn: conn,
+    user: user
+  } do
+    root_id = "https://remote.example/objects/root-checked-stale"
+    replies_url = root_id <> "/replies"
+    checked_at = DateTime.add(DateTime.utc_now(), -600, :second)
+
+    assert {:ok, root} =
+             Pipeline.ingest(
+               %{
+                 "id" => root_id,
+                 "type" => "Note",
+                 "attributedTo" => "https://remote.example/users/bob",
+                 "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+                 "cc" => [],
+                 "content" => "<p>Root</p>",
+                 "replies" => %{"id" => replies_url, "type" => "OrderedCollection"}
+               },
+               local: false
+             )
+
+    assert {:ok, root} = Objects.update_object(root, %{thread_replies_checked_at: checked_at})
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    assert {:ok, view, _html} = live(conn, "/@bob@remote.example/#{root.id}")
+
+    assert has_element?(view, "[data-role='thread-replies-empty']", "No replies yet.")
+
+    assert_enqueued(
+      worker: FetchThreadReplies,
+      args: %{"root_ap_id" => root.ap_id},
+      priority: 9
     )
   end
 
@@ -372,6 +408,63 @@ defmodule EgregorosWeb.StatusLiveTest do
     assert {:ok, view, _html} = live(conn, "/@bob@remote.example/#{root.id}")
 
     assert has_element?(view, "[data-role='thread-replies-fetching']", "Fetching replies")
+  end
+
+  test "thread view stops showing the fetching skeleton after a replies fetch completes with zero items",
+       %{
+         conn: conn,
+         user: user
+       } do
+    root_id = "https://remote.example/objects/root-fetches-no-replies"
+    replies_url = root_id <> "/replies"
+
+    assert {:ok, root} =
+             Pipeline.ingest(
+               %{
+                 "id" => root_id,
+                 "type" => "Note",
+                 "attributedTo" => "https://remote.example/users/bob",
+                 "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+                 "cc" => [],
+                 "content" => "<p>Root</p>",
+                 "replies" => %{
+                   "id" => replies_url,
+                   "type" => "OrderedCollection",
+                   "totalItems" => 0
+                 }
+               },
+               local: false
+             )
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    assert {:ok, view, _html} = live(conn, "/@bob@remote.example/#{root.id}")
+
+    assert has_element?(view, "[data-role='thread-replies-fetching']", "Fetching replies")
+
+    expect(Egregoros.HTTP.Mock, :get, fn url, _headers ->
+      assert url == replies_url
+
+      {:ok,
+       %{
+         status: 200,
+         body: %{
+           "id" => replies_url,
+           "type" => "OrderedCollectionPage",
+           "orderedItems" => []
+         },
+         headers: []
+       }}
+    end)
+
+    assert :ok =
+             FetchThreadReplies.perform(%Oban.Job{
+               args: %{"root_ap_id" => root.ap_id, "max_pages" => 1}
+             })
+
+    _ = :sys.get_state(view.pid)
+
+    assert has_element?(view, "[data-role='thread-replies-empty']", "No replies yet.")
+    refute has_element?(view, "[data-role='thread-replies-fetching']")
   end
 
   test "thread view shows skeleton placeholders while fetching replies", %{

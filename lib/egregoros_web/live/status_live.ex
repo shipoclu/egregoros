@@ -20,6 +20,7 @@ defmodule EgregorosWeb.StatusLive do
   alias EgregorosWeb.ViewModels.Status, as: StatusVM
 
   @reply_max_chars 5000
+  @thread_replies_refresh_after_seconds 300
 
   @impl true
   def mount(%{"nickname" => nickname, "uuid" => uuid} = params, session, socket) do
@@ -81,15 +82,24 @@ defmodule EgregorosWeb.StatusLive do
     fetching_replies? =
       case thread_note do
         %Egregoros.Object{type: "Note", local: false} = note ->
-          should_fetch_replies?(note, descendant_entries)
+          replies_url = note |> replies_url() |> normalize_binary()
+
+          if replies_url == "" do
+            false
+          else
+            if connected?(socket) do
+              _ =
+                ThreadDiscovery.enqueue_replies(note,
+                  refresh_after_seconds: @thread_replies_refresh_after_seconds
+                )
+            end
+
+            descendant_entries == [] and is_nil(note.thread_replies_checked_at)
+          end
 
         _ ->
           false
       end
-
-    if connected?(socket) and fetching_replies? do
-      _ = ThreadDiscovery.enqueue_replies(thread_note, existing_descendants: 0)
-    end
 
     if connected?(socket) and missing_parent? do
       _ = ThreadDiscovery.enqueue(thread_note)
@@ -217,9 +227,8 @@ defmodule EgregorosWeb.StatusLive do
 
   def handle_event("fetch_thread_replies", _params, socket) do
     case socket.assigns do
-      %{status: %{object: %{type: "Note"} = note}, descendants: descendants} ->
-        existing_descendants = descendants |> List.wrap() |> length()
-        _ = ThreadDiscovery.enqueue_replies(note, existing_descendants: existing_descendants)
+      %{status: %{object: %{type: "Note"} = note}} ->
+        _ = ThreadDiscovery.enqueue_replies(note, force: true)
         {:noreply, put_flash(socket, :info, "Queued a replies fetch.")}
 
       _ ->
@@ -970,6 +979,18 @@ defmodule EgregorosWeb.StatusLive do
 
     case socket.assigns.status do
       %{object: %{type: "Note"} = note} ->
+        note =
+          case note.ap_id do
+            ap_id when is_binary(ap_id) and ap_id != "" ->
+              case Objects.get_by_ap_id(ap_id) do
+                %Egregoros.Object{} = latest -> latest
+                _ -> note
+              end
+
+            _ ->
+              note
+          end
+
         status_entry = StatusVM.decorate(note, current_user)
 
         raw_ancestors = Objects.thread_ancestors(note)
@@ -983,7 +1004,8 @@ defmodule EgregorosWeb.StatusLive do
         thread_index = build_thread_index(status_entry, ancestor_entries, descendant_entries)
 
         fetching_replies? =
-          note.local == false and should_fetch_replies?(note, descendant_entries)
+          note.local == false and note |> replies_url() |> normalize_binary() != "" and
+            descendant_entries == [] and is_nil(note.thread_replies_checked_at)
 
         parent_ap_id =
           note.data
@@ -1218,25 +1240,6 @@ defmodule EgregorosWeb.StatusLive do
   end
 
   defp replies_url(_object), do: nil
-
-  defp should_fetch_replies?(%{data: %{} = data} = note, descendants)
-       when is_list(descendants) do
-    replies = Map.get(data, "replies")
-    replies_url = note |> replies_url() |> normalize_binary()
-    total_items = replies_total_items(replies)
-
-    note.local == false and replies_url != "" and descendants == [] and total_items != 0
-  end
-
-  defp should_fetch_replies?(_note, _descendants), do: false
-
-  defp replies_total_items(%{"totalItems" => total_items}) when is_integer(total_items),
-    do: total_items
-
-  defp replies_total_items(%{totalItems: total_items}) when is_integer(total_items),
-    do: total_items
-
-  defp replies_total_items(_value), do: nil
 
   defp extract_link(value) when is_binary(value), do: value
   defp extract_link(%{"id" => id}) when is_binary(id), do: id
