@@ -24,6 +24,9 @@ config :egregoros, Egregoros.Repo,
   port: port,
   database: database,
   pool: Ecto.Adapters.SQL.Sandbox,
+  ownership_timeout: 60_000,
+  timeout: 60_000,
+  pool_timeout: 60_000,
   pool_size: System.schedulers_online() * 2
 
 # We don't run a server during test. If one is required,
