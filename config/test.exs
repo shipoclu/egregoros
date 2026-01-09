@@ -65,6 +65,7 @@ config :egregoros, Egregoros.AvatarStorage, Egregoros.AvatarStorage.Mock
 config :egregoros, Egregoros.BannerStorage, Egregoros.BannerStorage.Mock
 config :egregoros, Egregoros.MediaStorage, Egregoros.MediaStorage.Mock
 config :egregoros, Egregoros.RateLimiter, Egregoros.RateLimiter.Mock
+config :egregoros, EgregorosWeb.WebSock, EgregorosWeb.WebSock.Mock
 
 config :egregoros, :password_iterations, 1_000
 

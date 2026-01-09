@@ -36,6 +36,7 @@ defmodule Egregoros.DataCase do
     Mox.stub_with(Egregoros.DNS.Mock, Egregoros.DNS.Stub)
     Mox.stub_with(Egregoros.AuthZ.Mock, Egregoros.AuthZ.Stub)
     Mox.stub_with(Egregoros.RateLimiter.Mock, Egregoros.RateLimiter.Stub)
+    Mox.stub_with(EgregorosWeb.WebSock.Mock, EgregorosWeb.WebSock.Stub)
     Mox.verify_on_exit!(tags)
     Egregoros.DataCase.setup_sandbox(tags)
     :ok
@@ -44,9 +45,31 @@ defmodule Egregoros.DataCase do
   @doc """
   Sets up the sandbox based on the test tags.
   """
-  def setup_sandbox(tags) do
-    pid = Ecto.Adapters.SQL.Sandbox.start_owner!(Egregoros.Repo, shared: not tags[:async])
-    on_exit(fn -> Ecto.Adapters.SQL.Sandbox.stop_owner(pid) end)
+  def setup_sandbox(_tags) do
+    # The connection owner must outlive any LiveView / client proxy processes.
+    #
+    # `Phoenix.LiveViewTest` starts its proxies under the ExUnit test supervisor.
+    # By also starting the SQL Sandbox owner under that supervisor (and doing so
+    # before starting any LiveViews), the supervisor will shut down the LiveView
+    # proxies first and only then terminate the owner, preventing intermittent
+    # "Postgrex.Protocol disconnected ... client exited" noise.
+    parent = self()
+    repo = Egregoros.Repo
+
+    {:ok, sup} = ExUnit.fetch_test_supervisor()
+
+    spec =
+      Supervisor.child_spec(
+        {Agent,
+         fn ->
+           :ok = Ecto.Adapters.SQL.Sandbox.checkout(repo)
+           :ok = Ecto.Adapters.SQL.Sandbox.allow(repo, self(), parent)
+         end},
+        restart: :temporary,
+        id: {__MODULE__, :sandbox_owner}
+      )
+
+    {:ok, _pid} = Supervisor.start_child(sup, spec)
   end
 
   @doc """

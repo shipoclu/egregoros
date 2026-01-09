@@ -9,6 +9,7 @@ Mox.defmock(Egregoros.BannerStorage.Mock, for: Egregoros.BannerStorage)
 Mox.defmock(Egregoros.MediaStorage.Mock, for: Egregoros.MediaStorage)
 Mox.defmock(Egregoros.HTML.Sanitizer.Mock, for: Egregoros.HTML.Sanitizer)
 Mox.defmock(Egregoros.RateLimiter.Mock, for: Egregoros.RateLimiter)
+Mox.defmock(EgregorosWeb.WebSock.Mock, for: EgregorosWeb.WebSock)
 Ecto.Adapters.SQL.Sandbox.mode(Egregoros.Repo, :manual)
 
 # Ensure system actors exist outside the SQL sandbox so async tests don't fight over

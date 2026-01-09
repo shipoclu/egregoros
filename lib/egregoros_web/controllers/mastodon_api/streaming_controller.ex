@@ -8,6 +8,7 @@ defmodule EgregorosWeb.MastodonAPI.StreamingController do
   alias Egregoros.User
   alias EgregorosWeb.MastodonAPI.StreamingStreams
   alias EgregorosWeb.MastodonAPI.StreamingSocket
+  alias EgregorosWeb.WebSock
 
   def index(conn, %{"stream" => stream, "scope" => scope} = params)
       when is_binary(stream) and is_binary(scope) do
@@ -26,7 +27,7 @@ defmodule EgregorosWeb.MastodonAPI.StreamingController do
          {conn, access_token} <- maybe_echo_protocol_and_get_access_token(conn, params),
          {:ok, current_user, oauth_token} <- authenticate_access_token(access_token),
          :ok <- authorize_user_streams(streams, current_user) do
-      WebSockAdapter.upgrade(
+      WebSock.upgrade(
         conn,
         StreamingSocket,
         %{
