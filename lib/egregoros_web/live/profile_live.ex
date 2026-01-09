@@ -12,6 +12,7 @@ defmodule EgregorosWeb.ProfileLive do
   alias Egregoros.Pipeline
   alias Egregoros.Publish
   alias Egregoros.Relationships
+  alias Egregoros.RelationshipEvents
   alias Egregoros.User
   alias Egregoros.Users
   alias EgregorosWeb.Live.Uploads, as: LiveUploads
@@ -31,6 +32,10 @@ defmodule EgregorosWeb.ProfileLive do
         nil -> nil
         id -> Users.get(id)
       end
+
+    if connected?(socket) and match?(%User{}, current_user) do
+      RelationshipEvents.subscribe(current_user.ap_id)
+    end
 
     profile_user =
       handle
@@ -132,6 +137,43 @@ defmodule EgregorosWeb.ProfileLive do
        max_file_size: 10_000_000,
        auto_upload: true
      )}
+  end
+
+  @impl true
+  def handle_info({:relationship_changed, %{actor: actor, object: object}}, socket) do
+    socket =
+      case socket.assigns do
+        %{current_user: %User{} = viewer, profile_user: %User{} = profile_user} ->
+          viewer_ap_id = viewer.ap_id
+          profile_ap_id = profile_user.ap_id
+
+          relevant? =
+            (actor == viewer_ap_id and object == profile_ap_id) or
+              (actor == profile_ap_id and object == viewer_ap_id)
+
+          if relevant? do
+            assign(socket,
+              follow_relationship: follow_relationship(viewer, profile_user),
+              follow_request_relationship: follow_request_relationship(viewer, profile_user),
+              block_relationship: relationship_for("Block", viewer, profile_user),
+              mute_relationship: relationship_for("Mute", viewer, profile_user),
+              follows_you?: follows_you?(viewer, profile_user),
+              followers_count: count_followers(profile_user),
+              following_count: count_following(profile_user)
+            )
+          else
+            socket
+          end
+
+        _ ->
+          socket
+      end
+
+    {:noreply, socket}
+  end
+
+  def handle_info(_message, socket) do
+    {:noreply, socket}
   end
 
   @impl true

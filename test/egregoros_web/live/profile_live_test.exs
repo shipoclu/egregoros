@@ -86,6 +86,55 @@ defmodule EgregorosWeb.ProfileLiveTest do
     assert has_element?(view, "button[data-role='profile-follow']")
   end
 
+  test "profile follow requests flip to follows when an accept arrives", %{
+    conn: conn,
+    viewer: viewer
+  } do
+    {:ok, remote} =
+      Users.create_user(%{
+        nickname: "bob",
+        ap_id: "https://remote.example/users/bob",
+        inbox: "https://remote.example/users/bob/inbox",
+        outbox: "https://remote.example/users/bob/outbox",
+        public_key: "remote-key",
+        private_key: nil,
+        local: false
+      })
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: viewer.id})
+    {:ok, view, _html} = live(conn, "/@#{remote.nickname}@remote.example")
+
+    view
+    |> element("button[data-role='profile-follow']")
+    |> render_click()
+
+    assert %{} =
+             follow_request =
+             Relationships.get_by_type_actor_object("FollowRequest", viewer.ap_id, remote.ap_id)
+
+    assert has_element?(view, "button[data-role='profile-unfollow-request']")
+
+    assert {:ok, _} =
+             Pipeline.ingest(
+               %{
+                 "id" => "https://remote.example/activities/accept/1",
+                 "type" => "Accept",
+                 "actor" => remote.ap_id,
+                 "object" => %{
+                   "id" => follow_request.activity_ap_id,
+                   "type" => "Follow",
+                   "actor" => viewer.ap_id,
+                   "object" => remote.ap_id
+                 }
+               },
+               local: false,
+               inbox_user_ap_id: viewer.ap_id
+             )
+
+    assert has_element?(view, "button[data-role='profile-unfollow']")
+    refute has_element?(view, "button[data-role='profile-unfollow-request']")
+  end
+
   test "profile shows follows-you badge when profile user follows the viewer", %{
     conn: conn,
     viewer: viewer,

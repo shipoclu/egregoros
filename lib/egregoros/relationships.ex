@@ -2,6 +2,7 @@ defmodule Egregoros.Relationships do
   import Ecto.Query, only: [from: 2]
 
   alias Egregoros.Relationship
+  alias Egregoros.RelationshipEvents
   alias Egregoros.Repo
 
   def upsert_relationship(attrs) when is_map(attrs) do
@@ -11,6 +12,20 @@ defmodule Egregoros.Relationships do
       on_conflict: {:replace, [:activity_ap_id, :emoji_url, :updated_at]},
       conflict_target: [:type, :actor, :object]
     )
+    |> case do
+      {:ok, %Relationship{} = relationship} = ok ->
+        _ =
+          RelationshipEvents.broadcast_change(
+            relationship.type,
+            relationship.actor,
+            relationship.object
+          )
+
+        ok
+
+      other ->
+        other
+    end
   end
 
   def get(id) when is_integer(id), do: Repo.get(Relationship, id)
@@ -22,8 +37,20 @@ defmodule Egregoros.Relationships do
 
   def delete_by_type_actor_object(type, actor, object)
       when is_binary(type) and is_binary(actor) and is_binary(object) do
-    from(r in Relationship, where: r.type == ^type and r.actor == ^actor and r.object == ^object)
-    |> Repo.delete_all()
+    result =
+      from(r in Relationship,
+        where: r.type == ^type and r.actor == ^actor and r.object == ^object
+      )
+      |> Repo.delete_all()
+
+    case result do
+      {count, _} when is_integer(count) and count > 0 ->
+        _ = RelationshipEvents.broadcast_change(type, actor, object)
+        result
+
+      _ ->
+        result
+    end
   end
 
   def delete_all_for_object(object_ap_id) when is_binary(object_ap_id) do
