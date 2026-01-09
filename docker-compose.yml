@@ -21,6 +21,12 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "bin/egregoros eval \"System.halt(if Egregoros.Release.healthcheck() == :ok, do: 0, else: 1)\""]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     environment:
       DATABASE_URL: ecto://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-egregoros_prod}
       SECRET_KEY_BASE: ${SECRET_KEY_BASE:?set SECRET_KEY_BASE}
