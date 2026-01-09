@@ -234,6 +234,104 @@ article[data-role="status-card"]:target {
 }
 
 /* ═══════════════════════════════════════════════════════════
+   NOTIFICATIONS VISUAL HIERARCHY
+   High: Mentions/Replies - elevated cards with shadow
+   Medium: Follows/Reposts - standard cards
+   Low: Likes/Reactions - minimal inline styling
+   ═══════════════════════════════════════════════════════════ */
+
+/* HIGH IMPORTANCE: Mentions (Note type) */
+[data-role="notification"][data-importance="high"] {
+  border-width: 2px;
+  border-color: var(--border-default);
+  box-shadow: 4px 4px 0 var(--border-default);
+  position: relative;
+}
+
+[data-role="notification"][data-importance="high"]:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0 var(--border-default);
+}
+
+[data-role="notification"][data-importance="high"]::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--text-primary);
+}
+
+/* MEDIUM IMPORTANCE: Follows, Reposts */
+[data-role="notification"][data-importance="medium"] {
+  border-width: 1px;
+  border-color: var(--border-muted);
+  box-shadow: none;
+  position: relative;
+}
+
+[data-role="notification"][data-importance="medium"]::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--text-muted);
+}
+
+/* LOW IMPORTANCE: Likes, Reactions - compact inline style */
+[data-role="notification"][data-importance="low"] {
+  border: none;
+  border-bottom: 1px dashed var(--border-muted);
+  background: var(--bg-subtle);
+  padding: 10px 16px;
+  position: relative;
+  /* Remove the space-y-4 gap from parent */
+  margin-top: -1rem;
+}
+
+/* First low importance item after non-low needs normal margin */
+[data-role="notification"]:not([data-importance="low"]) + [data-role="notification"][data-importance="low"] {
+  margin-top: 0;
+}
+
+/* Consecutive low importance items stack together */
+[data-role="notification"][data-importance="low"] + [data-role="notification"][data-importance="low"] {
+  margin-top: -1rem;
+}
+
+[data-role="notification"][data-importance="low"]:last-child {
+  border-bottom: none;
+}
+
+[data-role="notification"][data-importance="low"]::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2px;
+  height: 16px;
+  background: var(--border-muted);
+}
+
+/* High importance badge */
+[data-role="notification-badge"] {
+  position: absolute;
+  top: -8px;
+  right: 16px;
+  background: var(--text-primary);
+  color: var(--bg-base);
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 4px 8px;
+}
+
+/* ═══════════════════════════════════════════════════════════
    SCROLLBAR STYLING (Brutalist - no rounded corners)
    ═══════════════════════════════════════════════════════════ */
 

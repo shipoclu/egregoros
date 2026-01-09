@@ -401,60 +401,158 @@ defmodule EgregorosWeb.NotificationsLive do
   end
 
   defp notification_item(assigns) do
+    importance = notification_importance(assigns.entry.type)
+    assigns = assign(assigns, :importance, importance)
+
     ~H"""
     <article
       id={@id}
       data-role="notification"
       data-type={@entry.type}
-      class="border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] p-6 transition hover:bg-[color:var(--bg-subtle)]"
+      data-importance={@importance}
+      class={[
+        "relative bg-[color:var(--bg-base)] transition",
+        @importance == "high" && "border-2 border-[color:var(--border-default)] p-6",
+        @importance == "medium" && "border border-[color:var(--border-muted)] p-5",
+        @importance == "low" && "p-0",
+        @importance != "low" && "hover:bg-[color:var(--bg-subtle)]"
+      ]}
     >
-      <div class="flex items-start gap-4">
-        <.avatar size="sm" name={@entry.actor.display_name} src={@entry.actor.avatar_url} />
+      <%= if @importance == "low" do %>
+        <%!-- Compact inline layout for low importance --%>
+        <div class="flex items-center gap-2.5 pl-2">
+          <.avatar
+            size="xs"
+            name={@entry.actor.display_name}
+            src={@entry.actor.avatar_url}
+            class="shrink-0 !h-6 !w-6 !border"
+          />
+          <%= case @entry.reaction_emoji do %>
+            <% %{type: :unicode, emoji: emoji} -> %>
+              <span class="shrink-0 text-base">{emoji}</span>
+            <% %{type: :custom, url: url, shortcode: shortcode} -> %>
+              <img
+                src={url}
+                alt={shortcode}
+                class="size-4 shrink-0 object-contain"
+                loading="lazy"
+              />
+            <% _ -> %>
+              <.icon name={@entry.icon} class="size-3.5 shrink-0 text-[color:var(--text-muted)]" />
+          <% end %>
+          <span class="min-w-0 flex-1 truncate text-sm text-[color:var(--text-secondary)]">
+            <%= if is_binary(@entry.target_path) and @entry.target_path != "" do %>
+              <.link
+                navigate={@entry.target_path}
+                data-role="notification-target"
+                class="block truncate hover:underline underline-offset-2"
+                aria-label="Open post"
+              >
+                {emoji_inline(@entry.message, @entry.message_emojis)}
+              </.link>
+            <% else %>
+              {emoji_inline(@entry.message, @entry.message_emojis)}
+            <% end %>
+          </span>
+          <span class="shrink-0 text-xs text-[color:var(--text-muted)]">
+            <.time_ago at={@entry.notification.inserted_at} />
+          </span>
+        </div>
+      <% else %>
+        <%!-- Full layout for high/medium importance --%>
+        <span :if={@importance == "high"} data-role="notification-badge">
+          {notification_badge_label(@entry.type)}
+        </span>
 
-        <div class="min-w-0 flex-1 space-y-3">
-          <div class="flex items-start justify-between gap-3">
-            <div class="min-w-0">
-              <p class="flex flex-wrap items-center gap-2 text-sm font-bold text-[color:var(--text-primary)]">
-                <.icon name={@entry.icon} class="size-4 text-[color:var(--text-muted)]" />
-                <span data-role="notification-message" class="truncate">
-                  {emoji_inline(@entry.message, @entry.message_emojis)}
-                </span>
-              </p>
-              <p class="mt-1 font-mono text-xs text-[color:var(--text-muted)]">
-                {@entry.actor.handle}
-              </p>
+        <div class={[
+          "flex items-start",
+          @importance == "high" && "gap-4 pl-2",
+          @importance == "medium" && "gap-3 pl-2"
+        ]}>
+          <div data-role="notification-avatar">
+            <.avatar
+              size="sm"
+              name={@entry.actor.display_name}
+              src={@entry.actor.avatar_url}
+            />
+          </div>
+
+          <div class="min-w-0 flex-1 space-y-3">
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <p class={[
+                  "flex flex-wrap items-center gap-2 text-sm",
+                  @importance == "high" && "font-bold text-[color:var(--text-primary)]",
+                  @importance == "medium" && "font-semibold text-[color:var(--text-primary)]"
+                ]}>
+                  <.icon
+                    name={@entry.icon}
+                    class={[
+                      "size-4",
+                      @importance == "high" && "text-[color:var(--text-primary)]",
+                      @importance == "medium" && "text-[color:var(--text-muted)]"
+                    ]}
+                  />
+                  <span data-role="notification-message" class="truncate">
+                    {emoji_inline(@entry.message, @entry.message_emojis)}
+                  </span>
+                </p>
+                <p class="mt-1 font-mono text-xs text-[color:var(--text-muted)]">
+                  {@entry.actor.handle}
+                </p>
+              </div>
+
+              <span class="shrink-0">
+                <.time_ago at={@entry.notification.inserted_at} />
+              </span>
             </div>
 
-            <span class="shrink-0">
-              <.time_ago at={@entry.notification.inserted_at} />
-            </span>
-          </div>
-
-          <div
-            :if={@entry.preview_html}
-            class="border border-[color:var(--border-muted)] bg-[color:var(--bg-subtle)] p-4 text-sm text-[color:var(--text-secondary)]"
-          >
-            {@entry.preview_html}
-          </div>
-
-          <div
-            :if={is_binary(@entry.target_path) and @entry.target_path != ""}
-            class="flex justify-end"
-          >
-            <.link
-              navigate={@entry.target_path}
-              data-role="notification-target"
-              class="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wide text-[color:var(--text-muted)] transition hover:text-[color:var(--text-primary)] hover:underline underline-offset-2 focus-visible:outline-none focus-brutal"
-              aria-label="Open post"
+            <div
+              :if={@entry.preview_html}
+              data-role="notification-preview"
+              class={[
+                "border border-[color:var(--border-muted)] bg-[color:var(--bg-subtle)] p-4 text-sm text-[color:var(--text-secondary)]",
+                @importance == "high" && "border-2"
+              ]}
             >
-              Open post <.icon name="hero-arrow-right" class="size-4" />
-            </.link>
+              {@entry.preview_html}
+            </div>
+
+            <div
+              :if={is_binary(@entry.target_path) and @entry.target_path != ""}
+              class="flex justify-end"
+            >
+              <.link
+                navigate={@entry.target_path}
+                data-role="notification-target"
+                class={[
+                  "inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wide transition focus-visible:outline-none focus-brutal",
+                  @importance == "high" &&
+                    "bg-[color:var(--bg-subtle)] border border-[color:var(--border-muted)] px-3 py-1.5 text-[color:var(--text-primary)] hover:bg-[color:var(--text-primary)] hover:text-[color:var(--bg-base)] hover:border-[color:var(--border-default)]",
+                  @importance != "high" &&
+                    "text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] hover:underline underline-offset-2"
+                ]}
+                aria-label="Open post"
+              >
+                Open post <.icon name="hero-arrow-right" class="size-4" />
+              </.link>
+            </div>
           </div>
         </div>
-      </div>
+      <% end %>
     </article>
     """
   end
+
+  defp notification_importance("Note"), do: "high"
+  defp notification_importance("Follow"), do: "medium"
+  defp notification_importance("Announce"), do: "medium"
+  defp notification_importance("Like"), do: "low"
+  defp notification_importance("EmojiReact"), do: "low"
+  defp notification_importance(_type), do: "medium"
+
+  defp notification_badge_label("Note"), do: "Mention"
+  defp notification_badge_label(_type), do: nil
 
   defp set_filter_js(filter) when is_binary(filter) do
     JS.set_attribute({"data-filter", filter}, to: "#notifications-list")
@@ -514,17 +612,25 @@ defmodule EgregorosWeb.NotificationsLive do
 
     target_path = status_path_for_note(note)
     preview_html = note_preview(note)
+    preview_text = note_preview_text(note)
 
-    {icon, message, message_emojis} =
+    {icon, message, message_emojis, reaction_emoji} =
       case type do
         "Follow" ->
-          {"hero-user-plus", "#{actor.display_name} followed you", actor.emojis}
+          {"hero-user-plus", "#{actor.display_name} followed you", actor.emojis, nil}
 
         "Like" ->
-          {"hero-heart", "#{actor.display_name} liked your post", actor.emojis}
+          msg =
+            if preview_text do
+              "#{actor.display_name} liked \"#{preview_text}\""
+            else
+              "#{actor.display_name} liked your post"
+            end
+
+          {"hero-heart", msg, actor.emojis, nil}
 
         "Announce" ->
-          {"hero-arrow-path", "#{actor.display_name} reposted your post", actor.emojis}
+          {"hero-arrow-path", "#{actor.display_name} reposted your post", actor.emojis, nil}
 
         "EmojiReact" ->
           emoji_raw =
@@ -541,34 +647,42 @@ defmodule EgregorosWeb.NotificationsLive do
               Map.get(notification.data, "tag")
             )
 
-          {emoji_token, reaction_emojis} =
+          {emoji_token, reaction_emojis, reaction_display} =
             cond do
               is_binary(emoji_url) and emoji_url != "" and emoji != "" ->
-                {":#{emoji}:", [%{shortcode: emoji, url: emoji_url}]}
+                {":#{emoji}:", [%{shortcode: emoji, url: emoji_url}], %{type: :custom, shortcode: emoji, url: emoji_url}}
 
               emoji_raw != "" ->
-                {emoji_raw, []}
+                {emoji_raw, [], %{type: :unicode, emoji: emoji_raw}}
 
               true ->
-                {"", []}
+                {"", [], nil}
             end
 
           message =
-            if emoji_token == "" do
-              "#{actor.display_name} reacted to your post"
-            else
-              "#{actor.display_name} reacted #{emoji_token} to your post"
+            cond do
+              preview_text && emoji_token != "" ->
+                "#{actor.display_name} reacted #{emoji_token} to \"#{preview_text}\""
+
+              preview_text ->
+                "#{actor.display_name} reacted to \"#{preview_text}\""
+
+              emoji_token != "" ->
+                "#{actor.display_name} reacted #{emoji_token} to your post"
+
+              true ->
+                "#{actor.display_name} reacted to your post"
             end
 
           message_emojis = merge_emojis(actor.emojis, reaction_emojis)
 
-          {"hero-face-smile", message, message_emojis}
+          {"hero-face-smile", message, message_emojis, reaction_display}
 
         "Note" ->
-          {"hero-at-symbol", "#{actor.display_name} mentioned you", actor.emojis}
+          {"hero-at-symbol", "#{actor.display_name} mentioned you", actor.emojis, nil}
 
         _ ->
-          {"hero-bell", "#{actor.display_name} sent activity", actor.emojis}
+          {"hero-bell", "#{actor.display_name} sent activity", actor.emojis, nil}
       end
 
     %{
@@ -579,7 +693,9 @@ defmodule EgregorosWeb.NotificationsLive do
       message: message,
       message_emojis: message_emojis,
       preview_html: preview_html,
-      target_path: target_path
+      preview_text: preview_text,
+      target_path: target_path,
+      reaction_emoji: reaction_emoji
     }
   end
 
@@ -594,6 +710,29 @@ defmodule EgregorosWeb.NotificationsLive do
   end
 
   defp note_preview(_note), do: nil
+
+  # Returns a short plain text preview of the note content (max 30 chars)
+  defp note_preview_text(%Object{type: "Note"} = object) do
+    raw = object.data |> Map.get("content", "") |> to_string()
+
+    text =
+      raw
+      |> FastSanitize.strip_tags()
+      |> case do
+        {:ok, text} -> text
+        _ -> ""
+      end
+      |> String.replace(~r/\s+/, " ")
+      |> String.trim()
+
+    case text do
+      "" -> nil
+      text when byte_size(text) <= 30 -> text
+      text -> String.slice(text, 0, 27) <> "..."
+    end
+  end
+
+  defp note_preview_text(_note), do: nil
 
   defp note_for_ap_id(ap_id) when is_binary(ap_id) do
     case Objects.get_by_ap_id(ap_id) do
