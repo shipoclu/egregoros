@@ -1,5 +1,5 @@
 defmodule EgregorosWeb.SearchLiveTest do
-  use EgregorosWeb.ConnCase, async: true
+  use EgregorosWeb.ConnCase, async: false
 
   import Mox
   import Phoenix.LiveViewTest

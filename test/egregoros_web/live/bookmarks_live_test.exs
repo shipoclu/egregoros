@@ -1,5 +1,5 @@
 defmodule EgregorosWeb.BookmarksLiveTest do
-  use EgregorosWeb.ConnCase, async: true
+  use EgregorosWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest
 
