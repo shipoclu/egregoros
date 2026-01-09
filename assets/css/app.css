@@ -152,6 +152,11 @@ a.mention-link:hover {
   text-underline-offset: 2px;
 }
 
+/* Mention autocomplete suggestions */
+[data-role="mention-suggestion"][data-selected="true"] {
+  background-color: var(--bg-subtle);
+}
+
 /* Anchor navigation inside threads */
 article[data-role="status-card"] {
   scroll-margin-top: 6rem;

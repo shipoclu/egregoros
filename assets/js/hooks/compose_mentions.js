@@ -80,10 +80,10 @@ const ComposeMentions = {
   updateHighlight(suggestions) {
     suggestions.forEach((btn, i) => {
       if (i === this.selectedIndex) {
-        btn.classList.add("bg-[color:var(--bg-subtle)]")
+        btn.setAttribute("data-selected", "true")
         btn.scrollIntoView({block: "nearest"})
       } else {
-        btn.classList.remove("bg-[color:var(--bg-subtle)]")
+        btn.removeAttribute("data-selected")
       }
     })
   },
@@ -205,8 +205,14 @@ const ComposeMentions = {
       }
     }
 
-    // Reset selection when suggestions list changes
-    this.selectedIndex = -1
+    // Select first suggestion by default when suggestions appear
+    const suggestions = this.getSuggestionButtons()
+    if (suggestions.length > 0) {
+      this.selectedIndex = 0
+      this.updateHighlight(suggestions)
+    } else {
+      this.selectedIndex = -1
+    }
 
     // Position dropdown near cursor
     this.positionDropdown()
