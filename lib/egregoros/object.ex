@@ -4,7 +4,7 @@ defmodule Egregoros.Object do
   import Ecto.Changeset
 
   @required_fields ~w(ap_id type data)a
-  @optional_fields ~w(actor object published local)a
+  @optional_fields ~w(actor object published local thread_replies_checked_at)a
 
   schema "objects" do
     field :ap_id, :string
@@ -14,6 +14,7 @@ defmodule Egregoros.Object do
     field :data, :map
     field :published, :utc_datetime_usec
     field :local, :boolean, default: true
+    field :thread_replies_checked_at, :utc_datetime_usec
 
     timestamps(type: :utc_datetime_usec)
   end
