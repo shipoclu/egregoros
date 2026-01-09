@@ -198,6 +198,7 @@ defmodule EgregorosWeb.AppShell do
       <main
         id={@main_id}
         class={[
+          "min-w-0",
           @aside == [] && "lg:col-span-8",
           @aside != [] && "lg:col-span-6"
         ]}
