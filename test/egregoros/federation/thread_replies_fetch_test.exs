@@ -78,6 +78,48 @@ defmodule Egregoros.Federation.ThreadRepliesFetchTest do
     assert Enum.any?(Objects.thread_descendants(root), &(&1.ap_id == reply_id))
   end
 
+  test "thread replies worker records when replies were last checked, even when no replies exist" do
+    root_id = "https://remote.example/objects/root-checked-at"
+    replies_url = root_id <> "/replies"
+
+    {:ok, _root} =
+      Objects.create_object(%{
+        ap_id: root_id,
+        type: "Note",
+        actor: "https://remote.example/users/alice",
+        local: false,
+        data: %{
+          "id" => root_id,
+          "type" => "Note",
+          "attributedTo" => "https://remote.example/users/alice",
+          "content" => "<p>Root</p>",
+          "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+          "cc" => [],
+          "replies" => %{"id" => replies_url, "type" => "OrderedCollection"}
+        }
+      })
+
+    expect(Egregoros.HTTP.Mock, :get, fn url, _headers ->
+      assert url == replies_url
+
+      {:ok,
+       %{
+         status: 200,
+         body: %{
+           "id" => replies_url,
+           "type" => "OrderedCollectionPage",
+           "orderedItems" => []
+         },
+         headers: []
+       }}
+    end)
+
+    assert :ok = FetchThreadReplies.perform(%Oban.Job{args: %{"root_ap_id" => root_id}})
+
+    root = Objects.get_by_ap_id(root_id)
+    assert root.thread_replies_checked_at
+  end
+
   test "thread replies worker follows a collection's `first` page when needed" do
     root_id = "https://remote.example/objects/root-2"
     replies_url = root_id <> "/replies"

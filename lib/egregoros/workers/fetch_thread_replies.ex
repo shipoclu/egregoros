@@ -9,6 +9,7 @@ defmodule Egregoros.Workers.FetchThreadReplies do
   alias Egregoros.Object
   alias Egregoros.Objects
   alias Egregoros.Pipeline
+  alias Egregoros.Timeline
 
   @default_max_pages 2
   @default_max_items 50
@@ -33,7 +34,9 @@ defmodule Egregoros.Workers.FetchThreadReplies do
          replies_url when is_binary(replies_url) <- replies_url(note),
          replies_url <- String.trim(replies_url),
          true <- replies_url != "" do
-      fetch_pages(replies_url, max_pages, max_items, MapSet.new())
+      result = fetch_pages(replies_url, max_pages, max_items, MapSet.new())
+      _ = mark_thread_replies_checked(note, result)
+      result
     else
       nil ->
         case ObjectFetcher.fetch_and_ingest(root_ap_id) do
@@ -48,7 +51,9 @@ defmodule Egregoros.Workers.FetchThreadReplies do
             if replies_url == "" do
               :ok
             else
-              fetch_pages(replies_url, max_pages, max_items, MapSet.new())
+              result = fetch_pages(replies_url, max_pages, max_items, MapSet.new())
+              _ = mark_thread_replies_checked(note, result)
+              result
             end
 
           {:error, {:http_status, status}} when status in [401, 403, 404, 410] ->
@@ -272,4 +277,17 @@ defmodule Egregoros.Workers.FetchThreadReplies do
   end
 
   defp normalize_max_items(_value), do: @default_max_items
+
+  defp mark_thread_replies_checked(%Object{} = note, :ok) do
+    case Objects.update_object(note, %{thread_replies_checked_at: DateTime.utc_now()}) do
+      {:ok, %Object{} = updated} ->
+        Timeline.broadcast_post_updated(updated)
+        :ok
+
+      _ ->
+        :ok
+    end
+  end
+
+  defp mark_thread_replies_checked(_note, _result), do: :ok
 end
