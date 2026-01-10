@@ -674,8 +674,8 @@ defmodule EgregorosWeb.StatusCardTest do
 
     assert html =~ ~s(data-role="sensitive-media-reveal")
     assert html =~ ~s(data-role="sensitive-media-hide")
-    assert html =~ ~s(id="attachments-1")
-    assert html =~ ~r/id="attachments-1"[^>]*class="[^"]*hidden/
+    assert html =~ ~s(id="attachments-post-1")
+    assert html =~ ~r/id="attachments-post-1"[^>]*class="[^"]*hidden/
   end
 
   test "collapses long content behind a show-more toggle" do
@@ -707,8 +707,8 @@ defmodule EgregorosWeb.StatusCardTest do
       })
 
     assert html =~ ~s(data-role="post-content-toggle")
-    assert html =~ ~r/id="post-content-1"[^>]*class="[^"]*max-h-64/
-    assert html =~ ~r/id="post-content-1"[^>]*class="[^"]*overflow-hidden/
+    assert html =~ ~r/id="post-content-post-1"[^>]*class="[^"]*max-h-64/
+    assert html =~ ~r/id="post-content-post-1"[^>]*class="[^"]*overflow-hidden/
   end
 
   test "does not expose unsafe remote ids as share urls" do

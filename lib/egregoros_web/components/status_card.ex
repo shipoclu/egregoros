@@ -23,6 +23,29 @@ defmodule EgregorosWeb.StatusCard do
       data-role="status-card"
       class="scroll-mt-24 border-b border-[color:var(--border-muted)] bg-[color:var(--bg-base)] p-5 transition hover:bg-[color:var(--bg-subtle)] target:ring-2 target:ring-[color:var(--border-default)]"
     >
+      <% feed_id = feed_id_for_entry(@entry) %>
+
+      <%= if reposted_by = Map.get(@entry, :reposted_by) do %>
+        <div
+          data-role="reposted-by"
+          class="mb-3 flex flex-wrap items-center gap-2 text-xs font-mono text-[color:var(--text-muted)]"
+        >
+          <.icon name="hero-arrow-path" class="size-4" />
+          <span>Reposted by</span>
+
+          <%= if is_binary(repost_path = actor_profile_path(reposted_by)) do %>
+            <.link
+              navigate={repost_path}
+              class="font-bold text-[color:var(--text-primary)] hover:underline underline-offset-2 focus-visible:outline-none"
+            >
+              {reposted_by.handle}
+            </.link>
+          <% else %>
+            <span class="font-bold text-[color:var(--text-primary)]">{reposted_by.handle}</span>
+          <% end %>
+        </div>
+      <% end %>
+
       <div class="flex items-start justify-between gap-3">
         <div class="flex min-w-0 items-start gap-3">
           <%= if is_binary(profile_path = actor_profile_path(@entry.actor)) do %>
@@ -151,10 +174,10 @@ defmodule EgregorosWeb.StatusCard do
             </span>
           </summary>
 
-          <.status_body entry={@entry} current_user={@current_user} />
+          <.status_body id={@id} entry={@entry} current_user={@current_user} />
         </details>
       <% else %>
-        <.status_body entry={@entry} current_user={@current_user} />
+        <.status_body id={@id} entry={@entry} current_user={@current_user} />
       <% end %>
 
       <div
@@ -204,11 +227,11 @@ defmodule EgregorosWeb.StatusCard do
           <button
             type="button"
             data-role="like"
-            aria-pressed={@entry.liked?}
+            aria-pressed={if @entry.liked?, do: "true", else: "false"}
             data-pressed={if @entry.liked?, do: "true", else: "false"}
             phx-click={
               JS.dispatch("egregoros:optimistic-toggle", detail: %{kind: "like"})
-              |> JS.push("toggle_like", value: %{"id" => @entry.object.id})
+              |> JS.push("toggle_like", value: %{"id" => @entry.object.id, "feed_id" => feed_id})
             }
             class={[
               "inline-flex cursor-pointer items-center gap-2 border px-3 py-2 text-sm font-medium transition focus-visible:outline-none focus-brutal",
@@ -229,11 +252,11 @@ defmodule EgregorosWeb.StatusCard do
           <button
             type="button"
             data-role="repost"
-            aria-pressed={@entry.reposted?}
+            aria-pressed={if @entry.reposted?, do: "true", else: "false"}
             data-pressed={if @entry.reposted?, do: "true", else: "false"}
             phx-click={
               JS.dispatch("egregoros:optimistic-toggle", detail: %{kind: "repost"})
-              |> JS.push("toggle_repost", value: %{"id" => @entry.object.id})
+              |> JS.push("toggle_repost", value: %{"id" => @entry.object.id, "feed_id" => feed_id})
             }
             class={[
               "inline-flex cursor-pointer items-center gap-2 border px-3 py-2 text-sm font-medium transition focus-visible:outline-none focus-brutal",
@@ -261,13 +284,14 @@ defmodule EgregorosWeb.StatusCard do
               type="button"
               data-role="reaction"
               data-emoji={emoji}
-              aria-pressed={reaction.reacted?}
+              aria-pressed={if reaction.reacted?, do: "true", else: "false"}
               data-pressed={if reaction.reacted?, do: "true", else: "false"}
               phx-click={
                 JS.dispatch("egregoros:optimistic-toggle", detail: %{kind: "reaction"})
                 |> JS.push("toggle_reaction",
                   value: %{
                     "id" => @entry.object.id,
+                    "feed_id" => feed_id,
                     "emoji" => emoji
                   }
                 )
@@ -291,7 +315,7 @@ defmodule EgregorosWeb.StatusCard do
           <% end %>
 
           <details
-            id={"reaction-picker-#{@entry.object.id}"}
+            id={"reaction-picker-#{@id}"}
             data-role="reaction-picker"
             class="relative"
           >
@@ -304,7 +328,7 @@ defmodule EgregorosWeb.StatusCard do
 
             <div
               class="absolute right-0 top-11 z-40 w-64 overflow-hidden border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] p-4"
-              phx-click-away={JS.remove_attribute("open", to: "#reaction-picker-#{@entry.object.id}")}
+              phx-click-away={JS.remove_attribute("open", to: "#reaction-picker-#{@id}")}
             >
               <p class="text-xs font-bold uppercase tracking-wide text-[color:var(--text-muted)]">
                 React
@@ -321,10 +345,11 @@ defmodule EgregorosWeb.StatusCard do
                     |> JS.push("toggle_reaction",
                       value: %{
                         "id" => @entry.object.id,
+                        "feed_id" => feed_id,
                         "emoji" => emoji
                       }
                     )
-                    |> JS.remove_attribute("open", to: "#reaction-picker-#{@entry.object.id}")
+                    |> JS.remove_attribute("open", to: "#reaction-picker-#{@id}")
                   }
                   class="inline-flex cursor-pointer h-9 w-9 items-center justify-center text-xl transition hover:bg-[color:var(--bg-subtle)] focus-visible:outline-none focus-brutal"
                 >
@@ -356,6 +381,7 @@ defmodule EgregorosWeb.StatusCard do
 
   defp reaction_order(_reactions), do: @default_reactions
 
+  attr :id, :string, required: true
   attr :entry, :map, required: true
   attr :current_user, :any, default: nil
 
@@ -364,7 +390,7 @@ defmodule EgregorosWeb.StatusCard do
     <% sensitive_media = sensitive_media?(@entry.object) %>
     <% collapsible_content = long_content?(@entry.object) %>
     <% attachments_layout = attachments_layout(@entry.attachments) %>
-    <% content_id = "post-content-#{@entry.object.id}" %>
+    <% content_id = "post-content-#{@id}" %>
     <% fade_id = "#{content_id}-fade" %>
     <% toggle_more_id = "#{content_id}-more" %>
     <% toggle_less_id = "#{content_id}-less" %>
@@ -438,7 +464,7 @@ defmodule EgregorosWeb.StatusCard do
 
     <div
       :if={sensitive_media and @entry.attachments != []}
-      id={"sensitive-media-#{@entry.object.id}"}
+      id={"sensitive-media-#{@id}"}
       data-role="sensitive-media"
       class="mt-4 flex items-center justify-between gap-4 border-2 border-[color:var(--danger)] bg-[color:var(--danger-subtle)] px-4 py-3"
     >
@@ -457,8 +483,8 @@ defmodule EgregorosWeb.StatusCard do
         type="button"
         data-role="sensitive-media-reveal"
         phx-click={
-          JS.hide(to: "#sensitive-media-#{@entry.object.id}")
-          |> JS.remove_class("hidden", to: "#attachments-#{@entry.object.id}")
+          JS.hide(to: "#sensitive-media-#{@id}")
+          |> JS.remove_class("hidden", to: "#attachments-#{@id}")
         }
         class="inline-flex items-center gap-2 border-2 border-[color:var(--border-default)] bg-[color:var(--text-primary)] px-4 py-2 text-sm font-bold uppercase text-[color:var(--bg-base)] transition hover:bg-[color:var(--accent-primary-hover)] focus-visible:outline-none focus-brutal"
       >
@@ -468,7 +494,7 @@ defmodule EgregorosWeb.StatusCard do
 
     <div
       :if={@entry.attachments != []}
-      id={"attachments-#{@entry.object.id}"}
+      id={"attachments-#{@id}"}
       data-role="attachments"
       data-layout={attachments_layout}
       class={[
@@ -482,8 +508,8 @@ defmodule EgregorosWeb.StatusCard do
           type="button"
           data-role="sensitive-media-hide"
           phx-click={
-            JS.show(to: "#sensitive-media-#{@entry.object.id}")
-            |> JS.add_class("hidden", to: "#attachments-#{@entry.object.id}")
+            JS.show(to: "#sensitive-media-#{@id}")
+            |> JS.add_class("hidden", to: "#attachments-#{@id}")
           }
           class="inline-flex items-center gap-2 border border-[color:var(--border-muted)] bg-[color:var(--bg-subtle)] px-3 py-2 text-xs font-bold uppercase text-[color:var(--text-secondary)] transition hover:border-[color:var(--border-default)] hover:text-[color:var(--text-primary)] focus-visible:outline-none focus-brutal"
         >
@@ -604,6 +630,11 @@ defmodule EgregorosWeb.StatusCard do
 
   defp actor_profile_path(actor), do: ProfilePaths.profile_path(actor)
 
+  defp feed_id_for_entry(%{feed_id: id}) when is_integer(id), do: id
+  defp feed_id_for_entry(%{object: %{id: id}}) when is_integer(id), do: id
+  defp feed_id_for_entry(%{object: %{"id" => id}}) when is_integer(id), do: id
+  defp feed_id_for_entry(_entry), do: nil
+
   defp with_back_timeline(path, nil) when is_binary(path), do: path
 
   defp with_back_timeline(path, back_timeline) when is_binary(path) do
@@ -688,6 +719,7 @@ defmodule EgregorosWeb.StatusCard do
       |> assign(:share_url, status_share_url(assigns.entry))
       |> assign(:can_delete?, can_delete_post?(assigns.entry, assigns.current_user))
       |> assign(:bookmarked?, Map.get(assigns.entry, :bookmarked?, false))
+      |> assign(:feed_id, feed_id_for_entry(assigns.entry))
       |> assign_new(:menu_id, fn -> "#{assigns.card_id}-menu" end)
 
     ~H"""
@@ -744,6 +776,7 @@ defmodule EgregorosWeb.StatusCard do
           data-role="bookmark"
           phx-click="toggle_bookmark"
           phx-value-id={@entry.object.id}
+          phx-value-feed-id={@feed_id}
           phx-disable-with="..."
           class={[
             "flex w-full items-center gap-3 px-4 py-2.5 text-sm font-medium transition hover:bg-[color:var(--bg-subtle)]",
@@ -767,14 +800,14 @@ defmodule EgregorosWeb.StatusCard do
             <button
               type="button"
               data-role="delete-post"
-              phx-click={JS.toggle(to: "#delete-post-confirm-#{@entry.object.id}")}
+              phx-click={JS.toggle(to: "#delete-post-confirm-#{@card_id}")}
               class="flex w-full items-center gap-3 px-4 py-2.5 text-sm font-medium text-[color:var(--danger)] transition hover:bg-[color:var(--danger-subtle)]"
             >
               <.icon name="hero-trash" class="size-5" /> Delete post
             </button>
 
             <div
-              id={"delete-post-confirm-#{@entry.object.id}"}
+              id={"delete-post-confirm-#{@card_id}"}
               class="hidden space-y-3 px-4 pb-4 pt-2 text-sm"
             >
               <p class="text-[color:var(--text-muted)]">
@@ -785,7 +818,7 @@ defmodule EgregorosWeb.StatusCard do
                 <button
                   type="button"
                   data-role="delete-post-cancel"
-                  phx-click={JS.hide(to: "#delete-post-confirm-#{@entry.object.id}")}
+                  phx-click={JS.hide(to: "#delete-post-confirm-#{@card_id}")}
                   class="inline-flex items-center justify-center border border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-3 py-1.5 text-xs font-bold uppercase text-[color:var(--text-primary)] transition hover:bg-[color:var(--bg-subtle)] focus-visible:outline-none focus-brutal"
                 >
                   Cancel

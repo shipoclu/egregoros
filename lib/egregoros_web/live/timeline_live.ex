@@ -585,12 +585,12 @@ defmodule EgregorosWeb.TimelineLive do
     end
   end
 
-  def handle_event("toggle_like", %{"id" => id}, socket) do
+  def handle_event("toggle_like", %{"id" => id} = params, socket) do
     with %User{} = user <- socket.assigns.current_user,
          {post_id, ""} <- Integer.parse(to_string(id)) do
       _ = Interactions.toggle_like(user, post_id)
 
-      {:noreply, refresh_post(socket, post_id)}
+      {:noreply, refresh_post(socket, post_id, feed_id(params, post_id))}
     else
       nil ->
         {:noreply, put_flash(socket, :error, "Register to like posts.")}
@@ -600,12 +600,12 @@ defmodule EgregorosWeb.TimelineLive do
     end
   end
 
-  def handle_event("toggle_repost", %{"id" => id}, socket) do
+  def handle_event("toggle_repost", %{"id" => id} = params, socket) do
     with %User{} = user <- socket.assigns.current_user,
          {post_id, ""} <- Integer.parse(to_string(id)) do
       _ = Interactions.toggle_repost(user, post_id)
 
-      {:noreply, refresh_post(socket, post_id)}
+      {:noreply, refresh_post(socket, post_id, feed_id(params, post_id))}
     else
       nil ->
         {:noreply, put_flash(socket, :error, "Register to repost.")}
@@ -615,13 +615,13 @@ defmodule EgregorosWeb.TimelineLive do
     end
   end
 
-  def handle_event("toggle_reaction", %{"id" => id, "emoji" => emoji}, socket) do
+  def handle_event("toggle_reaction", %{"id" => id, "emoji" => emoji} = params, socket) do
     with %User{} = user <- socket.assigns.current_user,
          {post_id, ""} <- Integer.parse(to_string(id)) do
       emoji = to_string(emoji)
       _ = Interactions.toggle_reaction(user, post_id, emoji)
 
-      {:noreply, refresh_post(socket, post_id)}
+      {:noreply, refresh_post(socket, post_id, feed_id(params, post_id))}
     else
       nil ->
         {:noreply, put_flash(socket, :error, "Register to react.")}
@@ -631,12 +631,12 @@ defmodule EgregorosWeb.TimelineLive do
     end
   end
 
-  def handle_event("toggle_bookmark", %{"id" => id}, socket) do
+  def handle_event("toggle_bookmark", %{"id" => id} = params, socket) do
     with %User{} = user <- socket.assigns.current_user,
          {post_id, ""} <- Integer.parse(to_string(id)) do
       _ = Interactions.toggle_bookmark(user, post_id)
 
-      {:noreply, refresh_post(socket, post_id)}
+      {:noreply, refresh_post(socket, post_id, feed_id(params, post_id))}
     else
       nil ->
         {:noreply, put_flash(socket, :error, "Register to bookmark posts.")}
@@ -745,6 +745,18 @@ defmodule EgregorosWeb.TimelineLive do
     else
       {:noreply, socket}
     end
+  end
+
+  @impl true
+  def handle_info({:post_deleted, %{id: id}}, socket) when is_integer(id) do
+    pending_posts =
+      socket.assigns.pending_posts
+      |> Enum.reject(&(&1.id == id))
+
+    {:noreply,
+     socket
+     |> assign(pending_posts: pending_posts)
+     |> stream_delete(:posts, %{feed_id: id})}
   end
 
   @impl true
@@ -1056,15 +1068,15 @@ defmodule EgregorosWeb.TimelineLive do
   end
 
   defp list_timeline_posts(:home, %User{} = user, opts) when is_list(opts) do
-    Objects.list_home_notes(user.ap_id, opts)
+    Objects.list_home_statuses(user.ap_id, opts)
   end
 
   defp list_timeline_posts(:local, _user, opts) when is_list(opts) do
-    Objects.list_public_notes(Keyword.put(opts, :local, true))
+    Objects.list_public_statuses(Keyword.put(opts, :local, true))
   end
 
   defp list_timeline_posts(_timeline, _user, opts) when is_list(opts) do
-    Objects.list_public_notes(opts)
+    Objects.list_public_statuses(opts)
   end
 
   defp posts_cursor([]), do: nil
@@ -1076,11 +1088,12 @@ defmodule EgregorosWeb.TimelineLive do
     end
   end
 
+  defp post_dom_id(%{feed_id: id}) when is_integer(id), do: "post-#{id}"
   defp post_dom_id(%{object: %{id: id}}) when is_integer(id), do: "post-#{id}"
   defp post_dom_id(_post), do: Ecto.UUID.generate()
 
-  defp include_post?(%{type: "Note"} = post, :home, %User{} = user, home_actor_ids)
-       when is_list(home_actor_ids) do
+  defp include_post?(%{type: type} = post, :home, %User{} = user, home_actor_ids)
+       when type in ["Note", "Announce"] and is_list(home_actor_ids) do
     cond do
       not Objects.visible_to?(post, user) ->
         false
@@ -1099,15 +1112,19 @@ defmodule EgregorosWeb.TimelineLive do
     end
   end
 
-  defp include_post?(%{type: "Note"} = post, :public, _user, _home_actor_ids) do
+  defp include_post?(%{type: type} = post, :public, _user, _home_actor_ids)
+       when type in ["Note", "Announce"] do
     Objects.publicly_listed?(post)
   end
 
-  defp include_post?(%{type: "Note", local: true} = post, :local, _user, _home_actor_ids) do
+  defp include_post?(%{type: type, local: true} = post, :local, _user, _home_actor_ids)
+       when type in ["Note", "Announce"] do
     Objects.publicly_listed?(post)
   end
 
-  defp include_post?(%{type: "Note"} = _post, :local, _user, _home_actor_ids), do: false
+  defp include_post?(%{type: type} = _post, :local, _user, _home_actor_ids)
+       when type in ["Note", "Announce"],
+       do: false
 
   defp include_post?(_post, _timeline, _user, _home_actor_ids), do: false
 
@@ -1206,19 +1223,56 @@ defmodule EgregorosWeb.TimelineLive do
   defp timeline_label(:local), do: "Local"
   defp timeline_label(_timeline), do: "Public"
 
-  defp refresh_post(socket, post_id) when is_integer(post_id) do
+  defp refresh_post(socket, post_id, feed_id)
+       when is_integer(post_id) and is_integer(feed_id) do
     current_user = socket.assigns.current_user
 
     case Objects.get(post_id) do
       %{type: "Note"} = object ->
         if Objects.visible_to?(object, current_user) do
-          stream_insert(socket, :posts, StatusVM.decorate(object, current_user))
+          if feed_id == post_id do
+            stream_insert(socket, :posts, StatusVM.decorate(object, current_user))
+          else
+            socket
+            |> stream_insert(:posts, StatusVM.decorate(object, current_user), update_only: true)
+            |> refresh_announce_post(feed_id, current_user)
+          end
         else
-          stream_delete(socket, :posts, %{object: %{id: post_id}})
+          stream_delete(socket, :posts, %{feed_id: feed_id})
         end
 
       _ ->
         socket
+    end
+  end
+
+  defp refresh_announce_post(socket, feed_id, current_user)
+       when is_integer(feed_id) do
+    case Objects.get(feed_id) do
+      nil ->
+        stream_delete(socket, :posts, %{feed_id: feed_id})
+
+      %{type: "Announce"} = announce ->
+        case StatusVM.decorate(announce, current_user) do
+          nil -> stream_delete(socket, :posts, %{feed_id: feed_id})
+          entry -> stream_insert(socket, :posts, entry)
+        end
+
+      _ ->
+        socket
+    end
+  end
+
+  defp feed_id(%{} = params, fallback) when is_integer(fallback) do
+    case Map.get(params, "feed_id") do
+      nil ->
+        fallback
+
+      value ->
+        case Integer.parse(to_string(value)) do
+          {id, ""} -> id
+          _ -> fallback
+        end
     end
   end
 end

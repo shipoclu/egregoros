@@ -1,6 +1,7 @@
 defmodule EgregorosWeb.ViewModels.Status do
   @moduledoc false
 
+  alias Egregoros.Objects
   alias Egregoros.Relationships
   alias Egregoros.User
   alias EgregorosWeb.SafeMediaURL
@@ -10,6 +11,7 @@ defmodule EgregorosWeb.ViewModels.Status do
 
   def decorate(%{type: "Note"} = object, current_user) do
     %{
+      feed_id: object.id,
       object: object,
       actor: Actor.card(object.actor),
       attachments: attachments_for_object(object),
@@ -22,8 +24,34 @@ defmodule EgregorosWeb.ViewModels.Status do
     }
   end
 
+  def decorate(%{type: "Announce", object: object_ap_id} = announce, current_user)
+      when is_binary(object_ap_id) do
+    object_ap_id = String.trim(object_ap_id)
+
+    with true <- object_ap_id != "",
+         %{type: "Note"} = object <- Objects.get_by_ap_id(object_ap_id),
+         true <- Objects.visible_to?(object, current_user) do
+      %{
+        feed_id: announce.id,
+        object: object,
+        actor: Actor.card(object.actor),
+        reposted_by: Actor.card(announce.actor),
+        attachments: attachments_for_object(object),
+        likes_count: Relationships.count_by_type_object("Like", object.ap_id),
+        liked?: liked_by_user?(object, current_user),
+        reposts_count: Relationships.count_by_type_object("Announce", object.ap_id),
+        reposted?: reposted_by_user?(object, current_user),
+        bookmarked?: bookmarked_by_user?(object, current_user),
+        reactions: reactions_for_object(object, current_user)
+      }
+    else
+      _ -> nil
+    end
+  end
+
   def decorate(object, current_user) when is_map(object) do
     %{
+      feed_id: Map.get(object, :id) || Map.get(object, "id"),
       object: object,
       actor: Actor.card(Map.get(object, :actor)),
       attachments: [],
@@ -37,7 +65,41 @@ defmodule EgregorosWeb.ViewModels.Status do
   end
 
   def decorate_many(objects, current_user) when is_list(objects) do
-    Enum.map(objects, &decorate(&1, current_user))
+    reblog_ap_ids =
+      objects
+      |> Enum.filter(&match?(%{type: "Announce"}, &1))
+      |> Enum.map(&Map.get(&1, :object))
+      |> Enum.filter(&is_binary/1)
+      |> Enum.map(&String.trim/1)
+      |> Enum.reject(&(&1 == ""))
+      |> Enum.uniq()
+
+    reblogs_by_ap_id =
+      reblog_ap_ids
+      |> Objects.list_by_ap_ids()
+      |> Map.new(&{&1.ap_id, &1})
+
+    objects
+    |> Enum.map(fn
+      %{type: "Announce", object: object_ap_id} = announce when is_binary(object_ap_id) ->
+        object_ap_id = String.trim(object_ap_id)
+
+        case Map.get(reblogs_by_ap_id, object_ap_id) do
+          %{type: "Note"} = object ->
+            if Objects.visible_to?(object, current_user) do
+              decorate_announce(announce, object, current_user)
+            else
+              nil
+            end
+
+          _ ->
+            nil
+        end
+
+      other ->
+        decorate(other, current_user)
+    end)
+    |> Enum.reject(&is_nil/1)
   end
 
   def reaction_emojis, do: @reaction_emojis
@@ -182,4 +244,20 @@ defmodule EgregorosWeb.ViewModels.Status do
     do: media_type
 
   defp attachment_media_type(_), do: nil
+
+  defp decorate_announce(%{type: "Announce"} = announce, %{type: "Note"} = object, current_user) do
+    %{
+      feed_id: announce.id,
+      object: object,
+      actor: Actor.card(object.actor),
+      reposted_by: Actor.card(announce.actor),
+      attachments: attachments_for_object(object),
+      likes_count: Relationships.count_by_type_object("Like", object.ap_id),
+      liked?: liked_by_user?(object, current_user),
+      reposts_count: Relationships.count_by_type_object("Announce", object.ap_id),
+      reposted?: reposted_by_user?(object, current_user),
+      bookmarked?: bookmarked_by_user?(object, current_user),
+      reactions: reactions_for_object(object, current_user)
+    }
+  end
 end

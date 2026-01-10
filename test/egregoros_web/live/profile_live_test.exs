@@ -3,6 +3,7 @@ defmodule EgregorosWeb.ProfileLiveTest do
 
   import Phoenix.LiveViewTest
 
+  alias Egregoros.Activities.Announce
   alias Egregoros.Activities.Note
   alias Egregoros.Objects
   alias Egregoros.Pipeline
@@ -43,6 +44,20 @@ defmodule EgregorosWeb.ProfileLiveTest do
 
     assert Relationships.get(relationship.id) == nil
     assert has_element?(view, "button[data-role='profile-follow']")
+  end
+
+  test "profile lists announces by the profile actor", %{conn: conn, viewer: viewer, profile_user: profile_user} do
+    {:ok, charlie} = Users.create_local_user("charlie")
+    assert {:ok, note} = Pipeline.ingest(Note.build(charlie, "Boosted profile note"), local: true)
+    assert {:ok, announce} = Pipeline.ingest(Announce.build(profile_user, note), local: true)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: viewer.id})
+    {:ok, view, _html} = live(conn, "/@#{profile_user.nickname}")
+
+    assert has_element?(view, "#post-#{announce.id}")
+    assert has_element?(view, "#post-#{announce.id}", "Boosted profile note")
+    assert has_element?(view, "#post-#{announce.id} [data-role='reposted-by']", "@#{profile_user.nickname}")
+    assert has_element?(view, "#post-#{announce.id} [data-role='post-actor-handle']", "@charlie")
   end
 
   test "profile shows follow requests for remote accounts until accepted", %{

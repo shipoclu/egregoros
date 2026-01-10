@@ -3,6 +3,8 @@ defmodule EgregorosWeb.TimelineLiveTest do
 
   import Phoenix.LiveViewTest
 
+  alias Egregoros.Activities.Announce
+  alias Egregoros.Activities.Follow
   alias Egregoros.Activities.Note
   alias Egregoros.Objects
   alias Egregoros.Pipeline
@@ -1773,5 +1775,49 @@ defmodule EgregorosWeb.TimelineLiveTest do
     _ = :sys.get_state(view.pid)
 
     assert has_element?(view, "button[data-role='new-posts']", "2 new posts")
+  end
+
+  test "home timeline shows announces from followed users", %{conn: conn, user: alice} do
+    {:ok, bob} = Users.create_local_user("bob")
+    {:ok, charlie} = Users.create_local_user("charlie")
+
+    assert {:ok, _follow} = Pipeline.ingest(Follow.build(bob, alice), local: true)
+    assert {:ok, note} = Pipeline.ingest(Note.build(charlie, "Boost me"), local: true)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: bob.id})
+    {:ok, view, _html} = live(conn, "/")
+
+    refute has_element?(view, "article", "Boost me")
+
+    assert {:ok, announce} = Pipeline.ingest(Announce.build(alice, note), local: true)
+
+    assert has_element?(view, "#post-#{announce.id}")
+    assert has_element?(view, "#post-#{announce.id}", "Boost me")
+    assert has_element?(view, "#post-#{announce.id} [data-role='reposted-by']", "@alice")
+    assert has_element?(view, "#post-#{announce.id} [data-role='post-actor-handle']", "@charlie")
+  end
+
+  test "liking a boosted post updates the boost entry instead of inserting a duplicate note", %{
+    conn: conn,
+    user: alice
+  } do
+    {:ok, bob} = Users.create_local_user("bob")
+    {:ok, charlie} = Users.create_local_user("charlie")
+
+    assert {:ok, _follow} = Pipeline.ingest(Follow.build(bob, alice), local: true)
+    assert {:ok, note} = Pipeline.ingest(Note.build(charlie, "Boost target"), local: true)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: bob.id})
+    {:ok, view, _html} = live(conn, "/")
+
+    assert {:ok, announce} = Pipeline.ingest(Announce.build(alice, note), local: true)
+    assert has_element?(view, "#post-#{announce.id}")
+
+    view
+    |> element("#post-#{announce.id} button[data-role='like']")
+    |> render_click()
+
+    assert has_element?(view, "#post-#{announce.id} button[data-role='like'][aria-pressed='true']")
+    refute has_element?(view, "#post-#{note.id}")
   end
 end
