@@ -1,4 +1,4 @@
-ExUnit.start(exclude: [:security])
+ExUnit.start()
 Mox.defmock(Egregoros.Auth.Mock, for: Egregoros.Auth)
 Mox.defmock(Egregoros.Discovery.Mock, for: Egregoros.Discovery)
 Mox.defmock(Egregoros.HTTP.Mock, for: Egregoros.HTTP)
