@@ -64,6 +64,63 @@ defmodule Egregoros.Signature.HTTPActorFetchTest do
     assert Users.get_by_ap_id(actor_url)
   end
 
+  test "verify_request supports keyId urls ending in /main-key" do
+    unique = Ecto.UUID.generate() |> String.replace("-", "")
+    actor_url = "https://remote.example/users/alice-#{unique}"
+    {public_key, private_key_pem} = Keys.generate_rsa_keypair()
+
+    Egregoros.HTTP.Mock
+    |> expect(:get, fn url, _headers ->
+      assert url == actor_url
+
+      {:ok,
+       %{
+         status: 200,
+         body: %{
+           "id" => actor_url,
+           "type" => "Person",
+           "preferredUsername" => "alice",
+           "inbox" => actor_url <> "/inbox",
+           "outbox" => actor_url <> "/outbox",
+           "publicKey" => %{
+             "id" => actor_url <> "/main-key",
+             "owner" => actor_url,
+             "publicKeyPem" => public_key
+           }
+         },
+         headers: []
+       }}
+    end)
+
+    date = HTTPDate.format_rfc1123(DateTime.utc_now())
+
+    signature_string =
+      [
+        "(request-target): post /users/frank/inbox",
+        "date: " <> date
+      ]
+      |> Enum.join("\n")
+
+    [entry] = :public_key.pem_decode(private_key_pem)
+    private_key = :public_key.pem_entry_decode(entry)
+    signature = :public_key.sign(signature_string, :sha256, private_key) |> Base.encode64()
+
+    header =
+      "Signature " <>
+        "keyId=\"#{actor_url}/main-key\"," <>
+        "algorithm=\"rsa-sha256\"," <>
+        "headers=\"(request-target) date\"," <>
+        "signature=\"#{signature}\""
+
+    conn =
+      Plug.Test.conn(:post, "/users/frank/inbox", "")
+      |> Plug.Conn.put_req_header("date", date)
+      |> Plug.Conn.put_req_header("authorization", header)
+
+    assert {:ok, ^actor_url} = Egregoros.Signature.verify_request(conn)
+    assert Users.get_by_ap_id(actor_url)
+  end
+
   test "verify_request rejects unsafe actor urls" do
     actor_url = "http://127.0.0.1/users/alice"
 

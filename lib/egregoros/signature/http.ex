@@ -138,7 +138,7 @@ defmodule Egregoros.Signature.HTTP do
   end
 
   defp public_key_for_key_id(key_id) when is_binary(key_id) do
-    ap_id = key_id |> String.split("#") |> List.first()
+    ap_id = actor_ap_id_from_key_id(key_id)
 
     case Users.get_by_ap_id(ap_id) do
       %{} = user ->
@@ -162,16 +162,34 @@ defmodule Egregoros.Signature.HTTP do
   defp public_key_for_key_id(_), do: {:error, :invalid_signature}
 
   defp signer_ap_id_from_key_id(key_id) when is_binary(key_id) do
-    key_id
-    |> String.split("#", parts: 2)
-    |> List.first()
-    |> case do
+    case actor_ap_id_from_key_id(key_id) do
       ap_id when is_binary(ap_id) and ap_id != "" -> ap_id
       _ -> nil
     end
   end
 
   defp signer_ap_id_from_key_id(_), do: nil
+
+  defp actor_ap_id_from_key_id(key_id) when is_binary(key_id) do
+    key_id
+    |> String.split("#", parts: 2)
+    |> List.first()
+    |> String.trim()
+    |> case do
+      "" -> nil
+      ap_id -> strip_known_key_suffix(ap_id)
+    end
+  end
+
+  defp actor_ap_id_from_key_id(_key_id), do: nil
+
+  defp strip_known_key_suffix(ap_id) when is_binary(ap_id) do
+    if String.ends_with?(ap_id, "/main-key") do
+      String.trim_trailing(ap_id, "/main-key")
+    else
+      ap_id
+    end
+  end
 
   defp fetch_public_key_for_actor(ap_id) when is_binary(ap_id) do
     with {:ok, user} <- Egregoros.Federation.Actor.fetch_and_store(ap_id),
