@@ -7,12 +7,19 @@ defmodule EgregorosWeb.Plugs.Uploads do
   alias Egregoros.Users
   alias EgregorosWeb.Endpoint
 
+  @secure_headers [
+    {"x-content-type-options", "nosniff"},
+    {"x-frame-options", "DENY"},
+    {"x-xss-protection", "1; mode=block"}
+  ]
+
   def init(_opts) do
     static_opts =
       Plug.Static.init(
         at: "/uploads",
         from: {__MODULE__, :uploads_root, []},
         gzip: false,
+        headers: @secure_headers,
         only_matching: ~w(avatars banners media)
       )
 
