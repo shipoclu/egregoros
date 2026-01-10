@@ -8,7 +8,7 @@ defmodule Egregoros.Federation.SignedFetch do
 
   @default_accept "application/activity+json, application/ld+json"
   @default_user_agent "egregoros"
-  @signed_headers ["(request-target)", "host", "date"]
+  @signed_headers ["(request-target)", "host", "date", "digest", "content-length"]
 
   def get(url, opts \\ []) when is_binary(url) and is_list(opts) do
     accept = Keyword.get(opts, :accept, @default_accept)
@@ -34,6 +34,8 @@ defmodule Egregoros.Federation.SignedFetch do
       {"user-agent", user_agent},
       {"host", signed.host},
       {"date", signed.date},
+      {"digest", signed.digest},
+      {"content-length", signed.content_length},
       {"signature", signed.signature},
       {"authorization", signed.authorization}
     ]

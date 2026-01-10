@@ -16,10 +16,15 @@ defmodule Egregoros.Federation.SignedFetchTest do
       assert {"accept", "application/activity+json, application/ld+json"} in headers
       assert {"user-agent", "egregoros"} in headers
       assert {"host", "remote.example"} in headers
+      assert {"content-length", "0"} in headers
+
+      assert {"digest", digest} = List.keyfind(headers, "digest", 0)
+      assert String.starts_with?(digest, "SHA-256=")
 
       assert {"date", _date} = List.keyfind(headers, "date", 0)
       assert {"signature", signature} = List.keyfind(headers, "signature", 0)
       refute String.starts_with?(signature, "Signature ")
+      assert String.contains?(signature, "headers=\"(request-target) host date digest content-length\"")
 
       key_id = Endpoint.url() <> "/users/internal.fetch#main-key"
       assert String.contains?(signature, "keyId=\"#{key_id}\"")
