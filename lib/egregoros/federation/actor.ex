@@ -18,6 +18,28 @@ defmodule Egregoros.Federation.Actor do
     end
   end
 
+  def fetch_and_store_with_counts(actor_url) when is_binary(actor_url) do
+    checked_at = DateTime.utc_now() |> DateTime.truncate(:microsecond)
+
+    with :ok <- SafeURL.validate_http_url(actor_url),
+         {:ok, actor} <- fetch_actor(actor_url),
+         {:ok, attrs} <- to_user_attrs(actor, actor_url) do
+      count_attrs =
+        actor
+        |> fetch_follow_counts(actor_url)
+        |> Map.put(:remote_counts_checked_at, checked_at)
+
+      attrs =
+        attrs
+        |> Map.merge(count_attrs)
+
+      Users.upsert_user(attrs)
+    else
+      {:error, _} = error -> error
+      _ -> {:error, :actor_fetch_failed}
+    end
+  end
+
   def upsert_from_map(%{} = actor) do
     actor_url = actor |> extract_id() |> normalize_id()
 
@@ -126,6 +148,90 @@ defmodule Egregoros.Federation.Actor do
   end
 
   defp decode_json(_), do: {:error, :invalid_json}
+
+  defp fetch_follow_counts(%{} = actor, actor_id) when is_binary(actor_id) do
+    actor_id = String.trim(actor_id)
+
+    followers =
+      actor
+      |> Map.get("followers")
+      |> extract_url()
+      |> resolve_url(actor_id)
+
+    following =
+      actor
+      |> Map.get("following")
+      |> extract_url()
+      |> resolve_url(actor_id)
+
+    %{}
+    |> maybe_put_count(:remote_followers_count, fetch_total_items(followers))
+    |> maybe_put_count(:remote_following_count, fetch_total_items(following))
+  end
+
+  defp fetch_follow_counts(_actor, _actor_id), do: %{}
+
+  defp maybe_put_count(attrs, key, count) when is_map(attrs) and is_atom(key) do
+    if is_integer(count) and count >= 0 do
+      Map.put(attrs, key, count)
+    else
+      attrs
+    end
+  end
+
+  defp fetch_total_items(url) when is_binary(url) do
+    url = String.trim(url)
+
+    with true <- url != "",
+         :ok <- SafeURL.validate_http_url(url) do
+      case HTTP.get(url, headers()) do
+        {:ok, %{status: status, body: body}} when status in 200..299 ->
+          with {:ok, %{} = collection} <- decode_json(body) do
+            total_items(collection)
+          else
+            _ -> nil
+          end
+
+        {:ok, %{status: status}} when status in [401, 403] ->
+          fetch_total_items_signed(url)
+
+        _ ->
+          nil
+      end
+    else
+      _ -> nil
+    end
+  end
+
+  defp fetch_total_items(_url), do: nil
+
+  defp fetch_total_items_signed(url) when is_binary(url) do
+    with {:ok, %{status: status, body: body}} when status in 200..299 <-
+           SignedFetch.get(url, accept: "application/activity+json, application/ld+json"),
+         {:ok, %{} = collection} <- decode_json(body) do
+      total_items(collection)
+    else
+      _ -> nil
+    end
+  end
+
+  defp total_items(%{} = collection) do
+    case Map.get(collection, "totalItems") do
+      value when is_integer(value) ->
+        value
+
+      value when is_binary(value) ->
+        case Integer.parse(String.trim(value)) do
+          {int, ""} -> int
+          _ -> nil
+        end
+
+      _ ->
+        nil
+    end
+  end
+
+  defp total_items(_collection), do: nil
 
   defp to_user_attrs(%{"id" => id} = actor, actor_url)
        when is_binary(id) and is_binary(actor_url) do

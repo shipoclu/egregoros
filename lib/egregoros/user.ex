@@ -5,7 +5,30 @@ defmodule Egregoros.User do
 
   alias Egregoros.Domain
 
-  @fields ~w(nickname domain ap_id inbox outbox public_key private_key local admin locked email password_hash name bio avatar_url banner_url emojis moved_to_ap_id also_known_as)a
+  @fields ~w(
+    nickname
+    domain
+    ap_id
+    inbox
+    outbox
+    public_key
+    private_key
+    local
+    admin
+    locked
+    email
+    password_hash
+    name
+    bio
+    avatar_url
+    banner_url
+    emojis
+    moved_to_ap_id
+    also_known_as
+    remote_followers_count
+    remote_following_count
+    remote_counts_checked_at
+  )a
   @required_fields ~w(nickname ap_id inbox outbox public_key local)a
 
   schema "users" do
@@ -29,6 +52,9 @@ defmodule Egregoros.User do
     field :moved_to_ap_id, :string
     field :also_known_as, {:array, :string}, default: []
     field :last_activity_at, :utc_datetime_usec
+    field :remote_followers_count, :integer
+    field :remote_following_count, :integer
+    field :remote_counts_checked_at, :utc_datetime_usec
 
     timestamps(type: :utc_datetime_usec)
   end

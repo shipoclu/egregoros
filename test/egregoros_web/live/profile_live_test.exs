@@ -389,6 +389,60 @@ defmodule EgregorosWeb.ProfileLiveTest do
            )
   end
 
+  test "profile refreshes remote follower counts via ActivityPub", %{conn: conn, viewer: viewer} do
+    {:ok, remote} =
+      Users.create_user(%{
+        nickname: "bob",
+        ap_id: "https://remote.example/users/bob",
+        inbox: "https://remote.example/users/bob/inbox",
+        outbox: "https://remote.example/users/bob/outbox",
+        public_key: "remote-key",
+        private_key: nil,
+        local: false
+      })
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: viewer.id})
+    {:ok, view, _html} = live(conn, "/@#{remote.nickname}@remote.example")
+
+    assert has_element?(view, "a[href='/@#{remote.nickname}@remote.example/followers']", "0")
+    assert has_element?(view, "a[href='/@#{remote.nickname}@remote.example/following']", "0")
+
+    expect(Egregoros.HTTP.Mock, :get, fn "https://remote.example/users/bob", _headers ->
+      {:ok,
+       %{
+         status: 200,
+         headers: [],
+         body: %{
+           "@context" => "https://www.w3.org/ns/activitystreams",
+           "id" => "https://remote.example/users/bob",
+           "type" => "Person",
+           "preferredUsername" => "bob",
+           "inbox" => "https://remote.example/users/bob/inbox",
+           "outbox" => "https://remote.example/users/bob/outbox",
+           "publicKey" => %{"publicKeyPem" => "remote-key"},
+           "followers" => "https://remote.example/users/bob/followers",
+           "following" => "https://remote.example/users/bob/following"
+         }
+       }}
+    end)
+
+    expect(Egregoros.HTTP.Mock, :get, fn "https://remote.example/users/bob/followers", _headers ->
+      {:ok, %{status: 200, headers: [], body: %{"type" => "OrderedCollection", "totalItems" => 123}}}
+    end)
+
+    expect(Egregoros.HTTP.Mock, :get, fn "https://remote.example/users/bob/following", _headers ->
+      {:ok, %{status: 200, headers: [], body: %{"type" => "OrderedCollection", "totalItems" => 45}}}
+    end)
+
+    assert :ok =
+             perform_job(Egregoros.Workers.RefreshRemoteUserCounts, %{
+               "ap_id" => remote.ap_id
+             })
+
+    assert has_element?(view, "a[href='/@#{remote.nickname}@remote.example/followers']", "123")
+    assert has_element?(view, "a[href='/@#{remote.nickname}@remote.example/following']", "45")
+  end
+
   test "profile renders remote bios as sanitized html", %{conn: conn, viewer: viewer} do
     {:ok, remote} =
       Users.create_user(%{

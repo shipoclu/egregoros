@@ -13,8 +13,10 @@ defmodule EgregorosWeb.ProfileLive do
   alias Egregoros.Publish
   alias Egregoros.Relationships
   alias Egregoros.RelationshipEvents
+  alias Egregoros.UserEvents
   alias Egregoros.User
   alias Egregoros.Users
+  alias Egregoros.Workers.RefreshRemoteUserCounts
   alias EgregorosWeb.Live.Uploads, as: LiveUploads
   alias EgregorosWeb.MentionAutocomplete
   alias EgregorosWeb.Param
@@ -24,6 +26,7 @@ defmodule EgregorosWeb.ProfileLive do
   alias EgregorosWeb.ViewModels.Status, as: StatusVM
 
   @page_size 20
+  @remote_counts_refresh_interval_s 60 * 60
 
   @impl true
   def mount(%{"nickname" => handle}, session, socket) do
@@ -42,6 +45,11 @@ defmodule EgregorosWeb.ProfileLive do
       |> to_string()
       |> String.trim()
       |> Users.get_by_handle()
+
+    if connected?(socket) and match?(%User{}, profile_user) do
+      UserEvents.subscribe(profile_user.ap_id)
+      maybe_refresh_remote_counts(profile_user)
+    end
 
     profile_handle =
       case profile_user do
@@ -75,16 +83,7 @@ defmodule EgregorosWeb.ProfileLive do
 
     reply_form = Phoenix.Component.to_form(default_reply_params(), as: :reply)
 
-    profile_bio_html =
-      case profile_user do
-        %User{} = user ->
-          user.bio
-          |> HTML.to_safe_html(format: if(user.local, do: :text, else: :html))
-          |> Phoenix.HTML.raw()
-
-        _ ->
-          nil
-      end
+    profile_bio_html = profile_bio_html(profile_user)
 
     {:ok,
      socket
@@ -163,6 +162,33 @@ defmodule EgregorosWeb.ProfileLive do
             )
           else
             socket
+          end
+
+        _ ->
+          socket
+      end
+
+    {:noreply, socket}
+  end
+
+  def handle_info({:user_updated, %{ap_id: ap_id}}, socket) do
+    socket =
+      case socket.assigns.profile_user do
+        %User{ap_id: ^ap_id} ->
+          profile_user = Users.get_by_ap_id(ap_id)
+
+          case profile_user do
+            %User{} = profile_user ->
+              assign(socket,
+                profile_user: profile_user,
+                profile_handle: ActorVM.handle(profile_user, profile_user.ap_id),
+                profile_bio_html: profile_bio_html(profile_user),
+                followers_count: count_followers(profile_user),
+                following_count: count_following(profile_user)
+              )
+
+            _ ->
+              socket
           end
 
         _ ->
@@ -1103,10 +1129,18 @@ defmodule EgregorosWeb.ProfileLive do
 
   defp count_followers(nil), do: 0
 
+  defp count_followers(%User{local: false, remote_followers_count: count})
+       when is_integer(count) and count >= 0,
+       do: count
+
   defp count_followers(%User{} = user),
     do: Relationships.count_by_type_object("Follow", user.ap_id)
 
   defp count_following(nil), do: 0
+
+  defp count_following(%User{local: false, remote_following_count: count})
+       when is_integer(count) and count >= 0,
+       do: count
 
   defp count_following(%User{} = user),
     do: Relationships.count_by_type_actor("Follow", user.ap_id)
@@ -1158,4 +1192,30 @@ defmodule EgregorosWeb.ProfileLive do
     |> Notifications.list_for_user(limit: @page_size)
     |> length()
   end
+
+  defp profile_bio_html(%User{} = user) do
+    user.bio
+    |> HTML.to_safe_html(format: if(user.local, do: :text, else: :html))
+    |> Phoenix.HTML.raw()
+  end
+
+  defp profile_bio_html(_user), do: nil
+
+  defp maybe_refresh_remote_counts(%User{local: false, ap_id: ap_id} = user)
+       when is_binary(ap_id) do
+    stale? =
+      case user.remote_counts_checked_at do
+        nil -> true
+        %DateTime{} = at -> DateTime.diff(DateTime.utc_now(), at, :second) > @remote_counts_refresh_interval_s
+        _ -> true
+      end
+
+    if stale? do
+      _ = Oban.insert(RefreshRemoteUserCounts.new(%{"ap_id" => ap_id}, priority: 9))
+    end
+
+    :ok
+  end
+
+  defp maybe_refresh_remote_counts(_user), do: :ok
 end
