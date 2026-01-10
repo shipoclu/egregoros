@@ -227,6 +227,7 @@ defmodule Egregoros.Activities.Undo do
     end
 
     _ = maybe_broadcast_post_update(object)
+    if type == "Announce", do: Timeline.broadcast_post_deleted(target_activity)
     Objects.delete_object(target_activity)
   end
 
