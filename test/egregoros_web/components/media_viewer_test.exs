@@ -20,4 +20,20 @@ defmodule EgregorosWeb.MediaViewerTest do
     assert html =~
              ~r/<button(?=[^>]*data-role="media-viewer-close")(?=[^>]*\bz-20\b)[^>]*>/
   end
+
+  test "renders audio items with CORS-enabled audio tag" do
+    html =
+      render_component(&MediaViewer.media_viewer/1, %{
+        viewer: %{
+          items: [
+            %{href: "/uploads/media/1/sound.mp3", media_type: "audio/mpeg", description: "Sound"}
+          ],
+          index: 0
+        },
+        open: true
+      })
+
+    assert html =~ "<audio"
+    assert html =~ ~s(crossorigin="anonymous")
+  end
 end

@@ -116,6 +116,7 @@ defmodule EgregorosWeb.MediaViewer do
                       data-role="media-viewer-item"
                       preload="metadata"
                       aria-label={Map.get(item, :description, "Audio attachment")}
+                      crossorigin="anonymous"
                     >
                       <source src={item.href} type={Attachments.source_type(item, "audio/mpeg")} />
                     </audio>

@@ -240,6 +240,40 @@ defmodule EgregorosWeb.StatusCardTest do
     assert html =~ ~s(src="/uploads/media/1/video.mp4")
   end
 
+  test "renders audio attachments with CORS-enabled audio tag" do
+    html =
+      render_component(&StatusCard.status_card/1, %{
+        id: "post-1",
+        current_user: %{id: 1},
+        entry: %{
+          object: %{
+            id: 1,
+            inserted_at: ~U[2025-01-01 00:00:00Z],
+            local: false,
+            data: %{"content" => "<p>Hello</p>"}
+          },
+          actor: %{
+            display_name: "Alice",
+            handle: "@alice",
+            avatar_url: nil
+          },
+          attachments: [
+            %{href: "/uploads/media/1/audio.mp3", description: "", media_type: "audio/mpeg"}
+          ],
+          liked?: false,
+          likes_count: 0,
+          reposted?: false,
+          reposts_count: 0,
+          reactions: %{}
+        }
+      })
+
+    assert html =~ "<audio"
+    assert html =~ ~s(crossorigin="anonymous")
+    assert html =~ ~s(src="/uploads/media/1/audio.mp3")
+    assert html =~ ~s(type="audio/mpeg")
+  end
+
   test "renders non-media attachments as links" do
     html =
       render_component(&StatusCard.status_card/1, %{

@@ -906,6 +906,7 @@ defmodule EgregorosWeb.StatusCard do
             data-kind="audio"
             preload="metadata"
             aria-label={attachment_label(@attachment, "Audio attachment")}
+            crossorigin="anonymous"
           >
             <source
               src={@attachment.href}
