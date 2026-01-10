@@ -268,6 +268,11 @@ defmodule EgregorosWeb.StatusLiveTest do
 
     assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}")
 
+    refute has_element?(view, "button[data-role='thread-fetch-context']", "Retry")
+
+    send(view.pid, {:thread_retry_available, :context})
+    _ = :sys.get_state(view.pid)
+
     assert has_element?(view, "button[data-role='thread-fetch-context']", "Retry")
 
     _html =
@@ -517,6 +522,11 @@ defmodule EgregorosWeb.StatusLiveTest do
 
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     assert {:ok, view, _html} = live(conn, "/@bob@remote.example/#{root.id}")
+
+    refute has_element?(view, "button[data-role='thread-fetch-replies']", "Retry")
+
+    send(view.pid, {:thread_retry_available, :replies})
+    _ = :sys.get_state(view.pid)
 
     assert has_element?(view, "button[data-role='thread-fetch-replies']", "Retry")
 

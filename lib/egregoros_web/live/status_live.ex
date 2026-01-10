@@ -21,6 +21,7 @@ defmodule EgregorosWeb.StatusLive do
 
   @reply_max_chars 5000
   @thread_replies_refresh_after_seconds 300
+  @thread_retry_delay_ms 4_000
 
   @impl true
   def mount(%{"nickname" => nickname, "uuid" => uuid} = params, session, socket) do
@@ -103,6 +104,11 @@ defmodule EgregorosWeb.StatusLive do
 
     if connected?(socket) and missing_parent? do
       _ = ThreadDiscovery.enqueue(thread_note)
+      _ = schedule_thread_retry(:context)
+    end
+
+    if connected?(socket) and fetching_replies? do
+      _ = schedule_thread_retry(:replies)
     end
 
     reply_to_handle =
@@ -144,6 +150,8 @@ defmodule EgregorosWeb.StatusLive do
         thread_index: thread_index,
         thread_missing_context?: missing_parent?,
         thread_fetching_replies?: fetching_replies?,
+        thread_context_retry_visible?: false,
+        thread_replies_retry_visible?: false,
         reply_modal_open?: reply_modal_open?,
         reply_to_ap_id: reply_to_ap_id,
         reply_to_handle: reply_to_handle,
@@ -198,6 +206,28 @@ defmodule EgregorosWeb.StatusLive do
     socket =
       if thread_relevant?(socket, object) do
         refresh_thread(socket)
+      else
+        socket
+      end
+
+    {:noreply, socket}
+  end
+
+  def handle_info({:thread_retry_available, :context}, socket) do
+    socket =
+      if socket.assigns.thread_missing_context? do
+        assign(socket, thread_context_retry_visible?: true)
+      else
+        socket
+      end
+
+    {:noreply, socket}
+  end
+
+  def handle_info({:thread_retry_available, :replies}, socket) do
+    socket =
+      if socket.assigns.thread_fetching_replies? do
+        assign(socket, thread_replies_retry_visible?: true)
       else
         socket
       end
@@ -665,7 +695,7 @@ defmodule EgregorosWeb.StatusLive do
                     />
                   </div>
 
-                  <div class="mt-4">
+                  <div :if={@thread_context_retry_visible?} class="mt-4">
                     <.button
                       type="button"
                       size="sm"
@@ -734,7 +764,7 @@ defmodule EgregorosWeb.StatusLive do
                     />
                   </div>
 
-                  <div class="mt-5">
+                  <div :if={@thread_replies_retry_visible?} class="mt-5">
                     <.button
                       type="button"
                       size="sm"
@@ -1061,6 +1091,13 @@ defmodule EgregorosWeb.StatusLive do
   end
 
   defp thread_relevant?(_socket, _object), do: false
+
+  defp schedule_thread_retry(kind) when kind in [:context, :replies] do
+    _ = Process.send_after(self(), {:thread_retry_available, kind}, @thread_retry_delay_ms)
+    :ok
+  end
+
+  defp schedule_thread_retry(_kind), do: :ok
 
   defp thread_object_ap_ids(%{status: %{object: %{ap_id: ap_id}}} = assigns) do
     ap_id = ap_id |> to_string() |> String.trim()
