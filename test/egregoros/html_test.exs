@@ -144,45 +144,43 @@ defmodule Egregoros.HTMLTest do
       assert scrubbed =~ "<s>s</s>"
     end
 
-    test "allows code blocks with classes" do
+    test "allows code blocks and strips classes" do
       html =
         "<pre class=\"highlight\"><code class=\"language-elixir\">IO.puts(1)</code></pre>"
 
       scrubbed = HTML.sanitize(html)
 
-      assert scrubbed =~ "<pre"
-      assert scrubbed =~ ~s(class="highlight")
-      assert scrubbed =~ "<code"
-      assert scrubbed =~ ~s(class="language-elixir")
+      assert scrubbed =~ "<pre>"
+      assert scrubbed =~ "<code>"
       assert scrubbed =~ "IO.puts"
+      refute scrubbed =~ "highlight"
+      refute scrubbed =~ "language-elixir"
     end
 
-    test "allows lists with classes" do
+    test "allows lists and strips classes" do
       html = "<ul class=\"list\"><li class=\"item\">one</li><li>two</li></ul>"
 
       scrubbed = HTML.sanitize(html)
 
       assert scrubbed =~ "<ul"
-      assert scrubbed =~ ~s(class="list")
       assert scrubbed =~ "<li"
-      assert scrubbed =~ ~s(class="item")
       assert scrubbed =~ ">one<"
       assert scrubbed =~ ">two<"
+      refute scrubbed =~ "class="
     end
 
-    test "allows span and blockquote classes and strips event handlers" do
+    test "allows span and blockquote and strips classes and event handlers" do
       html =
         "<blockquote class=\"quote\"><span class=\"mention\" onclick=\"alert(1)\">@alice</span></blockquote>"
 
       scrubbed = HTML.sanitize(html)
 
       assert scrubbed =~ "<blockquote"
-      assert scrubbed =~ ~s(class="quote")
       assert scrubbed =~ "<span"
-      assert scrubbed =~ ~s(class="mention")
       assert scrubbed =~ "@alice"
       refute scrubbed =~ "onclick="
       refute scrubbed =~ "alert(1)"
+      refute scrubbed =~ "class="
     end
 
     test "allows img tags with http(s) src" do
@@ -195,7 +193,7 @@ defmodule Egregoros.HTMLTest do
     end
 
     test "preserves allowed img dimension attributes" do
-      html = "<img src=\"https://cdn.example/x.png\" width=\"100\" height=\"50\">"
+      html = "<img src=\"https://cdn.example/x.png\" alt=\":x:\" width=\"100\" height=\"50\">"
 
       scrubbed = HTML.sanitize(html)
 
