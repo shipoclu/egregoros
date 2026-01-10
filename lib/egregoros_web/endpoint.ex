@@ -1,6 +1,10 @@
 defmodule EgregorosWeb.Endpoint do
   use Phoenix.Endpoint, otp_app: :egregoros
 
+  if Application.compile_env(:egregoros, :force_ssl, false) do
+    plug EgregorosWeb.Plugs.ForceSSL
+  end
+
   # The session will be stored in the cookie and signed,
   # this means its contents can be read but not tampered with.
   # Set :encryption_salt if you would also like to encrypt it.
