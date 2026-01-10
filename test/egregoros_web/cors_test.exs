@@ -53,6 +53,29 @@ defmodule EgregorosWeb.CORSTest do
     assert get_resp_header(conn, "access-control-allow-headers") == ["authorization,content-type"]
   end
 
+  test "adds CORS headers for uploads responses", %{conn: conn} do
+    conn =
+      conn
+      |> put_req_header("origin", "https://frontend.example")
+      |> get("/uploads/media/1/does-not-exist.mp3")
+
+    assert get_resp_header(conn, "access-control-allow-origin") == ["*"]
+  end
+
+  test "responds to uploads preflight requests", %{conn: conn} do
+    conn =
+      conn
+      |> put_req_header("origin", "https://frontend.example")
+      |> put_req_header("access-control-request-method", "GET")
+      |> put_req_header("access-control-request-headers", "range")
+      |> options("/uploads/media/1/does-not-exist.mp3")
+
+    assert conn.status == 204
+    assert conn.resp_body == ""
+    assert get_resp_header(conn, "access-control-allow-origin") == ["*"]
+    assert get_resp_header(conn, "access-control-allow-headers") == ["range"]
+  end
+
   test "does not add CORS headers for browser pages", %{conn: conn} do
     conn =
       conn

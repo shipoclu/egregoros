@@ -3,7 +3,7 @@ defmodule EgregorosWeb.Plugs.CORS do
 
   import Plug.Conn
 
-  @default_paths ["/api", "/oauth", "/nodeinfo", "/.well-known/nodeinfo"]
+  @default_paths ["/api", "/oauth", "/nodeinfo", "/.well-known/nodeinfo", "/uploads"]
   @default_methods ~w(GET POST PUT PATCH DELETE OPTIONS)
   @default_expose_headers ["link"]
   @default_allow_headers "authorization,content-type,accept"
