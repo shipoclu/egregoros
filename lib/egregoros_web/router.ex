@@ -203,6 +203,8 @@ defmodule EgregorosWeb.Router do
     pipe_through :api
 
     post "/apps", AppsController, :create
+    get "/announcements", AnnouncementsController, :index
+    post "/announcements/:id/dismiss", AnnouncementsController, :dismiss
     get "/streaming", StreamingController, :index
     get "/streaming/:stream", StreamingController, :index
     get "/streaming/:stream/:scope", StreamingController, :index
