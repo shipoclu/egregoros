@@ -32,6 +32,32 @@ defmodule EgregorosWeb.SettingsControllerTest do
     assert html =~ ~s(data-role="nav-settings")
   end
 
+  test "GET /settings shows current avatar and header image", %{conn: conn} do
+    {:ok, user} =
+      Users.register_local_user(%{
+        nickname: "alice",
+        email: "alice@example.com",
+        password: "very secure password"
+      })
+
+    {:ok, _} =
+      Users.update_profile(user, %{
+        "avatar_url" => "/uploads/avatars/#{user.id}/avatar.png",
+        "banner_url" => "/uploads/banners/#{user.id}/banner.png"
+      })
+
+    conn =
+      conn
+      |> Plug.Test.init_test_session(%{user_id: user.id})
+      |> get("/settings")
+
+    html = html_response(conn, 200)
+    assert html =~ ~s(data-role="settings-avatar")
+    assert html =~ "/uploads/avatars/#{user.id}/avatar.png"
+    assert html =~ ~s(data-role="settings-banner-image")
+    assert html =~ "/uploads/banners/#{user.id}/banner.png"
+  end
+
   test "POST /settings/profile updates name, bio, avatar, and header image uploads", %{conn: conn} do
     {:ok, user} =
       Users.register_local_user(%{
