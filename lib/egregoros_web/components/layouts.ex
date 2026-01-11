@@ -5,6 +5,8 @@ defmodule EgregorosWeb.Layouts do
   """
   use EgregorosWeb, :html
 
+  alias EgregorosWeb.URL
+
   # Embed all files in layouts/* within this module.
   # The default root.html.heex file contains the HTML
   # skeleton of your application, namely HTML headers
@@ -69,24 +71,93 @@ defmodule EgregorosWeb.Layouts do
             </a>
 
             <%= if @current_user do %>
-              <a
-                href={~p"/settings"}
-                class="hidden px-3 py-2 text-sm font-medium uppercase text-[color:var(--text-secondary)] transition hover:text-[color:var(--text-primary)] hover:underline underline-offset-4 sm:block"
-              >
-                Settings
-              </a>
-              <.form for={%{}} action={~p"/logout"} method="post" class="hidden sm:block">
-                <button
-                  type="submit"
-                  class="flex items-center gap-2 px-3 py-2 text-sm font-medium uppercase text-[color:var(--text-secondary)] transition hover:text-[color:var(--text-primary)] hover:underline underline-offset-4"
-                >
-                  <span class="font-mono font-bold text-[color:var(--text-primary)]">
-                    {@current_user.nickname}
+              <details id="user-menu" data-role="user-menu" class="relative group">
+                <summary class="flex cursor-pointer items-center gap-2 px-3 py-2 text-sm font-medium uppercase text-[color:var(--text-secondary)] transition hover:text-[color:var(--text-primary)] hover:underline underline-offset-4 focus-visible:outline-none focus-brutal list-none [&::-webkit-details-marker]:hidden">
+                  <.avatar
+                    size="xs"
+                    name={user_display_name(@current_user)}
+                    src={user_avatar_src(@current_user)}
+                    class="transition group-hover:scale-105"
+                  />
+                  <span class="hidden font-mono font-bold text-[color:var(--text-primary)] sm:inline">
+                    {user_nickname(@current_user)}
                   </span>
-                  <span class="text-[color:var(--text-muted)]">&middot;</span>
-                  <span>Logout</span>
-                </button>
-              </.form>
+                  <.icon
+                    name="hero-chevron-down-micro"
+                    class="size-4 text-[color:var(--text-muted)] transition group-open:rotate-180"
+                  />
+                </summary>
+
+                <div class={[
+                  "absolute right-0 top-full z-50 mt-2 w-60 overflow-hidden border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)]",
+                  "shadow-[4px_4px_0_var(--border-default)] motion-safe:animate-rise"
+                ]}>
+                  <div class="border-b-2 border-[color:var(--border-muted)] px-4 py-3">
+                    <p class="truncate font-bold text-[color:var(--text-primary)]">
+                      {user_display_name(@current_user)}
+                    </p>
+                    <p class="truncate font-mono text-sm text-[color:var(--text-muted)]">
+                      @{user_nickname(@current_user)}
+                    </p>
+                  </div>
+
+                  <nav class="py-1" aria-label="User menu">
+                    <a
+                      data-role="user-menu-profile"
+                      href={~p"/@#{user_nickname(@current_user)}"}
+                      class="flex items-center gap-3 px-4 py-2.5 text-sm font-medium uppercase text-[color:var(--text-secondary)] transition hover:bg-[color:var(--bg-muted)] hover:text-[color:var(--text-primary)] focus-visible:bg-[color:var(--bg-muted)] focus-visible:outline-none"
+                    >
+                      <.icon name="hero-user-circle" class="size-4" /> Profile
+                    </a>
+
+                    <a
+                      data-role="user-menu-settings"
+                      href={~p"/settings"}
+                      class="flex items-center gap-3 px-4 py-2.5 text-sm font-medium uppercase text-[color:var(--text-secondary)] transition hover:bg-[color:var(--bg-muted)] hover:text-[color:var(--text-primary)] focus-visible:bg-[color:var(--bg-muted)] focus-visible:outline-none"
+                    >
+                      <.icon name="hero-cog-6-tooth" class="size-4" /> Settings
+                    </a>
+
+                    <a
+                      data-role="user-menu-privacy"
+                      href={~p"/settings/privacy"}
+                      class="flex items-center gap-3 px-4 py-2.5 text-sm font-medium uppercase text-[color:var(--text-secondary)] transition hover:bg-[color:var(--bg-muted)] hover:text-[color:var(--text-primary)] focus-visible:bg-[color:var(--bg-muted)] focus-visible:outline-none"
+                    >
+                      <.icon name="hero-shield-check" class="size-4" /> Privacy
+                    </a>
+
+                    <a
+                      data-role="user-menu-notifications"
+                      href={~p"/notifications"}
+                      class="flex items-center gap-3 px-4 py-2.5 text-sm font-medium uppercase text-[color:var(--text-secondary)] transition hover:bg-[color:var(--bg-muted)] hover:text-[color:var(--text-primary)] focus-visible:bg-[color:var(--bg-muted)] focus-visible:outline-none"
+                    >
+                      <.icon name="hero-bell" class="size-4" /> Notifications
+                    </a>
+
+                    <%= if Map.get(@current_user, :admin) == true do %>
+                      <a
+                        data-role="user-menu-admin"
+                        href={~p"/admin"}
+                        class="flex items-center gap-3 px-4 py-2.5 text-sm font-medium uppercase text-[color:var(--text-secondary)] transition hover:bg-[color:var(--bg-muted)] hover:text-[color:var(--text-primary)] focus-visible:bg-[color:var(--bg-muted)] focus-visible:outline-none"
+                      >
+                        <.icon name="hero-shield-check" class="size-4" /> Admin
+                      </a>
+                    <% end %>
+                  </nav>
+
+                  <div class="border-t-2 border-[color:var(--border-muted)] p-1">
+                    <.form for={%{}} action={~p"/logout"} method="post" class="contents">
+                      <button
+                        type="submit"
+                        data-role="user-menu-logout"
+                        class="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm font-medium uppercase text-[color:var(--danger)] transition hover:bg-[color:var(--bg-muted)] focus-visible:bg-[color:var(--bg-muted)] focus-visible:outline-none"
+                      >
+                        <.icon name="hero-arrow-right-on-rectangle" class="size-4" /> Logout
+                      </button>
+                    </.form>
+                  </div>
+                </div>
+              </details>
             <% else %>
               <a
                 href={~p"/login"}
@@ -204,4 +275,24 @@ defmodule EgregorosWeb.Layouts do
     </div>
     """
   end
+
+  defp user_avatar_src(user) when is_map(user) do
+    user
+    |> Map.get(:avatar_url)
+    |> URL.absolute()
+  end
+
+  defp user_avatar_src(_user), do: nil
+
+  defp user_display_name(user) when is_map(user) do
+    Map.get(user, :name) || Map.get(user, :nickname) || "Unknown"
+  end
+
+  defp user_display_name(_user), do: "Unknown"
+
+  defp user_nickname(user) when is_map(user) do
+    Map.get(user, :nickname) || "unknown"
+  end
+
+  defp user_nickname(_user), do: "unknown"
 end
