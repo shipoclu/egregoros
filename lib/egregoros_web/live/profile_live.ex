@@ -1243,9 +1243,14 @@ defmodule EgregorosWeb.ProfileLive do
        when is_binary(ap_id) do
     stale? =
       case user.remote_counts_checked_at do
-        nil -> true
-        %DateTime{} = at -> DateTime.diff(DateTime.utc_now(), at, :second) > @remote_counts_refresh_interval_s
-        _ -> true
+        nil ->
+          true
+
+        %DateTime{} = at ->
+          DateTime.diff(DateTime.utc_now(), at, :second) > @remote_counts_refresh_interval_s
+
+        _ ->
+          true
       end
 
     if stale? do

@@ -61,4 +61,3 @@ defmodule EgregorosWeb.Plugs.ForceSSLTest do
     end
   end
 end
-

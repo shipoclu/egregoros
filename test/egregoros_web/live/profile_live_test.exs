@@ -46,7 +46,11 @@ defmodule EgregorosWeb.ProfileLiveTest do
     assert has_element?(view, "button[data-role='profile-follow']")
   end
 
-  test "profile lists announces by the profile actor", %{conn: conn, viewer: viewer, profile_user: profile_user} do
+  test "profile lists announces by the profile actor", %{
+    conn: conn,
+    viewer: viewer,
+    profile_user: profile_user
+  } do
     {:ok, charlie} = Users.create_local_user("charlie")
     assert {:ok, note} = Pipeline.ingest(Note.build(charlie, "Boosted profile note"), local: true)
     assert {:ok, announce} = Pipeline.ingest(Announce.build(profile_user, note), local: true)
@@ -56,7 +60,13 @@ defmodule EgregorosWeb.ProfileLiveTest do
 
     assert has_element?(view, "#post-#{announce.id}")
     assert has_element?(view, "#post-#{announce.id}", "Boosted profile note")
-    assert has_element?(view, "#post-#{announce.id} [data-role='reposted-by']", profile_user.nickname)
+
+    assert has_element?(
+             view,
+             "#post-#{announce.id} [data-role='reposted-by']",
+             profile_user.nickname
+           )
+
     assert has_element?(view, "#post-#{announce.id} [data-role='reposted-by']", "reposted")
     assert has_element?(view, "#post-#{announce.id} [data-role='post-actor-handle']", "@charlie")
   end
@@ -443,11 +453,13 @@ defmodule EgregorosWeb.ProfileLiveTest do
     end)
 
     expect(Egregoros.HTTP.Mock, :get, fn "https://remote.example/users/bob/followers", _headers ->
-      {:ok, %{status: 200, headers: [], body: %{"type" => "OrderedCollection", "totalItems" => 123}}}
+      {:ok,
+       %{status: 200, headers: [], body: %{"type" => "OrderedCollection", "totalItems" => 123}}}
     end)
 
     expect(Egregoros.HTTP.Mock, :get, fn "https://remote.example/users/bob/following", _headers ->
-      {:ok, %{status: 200, headers: [], body: %{"type" => "OrderedCollection", "totalItems" => 45}}}
+      {:ok,
+       %{status: 200, headers: [], body: %{"type" => "OrderedCollection", "totalItems" => 45}}}
     end)
 
     assert :ok =

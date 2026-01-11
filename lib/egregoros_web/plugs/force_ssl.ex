@@ -81,7 +81,9 @@ defmodule EgregorosWeb.Plugs.ForceSSL do
     end)
   end
 
-  defp maybe_put_hsts(conn, true), do: put_resp_header(conn, "strict-transport-security", @default_hsts)
+  defp maybe_put_hsts(conn, true),
+    do: put_resp_header(conn, "strict-transport-security", @default_hsts)
+
   defp maybe_put_hsts(conn, false), do: conn
 
   defp redirect_to_https(conn) do
@@ -97,4 +99,3 @@ defmodule EgregorosWeb.Plugs.ForceSSL do
   defp qs(""), do: ""
   defp qs(qs), do: "?" <> qs
 end
-

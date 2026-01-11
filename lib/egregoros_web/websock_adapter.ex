@@ -6,4 +6,3 @@ defmodule EgregorosWeb.WebSockAdapter do
     WebSockAdapter.upgrade(conn, handler, state, opts)
   end
 end
-

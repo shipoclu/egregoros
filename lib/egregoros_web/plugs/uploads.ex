@@ -121,7 +121,8 @@ defmodule EgregorosWeb.Plugs.Uploads do
   end
 
   defp uploads_host do
-    with base when is_binary(base) and base != "" <- Application.get_env(:egregoros, :uploads_base_url),
+    with base when is_binary(base) and base != "" <-
+           Application.get_env(:egregoros, :uploads_base_url),
          %URI{host: host} when is_binary(host) and host != "" <- URI.parse(base) do
       host
     else

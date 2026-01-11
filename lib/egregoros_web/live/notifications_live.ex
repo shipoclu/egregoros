@@ -650,7 +650,8 @@ defmodule EgregorosWeb.NotificationsLive do
           {emoji_token, reaction_emojis, reaction_display} =
             cond do
               is_binary(emoji_url) and emoji_url != "" and emoji != "" ->
-                {":#{emoji}:", [%{shortcode: emoji, url: emoji_url}], %{type: :custom, shortcode: emoji, url: emoji_url}}
+                {":#{emoji}:", [%{shortcode: emoji, url: emoji_url}],
+                 %{type: :custom, shortcode: emoji, url: emoji_url}}
 
               emoji_raw != "" ->
                 {emoji_raw, [], %{type: :unicode, emoji: emoji_raw}}

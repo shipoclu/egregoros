@@ -1818,7 +1818,11 @@ defmodule EgregorosWeb.TimelineLiveTest do
     |> element("#post-#{announce.id} button[data-role='like']")
     |> render_click()
 
-    assert has_element?(view, "#post-#{announce.id} button[data-role='like'][aria-pressed='true']")
+    assert has_element?(
+             view,
+             "#post-#{announce.id} button[data-role='like'][aria-pressed='true']"
+           )
+
     refute has_element?(view, "#post-#{note.id}")
   end
 end

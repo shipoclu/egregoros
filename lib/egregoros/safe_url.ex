@@ -236,13 +236,13 @@ defmodule Egregoros.SafeURL do
 
   defp ipv4_from_parts([a, b])
        when is_integer(a) and is_integer(b) and a in 0..255 and b >= 0 and b <= 0xFF_FFFF do
-    {:ok, ipv4_from_int((a <<< 24) ||| b)}
+    {:ok, ipv4_from_int(a <<< 24 ||| b)}
   end
 
   defp ipv4_from_parts([a, b, c])
        when is_integer(a) and is_integer(b) and is_integer(c) and a in 0..255 and b in 0..255 and
               c >= 0 and c <= 0xFFFF do
-    {:ok, ipv4_from_int((a <<< 24) ||| (b <<< 16) ||| c)}
+    {:ok, ipv4_from_int(a <<< 24 ||| b <<< 16 ||| c)}
   end
 
   defp ipv4_from_parts([a, b, c, d])
@@ -255,9 +255,9 @@ defmodule Egregoros.SafeURL do
 
   defp ipv4_from_int(int) when is_integer(int) do
     {
-      (int >>> 24) &&& 0xFF,
-      (int >>> 16) &&& 0xFF,
-      (int >>> 8) &&& 0xFF,
+      int >>> 24 &&& 0xFF,
+      int >>> 16 &&& 0xFF,
+      int >>> 8 &&& 0xFF,
       int &&& 0xFF
     }
   end

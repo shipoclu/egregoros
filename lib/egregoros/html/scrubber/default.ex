@@ -37,7 +37,8 @@ defmodule Egregoros.HTML.Scrubber.Default do
   def scrub_attribute(:img, {"alt", value}) when is_binary(value), do: {"alt", value}
   def scrub_attribute(:img, {"title", value}) when is_binary(value), do: {"title", value}
 
-  def scrub_attribute(:img, {attr, value}) when attr in ["width", "height"] and is_binary(value) do
+  def scrub_attribute(:img, {attr, value})
+      when attr in ["width", "height"] and is_binary(value) do
     if String.match?(value, ~r/^\d+$/) do
       {attr, value}
     else

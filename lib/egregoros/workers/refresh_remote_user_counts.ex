@@ -25,4 +25,3 @@ defmodule Egregoros.Workers.RefreshRemoteUserCounts do
 
   def perform(%Oban.Job{}), do: {:discard, :invalid_args}
 end
-

@@ -32,4 +32,3 @@ defmodule EgregorosWeb.Plugs.Session do
     end
   end
 end
-

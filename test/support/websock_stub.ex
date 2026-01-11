@@ -6,4 +6,3 @@ defmodule EgregorosWeb.WebSock.Stub do
     %{conn | state: :upgraded}
   end
 end
-

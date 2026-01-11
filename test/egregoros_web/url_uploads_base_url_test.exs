@@ -9,7 +9,9 @@ defmodule EgregorosWeb.URLUploadsBaseURLTest do
     Application.put_env(:egregoros, :uploads_base_url, "https://i.example.com")
 
     try do
-      assert URL.absolute("/uploads/media/1/file.png") == "https://i.example.com/uploads/media/1/file.png"
+      assert URL.absolute("/uploads/media/1/file.png") ==
+               "https://i.example.com/uploads/media/1/file.png"
+
       assert URL.absolute("/objects/123") == Endpoint.url() <> "/objects/123"
     after
       restore_uploads_base_url(original)
@@ -50,4 +52,3 @@ defmodule EgregorosWeb.URLUploadsBaseURLTest do
     Application.put_env(:egregoros, :uploads_base_url, value)
   end
 end
-

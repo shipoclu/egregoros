@@ -24,7 +24,11 @@ defmodule Egregoros.Federation.SignedFetchTest do
       assert {"date", _date} = List.keyfind(headers, "date", 0)
       assert {"signature", signature} = List.keyfind(headers, "signature", 0)
       refute String.starts_with?(signature, "Signature ")
-      assert String.contains?(signature, "headers=\"(request-target) host date digest content-length\"")
+
+      assert String.contains?(
+               signature,
+               "headers=\"(request-target) host date digest content-length\""
+             )
 
       key_id = Endpoint.url() <> "/users/internal.fetch#main-key"
       assert String.contains?(signature, "keyId=\"#{key_id}\"")

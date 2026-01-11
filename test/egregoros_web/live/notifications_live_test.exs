@@ -307,7 +307,11 @@ defmodule EgregorosWeb.NotificationsLiveTest do
            )
   end
 
-  test "mention notifications include a link to the mentioned status", %{conn: conn, user: user, actor: actor} do
+  test "mention notifications include a link to the mentioned status", %{
+    conn: conn,
+    user: user,
+    actor: actor
+  } do
     assert {:ok, mention_create} = Publish.post_note(actor, "@alice Hello there")
     mention_note = Objects.get_by_ap_id(mention_create.object)
     mention_uuid = URL.local_object_uuid(mention_note.ap_id)

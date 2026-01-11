@@ -47,4 +47,3 @@ defmodule Egregoros.UserEvents do
     @topic_prefix <> user_ap_id
   end
 end
-

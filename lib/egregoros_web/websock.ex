@@ -9,4 +9,3 @@ defmodule EgregorosWeb.WebSock do
     Application.get_env(:egregoros, __MODULE__, EgregorosWeb.WebSockAdapter)
   end
 end
-

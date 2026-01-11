@@ -52,4 +52,3 @@ defmodule EgregorosWeb.Plugs.UploadsHostRestrictionTest do
   defp restore_env(key, nil), do: Application.delete_env(:egregoros, key)
   defp restore_env(key, value), do: Application.put_env(:egregoros, key, value)
 end
-

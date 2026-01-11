@@ -48,7 +48,8 @@ if config_env() != :test do
       ]
   end
 
-  uploads_base_url = System.get_env("EGREGOROS_UPLOADS_BASE_URL") || System.get_env("UPLOADS_BASE_URL")
+  uploads_base_url =
+    System.get_env("EGREGOROS_UPLOADS_BASE_URL") || System.get_env("UPLOADS_BASE_URL")
 
   if is_binary(uploads_base_url) and uploads_base_url != "" do
     config :egregoros, :uploads_base_url, uploads_base_url

@@ -83,7 +83,8 @@ defmodule EgregorosWeb.URL do
 
   defp same_host?(url, other) when is_binary(url) and is_binary(other) do
     with %URI{host: host} when is_binary(host) and host != "" <- URI.parse(url),
-         %URI{host: other_host} when is_binary(other_host) and other_host != "" <- URI.parse(other) do
+         %URI{host: other_host} when is_binary(other_host) and other_host != "" <-
+           URI.parse(other) do
       String.downcase(host) == String.downcase(other_host)
     else
       _ -> false

@@ -39,4 +39,3 @@ defmodule Egregoros.Security.SafeURLNoDNSSecurityTest do
     end
   end
 end
-
