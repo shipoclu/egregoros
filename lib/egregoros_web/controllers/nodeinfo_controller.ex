@@ -14,12 +14,24 @@ defmodule EgregorosWeb.NodeinfoController do
         %{
           "rel" => "http://nodeinfo.diaspora.software/ns/schema/2.0",
           "href" => Endpoint.url() <> "/nodeinfo/2.0.json"
+        },
+        %{
+          "rel" => "http://nodeinfo.diaspora.software/ns/schema/2.1",
+          "href" => Endpoint.url() <> "/nodeinfo/2.1.json"
         }
       ]
     })
   end
 
   def nodeinfo(conn, _params) do
+    render_nodeinfo(conn, "2.0")
+  end
+
+  def nodeinfo_2_1(conn, _params) do
+    render_nodeinfo(conn, "2.1")
+  end
+
+  defp render_nodeinfo(conn, version) when is_binary(version) do
     user_count =
       from(u in User, where: u.local == true and u.nickname != "internal.fetch")
       |> Repo.aggregate(:count, :id)
@@ -30,10 +42,10 @@ defmodule EgregorosWeb.NodeinfoController do
 
     conn
     |> put_resp_content_type(
-      "application/json; profile=http://nodeinfo.diaspora.software/ns/schema/2.0#; charset=utf-8"
+      "application/json; profile=http://nodeinfo.diaspora.software/ns/schema/#{version}#; charset=utf-8"
     )
     |> json(%{
-      "version" => "2.0",
+      "version" => version,
       "software" => %{
         "name" => "egregoros",
         "version" => app_version()

@@ -21,6 +21,15 @@ defmodule EgregorosWeb.NodeinfoControllerTest do
     assert "activitypub" in body["protocols"]
   end
 
+  test "GET /nodeinfo/2.1.json returns minimal payload", %{conn: conn} do
+    conn = get(conn, "/nodeinfo/2.1.json")
+    body = json_response(conn, 200)
+
+    assert body["version"] == "2.1"
+    assert body["software"]["name"] == "egregoros"
+    assert "activitypub" in body["protocols"]
+  end
+
   test "nodeinfo reports registrations and basic usage counts", %{conn: conn} do
     {:ok, user} = Users.create_local_user("local")
     {:ok, _note} = Publish.post_note(user, "hello", visibility: "public")
