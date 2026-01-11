@@ -1793,7 +1793,8 @@ defmodule EgregorosWeb.TimelineLiveTest do
 
     assert has_element?(view, "#post-#{announce.id}")
     assert has_element?(view, "#post-#{announce.id}", "Boost me")
-    assert has_element?(view, "#post-#{announce.id} [data-role='reposted-by']", "@alice")
+    assert has_element?(view, "#post-#{announce.id} [data-role='reposted-by']", "alice")
+    assert has_element?(view, "#post-#{announce.id} [data-role='reposted-by']", "reposted")
     assert has_element?(view, "#post-#{announce.id} [data-role='post-actor-handle']", "@charlie")
   end
 

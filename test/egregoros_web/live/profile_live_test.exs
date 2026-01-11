@@ -56,7 +56,8 @@ defmodule EgregorosWeb.ProfileLiveTest do
 
     assert has_element?(view, "#post-#{announce.id}")
     assert has_element?(view, "#post-#{announce.id}", "Boosted profile note")
-    assert has_element?(view, "#post-#{announce.id} [data-role='reposted-by']", "@#{profile_user.nickname}")
+    assert has_element?(view, "#post-#{announce.id} [data-role='reposted-by']", profile_user.nickname)
+    assert has_element?(view, "#post-#{announce.id} [data-role='reposted-by']", "reposted")
     assert has_element?(view, "#post-#{announce.id} [data-role='post-actor-handle']", "@charlie")
   end
 

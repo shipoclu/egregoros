@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Repost UX 1: Compact Pill - Pleroma Redux</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-base: #ffffff;
+      --bg-subtle: #f5f5f5;
+      --bg-muted: #ebebeb;
+      --text-primary: #000000;
+      --text-secondary: #555555;
+      --text-muted: #888888;
+      --border-default: #000000;
+      --border-muted: #cccccc;
+      --link: #0000ee;
+      --repost-accent: #666666;
+    }
+
+    [data-theme="dark"] {
+      --bg-base: #0a0a0a;
+      --bg-subtle: #141414;
+      --bg-muted: #1f1f1f;
+      --text-primary: #ffffff;
+      --text-secondary: #aaaaaa;
+      --text-muted: #666666;
+      --border-default: #ffffff;
+      --border-muted: #333333;
+      --link: #88aaff;
+      --repost-accent: #888888;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: var(--bg-base);
+      color: var(--text-primary);
+      line-height: 1.5;
+      font-size: 15px;
+    }
+
+    .container {
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+
+    h1 {
+      font-size: 24px;
+      font-weight: 900;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: -0.5px;
+    }
+
+    .description {
+      color: var(--text-secondary);
+      margin-bottom: 32px;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .description strong {
+      color: var(--text-primary);
+    }
+
+    .theme-toggle {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 8px 16px;
+      background: var(--text-primary);
+      color: var(--bg-base);
+      border: 2px solid var(--border-default);
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+
+    .posts {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* ===========================================
+       STATUS CARD BASE
+       =========================================== */
+    .status-card {
+      border: 2px solid var(--border-default);
+      background: var(--bg-base);
+      padding: 16px;
+      transition: background 0.1s;
+    }
+
+    .status-card:hover {
+      background: var(--bg-subtle);
+    }
+
+    /* ===========================================
+       COMPACT PILL REPOST INDICATOR
+       Small, unobtrusive pill above the post
+       =========================================== */
+    .repost-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 12px;
+      padding: 3px 10px 3px 3px;
+      background: var(--bg-muted);
+      font-size: 11px;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text-muted);
+    }
+
+    .repost-pill svg {
+      width: 12px;
+      height: 12px;
+    }
+
+    .repost-pill .reposter-avatar {
+      width: 20px;
+      height: 20px;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border-muted);
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+
+    .repost-pill .reposter-avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .repost-pill a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .repost-pill a:hover {
+      color: var(--text-primary);
+      text-decoration: underline;
+    }
+
+    /* ===========================================
+       POST HEADER
+       =========================================== */
+    .post-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .avatar {
+      width: 44px;
+      height: 44px;
+      background: var(--bg-muted);
+      border: 2px solid var(--border-default);
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+
+    .avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .post-meta {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .author-name {
+      font-weight: 700;
+      font-size: 15px;
+      color: var(--text-primary);
+    }
+
+    .author-handle {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 2px;
+    }
+
+    .badge {
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 2px 6px;
+      border: 1px solid var(--border-muted);
+      color: var(--text-muted);
+    }
+
+    .post-time {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-left: auto;
+      flex-shrink: 0;
+    }
+
+    /* ===========================================
+       POST CONTENT
+       =========================================== */
+    .post-content {
+      font-size: 15px;
+      line-height: 1.6;
+      color: var(--text-primary);
+    }
+
+    .post-content a {
+      color: var(--link);
+    }
+
+    /* Comparison box */
+    .comparison {
+      margin-top: 40px;
+      padding: 20px;
+      background: var(--bg-subtle);
+      border: 2px solid var(--border-default);
+    }
+
+    .comparison h2 {
+      font-size: 14px;
+      font-weight: 700;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+
+    .comparison ul {
+      list-style: none;
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .comparison li {
+      padding: 6px 0;
+      border-bottom: 1px solid var(--border-muted);
+    }
+
+    .comparison li:last-child {
+      border-bottom: none;
+    }
+
+    .comparison strong {
+      color: var(--text-primary);
+    }
+
+    .section-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+  </style>
+</head>
+<body data-theme="">
+  <button class="theme-toggle" onclick="document.documentElement.setAttribute('data-theme', document.documentElement.getAttribute('data-theme') === 'dark' ? '' : 'dark')">
+    Toggle Theme
+  </button>
+
+  <div class="container">
+    <h1>Compact Pill</h1>
+    <p class="description">
+      <strong>Concept:</strong> A small, unobtrusive pill indicator above the post header.
+      Minimal visual footprint, doesn't interrupt the flow of reading.
+      The reposter's handle is shortened and clickable.
+    </p>
+
+    <div class="posts">
+      <p class="section-label">Reposted status</p>
+
+      <article class="status-card">
+        <div class="repost-pill">
+          <div class="reposter-avatar">
+            <div style="width:100%;height:100%;background:linear-gradient(135deg, #a86 0%, #643 100%);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:8px;">K</div>
+          </div>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="M17 1l4 4-4 4"/>
+            <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+            <path d="M7 23l-4-4 4-4"/>
+            <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+          </svg>
+          <a href="#">kaia</a> reposted
+        </div>
+
+        <div class="post-header">
+          <div class="avatar">
+            <div style="width:100%;height:100%;background:linear-gradient(135deg, #667 0%, #334 100%);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:16px;">N</div>
+          </div>
+          <div class="post-meta">
+            <div class="author-name">Nanoraptor</div>
+            <div class="author-handle">
+              @NanoRaptor@bitbang.social
+              <span class="badge">Remote</span>
+            </div>
+          </div>
+          <span class="post-time">2h</span>
+        </div>
+
+        <div class="post-content">
+          The thinkfriend is the only portable computer that can love you back. It is never low on battery nor does it fail to boot. It simply is, and is very good at it.
+        </div>
+      </article>
+
+      <p class="section-label" style="margin-top: 24px;">Original status (for comparison)</p>
+
+      <article class="status-card">
+        <div class="post-header">
+          <div class="avatar">
+            <div style="width:100%;height:100%;background:linear-gradient(135deg, #667 0%, #334 100%);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:16px;">N</div>
+          </div>
+          <div class="post-meta">
+            <div class="author-name">Nanoraptor</div>
+            <div class="author-handle">
+              @NanoRaptor@bitbang.social
+              <span class="badge">Remote</span>
+            </div>
+          </div>
+          <span class="post-time">4h</span>
+        </div>
+
+        <div class="post-content">
+          The thinkfriend is the only portable computer that can love you back. It is never low on battery nor does it fail to boot. It simply is, and is very good at it.
+        </div>
+      </article>
+    </div>
+
+    <div class="comparison">
+      <h2>Design Rationale</h2>
+      <ul>
+        <li><strong>Compact pill:</strong> Small inline element that doesn't dominate the post. Uses muted background to blend in.</li>
+        <li><strong>Shortened handle:</strong> Shows just @username without domain to save space. Full handle on hover/click.</li>
+        <li><strong>Icon + text:</strong> Small repost icon (12px) followed by "@user reposted" in monospace.</li>
+        <li><strong>Position:</strong> Above the author header, clearly indicating "this is a repost of the below content".</li>
+        <li><strong>Trade-off:</strong> Very minimal, might be too subtle for some users. Good for power users who want clean timelines.</li>
+      </ul>
+    </div>
+  </div>
+</body>
+</html>

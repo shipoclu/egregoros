@@ -28,21 +28,28 @@ defmodule EgregorosWeb.StatusCard do
       <%= if reposted_by = Map.get(@entry, :reposted_by) do %>
         <div
           data-role="reposted-by"
-          class="mb-3 flex flex-wrap items-center gap-2 text-xs font-mono text-[color:var(--text-muted)]"
+          class="mb-3 inline-flex items-center gap-1.5 bg-[color:var(--bg-muted)] py-1 pl-1 pr-2.5 text-xs font-mono text-[color:var(--text-muted)]"
         >
-          <.icon name="hero-arrow-path" class="size-4" />
-          <span>Reposted by</span>
-
+          <.avatar
+            size="xs"
+            name={reposted_by.display_name}
+            src={reposted_by.avatar_url}
+            class="!h-5 !w-5 !border"
+          />
+          <.icon name="hero-arrow-path" class="size-3" />
           <%= if is_binary(repost_path = actor_profile_path(reposted_by)) do %>
             <.link
               navigate={repost_path}
-              class="font-bold text-[color:var(--text-primary)] hover:underline underline-offset-2 focus-visible:outline-none"
+              class="font-semibold text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] hover:underline underline-offset-2 focus-visible:outline-none"
             >
-              {reposted_by.handle}
+              {reposter_short_name(reposted_by)}
             </.link>
           <% else %>
-            <span class="font-bold text-[color:var(--text-primary)]">{reposted_by.handle}</span>
+            <span class="font-semibold text-[color:var(--text-secondary)]">
+              {reposter_short_name(reposted_by)}
+            </span>
           <% end %>
+          <span>reposted</span>
         </div>
       <% end %>
 
@@ -1002,4 +1009,20 @@ defmodule EgregorosWeb.StatusCard do
   end
 
   defp attachment_filename(_), do: "Attachment"
+
+  # Returns name for reposter - prefers display_name, falls back to nickname
+  defp reposter_short_name(%{display_name: name}) when is_binary(name) and name != "", do: name
+
+  defp reposter_short_name(%{nickname: nickname}) when is_binary(nickname) and nickname != "" do
+    nickname
+  end
+
+  defp reposter_short_name(%{handle: handle}) when is_binary(handle) do
+    handle
+    |> String.trim_leading("@")
+    |> String.split("@")
+    |> List.first()
+  end
+
+  defp reposter_short_name(_), do: "someone"
 end
