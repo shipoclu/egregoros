@@ -43,6 +43,19 @@ services:
     command: >
       sh -lc 'bin/egregoros eval "Egregoros.Release.migrate()" && exec bin/egregoros start'
 
+  pleroma_fe:
+    build:
+      context: .
+      dockerfile: docker/pleroma-fe/Dockerfile
+      args:
+        PLEROMA_FE_REPO: ${PLEROMA_FE_REPO:-https://git.pleroma.social/pleroma/pleroma-fe.git}
+        PLEROMA_FE_REF: ${PLEROMA_FE_REF:-2.10.0}
+    restart: unless-stopped
+    depends_on:
+      - web
+    expose:
+      - "80"
+
 volumes:
   egregoros_db:
   egregoros_uploads:
