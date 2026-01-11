@@ -260,6 +260,12 @@ defmodule EgregorosWeb.Router do
   end
 
   scope "/api/v1/pleroma", EgregorosWeb.PleromaAPI do
+    pipe_through [:api, :api_auth]
+
+    post "/notifications/read", NotificationsController, :read
+  end
+
+  scope "/api/v1/pleroma", EgregorosWeb.PleromaAPI do
     pipe_through [:api, :api_optional_auth]
 
     get "/emoji", EmojiController, :index

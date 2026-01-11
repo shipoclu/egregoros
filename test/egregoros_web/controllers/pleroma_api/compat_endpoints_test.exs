@@ -62,4 +62,18 @@ defmodule EgregorosWeb.PleromaAPI.CompatEndpointsTest do
 
     assert Enum.any?(response, &(&1["uri"] == note.ap_id))
   end
+
+  test "POST /api/v1/pleroma/notifications/read marks notifications as seen", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("alice")
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, user} end)
+
+    conn =
+      conn
+      |> put_req_header("authorization", "Bearer token")
+      |> post("/api/v1/pleroma/notifications/read", %{"max_id" => "123"})
+
+    assert json_response(conn, 200) == %{"status" => "success"}
+  end
 end
