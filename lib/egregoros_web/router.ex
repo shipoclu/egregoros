@@ -117,6 +117,7 @@ defmodule EgregorosWeb.Router do
 
     post "/oauth/token", OAuthController, :token
     post "/oauth/revoke", OAuthController, :revoke
+    get "/api/pleroma/emoji.json", PleromaEmojiController, :index
     get "/users/:nickname", ActorController, :show
     post "/users/:nickname/inbox", InboxController, :inbox
     get "/users/:nickname/outbox", OutboxController, :outbox
@@ -252,6 +253,14 @@ defmodule EgregorosWeb.Router do
     pipe_through [:api, :api_auth, :oauth_write]
 
     post "/media", MediaController, :create
+  end
+
+  scope "/api/v1/pleroma", EgregorosWeb.PleromaAPI do
+    pipe_through [:api, :api_optional_auth]
+
+    get "/emoji", EmojiController, :index
+    get "/accounts/:id/favourites", AccountsController, :favourites
+    get "/accounts/:id/scrobbles", AccountsController, :scrobbles
   end
 
   scope "/api/v1/pleroma", EgregorosWeb.PleromaAPI do
