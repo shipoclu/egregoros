@@ -187,6 +187,8 @@ defmodule EgregorosWeb.MastodonAPI.StatusRenderer do
       "filtered" => [],
       "language" => language(object),
       "pleroma" => %{
+        "conversation_id" => conversation_id(object, ctx),
+        "local" => object.local,
         "emoji_reactions" => emoji_reactions(object, ctx)
       }
     }
@@ -250,10 +252,58 @@ defmodule EgregorosWeb.MastodonAPI.StatusRenderer do
       "filtered" => [],
       "language" => if(is_map(reblog), do: Map.get(reblog, "language"), else: nil),
       "pleroma" => %{
+        "conversation_id" => conversation_id_for_reblog(reblog, announce, ctx),
+        "local" => announce.local,
         "emoji_reactions" => []
       }
     }
   end
+
+  defp conversation_id_for_reblog(%{} = reblog, _announce, _ctx) do
+    case get_in(reblog, ["pleroma", "conversation_id"]) do
+      id when is_integer(id) and id > 0 -> id
+      id when is_binary(id) and id != "" -> id
+      _ -> nil
+    end
+  end
+
+  defp conversation_id_for_reblog(_reblog, %Object{} = announce, ctx) do
+    conversation_id(announce, ctx)
+  end
+
+  defp conversation_id(%Object{type: "Announce", object: object_ap_id} = announce, ctx)
+       when is_binary(object_ap_id) do
+    object_ap_id = String.trim(object_ap_id)
+
+    cond do
+      object_ap_id == "" ->
+        announce.id
+
+      true ->
+        case Map.get(ctx.reblogs_by_ap_id, object_ap_id) do
+          %Object{} = object -> conversation_id(object, ctx)
+          _ -> announce.id
+        end
+    end
+  end
+
+  defp conversation_id(%Object{type: "Note"} = object, _ctx) do
+    root = conversation_root_note(object)
+    root.id
+  end
+
+  defp conversation_id(%Object{} = object, _ctx) do
+    object.id
+  end
+
+  defp conversation_root_note(%Object{type: "Note"} = object) do
+    case Objects.thread_ancestors(object) do
+      [%Object{} = root | _rest] -> root
+      _ -> object
+    end
+  end
+
+  defp conversation_root_note(%Object{} = object), do: object
 
   defp account_from_actor(actor, ctx) when is_binary(actor) do
     Map.get(ctx.accounts_by_actor, actor) ||

@@ -240,6 +240,43 @@ defmodule EgregorosWeb.MastodonAPI.StatusRendererTest do
     assert rendered["in_reply_to_account_id"] == Integer.to_string(alice.id)
   end
 
+  test "includes pleroma.conversation_id so pleroma-fe can group threads" do
+    {:ok, alice} = Users.create_local_user("alice")
+    {:ok, bob} = Users.create_local_user("bob")
+
+    {:ok, root} =
+      Objects.create_object(%{
+        ap_id: "https://remote.example/objects/root",
+        type: "Note",
+        actor: alice.ap_id,
+        local: false,
+        data: %{
+          "id" => "https://remote.example/objects/root",
+          "type" => "Note",
+          "actor" => alice.ap_id,
+          "content" => "root"
+        }
+      })
+
+    {:ok, reply} =
+      Objects.create_object(%{
+        ap_id: "https://remote.example/objects/reply",
+        type: "Note",
+        actor: bob.ap_id,
+        local: false,
+        data: %{
+          "id" => "https://remote.example/objects/reply",
+          "type" => "Note",
+          "actor" => bob.ap_id,
+          "content" => "reply",
+          "inReplyTo" => root.ap_id
+        }
+      })
+
+    assert StatusRenderer.render_status(root)["pleroma"]["conversation_id"] == root.id
+    assert StatusRenderer.render_status(reply)["pleroma"]["conversation_id"] == root.id
+  end
+
   test "renders spoiler_text and sensitive flags" do
     {:ok, alice} = Users.create_local_user("alice")
 
