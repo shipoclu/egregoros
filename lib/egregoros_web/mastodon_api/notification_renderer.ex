@@ -8,6 +8,8 @@ defmodule EgregorosWeb.MastodonAPI.NotificationRenderer do
   alias EgregorosWeb.MastodonAPI.StatusRenderer
 
   def render_notification(%Object{} = activity, %User{} = current_user) do
+    notifications_last_seen_id = Map.get(current_user, :notifications_last_seen_id, 0) || 0
+
     status =
       case activity.type do
         "Like" -> Objects.get_by_ap_id(activity.object)
@@ -23,7 +25,9 @@ defmodule EgregorosWeb.MastodonAPI.NotificationRenderer do
       "account" => AccountRenderer.render_account(account_for_actor(activity.actor)),
       "status" => if(status, do: StatusRenderer.render_status(status, current_user), else: nil),
       "pleroma" => %{
-        "is_seen" => false
+        "is_seen" =>
+          is_integer(notifications_last_seen_id) and notifications_last_seen_id > 0 and
+            activity.id <= notifications_last_seen_id
       }
     }
   end

@@ -28,6 +28,7 @@ defmodule Egregoros.User do
     remote_followers_count
     remote_following_count
     remote_counts_checked_at
+    notifications_last_seen_id
   )a
   @required_fields ~w(nickname ap_id inbox outbox public_key local)a
 
@@ -55,6 +56,7 @@ defmodule Egregoros.User do
     field :remote_followers_count, :integer
     field :remote_following_count, :integer
     field :remote_counts_checked_at, :utc_datetime_usec
+    field :notifications_last_seen_id, :integer, default: 0
 
     timestamps(type: :utc_datetime_usec)
   end

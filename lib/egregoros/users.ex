@@ -310,6 +310,28 @@ defmodule Egregoros.Users do
 
   def bump_last_activity_at(_actor_ap_id, _at), do: :ok
 
+  def bump_notifications_last_seen_id(%User{} = user, last_seen_id)
+      when is_integer(last_seen_id) and last_seen_id > 0 do
+    from(u in User,
+      where: u.id == ^user.id,
+      update: [
+        set: [
+          notifications_last_seen_id:
+            fragment(
+              "GREATEST(COALESCE(?, 0), ?)",
+              u.notifications_last_seen_id,
+              ^last_seen_id
+            )
+        ]
+      ]
+    )
+    |> Repo.update_all([])
+
+    :ok
+  end
+
+  def bump_notifications_last_seen_id(_user, _last_seen_id), do: :ok
+
   def search(query, opts \\ []) when is_binary(query) and is_list(opts) do
     query = String.trim(query)
     limit = opts |> Keyword.get(:limit, 20) |> normalize_limit()

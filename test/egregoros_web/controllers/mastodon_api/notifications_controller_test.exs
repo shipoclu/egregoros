@@ -161,4 +161,38 @@ defmodule EgregorosWeb.MastodonAPI.NotificationsControllerTest do
     assert [%{"pleroma" => %{"is_seen" => is_seen}} | _rest] = response
     assert is_boolean(is_seen)
   end
+
+  test "POST /api/v1/pleroma/notifications/read marks notifications as seen", %{conn: conn} do
+    {:ok, alice} = Users.create_local_user("alice")
+    {:ok, bob} = Users.create_local_user("bob")
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, alice} end)
+    |> expect(:current_user, fn _conn -> {:ok, alice} end)
+    |> expect(:current_user, fn _conn -> {:ok, Users.get(alice.id)} end)
+
+    {:ok, _follow} =
+      Pipeline.ingest(
+        %{
+          "id" => "https://example.com/activities/follow/mark-seen",
+          "type" => "Follow",
+          "actor" => bob.ap_id,
+          "object" => alice.ap_id
+        },
+        local: true
+      )
+
+    conn = get(conn, "/api/v1/notifications")
+    response = json_response(conn, 200)
+
+    assert [%{"id" => notification_id, "pleroma" => %{"is_seen" => false}} | _rest] = response
+
+    conn = post(conn, "/api/v1/pleroma/notifications/read", %{"max_id" => notification_id})
+    assert json_response(conn, 200) == %{"status" => "success"}
+
+    conn = get(conn, "/api/v1/notifications")
+    response = json_response(conn, 200)
+
+    assert [%{"id" => ^notification_id, "pleroma" => %{"is_seen" => true}} | _rest] = response
+  end
 end
