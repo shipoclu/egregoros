@@ -195,4 +195,24 @@ defmodule EgregorosWeb.MastodonAPI.NotificationsControllerTest do
 
     assert [%{"id" => ^notification_id, "pleroma" => %{"is_seen" => true}} | _rest] = response
   end
+
+  test "POST /api/v1/notifications/clear returns ok", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("alice")
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, user} end)
+
+    conn = post(conn, "/api/v1/notifications/clear")
+    assert json_response(conn, 200) == %{}
+  end
+
+  test "POST /api/v1/notifications/:id/dismiss returns ok", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("alice")
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, user} end)
+
+    conn = post(conn, "/api/v1/notifications/123/dismiss")
+    assert json_response(conn, 200) == %{}
+  end
 end

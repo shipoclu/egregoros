@@ -164,6 +164,8 @@ defmodule EgregorosWeb.Router do
     post "/statuses/:id/unbookmark", StatusesController, :unbookmark
     post "/statuses/:id/reblog", StatusesController, :reblog
     post "/statuses/:id/unreblog", StatusesController, :unreblog
+    post "/notifications/clear", NotificationsController, :clear
+    post "/notifications/:id/dismiss", NotificationsController, :dismiss
   end
 
   scope "/api/v1", EgregorosWeb.MastodonAPI do

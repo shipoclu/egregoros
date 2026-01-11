@@ -24,4 +24,12 @@ defmodule EgregorosWeb.MastodonAPI.NotificationsController do
     |> Pagination.maybe_put_links(activities, has_more?, pagination)
     |> json(Enum.map(activities, &NotificationRenderer.render_notification(&1, user)))
   end
+
+  def clear(conn, _params) do
+    json(conn, %{})
+  end
+
+  def dismiss(conn, _params) do
+    json(conn, %{})
+  end
 end
