@@ -31,6 +31,9 @@ defmodule EgregorosWeb.AdminControllerTest do
     html = html_response(conn, 200)
     assert html =~ "Admin settings"
     assert html =~ "Relays"
+    assert html =~ "Oban dashboard"
+    assert html =~ "Live dashboard"
+    assert html =~ "/admin/dashboard"
   end
 
   test "POST /admin/relays subscribes the internal actor to the relay", %{conn: conn} do
