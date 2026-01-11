@@ -54,7 +54,7 @@ defmodule EgregorosWeb.MastodonAPI.Pagination do
   defp maybe_put_next(links, _conn, _base_params, _last_id, false), do: links
 
   defp build_url(path, params) when is_binary(path) and is_map(params) do
-    query = URI.encode_query(params)
+    query = Plug.Conn.Query.encode(params)
 
     Endpoint.url() <>
       path <>

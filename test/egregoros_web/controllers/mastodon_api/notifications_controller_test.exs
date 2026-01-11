@@ -104,4 +104,34 @@ defmodule EgregorosWeb.MastodonAPI.NotificationsControllerTest do
              notification["type"] == "mention" and is_map(notification["status"])
            end)
   end
+
+  test "GET /api/v1/notifications supports include_types[] without crashing", %{conn: conn} do
+    {:ok, alice} = Users.create_local_user("alice")
+    {:ok, bob} = Users.create_local_user("bob")
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, alice} end)
+
+    {:ok, _follow} =
+      Pipeline.ingest(
+        %{
+          "id" => "https://example.com/activities/follow/with-types",
+          "type" => "Follow",
+          "actor" => bob.ap_id,
+          "object" => alice.ap_id
+        },
+        local: true
+      )
+
+    conn =
+      get(
+        conn,
+        "/api/v1/notifications?with_muted=true&include_types[]=mention&include_types[]=status&include_types[]=favourite&include_types[]=reblog&include_types[]=follow&include_types[]=follow_request&include_types[]=move&include_types[]=poll&include_types[]=pleroma:emoji_reaction&include_types[]=pleroma:report&limit=20"
+      )
+
+    response = json_response(conn, 200)
+    assert is_list(response)
+    assert length(response) == 1
+    assert List.first(response)["type"] == "follow"
+  end
 end
