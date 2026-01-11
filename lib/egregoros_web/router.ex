@@ -2,6 +2,7 @@ defmodule EgregorosWeb.Router do
   use EgregorosWeb, :router
 
   import Oban.Web.Router
+  import Phoenix.LiveDashboard.Router
 
   pipeline :health do
   end
@@ -99,6 +100,7 @@ defmodule EgregorosWeb.Router do
     pipe_through [:browser, :admin]
 
     oban_dashboard("/oban", oban_name: Oban)
+    live_dashboard "/dashboard", metrics: EgregorosWeb.Telemetry
   end
 
   scope "/", EgregorosWeb do
