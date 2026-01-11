@@ -177,6 +177,7 @@ defmodule EgregorosWeb.Router do
     pipe_through [:api, :api_auth, :oauth_read]
 
     get "/accounts/verify_credentials", AccountsController, :verify_credentials
+    get "/accounts/search", AccountsController, :search
     get "/accounts/relationships", AccountsController, :relationships
     get "/timelines/home", TimelinesController, :home
     get "/notifications", NotificationsController, :index
@@ -239,6 +240,11 @@ defmodule EgregorosWeb.Router do
     pipe_through :api
 
     get "/instance", InstanceController, :show_v2
+  end
+
+  scope "/api/v2", EgregorosWeb.MastodonAPI do
+    pipe_through [:api, :api_optional_auth]
+
     get "/search", SearchController, :index
   end
 

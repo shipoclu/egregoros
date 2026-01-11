@@ -5,27 +5,36 @@ defmodule EgregorosWeb.MastodonAPI.SearchController do
   alias Egregoros.Federation.Actor
   alias Egregoros.Federation.WebFinger
   alias Egregoros.Handles
+  alias Egregoros.Objects
   alias Egregoros.Users
   alias EgregorosWeb.Endpoint
   alias EgregorosWeb.MastodonAPI.AccountRenderer
+  alias EgregorosWeb.MastodonAPI.StatusRenderer
 
   def index(conn, params) do
     q = params |> Map.get("q", "") |> to_string() |> String.trim()
     resolve? = Map.get(params, "resolve") in [true, "true"]
     limit = params |> Map.get("limit") |> parse_limit()
 
+    current_user = conn.assigns[:current_user]
+
     accounts =
       q
-      |> search_accounts(resolve?, limit)
+      |> search_accounts(resolve?, limit, current_user)
       |> Enum.map(&AccountRenderer.render_account/1)
 
-    json(conn, %{"accounts" => accounts, "statuses" => [], "hashtags" => []})
+    statuses =
+      q
+      |> Objects.search_visible_notes(current_user, limit: limit)
+      |> StatusRenderer.render_statuses(current_user)
+
+    json(conn, %{"accounts" => accounts, "statuses" => statuses, "hashtags" => []})
   end
 
-  defp search_accounts("", _resolve?, _limit), do: []
+  defp search_accounts("", _resolve?, _limit, _current_user), do: []
 
-  defp search_accounts(q, resolve?, limit) do
-    local_matches = Users.search(q, limit: limit)
+  defp search_accounts(q, resolve?, limit, current_user) do
+    local_matches = Users.search_mentions(q, limit: limit, current_user: current_user)
 
     matches =
       if resolve? and String.contains?(q, "@") do

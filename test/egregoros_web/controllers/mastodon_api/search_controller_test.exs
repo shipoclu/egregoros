@@ -3,6 +3,7 @@ defmodule EgregorosWeb.MastodonAPI.SearchControllerTest do
 
   import Mox
 
+  alias Egregoros.Publish
   alias Egregoros.Users
 
   test "GET /api/v2/search returns matching local accounts", %{conn: conn} do
@@ -149,7 +150,52 @@ defmodule EgregorosWeb.MastodonAPI.SearchControllerTest do
 
     assert Enum.any?(
              response["accounts"],
-             &(&1["username"] == "bob" and &1["acct"] == "bob@remote.example")
+           &(&1["username"] == "bob" and &1["acct"] == "bob@remote.example")
            )
+  end
+
+  test "GET /api/v2/search returns matching statuses", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("alice")
+    {:ok, _} = Publish.post_note(user, "Hello from search")
+
+    conn = get(conn, "/api/v2/search", %{"q" => "Hello"})
+    response = json_response(conn, 200)
+
+    assert Enum.any?(response["statuses"], &(&1["content"] == "<p>Hello from search</p>"))
+  end
+
+  test "GET /api/v2/search does not leak direct statuses and returns them for recipients", %{
+    conn: conn
+  } do
+    {:ok, alice} = Users.create_local_user("alice")
+    {:ok, bob} = Users.create_local_user("bob")
+    {:ok, charlie} = Users.create_local_user("charlie")
+
+    {:ok, _} = Publish.post_note(alice, "@bob Secret DM", visibility: "direct")
+
+    conn = get(conn, "/api/v2/search", %{"q" => "Secret"})
+    response = json_response(conn, 200)
+    assert response["statuses"] == []
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, bob} end)
+    |> expect(:current_user, fn _conn -> {:ok, charlie} end)
+
+    bob_conn =
+      build_conn()
+      |> put_req_header("authorization", "Bearer token")
+      |> get("/api/v2/search", %{"q" => "Secret"})
+
+    bob_response = json_response(bob_conn, 200)
+
+    assert Enum.any?(bob_response["statuses"], &(&1["visibility"] == "direct"))
+
+    charlie_conn =
+      build_conn()
+      |> put_req_header("authorization", "Bearer token")
+      |> get("/api/v2/search", %{"q" => "Secret"})
+
+    charlie_response = json_response(charlie_conn, 200)
+    assert charlie_response["statuses"] == []
   end
 end

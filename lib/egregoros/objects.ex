@@ -241,6 +241,74 @@ defmodule Egregoros.Objects do
 
   def search_notes(_query, _opts), do: []
 
+  def search_visible_notes(query, viewer, opts \\ [])
+
+  def search_visible_notes(query, viewer, opts) when is_binary(query) and is_list(opts) do
+    query = String.trim(query)
+    limit = opts |> Keyword.get(:limit, 20) |> normalize_limit()
+
+    viewer_ap_id =
+      case viewer do
+        %Egregoros.User{ap_id: ap_id} when is_binary(ap_id) and ap_id != "" -> ap_id
+        ap_id when is_binary(ap_id) and ap_id != "" -> ap_id
+        _ -> nil
+      end
+
+    if query == "" do
+      []
+    else
+      pattern = "%" <> query <> "%"
+
+      search_query =
+        from(o in Object,
+          where:
+            o.type == "Note" and
+              (fragment("?->>'content' ILIKE ?", o.data, ^pattern) or
+                 fragment("?->>'summary' ILIKE ?", o.data, ^pattern)),
+          order_by: [desc: o.id],
+          limit: ^limit
+        )
+
+      if is_binary(viewer_ap_id) do
+        base_visibility =
+          dynamic(
+            [o, follow],
+            o.actor == ^viewer_ap_id or
+              fragment("? @> ?", o.data, ^%{"to" => [@as_public]}) or
+              fragment("? @> ?", o.data, ^%{"cc" => [@as_public]}) or
+              fragment("? @> ?", o.data, ^%{"audience" => [@as_public]}) or
+              fragment("? @> ?", o.data, ^%{"to" => [viewer_ap_id]}) or
+              fragment("? @> ?", o.data, ^%{"cc" => [viewer_ap_id]}) or
+              fragment("? @> ?", o.data, ^%{"bto" => [viewer_ap_id]}) or
+              fragment("? @> ?", o.data, ^%{"bcc" => [viewer_ap_id]}) or
+              fragment("? @> ?", o.data, ^%{"audience" => [viewer_ap_id]})
+          )
+
+        followers_visibility =
+          dynamic(
+            [o, follow],
+            not is_nil(follow.id) and
+              (fragment("jsonb_exists((?->'to'), (? || '/followers'))", o.data, o.actor) or
+                 fragment("jsonb_exists((?->'cc'), (? || '/followers'))", o.data, o.actor))
+          )
+
+        from(o in search_query,
+          left_join: follow in Relationship,
+          on:
+            follow.type == "Follow" and follow.actor == ^viewer_ap_id and follow.object == o.actor,
+          where: ^dynamic([o, follow], ^base_visibility or ^followers_visibility)
+        )
+        |> Repo.all()
+      else
+        search_query
+        |> where_publicly_visible()
+        |> Repo.all()
+      end
+    end
+  end
+
+  def search_visible_notes(_query, _viewer, _opts), do: []
+
   @status_types ~w(Note Announce)
 
   defp where_announces_have_object(query) do

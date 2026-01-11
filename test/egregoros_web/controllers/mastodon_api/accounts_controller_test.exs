@@ -884,4 +884,24 @@ defmodule EgregorosWeb.MastodonAPI.AccountsControllerTest do
     conn = get(conn, "/api/v1/accounts/lookup", %{"acct" => "missing@remote.example"})
     assert response(conn, 404) == "Not Found"
   end
+
+  test "GET /api/v1/accounts/search returns matching accounts for pleroma-fe autocomplete", %{
+    conn: conn
+  } do
+    {:ok, alice} = Users.create_local_user("alice")
+    {:ok, bob} = Users.create_local_user("bob")
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, alice} end)
+
+    conn =
+      conn
+      |> put_req_header("authorization", "Bearer token")
+      |> get("/api/v1/accounts/search", %{"q" => "bo", "resolve" => "true"})
+
+    response = json_response(conn, 200)
+
+    assert is_list(response)
+    assert Enum.any?(response, &(&1["id"] == Integer.to_string(bob.id)))
+  end
 end
