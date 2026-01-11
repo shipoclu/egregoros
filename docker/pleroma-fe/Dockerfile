@@ -13,8 +13,9 @@ RUN corepack enable
 RUN yarn install --frozen-lockfile
 RUN yarn build
 
-# Provide an empty static config file so Pleroma-FE doesn't warn loudly.
-RUN mkdir -p dist/static && echo '{}' > dist/static/config.json
+# Provide a minimal static config:
+# - Force OAuth (authorization_code) login flow, not password grant.
+RUN mkdir -p dist/static && echo '{"loginMethod":"token"}' > dist/static/config.json
 
 FROM nginx:1.27-alpine
 
