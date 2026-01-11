@@ -448,6 +448,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusRenderer do
     url = attachment_url(attachment)
     description = Map.get(attachment, "name")
     blurhash = Map.get(attachment, "blurhash")
+    meta = attachment_meta(attachment, object)
 
     if is_binary(url) and url != "" do
       %{
@@ -456,7 +457,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusRenderer do
         "url" => url,
         "preview_url" => url,
         "remote_url" => nil,
-        "meta" => %{},
+        "meta" => meta,
         "description" => description,
         "blurhash" => blurhash
       }
@@ -465,6 +466,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusRenderer do
 
   defp render_media_attachment(attachment) when is_map(attachment) do
     url = attachment_url(attachment)
+    meta = attachment_meta(attachment, nil)
 
     if is_binary(url) and url != "" do
       %{
@@ -473,7 +475,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusRenderer do
         "url" => url,
         "preview_url" => url,
         "remote_url" => nil,
-        "meta" => %{},
+        "meta" => meta,
         "description" => Map.get(attachment, "name"),
         "blurhash" => Map.get(attachment, "blurhash")
       }
@@ -482,6 +484,21 @@ defmodule EgregorosWeb.MastodonAPI.StatusRenderer do
 
   defp media_id(%Object{} = object, _fallback), do: Integer.to_string(object.id)
   defp media_id(_object, fallback), do: fallback
+
+  defp attachment_meta(attachment, %Object{} = object) when is_map(attachment) do
+    meta =
+      case Map.get(object.data, "meta") do
+        meta when is_map(meta) -> meta
+        _ -> Map.get(attachment, "meta")
+      end
+
+    if is_map(meta), do: meta, else: %{}
+  end
+
+  defp attachment_meta(attachment, _object) when is_map(attachment) do
+    meta = Map.get(attachment, "meta")
+    if is_map(meta), do: meta, else: %{}
+  end
 
   defp attachment_url(%{"url" => [%{"href" => href} | _]}) when is_binary(href) do
     SafeMediaURL.safe(href)

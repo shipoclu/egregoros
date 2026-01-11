@@ -13,18 +13,7 @@ defmodule EgregorosWeb.MastodonAPI.MediaController do
 
     with {:ok, url_path} <- MediaStorage.store_media(user, upload),
          {:ok, object} <- Media.create_media_object(user, upload, url_path) do
-      url = URL.absolute(url_path) || ""
-
-      json(conn, %{
-        "id" => Integer.to_string(object.id),
-        "type" => mastodon_media_type(upload.content_type),
-        "url" => url,
-        "preview_url" => url,
-        "remote_url" => nil,
-        "meta" => %{},
-        "description" => nil,
-        "blurhash" => nil
-      })
+      json(conn, mastodon_attachment_json(object))
     else
       _ -> send_resp(conn, 422, "Unprocessable Entity")
     end
@@ -63,14 +52,30 @@ defmodule EgregorosWeb.MastodonAPI.MediaController do
     href = attachment_url(object)
     url = URL.absolute(href) || href
 
+    meta =
+      object.data
+      |> Map.get("meta")
+      |> case do
+        meta when is_map(meta) -> meta
+        _ -> %{}
+      end
+
+    description =
+      object.data
+      |> Map.get("name")
+      |> case do
+        value when is_binary(value) and value != "" -> value
+        _ -> nil
+      end
+
     %{
       "id" => Integer.to_string(object.id),
       "type" => mastodon_media_type(media_type_from_object(object)),
       "url" => url,
       "preview_url" => url,
       "remote_url" => nil,
-      "meta" => %{},
-      "description" => Map.get(object.data, "name"),
+      "meta" => meta,
+      "description" => description,
       "blurhash" => Map.get(object.data, "blurhash")
     }
   end

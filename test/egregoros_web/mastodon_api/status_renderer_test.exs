@@ -310,7 +310,11 @@ defmodule EgregorosWeb.MastodonAPI.StatusRendererTest do
         type: "Document",
         actor: alice.ap_id,
         local: false,
-        data: %{"id" => "https://remote.example/objects/media/1", "type" => "Document"}
+        data: %{
+          "id" => "https://remote.example/objects/media/1",
+          "type" => "Document",
+          "meta" => %{"original" => %{"width" => 640, "height" => 480}}
+        }
       })
 
     {:ok, note} =
@@ -343,6 +347,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusRendererTest do
                "type" => "video",
                "url" => url,
                "preview_url" => preview,
+               "meta" => %{"original" => %{"width" => 640, "height" => 480}},
                "description" => "clip",
                "blurhash" => "abc"
              }

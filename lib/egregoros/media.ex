@@ -5,6 +5,7 @@ defmodule Egregoros.Media do
   alias Egregoros.Repo
   alias Egregoros.User
   alias Egregoros.Objects
+  alias Egregoros.MediaMeta
   alias EgregorosWeb.Endpoint
   alias EgregorosWeb.URL
 
@@ -14,6 +15,7 @@ defmodule Egregoros.Media do
       when is_binary(url_path) and is_list(opts) do
     ap_id = Endpoint.url() <> "/objects/" <> Ecto.UUID.generate()
     href = URL.absolute(url_path) || url_path
+    meta = MediaMeta.mastodon_meta(upload)
 
     description =
       opts
@@ -38,6 +40,7 @@ defmodule Egregoros.Media do
             "href" => href
           }
         ],
+        "meta" => meta,
         "name" => description
       }
     })

@@ -14,7 +14,7 @@ defmodule EgregorosWeb.MastodonAPI.MediaControllerTest do
 
     upload =
       %Plug.Upload{
-        path: tmp_upload_path(),
+        path: fixture_path("DSCN0010.png"),
         filename: "image.png",
         content_type: "image/png"
       }
@@ -31,6 +31,7 @@ defmodule EgregorosWeb.MastodonAPI.MediaControllerTest do
     assert response["type"] == "image"
     assert String.ends_with?(response["url"], "/uploads/media/#{user.id}/image.png")
     assert response["preview_url"] == response["url"]
+    assert %{"original" => %{"width" => 640, "height" => 480}} = response["meta"]
 
     assert %{} = Objects.get(response["id"])
   end
@@ -43,7 +44,7 @@ defmodule EgregorosWeb.MastodonAPI.MediaControllerTest do
 
     upload =
       %Plug.Upload{
-        path: tmp_upload_path(),
+        path: fixture_path("DSCN0010.png"),
         filename: "image.png",
         content_type: "image/png"
       }
@@ -95,5 +96,9 @@ defmodule EgregorosWeb.MastodonAPI.MediaControllerTest do
     path = Path.join(System.tmp_dir!(), "egregoros-test-upload-#{Ecto.UUID.generate()}")
     File.write!(path, <<0, 1, 2, 3>>)
     path
+  end
+
+  defp fixture_path(filename) do
+    Path.expand(Path.join(["test", "fixtures", filename]), File.cwd!())
   end
 end
