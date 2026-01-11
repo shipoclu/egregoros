@@ -11,6 +11,14 @@ defmodule EgregorosWeb.PleromaAPI.CompatEndpointsTest do
     assert response == %{}
   end
 
+  test "GET /api/pleroma/frontend_configurations returns pleroma_fe config", %{conn: conn} do
+    conn = get(conn, "/api/pleroma/frontend_configurations")
+    response = json_response(conn, 200)
+    assert is_map(response)
+    assert Map.has_key?(response, "pleroma_fe")
+    assert is_map(response["pleroma_fe"])
+  end
+
   test "GET /api/v1/pleroma/emoji returns custom emoji map", %{conn: conn} do
     conn = get(conn, "/api/v1/pleroma/emoji")
     response = json_response(conn, 200)
@@ -55,4 +63,3 @@ defmodule EgregorosWeb.PleromaAPI.CompatEndpointsTest do
     assert Enum.any?(response, &(&1["uri"] == note.ap_id))
   end
 end
-

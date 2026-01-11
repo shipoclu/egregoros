@@ -117,6 +117,7 @@ defmodule EgregorosWeb.Router do
 
     post "/oauth/token", OAuthController, :token
     post "/oauth/revoke", OAuthController, :revoke
+    get "/api/pleroma/frontend_configurations", PleromaFrontendConfigurationsController, :index
     get "/api/pleroma/emoji.json", PleromaEmojiController, :index
     get "/users/:nickname", ActorController, :show
     post "/users/:nickname/inbox", InboxController, :inbox
