@@ -27,4 +27,23 @@ defmodule EgregorosWeb.Admin.LiveDashboardTest do
     conn = get(recycle(conn), "/admin/dashboard/home")
     assert html_response(conn, 200)
   end
+
+  test "GET /admin/dashboard/os_mon renders for admins", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("alice")
+    {:ok, user} = Users.set_admin(user, true)
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+
+    conn = get(conn, "/admin/dashboard/os_mon")
+    assert html_response(conn, 200)
+  end
+
+  test "GET /admin/dashboard/ecto_stats renders for admins", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("alice")
+    {:ok, user} = Users.set_admin(user, true)
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+
+    conn = get(conn, "/admin/dashboard/ecto_stats")
+    html = html_response(conn, 200)
+    assert html =~ "Egregoros.Repo"
+  end
 end

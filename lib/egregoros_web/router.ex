@@ -100,7 +100,7 @@ defmodule EgregorosWeb.Router do
     pipe_through [:browser, :admin]
 
     oban_dashboard("/oban", oban_name: Oban)
-    live_dashboard "/dashboard", metrics: EgregorosWeb.Telemetry
+    live_dashboard "/dashboard", metrics: EgregorosWeb.Telemetry, ecto_repos: [Egregoros.Repo]
   end
 
   scope "/", EgregorosWeb do

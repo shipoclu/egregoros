@@ -36,7 +36,7 @@ defmodule Egregoros.MixProject do
   def application do
     [
       mod: {Egregoros.Application, []},
-      extra_applications: [:logger, :runtime_tools]
+      extra_applications: [:logger, :runtime_tools, :os_mon]
     ]
   end
 
@@ -58,6 +58,7 @@ defmodule Egregoros.MixProject do
       {:phoenix, "~> 1.8.3"},
       {:phoenix_ecto, "~> 4.5"},
       {:ecto_sql, "~> 3.13"},
+      {:ecto_psql_extras, "~> 0.7"},
       {:postgrex, ">= 0.0.0"},
       {:oban, "~> 2.19"},
       {:oban_web, "~> 2.11"},
