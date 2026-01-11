@@ -134,4 +134,31 @@ defmodule EgregorosWeb.MastodonAPI.NotificationsControllerTest do
     assert length(response) == 1
     assert List.first(response)["type"] == "follow"
   end
+
+  test "GET /api/v1/notifications includes pleroma.is_seen for pleroma-fe compatibility", %{
+    conn: conn
+  } do
+    {:ok, alice} = Users.create_local_user("alice")
+    {:ok, bob} = Users.create_local_user("bob")
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, alice} end)
+
+    {:ok, _follow} =
+      Pipeline.ingest(
+        %{
+          "id" => "https://example.com/activities/follow/is-seen",
+          "type" => "Follow",
+          "actor" => bob.ap_id,
+          "object" => alice.ap_id
+        },
+        local: true
+      )
+
+    conn = get(conn, "/api/v1/notifications")
+    response = json_response(conn, 200)
+
+    assert [%{"pleroma" => %{"is_seen" => is_seen}} | _rest] = response
+    assert is_boolean(is_seen)
+  end
 end

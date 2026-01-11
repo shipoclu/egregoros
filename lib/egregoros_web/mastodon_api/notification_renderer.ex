@@ -21,7 +21,10 @@ defmodule EgregorosWeb.MastodonAPI.NotificationRenderer do
       "type" => mastodon_type(activity.type),
       "created_at" => format_datetime(activity),
       "account" => AccountRenderer.render_account(account_for_actor(activity.actor)),
-      "status" => if(status, do: StatusRenderer.render_status(status, current_user), else: nil)
+      "status" => if(status, do: StatusRenderer.render_status(status, current_user), else: nil),
+      "pleroma" => %{
+        "is_seen" => false
+      }
     }
   end
 
