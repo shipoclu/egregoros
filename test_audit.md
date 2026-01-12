@@ -128,14 +128,15 @@ Mark each file after review:
 - [ ] test/egregoros/pipeline_cast_and_validate_test.exs
 - [ ] test/egregoros/pipeline_test.exs
 - [ ] test/egregoros/publish_test.exs
-- [ ] test/egregoros/rate_limiter/ets_test.exs
+- [x] test/egregoros/rate_limiter/ets_test.exs
 - [ ] test/egregoros/relationship_schema_test.exs
 - [ ] test/egregoros/relationships_test.exs
 - [ ] test/egregoros/relays_test.exs
 - [ ] test/egregoros/release_healthcheck_test.exs
-- [ ] test/egregoros/safe_url_test.exs
+- [x] test/egregoros/runtime_config_test.exs
+- [x] test/egregoros/safe_url_test.exs
 - [ ] test/egregoros/security/html_scrubber_security_test.exs
-- [ ] test/egregoros/security/safe_url_no_dns_security_test.exs
+- [x] test/egregoros/security/safe_url_no_dns_security_test.exs
 - [ ] test/egregoros/security/uploads_security_headers_test.exs
 - [ ] test/egregoros/signature/http_actor_fetch_test.exs
 - [ ] test/egregoros/signature/http_test.exs
@@ -148,8 +149,9 @@ Mark each file after review:
 - [ ] test/egregoros/workers/deliver_activity_test.exs
 - [ ] test/egregoros/workers/deliver_to_actor_test.exs
 - [ ] test/egregoros/workers/fetch_actor_test.exs
+- [x] test/egregoros/workers/follow_remote_test.exs
 - [ ] test/egregoros/workers/ingest_activity_test.exs
-- [ ] test/egregoros/workers/resolve_mentions_test.exs
+- [x] test/egregoros/workers/resolve_mentions_test.exs
 - [ ] test/egregoros_web/body_reader_test.exs
 - [ ] test/egregoros_web/components/app_shell_test.exs
 - [ ] test/egregoros_web/components/core_components_test.exs
@@ -233,4 +235,3 @@ Mark each file after review:
 - [ ] test/egregoros_web/view_models/actor_test.exs
 - [ ] test/egregoros_web/view_models/status_test.exs
 - [ ] test/mix/tasks/egregoros_tasks_test.exs
-
