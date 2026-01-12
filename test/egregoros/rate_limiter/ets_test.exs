@@ -25,7 +25,12 @@ defmodule Egregoros.RateLimiter.ETSTest do
   test "allow?/4 resets counts when the time window changes" do
     key = "key-" <> Ecto.UUID.generate()
     assert :ok == ETS.allow?(:inbox, key, 1, 1)
-    Process.sleep(2)
+
+    now_ms = System.monotonic_time(:millisecond)
+    current_window_id = div(now_ms, 1)
+
+    :ets.insert(@table, {{:inbox, key, 1}, current_window_id - 1, 1, now_ms})
+
     assert :ok == ETS.allow?(:inbox, key, 1, 1)
   end
 
