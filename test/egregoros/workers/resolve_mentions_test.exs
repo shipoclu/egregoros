@@ -10,6 +10,8 @@ defmodule Egregoros.Workers.ResolveMentionsTest do
   alias Egregoros.Workers.DeliverActivity
   alias Egregoros.Workers.ResolveMentions
 
+  @as_public "https://www.w3.org/ns/activitystreams#Public"
+
   test "perform delivers Create to remote followers even when webfinger lookup fails" do
     {:ok, local} = Users.create_local_user("alice")
 
@@ -128,5 +130,114 @@ defmodule Egregoros.Workers.ResolveMentionsTest do
       end)
 
     assert Enum.any?(create_jobs, &(&1.args["inbox_url"] == remote.inbox))
+  end
+
+  test "perform adds resolved remote mentions to cc for unlisted posts" do
+    {:ok, local} = Users.create_local_user("alice")
+
+    actor_url = "https://donotsta.re/users/toast"
+    stub_remote_actor("toast", "donotsta.re", actor_url)
+
+    assert {:ok, create} =
+             Publish.post_note(local, "hi @toast@donotsta.re", visibility: "unlisted")
+
+    [job] = all_enqueued(worker: ResolveMentions)
+    assert :ok = perform_job(ResolveMentions, job.args)
+
+    assert %Egregoros.User{} = remote = Users.get_by_handle("@toast@donotsta.re")
+    assert remote.ap_id == actor_url
+
+    assert %{} = note = Objects.get_by_ap_id(create.object)
+
+    assert @as_public in List.wrap(note.data["cc"])
+    assert remote.ap_id in List.wrap(note.data["cc"])
+    refute remote.ap_id in List.wrap(note.data["to"])
+  end
+
+  test "perform adds resolved remote mentions to cc for followers-only posts" do
+    {:ok, local} = Users.create_local_user("alice")
+
+    actor_url = "https://donotsta.re/users/toast"
+    stub_remote_actor("toast", "donotsta.re", actor_url)
+
+    assert {:ok, create} =
+             Publish.post_note(local, "hi @toast@donotsta.re", visibility: "private")
+
+    [job] = all_enqueued(worker: ResolveMentions)
+    assert :ok = perform_job(ResolveMentions, job.args)
+
+    assert %Egregoros.User{} = remote = Users.get_by_handle("@toast@donotsta.re")
+    assert remote.ap_id == actor_url
+
+    assert %{} = note = Objects.get_by_ap_id(create.object)
+
+    assert (local.ap_id <> "/followers") in List.wrap(note.data["to"])
+    assert remote.ap_id in List.wrap(note.data["cc"])
+    refute remote.ap_id in List.wrap(note.data["to"])
+  end
+
+  test "perform adds resolved remote mentions to to for direct posts" do
+    {:ok, local} = Users.create_local_user("alice")
+
+    actor_url = "https://donotsta.re/users/toast"
+    stub_remote_actor("toast", "donotsta.re", actor_url)
+
+    assert {:ok, create} = Publish.post_note(local, "hi @toast@donotsta.re", visibility: "direct")
+
+    [job] = all_enqueued(worker: ResolveMentions)
+    assert :ok = perform_job(ResolveMentions, job.args)
+
+    assert %Egregoros.User{} = remote = Users.get_by_handle("@toast@donotsta.re")
+    assert remote.ap_id == actor_url
+
+    assert %{} = note = Objects.get_by_ap_id(create.object)
+
+    assert remote.ap_id in List.wrap(note.data["to"])
+    assert List.wrap(note.data["cc"]) == []
+  end
+
+  defp stub_remote_actor(nickname, domain, actor_url)
+       when is_binary(nickname) and is_binary(domain) and is_binary(actor_url) do
+    stub(Egregoros.HTTP.Mock, :get, fn url, _headers ->
+      cond do
+        url == "https://#{domain}/.well-known/webfinger?resource=acct:#{nickname}@#{domain}" ->
+          {:ok,
+           %{
+             status: 200,
+             body: %{
+               "subject" => "acct:#{nickname}@#{domain}",
+               "links" => [
+                 %{
+                   "rel" => "self",
+                   "type" => "application/activity+json",
+                   "href" => actor_url
+                 }
+               ]
+             },
+             headers: []
+           }}
+
+        url == actor_url ->
+          {:ok,
+           %{
+             status: 200,
+             body: %{
+               "id" => actor_url,
+               "type" => "Person",
+               "preferredUsername" => nickname,
+               "inbox" => actor_url <> "/inbox",
+               "outbox" => actor_url <> "/outbox",
+               "publicKey" => %{
+                 "publicKeyPem" =>
+                   "-----BEGIN PUBLIC KEY-----\nMIIB...\n-----END PUBLIC KEY-----\n"
+               }
+             },
+             headers: []
+           }}
+
+        true ->
+          {:ok, %{status: 404, body: %{}, headers: []}}
+      end
+    end)
   end
 end
