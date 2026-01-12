@@ -12,6 +12,21 @@ Non-goals:
 - Chasing arbitrary “100% coverage”.
 - Rewriting tests purely for style if they’re already stable and meaningful.
 
+## Baseline (current state)
+
+- `mix test --cover` (2026-01-12): `1308` tests, `0` failures, **84.50%** total coverage (threshold `85%`).
+- “Smell” checks:
+  - No `Process.sleep/1` / `:timer.sleep/1` occurrences in `test/`.
+  - No `Application.put_env/delete_env` occurrences in `test/`.
+- Lowest-coverage modules worth targeting early (high ROI for coverage gate):
+  - `EgregorosWeb.WebSockAdapter` (0%)
+  - `Egregoros.UserEvents` (~54%)
+  - `Egregoros.InstanceSettings` (~60%)
+  - `EgregorosWeb.Live.Uploads` (~50%)
+  - `Egregoros.Workers.RefreshRemoteUserCounts` (~40%)
+- Known test-suite noise:
+  - Occasional `Postgrex.Protocol disconnected` log spam during suite/precommit runs (likely a process escaping the SQL sandbox owner lifetime).
+
 ## Review Criteria (per test / per file)
 
 For each test file, answer:
