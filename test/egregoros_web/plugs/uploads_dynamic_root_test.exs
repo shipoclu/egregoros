@@ -1,8 +1,9 @@
 defmodule EgregorosWeb.Plugs.UploadsDynamicRootTest do
-  use ExUnit.Case, async: false
+  use ExUnit.Case, async: true
 
   import Plug.Test
 
+  alias Egregoros.RuntimeConfig
   alias EgregorosWeb.Plugs.Uploads
 
   defp temp_dir do
@@ -14,30 +15,25 @@ defmodule EgregorosWeb.Plugs.UploadsDynamicRootTest do
     dir_a = Path.join(base_dir, "a")
     dir_b = Path.join(base_dir, "b")
     file_path = Path.join([dir_b, "avatars", "1", "dynamic-root-test.jpg"])
-    original = Application.get_env(:egregoros, :uploads_dir)
 
     try do
-      Application.put_env(:egregoros, :uploads_dir, dir_a)
-      opts = Uploads.init([])
+      RuntimeConfig.with(%{uploads_dir: dir_a}, fn ->
+        opts = Uploads.init([])
 
-      Application.put_env(:egregoros, :uploads_dir, dir_b)
-      File.mkdir_p!(Path.dirname(file_path))
-      File.write!(file_path, "ok")
+        RuntimeConfig.with(%{uploads_dir: dir_b}, fn ->
+          File.mkdir_p!(Path.dirname(file_path))
+          File.write!(file_path, "ok")
 
-      conn =
-        conn(:get, "/uploads/avatars/1/dynamic-root-test.jpg")
-        |> init_test_session(%{})
-        |> Uploads.call(opts)
+          conn =
+            conn(:get, "/uploads/avatars/1/dynamic-root-test.jpg")
+            |> init_test_session(%{})
+            |> Uploads.call(opts)
 
-      assert conn.status == 200
-      assert conn.halted
+          assert conn.status == 200
+          assert conn.halted
+        end)
+      end)
     after
-      if is_binary(original) do
-        Application.put_env(:egregoros, :uploads_dir, original)
-      else
-        Application.delete_env(:egregoros, :uploads_dir)
-      end
-
       File.rm_rf!(base_dir)
     end
   end

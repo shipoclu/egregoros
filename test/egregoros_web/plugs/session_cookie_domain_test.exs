@@ -1,16 +1,14 @@
 defmodule EgregorosWeb.Plugs.SessionCookieDomainTest do
-  use ExUnit.Case, async: false
+  use ExUnit.Case, async: true
 
   import Plug.Conn
   import Plug.Test
 
+  alias Egregoros.RuntimeConfig
   alias EgregorosWeb.Plugs.Session
 
   test "does not set a Domain attribute by default" do
-    original = Application.get_env(:egregoros, :session_cookie_domain)
-    Application.delete_env(:egregoros, :session_cookie_domain)
-
-    try do
+    RuntimeConfig.with(%{session_cookie_domain: nil}, fn ->
       secret_key_base = EgregorosWeb.Endpoint.config(:secret_key_base)
 
       conn =
@@ -23,16 +21,11 @@ defmodule EgregorosWeb.Plugs.SessionCookieDomainTest do
 
       assert [cookie] = get_resp_header(conn, "set-cookie")
       refute String.contains?(cookie, "domain=")
-    after
-      restore_session_cookie_domain(original)
-    end
+    end)
   end
 
   test "sets a Domain attribute when configured" do
-    original = Application.get_env(:egregoros, :session_cookie_domain)
-    Application.put_env(:egregoros, :session_cookie_domain, "example.com")
-
-    try do
+    RuntimeConfig.with(%{session_cookie_domain: "example.com"}, fn ->
       secret_key_base = EgregorosWeb.Endpoint.config(:secret_key_base)
 
       conn =
@@ -45,16 +38,6 @@ defmodule EgregorosWeb.Plugs.SessionCookieDomainTest do
 
       assert [cookie] = get_resp_header(conn, "set-cookie")
       assert String.contains?(cookie, "domain=example.com")
-    after
-      restore_session_cookie_domain(original)
-    end
-  end
-
-  defp restore_session_cookie_domain(nil) do
-    Application.delete_env(:egregoros, :session_cookie_domain)
-  end
-
-  defp restore_session_cookie_domain(value) do
-    Application.put_env(:egregoros, :session_cookie_domain, value)
+    end)
   end
 end

@@ -1,4 +1,5 @@
 defmodule EgregorosWeb.URL do
+  alias Egregoros.RuntimeConfig
   alias EgregorosWeb.Endpoint
 
   def absolute(nil), do: nil
@@ -75,7 +76,7 @@ defmodule EgregorosWeb.URL do
   defp uploads_path?(_url), do: false
 
   defp uploads_base_url do
-    case Application.get_env(:egregoros, :uploads_base_url) do
+    case RuntimeConfig.get(:uploads_base_url) do
       base when is_binary(base) -> String.trim(base)
       _ -> nil
     end

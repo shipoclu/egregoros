@@ -3,6 +3,7 @@ defmodule EgregorosWeb.Plugs.Uploads do
 
   import Plug.Conn
 
+  alias Egregoros.RuntimeConfig
   alias EgregorosWeb.Endpoint
 
   @secure_headers [
@@ -66,7 +67,7 @@ defmodule EgregorosWeb.Plugs.Uploads do
 
     default = Path.join([priv_dir, "static", "uploads"])
 
-    Application.get_env(:egregoros, :uploads_dir, default)
+    RuntimeConfig.get(:uploads_dir, default)
   end
 
   defp uploads_host_allowed?(%Plug.Conn{} = conn) do
@@ -96,7 +97,7 @@ defmodule EgregorosWeb.Plugs.Uploads do
 
   defp uploads_host do
     with base when is_binary(base) and base != "" <-
-           Application.get_env(:egregoros, :uploads_base_url),
+           RuntimeConfig.get(:uploads_base_url),
          %URI{host: host} when is_binary(host) and host != "" <- URI.parse(base) do
       host
     else

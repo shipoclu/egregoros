@@ -3,6 +3,8 @@ defmodule EgregorosWeb.Plugs.Session do
 
   @behaviour Plug
 
+  alias Egregoros.RuntimeConfig
+
   @base_session_options [
     store: :cookie,
     key: "_egregoros_key",
@@ -22,7 +24,7 @@ defmodule EgregorosWeb.Plugs.Session do
   defp session_options do
     options = @base_session_options
 
-    case Application.get_env(:egregoros, :session_cookie_domain) do
+    case RuntimeConfig.get(:session_cookie_domain) do
       domain when is_binary(domain) ->
         domain = String.trim(domain)
         if domain == "", do: options, else: Keyword.put(options, :domain, domain)
