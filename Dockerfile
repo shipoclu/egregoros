@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     cmake \
     git \
+    libvips-dev \
     pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
@@ -37,6 +38,7 @@ FROM ${RUNNER_IMAGE} AS runner
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
+    libvips \
     libncurses6 \
     libstdc++6 \
     openssl \
