@@ -140,10 +140,10 @@ defmodule EgregorosWeb.StatusCard do
               class="inline-flex hover:underline underline-offset-2 focus-visible:outline-none focus-brutal"
               aria-label="Open post"
             >
-              <.time_ago at={@entry.object.inserted_at} />
+              <.time_ago at={object_timestamp(@entry.object)} />
             </.link>
           <% else %>
-            <.time_ago at={@entry.object.inserted_at} />
+            <.time_ago at={object_timestamp(@entry.object)} />
           <% end %>
 
           <.status_menu card_id={@id} entry={@entry} current_user={@current_user} />
@@ -1002,6 +1002,20 @@ defmodule EgregorosWeb.StatusCard do
   end
 
   defp attachment_filename(_), do: "Attachment"
+
+  defp object_timestamp(%{published: %DateTime{} = dt}), do: dt
+  defp object_timestamp(%{published: %NaiveDateTime{} = dt}), do: dt
+
+  defp object_timestamp(%{data: %{"published" => published}}) when is_binary(published) do
+    case DateTime.from_iso8601(published) do
+      {:ok, dt, _} -> dt
+      _ -> nil
+    end
+  end
+
+  defp object_timestamp(%{inserted_at: %DateTime{} = dt}), do: dt
+  defp object_timestamp(%{inserted_at: %NaiveDateTime{} = dt}), do: dt
+  defp object_timestamp(_), do: nil
 
   # Returns name for reposter - prefers display_name, falls back to nickname
   defp reposter_short_name(%{display_name: name}) when is_binary(name) and name != "", do: name

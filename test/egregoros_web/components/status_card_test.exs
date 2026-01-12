@@ -507,6 +507,41 @@ defmodule EgregorosWeb.StatusCardTest do
     assert html =~ ~s(href="/@alice/#{uuid}")
   end
 
+  test "prefers the status published timestamp for display over ingestion order" do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+    published = DateTime.add(now, -2 * 365 * 24 * 60 * 60, :second)
+
+    html =
+      render_component(&StatusCard.status_card/1, %{
+        id: "post-1",
+        current_user: nil,
+        entry: %{
+          object: %{
+            id: 1,
+            inserted_at: now,
+            published: published,
+            local: false,
+            data: %{"content" => "Hello world"}
+          },
+          actor: %{
+            display_name: "Alice",
+            nickname: "alice",
+            handle: "@alice",
+            avatar_url: nil
+          },
+          attachments: [],
+          liked?: false,
+          likes_count: 0,
+          reposted?: false,
+          reposts_count: 0,
+          reactions: %{}
+        }
+      })
+
+    assert html =~ ~r/>\s*2y\s*</
+    refute html =~ ~r/>\s*now\s*</
+  end
+
   test "renders a status action menu with a copy-link target" do
     uuid = "8a31b5d5-5453-4f65-88b9-e0b8d535a4b4"
     permalink = EgregorosWeb.Endpoint.url() <> "/@alice/#{uuid}"
