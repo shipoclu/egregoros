@@ -2,6 +2,7 @@ defmodule EgregorosWeb.Plugs.UploadsAccessTest do
   use EgregorosWeb.ConnCase, async: false
 
   alias Egregoros.Objects
+  alias Egregoros.MediaVariants
   alias Egregoros.Pipeline
   alias Egregoros.Users
   alias EgregorosWeb.Endpoint
@@ -12,7 +13,9 @@ defmodule EgregorosWeb.Plugs.UploadsAccessTest do
     {:ok, other} = Users.create_local_user("other")
 
     filename = "uploads-access-test.png"
+    thumbnail_filename = MediaVariants.thumbnail_filename(filename)
     url_path = "/uploads/media/#{author.id}/#{filename}"
+    thumbnail_url_path = "/uploads/media/#{author.id}/#{thumbnail_filename}"
 
     uploads_root = Application.fetch_env!(:egregoros, :uploads_dir)
 
@@ -21,6 +24,10 @@ defmodule EgregorosWeb.Plugs.UploadsAccessTest do
     file_path = Path.join(media_dir, filename)
     File.write!(file_path, "ok")
     assert File.exists?(file_path)
+
+    thumbnail_file_path = Path.join(media_dir, thumbnail_filename)
+    File.write!(thumbnail_file_path, "thumb")
+    assert File.exists?(thumbnail_file_path)
 
     on_exit(fn ->
       File.rm_rf!(Path.join([uploads_root, "media", Integer.to_string(author.id)]))
@@ -45,7 +52,18 @@ defmodule EgregorosWeb.Plugs.UploadsAccessTest do
               "mediaType" => "image/png",
               "href" => url_path
             }
-          ]
+          ],
+          "icon" => %{
+            "type" => "Image",
+            "mediaType" => MediaVariants.thumbnail_content_type(),
+            "url" => [
+              %{
+                "type" => "Link",
+                "mediaType" => MediaVariants.thumbnail_content_type(),
+                "href" => thumbnail_url_path
+              }
+            ]
+          }
         }
       })
 
@@ -67,11 +85,14 @@ defmodule EgregorosWeb.Plugs.UploadsAccessTest do
 
     recipient_conn = Plug.Test.init_test_session(conn, %{user_id: recipient.id})
     assert response(get(recipient_conn, url_path), 200) == "ok"
+    assert response(get(recipient_conn, thumbnail_url_path), 200) == "thumb"
 
     other_conn = Plug.Test.init_test_session(conn, %{user_id: other.id})
     assert response(get(other_conn, url_path), 404) == "Not Found"
+    assert response(get(other_conn, thumbnail_url_path), 404) == "Not Found"
 
     owner_conn = Plug.Test.init_test_session(conn, %{user_id: author.id})
     assert response(get(owner_conn, url_path), 200) == "ok"
+    assert response(get(owner_conn, thumbnail_url_path), 200) == "thumb"
   end
 end

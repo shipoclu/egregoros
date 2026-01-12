@@ -153,7 +153,9 @@ defmodule Egregoros.Media do
       where:
         o.local == true and o.type in ^@allowed_types and
           (fragment("? @> ?", o.data, ^%{"url" => [%{"href" => href}]}) or
-             fragment("? @> ?", o.data, ^%{"url" => [%{"href" => absolute}]})),
+             fragment("? @> ?", o.data, ^%{"url" => [%{"href" => absolute}]}) or
+             fragment("? @> ?", o.data, ^%{"icon" => %{"url" => [%{"href" => href}]}}) or
+             fragment("? @> ?", o.data, ^%{"icon" => %{"url" => [%{"href" => absolute}]}})),
       limit: 1
     )
     |> Repo.one()
