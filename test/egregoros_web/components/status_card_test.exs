@@ -103,6 +103,9 @@ defmodule EgregorosWeb.StatusCardTest do
     assert html =~ ~s(data-role="reaction-picker")
     assert html =~ ~s(data-role="reaction-picker-option")
     assert html =~ ~s(data-emoji="😀")
+
+    assert html =~
+             ~r/id="reaction-picker-post-1".*shadow-\[4px_4px_0_var\(--border-default\)\]/s
   end
 
   test "renders custom emojis in post content when ActivityPub emoji tags are present" do
@@ -542,6 +545,7 @@ defmodule EgregorosWeb.StatusCardTest do
     assert html =~ ~s(phx-click-away=)
     assert html =~ ~s(phx-window-keydown=)
     assert html =~ ~s(phx-key="escape")
+    assert html =~ ~r/id="post-1-menu".*shadow-\[4px_4px_0_var\(--border-default\)\]/s
     assert html =~ ~s(data-role="copy-link")
     assert html =~ ~s(data-copy-text="#{permalink}")
   end

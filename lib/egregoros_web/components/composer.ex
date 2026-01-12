@@ -93,7 +93,7 @@ defmodule EgregorosWeb.Composer do
               phx-click-away={close_menu_js(@visibility_menu_id)}
               phx-window-keydown={close_menu_js(@visibility_menu_id)}
               phx-key="escape"
-              class="absolute left-0 z-40 hidden w-72 border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] p-4 data-[placement=bottom]:top-full data-[placement=bottom]:mt-2 data-[placement=bottom]:bottom-auto data-[placement=bottom]:mb-0 data-[placement=top]:bottom-full data-[placement=top]:mb-2 data-[placement=top]:top-auto data-[placement=top]:mt-0"
+              class="absolute left-0 z-40 hidden w-72 border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] shadow-[4px_4px_0_var(--border-default)] motion-safe:animate-rise p-4 data-[placement=bottom]:top-full data-[placement=bottom]:mt-2 data-[placement=bottom]:bottom-auto data-[placement=bottom]:mb-0 data-[placement=top]:bottom-full data-[placement=top]:mb-2 data-[placement=top]:top-auto data-[placement=top]:mt-0"
             >
               <p class="text-xs font-bold uppercase tracking-wider text-[color:var(--text-muted)]">
                 Visibility
@@ -143,7 +143,7 @@ defmodule EgregorosWeb.Composer do
               phx-click-away={close_menu_js(@language_menu_id)}
               phx-window-keydown={close_menu_js(@language_menu_id)}
               phx-key="escape"
-              class="absolute left-0 z-40 hidden w-72 border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] p-4 data-[placement=bottom]:top-full data-[placement=bottom]:mt-2 data-[placement=bottom]:bottom-auto data-[placement=bottom]:mb-0 data-[placement=top]:bottom-full data-[placement=top]:mb-2 data-[placement=top]:top-auto data-[placement=top]:mt-0"
+              class="absolute left-0 z-40 hidden w-72 border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] shadow-[4px_4px_0_var(--border-default)] motion-safe:animate-rise p-4 data-[placement=bottom]:top-full data-[placement=bottom]:mt-2 data-[placement=bottom]:bottom-auto data-[placement=bottom]:mb-0 data-[placement=top]:bottom-full data-[placement=top]:mb-2 data-[placement=top]:top-auto data-[placement=top]:mt-0"
             >
               <p class="text-xs font-bold uppercase tracking-wider text-[color:var(--text-muted)]">
                 Language
@@ -201,7 +201,7 @@ defmodule EgregorosWeb.Composer do
               id={@mentions_id}
               data-role="compose-mention-suggestions"
               style="top: 1.75rem"
-              class="absolute left-0 right-0 z-30 overflow-hidden border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)]"
+              class="absolute left-0 right-0 z-30 overflow-hidden border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] shadow-[4px_4px_0_var(--border-default)] motion-safe:animate-rise"
             >
               <ul class="max-h-64 divide-y divide-[color:var(--border-muted)] overflow-y-auto">
                 <li :for={suggestion <- @mention_suggestions}>

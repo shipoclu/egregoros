@@ -210,6 +210,68 @@ defmodule EgregorosWeb.CoreComponents do
   end
 
   @doc """
+  Renders a `<details>`-based popover menu.
+
+  The popover relies on the browser-managed `open` attribute. Click-away and
+  Escape-to-close behavior are implemented client-side via LiveView JS commands.
+  """
+  attr :id, :string, required: true
+
+  attr :class, :any,
+    default: nil,
+    doc: "additional classes for the `<details>` wrapper"
+
+  attr :summary_class, :any,
+    default: nil,
+    doc: "additional classes for the `<summary>` trigger"
+
+  attr :panel_class, :any,
+    default: nil,
+    doc: "additional classes for the popover panel"
+
+  attr :rest, :global, include: ~w(data-role)
+
+  attr :summary_aria_label, :string,
+    default: nil,
+    doc: "optional aria-label applied to the `<summary>`"
+
+  attr :summary_data_role, :string,
+    default: nil,
+    doc: "optional data-role applied to the `<summary>`"
+
+  slot :trigger, required: true
+  slot :inner_block, required: true
+
+  def popover(assigns) do
+    ~H"""
+    <details
+      id={@id}
+      class={["group relative", @class]}
+      phx-click-away={JS.remove_attribute("open", to: "##{@id}")}
+      phx-window-keydown={JS.remove_attribute("open", to: "##{@id}")}
+      phx-key="escape"
+      {@rest}
+    >
+      <summary
+        class={["list-none [&::-webkit-details-marker]:hidden", @summary_class]}
+        aria-label={@summary_aria_label}
+        data-role={@summary_data_role}
+      >
+        {render_slot(@trigger)}
+      </summary>
+
+      <div class={[
+        "border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)]",
+        "shadow-[4px_4px_0_var(--border-default)] motion-safe:animate-rise",
+        @panel_class
+      ]}>
+        {render_slot(@inner_block)}
+      </div>
+    </details>
+    """
+  end
+
+  @doc """
   Renders an emoji picker for composer-like forms.
 
   This component is purely client-side via the `EmojiPicker` LiveView hook.
@@ -244,7 +306,7 @@ defmodule EgregorosWeb.CoreComponents do
         data-state="closed"
         data-placement="bottom"
         class={[
-          "absolute left-1/2 z-30 hidden max-h-72 w-64 -translate-x-1/2 overflow-y-auto border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] p-4 data-[placement=bottom]:top-full data-[placement=bottom]:mt-2 data-[placement=bottom]:bottom-auto data-[placement=bottom]:mb-0 data-[placement=top]:bottom-full data-[placement=top]:mb-2 data-[placement=top]:top-auto data-[placement=top]:mt-0"
+          "absolute left-1/2 z-30 hidden max-h-72 w-64 -translate-x-1/2 overflow-y-auto border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] shadow-[4px_4px_0_var(--border-default)] motion-safe:animate-rise p-4 data-[placement=bottom]:top-full data-[placement=bottom]:mt-2 data-[placement=bottom]:bottom-auto data-[placement=bottom]:mb-0 data-[placement=top]:bottom-full data-[placement=top]:mb-2 data-[placement=top]:top-auto data-[placement=top]:mt-0"
         ]}
       >
         <p class="text-xs font-bold uppercase tracking-wider text-[color:var(--text-muted)]">

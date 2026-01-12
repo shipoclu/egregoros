@@ -321,50 +321,47 @@ defmodule EgregorosWeb.StatusCard do
             </button>
           <% end %>
 
-          <details
+          <.popover
             id={"reaction-picker-#{@id}"}
             data-role="reaction-picker"
             class="relative"
+            summary_class="cursor-pointer focus-visible:outline-none focus-brutal"
+            panel_class="absolute right-0 top-full z-40 mt-2 w-64 overflow-hidden p-4"
           >
-            <summary class="list-none cursor-pointer [&::-webkit-details-marker]:hidden">
-              <span class="inline-flex h-9 w-9 items-center justify-center border border-[color:var(--border-muted)] bg-[color:var(--bg-base)] text-[color:var(--text-muted)] transition hover:border-[color:var(--border-default)] hover:text-[color:var(--text-primary)] focus-visible:outline-none focus-brutal">
+            <:trigger>
+              <span class="inline-flex h-9 w-9 items-center justify-center border border-[color:var(--border-muted)] bg-[color:var(--bg-base)] text-[color:var(--text-muted)] transition hover:border-[color:var(--border-default)] hover:text-[color:var(--text-primary)]">
                 <.icon name="hero-face-smile" class="size-5" />
                 <span class="sr-only">Add reaction</span>
               </span>
-            </summary>
+            </:trigger>
 
-            <div
-              class="absolute right-0 top-11 z-40 w-64 overflow-hidden border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] p-4"
-              phx-click-away={JS.remove_attribute("open", to: "#reaction-picker-#{@id}")}
-            >
-              <p class="text-xs font-bold uppercase tracking-wide text-[color:var(--text-muted)]">
-                React
-              </p>
+            <p class="text-xs font-bold uppercase tracking-wide text-[color:var(--text-muted)]">
+              React
+            </p>
 
-              <div class="mt-3 grid grid-cols-8 gap-1">
-                <button
-                  :for={emoji <- reaction_picker_emojis()}
-                  type="button"
-                  data-role="reaction-picker-option"
-                  data-emoji={emoji}
-                  phx-click={
-                    JS.dispatch("egregoros:optimistic-toggle", detail: %{kind: "reaction"})
-                    |> JS.push("toggle_reaction",
-                      value: %{
-                        "id" => @entry.object.id,
-                        "feed_id" => feed_id,
-                        "emoji" => emoji
-                      }
-                    )
-                    |> JS.remove_attribute("open", to: "#reaction-picker-#{@id}")
-                  }
-                  class="inline-flex cursor-pointer h-9 w-9 items-center justify-center text-xl transition hover:bg-[color:var(--bg-subtle)] focus-visible:outline-none focus-brutal"
-                >
-                  {emoji}
-                </button>
-              </div>
+            <div class="mt-3 grid grid-cols-8 gap-1">
+              <button
+                :for={emoji <- reaction_picker_emojis()}
+                type="button"
+                data-role="reaction-picker-option"
+                data-emoji={emoji}
+                phx-click={
+                  JS.dispatch("egregoros:optimistic-toggle", detail: %{kind: "reaction"})
+                  |> JS.push("toggle_reaction",
+                    value: %{
+                      "id" => @entry.object.id,
+                      "feed_id" => feed_id,
+                      "emoji" => emoji
+                    }
+                  )
+                  |> JS.remove_attribute("open", to: "#reaction-picker-#{@id}")
+                }
+                class="inline-flex cursor-pointer h-9 w-9 items-center justify-center text-xl transition hover:bg-[color:var(--bg-subtle)] focus-visible:outline-none focus-brutal"
+              >
+                {emoji}
+              </button>
             </div>
-          </details>
+          </.popover>
         </div>
       </div>
     </article>
@@ -730,123 +727,118 @@ defmodule EgregorosWeb.StatusCard do
       |> assign_new(:menu_id, fn -> "#{assigns.card_id}-menu" end)
 
     ~H"""
-    <details id={@menu_id} data-role="status-menu" class="relative">
-      <summary
-        data-role="status-menu-trigger"
-        aria-label="Post actions"
-        class="list-none [&::-webkit-details-marker]:hidden"
-      >
+    <.popover
+      id={@menu_id}
+      data-role="status-menu"
+      summary_data_role="status-menu-trigger"
+      summary_aria_label="Post actions"
+      panel_class="absolute right-0 top-9 z-40 w-48 overflow-hidden"
+    >
+      <:trigger>
         <span class="inline-flex h-8 w-8 items-center justify-center text-[color:var(--text-muted)] transition hover:bg-[color:var(--bg-subtle)] hover:text-[color:var(--text-primary)] focus-visible:outline-none focus-brutal">
           <.icon name="hero-ellipsis-horizontal" class="size-5" />
         </span>
-      </summary>
+      </:trigger>
 
-      <div
-        class="absolute right-0 top-9 z-40 w-48 overflow-hidden border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)]"
-        phx-click-away={JS.remove_attribute("open", to: "##{@menu_id}")}
-        phx-window-keydown={JS.remove_attribute("open", to: "##{@menu_id}")}
-        phx-key="escape"
+      <button
+        :if={is_binary(@share_url) and @share_url != ""}
+        type="button"
+        data-role="copy-link"
+        data-copy-text={@share_url}
+        phx-click={
+          JS.dispatch("egregoros:copy")
+          |> JS.push("copied_link")
+          |> JS.remove_attribute("open", to: "##{@menu_id}")
+        }
+        class="flex w-full items-center gap-3 px-4 py-2.5 text-sm font-medium text-[color:var(--text-primary)] transition hover:bg-[color:var(--bg-subtle)]"
       >
-        <button
-          :if={is_binary(@share_url) and @share_url != ""}
-          type="button"
-          data-role="copy-link"
-          data-copy-text={@share_url}
-          phx-click={
-            JS.dispatch("egregoros:copy")
-            |> JS.push("copied_link")
-            |> JS.remove_attribute("open", to: "##{@menu_id}")
-          }
-          class="flex w-full items-center gap-3 px-4 py-2.5 text-sm font-medium text-[color:var(--text-primary)] transition hover:bg-[color:var(--bg-subtle)]"
-        >
-          <.icon name="hero-clipboard-document" class="size-5 text-[color:var(--text-muted)]" />
-          Copy link
-        </button>
+        <.icon name="hero-clipboard-document" class="size-5 text-[color:var(--text-muted)]" />
+        Copy link
+      </button>
 
-        <a
-          :if={is_binary(@share_url) and @share_url != ""}
-          data-role="open-link"
-          href={@share_url}
-          target="_blank"
-          rel="nofollow noopener noreferrer"
-          class="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-[color:var(--text-primary)] transition hover:bg-[color:var(--bg-subtle)]"
-        >
-          <.icon
-            name="hero-arrow-top-right-on-square"
-            class="size-5 text-[color:var(--text-muted)]"
-          /> Open link
-        </a>
+      <a
+        :if={is_binary(@share_url) and @share_url != ""}
+        data-role="open-link"
+        href={@share_url}
+        target="_blank"
+        rel="nofollow noopener noreferrer"
+        class="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-[color:var(--text-primary)] transition hover:bg-[color:var(--bg-subtle)]"
+      >
+        <.icon
+          name="hero-arrow-top-right-on-square"
+          class="size-5 text-[color:var(--text-muted)]"
+        /> Open link
+      </a>
 
-        <button
-          :if={@current_user}
-          type="button"
-          data-role="bookmark"
-          phx-click="toggle_bookmark"
-          phx-value-id={@entry.object.id}
-          phx-value-feed-id={@feed_id}
-          phx-disable-with="..."
+      <button
+        :if={@current_user}
+        type="button"
+        data-role="bookmark"
+        phx-click="toggle_bookmark"
+        phx-value-id={@entry.object.id}
+        phx-value-feed-id={@feed_id}
+        phx-disable-with="..."
+        class={[
+          "flex w-full items-center gap-3 px-4 py-2.5 text-sm font-medium transition hover:bg-[color:var(--bg-subtle)]",
+          @bookmarked? && "text-[color:var(--text-primary)]",
+          !@bookmarked? && "text-[color:var(--text-primary)]"
+        ]}
+      >
+        <.icon
+          name={if @bookmarked?, do: "hero-bookmark-solid", else: "hero-bookmark"}
           class={[
-            "flex w-full items-center gap-3 px-4 py-2.5 text-sm font-medium transition hover:bg-[color:var(--bg-subtle)]",
+            "size-5",
             @bookmarked? && "text-[color:var(--text-primary)]",
-            !@bookmarked? && "text-[color:var(--text-primary)]"
+            !@bookmarked? && "text-[color:var(--text-muted)]"
           ]}
-        >
-          <.icon
-            name={if @bookmarked?, do: "hero-bookmark-solid", else: "hero-bookmark"}
-            class={[
-              "size-5",
-              @bookmarked? && "text-[color:var(--text-primary)]",
-              !@bookmarked? && "text-[color:var(--text-muted)]"
-            ]}
-          />
-          {if @bookmarked?, do: "Unbookmark", else: "Bookmark"}
-        </button>
+        />
+        {if @bookmarked?, do: "Unbookmark", else: "Bookmark"}
+      </button>
 
-        <%= if @can_delete? do %>
-          <div class="border-t border-[color:var(--border-muted)]">
-            <button
-              type="button"
-              data-role="delete-post"
-              phx-click={JS.toggle(to: "#delete-post-confirm-#{@card_id}")}
-              class="flex w-full items-center gap-3 px-4 py-2.5 text-sm font-medium text-[color:var(--danger)] transition hover:bg-[color:var(--danger-subtle)]"
-            >
-              <.icon name="hero-trash" class="size-5" /> Delete post
-            </button>
+      <%= if @can_delete? do %>
+        <div class="border-t border-[color:var(--border-muted)]">
+          <button
+            type="button"
+            data-role="delete-post"
+            phx-click={JS.toggle(to: "#delete-post-confirm-#{@card_id}")}
+            class="flex w-full items-center gap-3 px-4 py-2.5 text-sm font-medium text-[color:var(--danger)] transition hover:bg-[color:var(--danger-subtle)]"
+          >
+            <.icon name="hero-trash" class="size-5" /> Delete post
+          </button>
 
-            <div
-              id={"delete-post-confirm-#{@card_id}"}
-              class="hidden space-y-3 px-4 pb-4 pt-2 text-sm"
-            >
-              <p class="text-[color:var(--text-muted)]">
-                This cannot be undone.
-              </p>
+          <div
+            id={"delete-post-confirm-#{@card_id}"}
+            class="hidden space-y-3 px-4 pb-4 pt-2 text-sm"
+          >
+            <p class="text-[color:var(--text-muted)]">
+              This cannot be undone.
+            </p>
 
-              <div class="flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  data-role="delete-post-cancel"
-                  phx-click={JS.hide(to: "#delete-post-confirm-#{@card_id}")}
-                  class="inline-flex items-center justify-center border border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-3 py-1.5 text-xs font-bold uppercase text-[color:var(--text-primary)] transition hover:bg-[color:var(--bg-subtle)] focus-visible:outline-none focus-brutal"
-                >
-                  Cancel
-                </button>
+            <div class="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                data-role="delete-post-cancel"
+                phx-click={JS.hide(to: "#delete-post-confirm-#{@card_id}")}
+                class="inline-flex items-center justify-center border border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-3 py-1.5 text-xs font-bold uppercase text-[color:var(--text-primary)] transition hover:bg-[color:var(--bg-subtle)] focus-visible:outline-none focus-brutal"
+              >
+                Cancel
+              </button>
 
-                <button
-                  type="button"
-                  data-role="delete-post-confirm"
-                  phx-click="delete_post"
-                  phx-value-id={@entry.object.id}
-                  phx-disable-with="Deleting..."
-                  class="inline-flex items-center justify-center border-2 border-[color:var(--danger)] bg-[color:var(--danger)] px-3 py-1.5 text-xs font-bold uppercase text-[color:var(--bg-base)] transition hover:bg-[color:var(--danger-subtle)] hover:text-[color:var(--danger)] focus-visible:outline-none focus-brutal"
-                >
-                  Delete
-                </button>
-              </div>
+              <button
+                type="button"
+                data-role="delete-post-confirm"
+                phx-click="delete_post"
+                phx-value-id={@entry.object.id}
+                phx-disable-with="Deleting..."
+                class="inline-flex items-center justify-center border-2 border-[color:var(--danger)] bg-[color:var(--danger)] px-3 py-1.5 text-xs font-bold uppercase text-[color:var(--bg-base)] transition hover:bg-[color:var(--danger-subtle)] hover:text-[color:var(--danger)] focus-visible:outline-none focus-brutal"
+              >
+                Delete
+              </button>
             </div>
           </div>
-        <% end %>
-      </div>
-    </details>
+        </div>
+      <% end %>
+    </.popover>
     """
   end
 

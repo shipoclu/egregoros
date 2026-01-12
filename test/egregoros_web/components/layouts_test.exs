@@ -23,6 +23,9 @@ defmodule EgregorosWeb.LayoutsTest do
       })
 
     assert html =~ ~s(data-role="user-menu")
+    assert html =~ ~s(phx-click-away=)
+    assert html =~ ~s(phx-window-keydown=)
+    assert html =~ ~s(phx-key="escape")
     assert html =~ ~s(href="/@alice")
     assert html =~ ~s(href="/settings")
     assert html =~ ~s(action="/logout")

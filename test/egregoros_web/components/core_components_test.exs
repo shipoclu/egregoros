@@ -113,6 +113,28 @@ defmodule EgregorosWeb.CoreComponentsTest do
     assert html =~ "text-white"
   end
 
+  test "popover renders a details wrapper with close handlers and brutalist shadow" do
+    html =
+      render_component(&CoreComponents.popover/1, %{
+        id: "demo-popover",
+        class: nil,
+        summary_class: nil,
+        panel_class: "absolute right-0 top-full mt-2",
+        rest: %{"data-role" => "demo-popover"},
+        summary_aria_label: "Demo",
+        trigger: slot_text("Open"),
+        inner_block: slot_text("Panel")
+      })
+
+    assert html =~ ~s(<details)
+    assert html =~ ~s(id="demo-popover")
+    assert html =~ ~s(data-role="demo-popover")
+    assert html =~ ~s(phx-click-away=)
+    assert html =~ ~s(phx-window-keydown=)
+    assert html =~ ~s(phx-key="escape")
+    assert html =~ "shadow-[4px_4px_0_var(--border-default)]"
+  end
+
   test "card wraps content and exposes a stable data role" do
     html =
       render_component(

@@ -71,8 +71,13 @@ defmodule EgregorosWeb.Layouts do
             </a>
 
             <%= if @current_user do %>
-              <details id="user-menu" data-role="user-menu" class="relative group">
-                <summary class="flex cursor-pointer items-center gap-2 px-3 py-2 text-sm font-medium uppercase text-[color:var(--text-secondary)] transition hover:text-[color:var(--text-primary)] hover:underline underline-offset-4 focus-visible:outline-none focus-brutal list-none [&::-webkit-details-marker]:hidden">
+              <.popover
+                id="user-menu"
+                data-role="user-menu"
+                summary_class="flex cursor-pointer items-center gap-2 px-3 py-2 text-sm font-medium uppercase text-[color:var(--text-secondary)] transition hover:text-[color:var(--text-primary)] hover:underline underline-offset-4 focus-visible:outline-none focus-brutal"
+                panel_class="absolute right-0 top-full z-50 mt-2 w-60 overflow-hidden"
+              >
+                <:trigger>
                   <.avatar
                     size="xs"
                     name={user_display_name(@current_user)}
@@ -86,78 +91,73 @@ defmodule EgregorosWeb.Layouts do
                     name="hero-chevron-down-micro"
                     class="size-4 text-[color:var(--text-muted)] transition group-open:rotate-180"
                   />
-                </summary>
+                </:trigger>
 
-                <div class={[
-                  "absolute right-0 top-full z-50 mt-2 w-60 overflow-hidden border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)]",
-                  "shadow-[4px_4px_0_var(--border-default)] motion-safe:animate-rise"
-                ]}>
-                  <div class="border-b-2 border-[color:var(--border-muted)] px-4 py-3">
-                    <p class="truncate font-bold text-[color:var(--text-primary)]">
-                      {user_display_name(@current_user)}
-                    </p>
-                    <p class="truncate font-mono text-sm text-[color:var(--text-muted)]">
-                      @{user_nickname(@current_user)}
-                    </p>
-                  </div>
-
-                  <nav class="py-1" aria-label="User menu">
-                    <a
-                      data-role="user-menu-profile"
-                      href={~p"/@#{user_nickname(@current_user)}"}
-                      class="flex items-center gap-3 px-4 py-2.5 text-sm font-medium uppercase text-[color:var(--text-secondary)] transition hover:bg-[color:var(--bg-muted)] hover:text-[color:var(--text-primary)] focus-visible:bg-[color:var(--bg-muted)] focus-visible:outline-none"
-                    >
-                      <.icon name="hero-user-circle" class="size-4" /> Profile
-                    </a>
-
-                    <a
-                      data-role="user-menu-settings"
-                      href={~p"/settings"}
-                      class="flex items-center gap-3 px-4 py-2.5 text-sm font-medium uppercase text-[color:var(--text-secondary)] transition hover:bg-[color:var(--bg-muted)] hover:text-[color:var(--text-primary)] focus-visible:bg-[color:var(--bg-muted)] focus-visible:outline-none"
-                    >
-                      <.icon name="hero-cog-6-tooth" class="size-4" /> Settings
-                    </a>
-
-                    <a
-                      data-role="user-menu-privacy"
-                      href={~p"/settings/privacy"}
-                      class="flex items-center gap-3 px-4 py-2.5 text-sm font-medium uppercase text-[color:var(--text-secondary)] transition hover:bg-[color:var(--bg-muted)] hover:text-[color:var(--text-primary)] focus-visible:bg-[color:var(--bg-muted)] focus-visible:outline-none"
-                    >
-                      <.icon name="hero-shield-check" class="size-4" /> Privacy
-                    </a>
-
-                    <a
-                      data-role="user-menu-notifications"
-                      href={~p"/notifications"}
-                      class="flex items-center gap-3 px-4 py-2.5 text-sm font-medium uppercase text-[color:var(--text-secondary)] transition hover:bg-[color:var(--bg-muted)] hover:text-[color:var(--text-primary)] focus-visible:bg-[color:var(--bg-muted)] focus-visible:outline-none"
-                    >
-                      <.icon name="hero-bell" class="size-4" /> Notifications
-                    </a>
-
-                    <%= if Map.get(@current_user, :admin) == true do %>
-                      <a
-                        data-role="user-menu-admin"
-                        href={~p"/admin"}
-                        class="flex items-center gap-3 px-4 py-2.5 text-sm font-medium uppercase text-[color:var(--text-secondary)] transition hover:bg-[color:var(--bg-muted)] hover:text-[color:var(--text-primary)] focus-visible:bg-[color:var(--bg-muted)] focus-visible:outline-none"
-                      >
-                        <.icon name="hero-shield-check" class="size-4" /> Admin
-                      </a>
-                    <% end %>
-                  </nav>
-
-                  <div class="border-t-2 border-[color:var(--border-muted)] p-1">
-                    <.form for={%{}} action={~p"/logout"} method="post" class="contents">
-                      <button
-                        type="submit"
-                        data-role="user-menu-logout"
-                        class="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm font-medium uppercase text-[color:var(--danger)] transition hover:bg-[color:var(--bg-muted)] focus-visible:bg-[color:var(--bg-muted)] focus-visible:outline-none"
-                      >
-                        <.icon name="hero-arrow-right-on-rectangle" class="size-4" /> Logout
-                      </button>
-                    </.form>
-                  </div>
+                <div class="border-b-2 border-[color:var(--border-muted)] px-4 py-3">
+                  <p class="truncate font-bold text-[color:var(--text-primary)]">
+                    {user_display_name(@current_user)}
+                  </p>
+                  <p class="truncate font-mono text-sm text-[color:var(--text-muted)]">
+                    @{user_nickname(@current_user)}
+                  </p>
                 </div>
-              </details>
+
+                <nav class="py-1" aria-label="User menu">
+                  <a
+                    data-role="user-menu-profile"
+                    href={~p"/@#{user_nickname(@current_user)}"}
+                    class="flex items-center gap-3 px-4 py-2.5 text-sm font-medium uppercase text-[color:var(--text-secondary)] transition hover:bg-[color:var(--bg-muted)] hover:text-[color:var(--text-primary)] focus-visible:bg-[color:var(--bg-muted)] focus-visible:outline-none"
+                  >
+                    <.icon name="hero-user-circle" class="size-4" /> Profile
+                  </a>
+
+                  <a
+                    data-role="user-menu-settings"
+                    href={~p"/settings"}
+                    class="flex items-center gap-3 px-4 py-2.5 text-sm font-medium uppercase text-[color:var(--text-secondary)] transition hover:bg-[color:var(--bg-muted)] hover:text-[color:var(--text-primary)] focus-visible:bg-[color:var(--bg-muted)] focus-visible:outline-none"
+                  >
+                    <.icon name="hero-cog-6-tooth" class="size-4" /> Settings
+                  </a>
+
+                  <a
+                    data-role="user-menu-privacy"
+                    href={~p"/settings/privacy"}
+                    class="flex items-center gap-3 px-4 py-2.5 text-sm font-medium uppercase text-[color:var(--text-secondary)] transition hover:bg-[color:var(--bg-muted)] hover:text-[color:var(--text-primary)] focus-visible:bg-[color:var(--bg-muted)] focus-visible:outline-none"
+                  >
+                    <.icon name="hero-shield-check" class="size-4" /> Privacy
+                  </a>
+
+                  <a
+                    data-role="user-menu-notifications"
+                    href={~p"/notifications"}
+                    class="flex items-center gap-3 px-4 py-2.5 text-sm font-medium uppercase text-[color:var(--text-secondary)] transition hover:bg-[color:var(--bg-muted)] hover:text-[color:var(--text-primary)] focus-visible:bg-[color:var(--bg-muted)] focus-visible:outline-none"
+                  >
+                    <.icon name="hero-bell" class="size-4" /> Notifications
+                  </a>
+
+                  <%= if Map.get(@current_user, :admin) == true do %>
+                    <a
+                      data-role="user-menu-admin"
+                      href={~p"/admin"}
+                      class="flex items-center gap-3 px-4 py-2.5 text-sm font-medium uppercase text-[color:var(--text-secondary)] transition hover:bg-[color:var(--bg-muted)] hover:text-[color:var(--text-primary)] focus-visible:bg-[color:var(--bg-muted)] focus-visible:outline-none"
+                    >
+                      <.icon name="hero-shield-check" class="size-4" /> Admin
+                    </a>
+                  <% end %>
+                </nav>
+
+                <div class="border-t-2 border-[color:var(--border-muted)] p-1">
+                  <.form for={%{}} action={~p"/logout"} method="post" class="contents">
+                    <button
+                      type="submit"
+                      data-role="user-menu-logout"
+                      class="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm font-medium uppercase text-[color:var(--danger)] transition hover:bg-[color:var(--bg-muted)] focus-visible:bg-[color:var(--bg-muted)] focus-visible:outline-none"
+                    >
+                      <.icon name="hero-arrow-right-on-rectangle" class="size-4" /> Logout
+                    </button>
+                  </.form>
+                </div>
+              </.popover>
             <% else %>
               <a
                 href={~p"/login"}
