@@ -45,4 +45,31 @@ defmodule EgregorosWeb.WebFingerControllerTest do
 
     assert self_link["href"] == user.ap_id
   end
+
+  test "GET /.well-known/webfinger returns 400 when resource is missing", %{conn: conn} do
+    conn = get(conn, "/.well-known/webfinger")
+    assert response(conn, 400) == "Bad Request"
+  end
+
+  test "GET /.well-known/webfinger returns 404 for unknown local user", %{conn: conn} do
+    host = Endpoint.url() |> URI.parse() |> Map.fetch!(:host)
+    conn = get(conn, "/.well-known/webfinger", resource: "acct:doesnotexist@#{host}")
+    assert response(conn, 404) == "Not Found"
+  end
+
+  test "GET /.well-known/webfinger resolves a local user by ap_id resource", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("alice")
+
+    conn = get(conn, "/.well-known/webfinger", resource: user.ap_id)
+    body = json_response(conn, 200)
+
+    assert body["aliases"] == [user.ap_id]
+
+    self_link =
+      Enum.find(body["links"], fn link ->
+        link["rel"] == "self" and link["type"] == "application/activity+json"
+      end)
+
+    assert self_link["href"] == user.ap_id
+  end
 end

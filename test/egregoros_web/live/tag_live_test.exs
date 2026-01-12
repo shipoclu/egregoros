@@ -329,4 +329,39 @@ defmodule EgregorosWeb.TagLiveTest do
 
     refute has_element?(view, "button[data-role='tag-load-more']")
   end
+
+  test "closing the reply modal clears queued uploads", %{conn: conn, user: user, note: note} do
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    assert {:ok, view, _html} = live(conn, "/tags/elixir")
+
+    view
+    |> element("#post-#{note.id} button[data-role='reply']")
+    |> render_click()
+
+    fixture_path = Fixtures.path!("DSCN0010.png")
+    content = File.read!(fixture_path)
+
+    upload =
+      file_input(view, "#reply-modal-form", :reply_media, [
+        %{
+          last_modified: 1_694_171_879_000,
+          name: "photo.png",
+          content: content,
+          size: byte_size(content),
+          type: "image/png"
+        }
+      ])
+
+    assert render_upload(upload, "photo.png") =~ "100%"
+    assert has_element?(view, "[data-role='media-entry']")
+
+    _html = render_click(view, "close_reply_modal", %{})
+    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='closed']")
+
+    view
+    |> element("#post-#{note.id} button[data-role='reply']")
+    |> render_click()
+
+    refute has_element?(view, "[data-role='media-entry']")
+  end
 end

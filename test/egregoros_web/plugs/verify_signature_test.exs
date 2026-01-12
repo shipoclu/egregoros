@@ -67,7 +67,7 @@ defmodule EgregorosWeb.Plugs.VerifySignatureTest do
     assert conn.status == 401
   end
 
-  test "allows requests when the activity actor is missing from body params" do
+  test "rejects requests when the activity actor is missing from body params" do
     {:ok, user} = Users.create_local_user("alice")
 
     body = Jason.encode!(%{"id" => "https://remote.example/activities/1", "type" => "Follow"})
