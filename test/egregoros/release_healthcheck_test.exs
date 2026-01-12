@@ -35,4 +35,32 @@ defmodule Egregoros.ReleaseHealthcheckTest do
       assert {:error, :bad_status} = Release.healthcheck(port: port)
     end)
   end
+
+  test "healthcheck/1 returns an error when the server closes without a response" do
+    {:ok, listen_socket} = :gen_tcp.listen(0, [:binary, active: false, reuseaddr: true])
+    {:ok, {_addr, port}} = :inet.sockname(listen_socket)
+
+    server =
+      Task.async(fn ->
+        {:ok, socket} = :gen_tcp.accept(listen_socket)
+        _ = :gen_tcp.recv(socket, 0, 1_000)
+        :ok = :gen_tcp.close(socket)
+        :ok = :gen_tcp.close(listen_socket)
+      end)
+
+    try do
+      assert {:error, :closed} = Release.healthcheck(port: port)
+    after
+      _ = Task.shutdown(server, :brutal_kill)
+      _ = :gen_tcp.close(listen_socket)
+    end
+  end
+
+  test "healthcheck/1 returns an error when it cannot connect" do
+    {:ok, listen_socket} = :gen_tcp.listen(0, [:binary, active: false, reuseaddr: true])
+    {:ok, {_addr, port}} = :inet.sockname(listen_socket)
+    :ok = :gen_tcp.close(listen_socket)
+
+    assert {:error, _reason} = Release.healthcheck(port: port, timeout: 50)
+  end
 end

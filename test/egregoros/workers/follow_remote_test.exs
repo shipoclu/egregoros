@@ -94,4 +94,17 @@ defmodule Egregoros.Workers.FollowRemoteTest do
                "handle" => "not-a-handle"
              })
   end
+
+  test "perform/1 discards jobs with unsafe handles without doing HTTP" do
+    {:ok, local} = Users.create_local_user("alice")
+
+    expect(Egregoros.HTTP.Mock, :get, 0, fn _url, _headers -> :ok end)
+    expect(Egregoros.HTTP.Mock, :post, 0, fn _url, _body, _headers -> :ok end)
+
+    assert {:discard, :unsafe_url} =
+             perform_job(FollowRemote, %{
+               "user_id" => local.id,
+               "handle" => "bob@127.0.0.1"
+             })
+  end
 end

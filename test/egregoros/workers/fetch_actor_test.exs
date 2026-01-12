@@ -43,4 +43,30 @@ defmodule Egregoros.Workers.FetchActorTest do
     assert {:discard, :invalid_args} = FetchActor.perform(%Oban.Job{args: %{}})
     assert {:discard, :invalid_args} = FetchActor.perform(%Oban.Job{args: %{"ap_id" => 1}})
   end
+
+  test "does not refetch actors that already exist" do
+    ap_id = "https://remote.example/users/bob"
+
+    {:ok, _remote} =
+      Users.create_user(%{
+        nickname: "bob",
+        domain: "remote.example",
+        ap_id: ap_id,
+        inbox: ap_id <> "/inbox",
+        outbox: ap_id <> "/outbox",
+        public_key: "PUB",
+        private_key: nil,
+        local: false
+      })
+
+    stub(Egregoros.HTTP.Mock, :get, fn _url, _headers ->
+      flunk("unexpected HTTP GET during FetchActor.perform/1")
+    end)
+
+    assert :ok = FetchActor.perform(%Oban.Job{args: %{"ap_id" => ap_id}})
+  end
+
+  test "returns an error when the actor url is unsafe" do
+    assert {:error, :unsafe_url} = FetchActor.perform(%Oban.Job{args: %{"ap_id" => "not-a-url"}})
+  end
 end
