@@ -73,7 +73,9 @@ defmodule EgregorosWeb.Plugs.CORSPlugTest do
       |> put_req_header("origin", "https://allowed.example")
       |> CORS.call(opts)
 
-    assert get_resp_header(conn_allowed, "access-control-allow-origin") == ["https://allowed.example"]
+    assert get_resp_header(conn_allowed, "access-control-allow-origin") == [
+             "https://allowed.example"
+           ]
 
     conn_blocked =
       :get
@@ -110,6 +112,7 @@ defmodule EgregorosWeb.Plugs.CORSPlugTest do
       |> CORS.call(cors_opts())
 
     assert conn.halted
+
     assert get_resp_header(conn, "access-control-allow-headers") == [
              "authorization,content-type,accept"
            ]
@@ -127,4 +130,3 @@ defmodule EgregorosWeb.Plugs.CORSPlugTest do
     |> Keyword.merge(overrides)
   end
 end
-

@@ -110,7 +110,12 @@ defmodule Egregoros.MixProject do
         "esbuild egregoros --minify",
         "phx.digest"
       ],
-      precommit: ["compile --warnings-as-errors", "deps.unlock --unused", "format", "test"]
+      precommit: [
+        "compile --warnings-as-errors",
+        "deps.unlock --unused",
+        "format --check-formatted",
+        "test"
+      ]
     ]
   end
 end

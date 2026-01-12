@@ -152,9 +152,17 @@ defmodule Egregoros.SafeURLTest do
   test "validate_http_url_no_dns rejects numeric hosts that fail parsing" do
     assert {:error, :unsafe_url} == SafeURL.validate_http_url_no_dns("http://0x/users/alice")
     assert {:error, :unsafe_url} == SafeURL.validate_http_url_no_dns("http://0xGG/users/alice")
-    assert {:error, :unsafe_url} == SafeURL.validate_http_url_no_dns("http://4294967296/users/alice")
-    assert {:error, :unsafe_url} == SafeURL.validate_http_url_no_dns("http://0x100.0.0.1/users/alice")
-    assert {:error, :unsafe_url} == SafeURL.validate_http_url_no_dns("http://8.16777216/users/alice")
-    assert {:error, :unsafe_url} == SafeURL.validate_http_url_no_dns("http://8.8.65536/users/alice")
+
+    assert {:error, :unsafe_url} ==
+             SafeURL.validate_http_url_no_dns("http://4294967296/users/alice")
+
+    assert {:error, :unsafe_url} ==
+             SafeURL.validate_http_url_no_dns("http://0x100.0.0.1/users/alice")
+
+    assert {:error, :unsafe_url} ==
+             SafeURL.validate_http_url_no_dns("http://8.16777216/users/alice")
+
+    assert {:error, :unsafe_url} ==
+             SafeURL.validate_http_url_no_dns("http://8.8.65536/users/alice")
   end
 end
