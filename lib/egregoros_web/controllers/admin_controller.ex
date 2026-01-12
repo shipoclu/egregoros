@@ -1,17 +1,50 @@
 defmodule EgregorosWeb.AdminController do
   use EgregorosWeb, :controller
 
+  alias Egregoros.InstanceSettings
   alias Egregoros.Relays
   alias Egregoros.User
+  alias EgregorosWeb.Param
 
   def index(conn, _params) do
     form = Phoenix.Component.to_form(%{"ap_id" => ""}, as: :relay)
+    registrations_open? = InstanceSettings.registrations_open?()
+
+    registrations_form =
+      Phoenix.Component.to_form(
+        %{"open" => registrations_open?},
+        as: :registrations
+      )
 
     render(conn, :index,
       relays: Relays.list_relays(),
       form: form,
+      registrations_open?: registrations_open?,
+      registrations_form: registrations_form,
       notifications_count: notifications_count(conn.assigns.current_user)
     )
+  end
+
+  def update_registrations(conn, %{"registrations" => %{} = params}) do
+    open? = Param.truthy?(Map.get(params, "open"))
+
+    case InstanceSettings.set_registrations_open(open?) do
+      {:ok, _settings} ->
+        conn
+        |> put_flash(:info, "Registration settings updated.")
+        |> redirect(to: ~p"/admin")
+
+      {:error, _reason} ->
+        conn
+        |> put_flash(:error, "Could not update registration settings.")
+        |> redirect(to: ~p"/admin")
+    end
+  end
+
+  def update_registrations(conn, _params) do
+    conn
+    |> put_status(:unprocessable_entity)
+    |> text("Unprocessable Entity")
   end
 
   def create_relay(conn, %{"relay" => %{} = params}) do

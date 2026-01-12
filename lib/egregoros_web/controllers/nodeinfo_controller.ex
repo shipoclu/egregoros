@@ -3,6 +3,7 @@ defmodule EgregorosWeb.NodeinfoController do
 
   import Ecto.Query, only: [from: 2]
 
+  alias Egregoros.InstanceSettings
   alias Egregoros.Object
   alias Egregoros.Repo
   alias Egregoros.User
@@ -52,7 +53,7 @@ defmodule EgregorosWeb.NodeinfoController do
       },
       "protocols" => ["activitypub"],
       "services" => %{"inbound" => [], "outbound" => []},
-      "openRegistrations" => true,
+      "openRegistrations" => InstanceSettings.registrations_open?(),
       "usage" => %{"users" => %{"total" => user_count}, "localPosts" => local_posts},
       "metadata" => %{}
     })

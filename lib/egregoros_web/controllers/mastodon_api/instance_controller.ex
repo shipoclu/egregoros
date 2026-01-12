@@ -3,6 +3,7 @@ defmodule EgregorosWeb.MastodonAPI.InstanceController do
 
   import Ecto.Query, only: [from: 2]
 
+  alias Egregoros.InstanceSettings
   alias Egregoros.Object
   alias Egregoros.Repo
   alias Egregoros.User
@@ -13,6 +14,7 @@ defmodule EgregorosWeb.MastodonAPI.InstanceController do
   def show(conn, _params) do
     base_url = Endpoint.url()
     host = URI.parse(base_url).host || "localhost"
+    registrations_open? = InstanceSettings.registrations_open?()
 
     user_count =
       from(u in User, where: u.nickname != "internal.fetch")
@@ -37,7 +39,7 @@ defmodule EgregorosWeb.MastodonAPI.InstanceController do
       },
       "thumbnail" => nil,
       "languages" => ["en"],
-      "registrations" => true,
+      "registrations" => registrations_open?,
       "approval_required" => false,
       "invites_enabled" => false
     })
@@ -100,6 +102,7 @@ defmodule EgregorosWeb.MastodonAPI.InstanceController do
   def show_v2(conn, _params) do
     base_url = Endpoint.url()
     host = URI.parse(base_url).host || "localhost"
+    registrations_open? = InstanceSettings.registrations_open?()
 
     active_month =
       from(u in User, where: u.nickname != "internal.fetch")
@@ -143,7 +146,7 @@ defmodule EgregorosWeb.MastodonAPI.InstanceController do
         }
       },
       "registrations" => %{
-        "enabled" => true,
+        "enabled" => registrations_open?,
         "approval_required" => false,
         "message" => nil
       },

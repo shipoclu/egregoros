@@ -92,6 +92,7 @@ defmodule EgregorosWeb.Router do
     pipe_through [:browser, :admin]
 
     get "/admin", AdminController, :index
+    post "/admin/registrations", AdminController, :update_registrations
     post "/admin/relays", AdminController, :create_relay
     delete "/admin/relays/:id", AdminController, :delete_relay
   end

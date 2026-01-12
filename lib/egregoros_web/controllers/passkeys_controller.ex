@@ -1,6 +1,7 @@
 defmodule EgregorosWeb.PasskeysController do
   use EgregorosWeb, :controller
 
+  alias Egregoros.InstanceSettings
   alias Egregoros.Passkeys
   alias Egregoros.Passkeys.Credential
   alias Egregoros.Passkeys.WebAuthn
@@ -10,6 +11,16 @@ defmodule EgregorosWeb.PasskeysController do
   alias EgregorosWeb.ReturnTo
 
   def registration_options(conn, params) do
+    if InstanceSettings.registrations_open?() do
+      registration_options_open(conn, params)
+    else
+      conn
+      |> put_status(:forbidden)
+      |> json(%{"error" => "registrations_closed"})
+    end
+  end
+
+  defp registration_options_open(conn, params) do
     nickname = params |> Map.get("nickname", "") |> to_string() |> String.trim()
     return_to = params |> Map.get("return_to", "") |> to_string()
 
@@ -52,6 +63,19 @@ defmodule EgregorosWeb.PasskeysController do
   end
 
   def registration_finish(conn, %{"credential" => %{} = credential}) do
+    if InstanceSettings.registrations_open?() do
+      registration_finish_open(conn, credential)
+    else
+      conn
+      |> clear_passkey_registration_session()
+      |> put_status(:forbidden)
+      |> json(%{"error" => "registrations_closed"})
+    end
+  end
+
+  def registration_finish(conn, _params), do: send_resp(conn, 422, "Unprocessable Entity")
+
+  defp registration_finish_open(conn, %{} = credential) do
     challenge = get_session(conn, :passkey_reg_challenge)
     nickname = get_session(conn, :passkey_reg_nickname)
     email = get_session(conn, :passkey_reg_email)
@@ -83,8 +107,6 @@ defmodule EgregorosWeb.PasskeysController do
         |> send_resp(422, "Unprocessable Entity")
     end
   end
-
-  def registration_finish(conn, _params), do: send_resp(conn, 422, "Unprocessable Entity")
 
   def authentication_options(conn, params) do
     nickname = params |> Map.get("nickname", "") |> to_string() |> String.trim()

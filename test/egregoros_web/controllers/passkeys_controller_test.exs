@@ -1,6 +1,7 @@
 defmodule EgregorosWeb.PasskeysControllerTest do
   use EgregorosWeb.ConnCase, async: true
 
+  alias Egregoros.InstanceSettings
   alias Egregoros.Passkeys
   alias Egregoros.Users
 
@@ -51,6 +52,21 @@ defmodule EgregorosWeb.PasskeysControllerTest do
 
     # Sanity check: can authenticate with the stored credential.
     assert {:ok, _user} = authenticate_with_passkey(conn, user, credential, priv)
+  end
+
+  test "passkey registration is forbidden when registrations are closed", %{conn: conn} do
+    assert {:ok, _settings} = InstanceSettings.set_registrations_open(false)
+
+    csrf_token = Phoenix.Controller.get_csrf_token()
+
+    conn =
+      post(conn, "/passkeys/registration/options", %{
+        "_csrf_token" => csrf_token,
+        "nickname" => "alice",
+        "email" => ""
+      })
+
+    assert json_response(conn, 403)["error"] == "registrations_closed"
   end
 
   test "passkey registration respects return_to", %{conn: conn} do

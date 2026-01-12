@@ -31,6 +31,30 @@
       <div class="mt-8 space-y-6">
         <div>
           <h3 class="text-sm font-semibold uppercase tracking-[0.25em] text-slate-500 dark:text-slate-400">
+            Registrations
+          </h3>
+          <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">
+            Control whether new users can sign up for this instance.
+          </p>
+
+          <.form
+            for={@registrations_form}
+            action={~p"/admin/registrations"}
+            class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"
+          >
+            <.input
+              type="checkbox"
+              field={@registrations_form[:open]}
+              label="Allow sign ups"
+              class="mt-1"
+            />
+
+            <.button type="submit" class="sm:w-44">Save</.button>
+          </.form>
+        </div>
+
+        <div>
+          <h3 class="text-sm font-semibold uppercase tracking-[0.25em] text-slate-500 dark:text-slate-400">
             Relays
           </h3>
           <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">

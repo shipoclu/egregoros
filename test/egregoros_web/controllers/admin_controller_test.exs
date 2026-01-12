@@ -4,6 +4,7 @@ defmodule EgregorosWeb.AdminControllerTest do
   import Mox
 
   alias Egregoros.Federation.InternalFetchActor
+  alias Egregoros.InstanceSettings
   alias Egregoros.Relationships
   alias Egregoros.Relays
   alias Egregoros.Users
@@ -34,6 +35,23 @@ defmodule EgregorosWeb.AdminControllerTest do
     assert html =~ "Oban dashboard"
     assert html =~ "Live dashboard"
     assert html =~ "/admin/dashboard"
+  end
+
+  test "POST /admin/registrations updates registration settings", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("alice")
+    {:ok, user} = Users.set_admin(user, true)
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+
+    csrf_token = Phoenix.Controller.get_csrf_token()
+
+    conn =
+      post(conn, "/admin/registrations", %{
+        "_csrf_token" => csrf_token,
+        "registrations" => %{"open" => "false"}
+      })
+
+    assert redirected_to(conn) == "/admin"
+    refute InstanceSettings.registrations_open?()
   end
 
   test "POST /admin/relays subscribes the internal actor to the relay", %{conn: conn} do

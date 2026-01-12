@@ -14,7 +14,13 @@
 
       <p :if={@error} class="mt-4 text-sm text-rose-500">{@error}</p>
 
-      <.form for={@form} id="registration-form" action={~p"/register"} class="mt-6 space-y-4">
+      <.form
+        :if={@registrations_open?}
+        for={@form}
+        id="registration-form"
+        action={~p"/register"}
+        class="mt-6 space-y-4"
+      >
         <.input type="hidden" field={@form[:return_to]} />
 
         <.input
@@ -66,6 +72,11 @@
         >
         </p>
       </.form>
+      <div :if={!@registrations_open?} class="mt-6 rounded-2xl border border-slate-200 bg-white/70 p-4 dark:border-slate-700 dark:bg-slate-950/30">
+        <p class="text-sm text-slate-700 dark:text-slate-200">
+          Registrations are currently closed on this instance.
+        </p>
+      </div>
 
       <p class="mt-6 text-sm text-slate-600 dark:text-slate-300">
         Already have an account?

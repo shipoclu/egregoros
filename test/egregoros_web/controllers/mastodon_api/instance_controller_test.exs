@@ -1,6 +1,8 @@
 defmodule EgregorosWeb.MastodonAPI.InstanceControllerTest do
   use EgregorosWeb.ConnCase, async: true
 
+  alias Egregoros.InstanceSettings
+
   test "GET /api/v1/instance returns instance information", %{conn: conn} do
     conn = get(conn, "/api/v1/instance")
     response = json_response(conn, 200)
@@ -10,6 +12,18 @@ defmodule EgregorosWeb.MastodonAPI.InstanceControllerTest do
     assert is_binary(response["version"])
     assert is_binary(get_in(response, ["urls", "streaming_api"]))
     assert is_map(response["stats"])
+  end
+
+  test "instance payloads reflect registration state", %{conn: conn} do
+    assert {:ok, _settings} = InstanceSettings.set_registrations_open(false)
+
+    conn = get(conn, "/api/v1/instance")
+    response = json_response(conn, 200)
+    assert response["registrations"] == false
+
+    conn = get(recycle(conn), "/api/v2/instance")
+    response = json_response(conn, 200)
+    assert get_in(response, ["registrations", "enabled"]) == false
   end
 
   test "GET /api/v2/instance returns instance information", %{conn: conn} do

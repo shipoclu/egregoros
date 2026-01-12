@@ -1,6 +1,7 @@
 defmodule EgregorosWeb.NodeinfoControllerTest do
   use EgregorosWeb.ConnCase, async: true
 
+  alias Egregoros.InstanceSettings
   alias Egregoros.Publish
   alias Egregoros.Users
 
@@ -40,6 +41,15 @@ defmodule EgregorosWeb.NodeinfoControllerTest do
     assert body["openRegistrations"] == true
     assert body["usage"]["users"]["total"] == 1
     assert body["usage"]["localPosts"] == 1
+  end
+
+  test "nodeinfo reflects when registrations are closed", %{conn: conn} do
+    assert {:ok, _settings} = InstanceSettings.set_registrations_open(false)
+
+    conn = get(conn, "/nodeinfo/2.0.json")
+    body = json_response(conn, 200)
+
+    assert body["openRegistrations"] == false
   end
 
   test "GET /nodeinfo/2.0 returns minimal payload", %{conn: conn} do

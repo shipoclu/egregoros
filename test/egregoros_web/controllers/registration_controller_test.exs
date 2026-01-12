@@ -1,6 +1,7 @@
 defmodule EgregorosWeb.RegistrationControllerTest do
   use EgregorosWeb.ConnCase, async: true
 
+  alias Egregoros.InstanceSettings
   alias Egregoros.Users
 
   test "GET /register renders form", %{conn: conn} do
@@ -45,5 +46,22 @@ defmodule EgregorosWeb.RegistrationControllerTest do
     assert redirected_to(conn) == "/settings"
     assert conn.private[:plug_session_info] == :renew
     assert is_integer(get_session(conn, :user_id))
+  end
+
+  test "POST /register is forbidden when registrations are closed", %{conn: conn} do
+    assert {:ok, _settings} = InstanceSettings.set_registrations_open(false)
+
+    conn =
+      post(conn, "/register", %{
+        "registration" => %{
+          "nickname" => "alice",
+          "email" => "",
+          "password" => "very secure password"
+        }
+      })
+
+    html = html_response(conn, 403)
+    assert html =~ "Registrations are closed"
+    refute Users.get_by_nickname("alice")
   end
 end
