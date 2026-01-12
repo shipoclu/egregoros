@@ -51,6 +51,24 @@ defmodule EgregorosWeb.MastodonAPI.AccountRendererTest do
     assert rendered["avatar_static"] == "https://remote.example/media/avatar.png"
   end
 
+  test "renders remote banner urls relative to their ap id host" do
+    {:ok, user} =
+      Users.create_user(%{
+        nickname: "bob",
+        ap_id: "https://remote.example/users/bob",
+        inbox: "https://remote.example/users/bob/inbox",
+        outbox: "https://remote.example/users/bob/outbox",
+        public_key: "PUB",
+        private_key: nil,
+        local: false,
+        banner_url: "/media/banner.png"
+      })
+
+    rendered = AccountRenderer.render_account(user)
+    assert rendered["header"] == "https://remote.example/media/banner.png"
+    assert rendered["header_static"] == "https://remote.example/media/banner.png"
+  end
+
   test "renders account url as a local profile url" do
     {:ok, user} = Users.create_local_user("alice")
 

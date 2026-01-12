@@ -46,6 +46,7 @@ defmodule EgregorosWeb.MastodonAPI.AccountRenderer do
 
   def render_account(%User{} = user, opts) when is_list(opts) do
     avatar_url = URL.absolute(user.avatar_url, user.ap_id) || ""
+    banner_url = URL.absolute(user.banner_url, user.ap_id) || ""
 
     url =
       case ProfilePaths.profile_path(user) do
@@ -84,8 +85,8 @@ defmodule EgregorosWeb.MastodonAPI.AccountRenderer do
       "note" => bio,
       "avatar" => avatar_url,
       "avatar_static" => avatar_url,
-      "header" => "",
-      "header_static" => "",
+      "header" => banner_url,
+      "header_static" => banner_url,
       "locked" => user.locked,
       "bot" => false,
       "discoverable" => true,
