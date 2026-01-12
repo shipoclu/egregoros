@@ -140,4 +140,21 @@ defmodule Egregoros.SafeURLTest do
     assert :ok == SafeURL.validate_http_url_no_dns("http://8.8.8.8/users/alice")
     assert :ok == SafeURL.validate_http_url_no_dns("http://[2001:4860:4860::8888]/users/alice")
   end
+
+  test "validate_http_url_no_dns allows obfuscated public IPv4 forms" do
+    assert :ok == SafeURL.validate_http_url_no_dns("http://134744072/users/alice")
+    assert :ok == SafeURL.validate_http_url_no_dns("http://0x08080808/users/alice")
+    assert :ok == SafeURL.validate_http_url_no_dns("http://8.8/users/alice")
+    assert :ok == SafeURL.validate_http_url_no_dns("http://8.8.8/users/alice")
+    assert :ok == SafeURL.validate_http_url_no_dns("http://0x8.0x8.0x8.0x8/users/alice")
+  end
+
+  test "validate_http_url_no_dns rejects numeric hosts that fail parsing" do
+    assert {:error, :unsafe_url} == SafeURL.validate_http_url_no_dns("http://0x/users/alice")
+    assert {:error, :unsafe_url} == SafeURL.validate_http_url_no_dns("http://0xGG/users/alice")
+    assert {:error, :unsafe_url} == SafeURL.validate_http_url_no_dns("http://4294967296/users/alice")
+    assert {:error, :unsafe_url} == SafeURL.validate_http_url_no_dns("http://0x100.0.0.1/users/alice")
+    assert {:error, :unsafe_url} == SafeURL.validate_http_url_no_dns("http://8.16777216/users/alice")
+    assert {:error, :unsafe_url} == SafeURL.validate_http_url_no_dns("http://8.8.65536/users/alice")
+  end
 end
