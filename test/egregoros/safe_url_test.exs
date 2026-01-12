@@ -121,4 +121,23 @@ defmodule Egregoros.SafeURLTest do
 
     assert {:error, :unsafe_url} == SafeURL.validate_http_url_no_dns("http://[::1]/users/alice")
   end
+
+  test "validate_http_url_no_dns rejects non-http schemes" do
+    assert {:error, :unsafe_url} == SafeURL.validate_http_url_no_dns("file:///etc/passwd")
+  end
+
+  test "validate_http_url_no_dns rejects urls without a host" do
+    assert {:error, :unsafe_url} == SafeURL.validate_http_url_no_dns("https:///users/alice")
+    assert {:error, :unsafe_url} == SafeURL.validate_http_url_no_dns("https://")
+  end
+
+  test "validate_http_url_no_dns rejects non-binary urls" do
+    assert {:error, :unsafe_url} == SafeURL.validate_http_url_no_dns(nil)
+    assert {:error, :unsafe_url} == SafeURL.validate_http_url_no_dns(123)
+  end
+
+  test "validate_http_url_no_dns allows public ip literals" do
+    assert :ok == SafeURL.validate_http_url_no_dns("http://8.8.8.8/users/alice")
+    assert :ok == SafeURL.validate_http_url_no_dns("http://[2001:4860:4860::8888]/users/alice")
+  end
 end
