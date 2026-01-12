@@ -3,8 +3,6 @@ defmodule EgregorosWeb.Plugs.Uploads do
 
   import Plug.Conn
 
-  alias Egregoros.Media
-  alias Egregoros.Users
   alias EgregorosWeb.Endpoint
 
   @secure_headers [
@@ -28,17 +26,9 @@ defmodule EgregorosWeb.Plugs.Uploads do
 
   def call(%Plug.Conn{request_path: "/uploads" <> _rest} = conn, %{static_opts: static_opts}) do
     if uploads_host_allowed?(conn) do
-      conn = fetch_session(conn)
-
       case conn.request_path do
         "/uploads/media/" <> _ ->
-          user = current_user(conn)
-
-          if Media.local_href_visible_to?(conn.request_path, user) do
-            serve_static(conn, static_opts)
-          else
-            not_found(conn)
-          end
+          serve_static(conn, static_opts)
 
         "/uploads/avatars/" <> _ ->
           serve_static(conn, static_opts)
@@ -55,22 +45,6 @@ defmodule EgregorosWeb.Plugs.Uploads do
   end
 
   def call(conn, _opts), do: conn
-
-  defp current_user(conn) do
-    case get_session(conn, :user_id) do
-      id when is_integer(id) ->
-        Users.get(id)
-
-      id when is_binary(id) ->
-        case Integer.parse(id) do
-          {int, ""} -> Users.get(int)
-          _ -> nil
-        end
-
-      _ ->
-        nil
-    end
-  end
 
   defp serve_static(conn, static_opts) do
     conn = Plug.Static.call(conn, static_opts)
