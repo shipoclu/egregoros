@@ -904,7 +904,8 @@ defmodule EgregorosWeb.StatusCard do
           <img
             data-role="attachment"
             data-kind="image"
-            src={@attachment.href}
+            src={Map.get(@attachment, :preview_href) || @attachment.href}
+            data-full-href={@attachment.href}
             alt={@attachment.description}
             class={[
               @height_class,

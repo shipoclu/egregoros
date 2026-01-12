@@ -1022,6 +1022,51 @@ defmodule EgregorosWeb.TimelineLiveTest do
     assert has_element?(view, "#post-#{note.id} img[data-role='attachment']")
   end
 
+  test "image attachments render with thumbnail previews in the timeline", %{conn: conn, user: user} do
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/")
+
+    fixture_path = Fixtures.path!("DSCN0010.png")
+    content = File.read!(fixture_path)
+
+    upload =
+      file_input(view, "#timeline-form", :media, [
+        %{
+          last_modified: 1_694_171_879_000,
+          name: "photo.png",
+          content: content,
+          size: byte_size(content),
+          type: "image/png"
+        }
+      ])
+
+    expect(Egregoros.MediaStorage.Mock, :store_media, fn passed_user, passed_upload ->
+      assert passed_user.id == user.id
+      assert passed_upload.filename == "photo.png"
+      assert passed_upload.content_type == "image/png"
+      {:ok, "/uploads/media/#{passed_user.id}/photo.png"}
+    end)
+
+    assert render_upload(upload, "photo.png") =~ "100%"
+
+    view
+    |> form("#timeline-form", post: %{content: "Hello with media"})
+    |> render_submit()
+
+    [note] = Objects.list_notes()
+
+    html =
+      view
+      |> element("#post-#{note.id} img[data-role='attachment'][data-kind='image']")
+      |> render()
+
+    full = EgregorosWeb.Endpoint.url() <> "/uploads/media/#{user.id}/photo.png"
+    thumb = EgregorosWeb.Endpoint.url() <> "/uploads/media/#{user.id}/photo-thumb.jpg"
+
+    assert html =~ "data-full-href=\"#{full}\""
+    assert html =~ "src=\"#{thumb}\""
+  end
+
   test "compose Add media button is wired to the hidden file input", %{conn: conn, user: user} do
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     {:ok, view, _html} = live(conn, "/")

@@ -134,9 +134,10 @@ const MediaViewer = {
   itemFromButton(button) {
     const img = button.querySelector("img[data-role='attachment'][data-kind='image']")
     if (img) {
+      const fullHref = img.dataset.fullHref || img.getAttribute("data-full-href") || img.getAttribute("src") || ""
       return {
         kind: "image",
-        href: img.getAttribute("src") || "",
+        href: fullHref,
         description: img.getAttribute("alt") || "",
       }
     }

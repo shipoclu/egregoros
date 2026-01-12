@@ -207,6 +207,12 @@ defmodule EgregorosWeb.ViewModels.Status do
       |> Enum.find_value(&attachment_href/1)
       |> SafeMediaURL.safe()
 
+    preview_href =
+      attachment
+      |> Map.get("icon")
+      |> preview_href_from_icon()
+      |> SafeMediaURL.safe()
+
     media_type =
       cond do
         is_binary(Map.get(attachment, "mediaType")) ->
@@ -228,6 +234,7 @@ defmodule EgregorosWeb.ViewModels.Status do
     if is_binary(href) and href != "" do
       %{
         href: href,
+        preview_href: preview_href,
         media_type: media_type,
         description: description
       }
@@ -237,8 +244,17 @@ defmodule EgregorosWeb.ViewModels.Status do
   end
 
   defp attachment_href(%{"href" => href}) when is_binary(href), do: href
+  defp attachment_href(%{"url" => href}) when is_binary(href), do: href
   defp attachment_href(href) when is_binary(href), do: href
   defp attachment_href(_), do: nil
+
+  defp preview_href_from_icon(%{"url" => urls}) do
+    urls
+    |> List.wrap()
+    |> Enum.find_value(&attachment_href/1)
+  end
+
+  defp preview_href_from_icon(_icon), do: nil
 
   defp attachment_media_type(%{"mediaType" => media_type}) when is_binary(media_type),
     do: media_type
