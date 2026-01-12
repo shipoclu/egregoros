@@ -79,6 +79,124 @@ defmodule EgregorosWeb.BookmarksLiveTest do
     assert reply.data["inReplyTo"] == parent.ap_id
   end
 
+  test "bookmarks reply modal requires authentication", %{conn: conn} do
+    {:ok, view, _html} = live(conn, "/bookmarks")
+
+    _html =
+      render_click(view, "open_reply_modal", %{
+        "in_reply_to" => "https://example.com/objects/1",
+        "actor_handle" => "@someone"
+      })
+
+    assert render(view) =~ "Register to reply."
+  end
+
+  test "bookmarks reply modal ignores blank targets", %{conn: conn, user: user} do
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/bookmarks")
+
+    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='closed']")
+
+    _html =
+      render_click(view, "open_reply_modal", %{
+        "in_reply_to" => "   ",
+        "actor_handle" => "@someone"
+      })
+
+    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='closed']")
+  end
+
+  test "bookmarks reply modal can be closed and resets state", %{conn: conn, user: user} do
+    assert {:ok, parent} = Pipeline.ingest(Note.build(user, "Parent post"), local: true)
+    assert {:ok, :bookmarked} = Interactions.toggle_bookmark(user, parent.id)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/bookmarks")
+
+    _html =
+      render_click(view, "open_reply_modal", %{
+        "in_reply_to" => parent.ap_id,
+        "actor_handle" => "@#{user.nickname}"
+      })
+
+    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='open']")
+
+    assert has_element?(
+             view,
+             "#reply-modal [data-role='reply-in-reply-to'][value='#{parent.ap_id}']"
+           )
+
+    _html = render_click(view, "close_reply_modal", %{})
+
+    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='closed']")
+    assert has_element?(view, "#reply-modal [data-role='reply-in-reply-to'][value='']")
+  end
+
+  test "bookmarks reply modal supports mention_search and mention_clear", %{
+    conn: conn,
+    user: user
+  } do
+    {:ok, bob} = Users.create_local_user("bob")
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/bookmarks")
+
+    refute has_element?(view, "[data-role='compose-mention-suggestions']")
+
+    _html =
+      render_change(view, "mention_search", %{
+        "q" => "@#{bob.nickname}",
+        "scope" => "reply-modal"
+      })
+
+    assert has_element?(
+             view,
+             "[data-role='compose-mention-suggestions'] [data-role='mention-suggestion']",
+             "@#{bob.nickname}"
+           )
+
+    _html = render_change(view, "mention_clear", %{"scope" => "reply-modal"})
+
+    refute has_element?(view, "[data-role='compose-mention-suggestions']")
+  end
+
+  test "bookmarks create_reply fails with a helpful error when no target is selected", %{
+    conn: conn,
+    user: user
+  } do
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/bookmarks")
+
+    view
+    |> form("#reply-modal-form", reply: %{content: "Hi"})
+    |> render_submit()
+
+    assert render(view) =~ "Select a post to reply to."
+  end
+
+  test "bookmarks create_reply rejects too-long replies", %{conn: conn, user: user} do
+    assert {:ok, parent} = Pipeline.ingest(Note.build(user, "Parent post"), local: true)
+    assert {:ok, :bookmarked} = Interactions.toggle_bookmark(user, parent.id)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/bookmarks")
+
+    _html =
+      render_click(view, "open_reply_modal", %{
+        "in_reply_to" => parent.ap_id,
+        "actor_handle" => "@#{user.nickname}"
+      })
+
+    too_long = String.duplicate("a", 6000)
+
+    view
+    |> form("#reply-modal-form", reply: %{content: too_long})
+    |> render_submit()
+
+    assert render(view) =~ "Reply is too long."
+    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='open']")
+  end
+
   test "favourites page lists liked posts and allows unliking", %{conn: conn, user: user} do
     {:ok, note} = Pipeline.ingest(Note.build(user, "Hello favourited"), local: true)
     assert {:ok, _} = Interactions.toggle_like(user, note.id)
