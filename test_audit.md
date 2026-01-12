@@ -66,60 +66,60 @@ These should converge to **zero occurrences**:
 ## Checklist (test files)
 
 Mark each file after review:
-- [ ] test/egregoros/activities/accept_cast_and_validate_test.exs
-- [ ] test/egregoros/activities/announce_cast_and_validate_test.exs
-- [ ] test/egregoros/activities/builders_test.exs
-- [ ] test/egregoros/activities/create_cast_and_validate_test.exs
-- [ ] test/egregoros/activities/delete_cast_and_validate_test.exs
-- [ ] test/egregoros/activities/delete_side_effects_test.exs
-- [ ] test/egregoros/activities/emoji_react_cast_and_validate_test.exs
-- [ ] test/egregoros/activities/follow_cast_and_validate_test.exs
-- [ ] test/egregoros/activities/helpers_test.exs
-- [ ] test/egregoros/activities/like_cast_and_validate_test.exs
-- [ ] test/egregoros/activities/move_ingest_test.exs
-- [ ] test/egregoros/activities/note_cast_and_validate_test.exs
-- [ ] test/egregoros/activities/undo_authorization_test.exs
-- [ ] test/egregoros/activities/undo_cast_and_validate_test.exs
-- [ ] test/egregoros/activities/update_cast_and_validate_test.exs
-- [ ] test/egregoros/activities/update_ingest_test.exs
-- [ ] test/egregoros/activities/update_note_ingest_test.exs
-- [ ] test/egregoros/activities/update_side_effects_test.exs
-- [ ] test/egregoros/activity_pub/object_validators/types_test.exs
-- [ ] test/egregoros/auth/bearer_token_test.exs
-- [ ] test/egregoros/auth/default_test.exs
-- [ ] test/egregoros/authz/oauth_scopes_test.exs
-- [ ] test/egregoros/avatar_storage/local_test.exs
-- [ ] test/egregoros/banner_storage/local_test.exs
-- [ ] test/egregoros/bench/runner_test.exs
-- [ ] test/egregoros/bench/seed_test.exs
-- [ ] test/egregoros/bench/stats_test.exs
-- [ ] test/egregoros/bench/suite_test.exs
-- [ ] test/egregoros/cbor_test.exs
-- [ ] test/egregoros/compat/upstream_fixtures_test.exs
-- [ ] test/egregoros/custom_emojis_test.exs
-- [ ] test/egregoros/deployment_test.exs
-- [ ] test/egregoros/direct_messages_test.exs
-- [ ] test/egregoros/discovery/implementations_test.exs
-- [ ] test/egregoros/discovery_test.exs
-- [ ] test/egregoros/dns/cached_test.exs
-- [ ] test/egregoros/dns/inet_test.exs
-- [ ] test/egregoros/e2ee_test.exs
-- [ ] test/egregoros/federation/actor_discovery_test.exs
-- [ ] test/egregoros/federation/actor_test.exs
-- [ ] test/egregoros/federation/announce_object_fetch_test.exs
-- [ ] test/egregoros/federation/delivery_test.exs
-- [ ] test/egregoros/federation/fetch_thread_ancestors_test.exs
-- [ ] test/egregoros/federation/follow_flow_test.exs
-- [ ] test/egregoros/federation/follow_remote_async_test.exs
-- [ ] test/egregoros/federation/incoming_follow_accept_test.exs
-- [ ] test/egregoros/federation/incoming_follow_reject_test.exs
-- [ ] test/egregoros/federation/incoming_undo_follow_test.exs
-- [ ] test/egregoros/federation/like_object_fetch_test.exs
-- [ ] test/egregoros/federation/outgoing_delivery_test.exs
-- [ ] test/egregoros/federation/signed_fetch_test.exs
-- [ ] test/egregoros/federation/thread_fetch_test.exs
-- [ ] test/egregoros/federation/thread_replies_fetch_test.exs
-- [ ] test/egregoros/federation/webfinger_test.exs
+- [x] test/egregoros/activities/accept_cast_and_validate_test.exs (✅ keep)
+- [x] test/egregoros/activities/announce_cast_and_validate_test.exs (✅ keep)
+- [x] test/egregoros/activities/builders_test.exs (✅ keep)
+- [x] test/egregoros/activities/create_cast_and_validate_test.exs (✅ keep)
+- [x] test/egregoros/activities/delete_cast_and_validate_test.exs (✅ keep)
+- [x] test/egregoros/activities/delete_side_effects_test.exs (✅ keep)
+- [x] test/egregoros/activities/emoji_react_cast_and_validate_test.exs (✅ keep)
+- [x] test/egregoros/activities/follow_cast_and_validate_test.exs (✅ keep)
+- [x] test/egregoros/activities/helpers_test.exs (✅ keep)
+- [x] test/egregoros/activities/like_cast_and_validate_test.exs (✅ keep)
+- [x] test/egregoros/activities/move_ingest_test.exs (✅ keep)
+- [x] test/egregoros/activities/note_cast_and_validate_test.exs (✅ keep)
+- [x] test/egregoros/activities/undo_authorization_test.exs (✅ keep)
+- [x] test/egregoros/activities/undo_cast_and_validate_test.exs (✅ keep)
+- [x] test/egregoros/activities/update_cast_and_validate_test.exs (✅ keep)
+- [x] test/egregoros/activities/update_ingest_test.exs (✅ keep)
+- [x] test/egregoros/activities/update_note_ingest_test.exs (✅ keep)
+- [x] test/egregoros/activities/update_side_effects_test.exs (✅ keep)
+- [x] test/egregoros/activity_pub/object_validators/types_test.exs (✅ keep; good type contract coverage)
+- [x] test/egregoros/auth/bearer_token_test.exs (✅ keep; ensures bearer auth correctness)
+- [x] test/egregoros/auth/default_test.exs (✅ keep; stubbed local auth contract)
+- [x] test/egregoros/authz/oauth_scopes_test.exs (✅ keep; scope enforcement)
+- [x] test/egregoros/avatar_storage/local_test.exs (✅ keep)
+- [x] test/egregoros/banner_storage/local_test.exs (✅ keep)
+- [x] test/egregoros/bench/runner_test.exs (✅ keep)
+- [x] test/egregoros/bench/seed_test.exs (✅ keep; guards Postgres param chunking)
+- [x] test/egregoros/bench/stats_test.exs (✅ keep)
+- [x] test/egregoros/bench/suite_test.exs (✅ keep)
+- [x] test/egregoros/cbor_test.exs (✅ keep; codec invariants + failure cases)
+- [x] test/egregoros/compat/upstream_fixtures_test.exs (✅ keep; real-world fixture ingestion)
+- [x] test/egregoros/custom_emojis_test.exs (✅ keep; SSRF/XSS hardening)
+- [x] test/egregoros/deployment_test.exs (✅ keep; env-driven admin bootstrap)
+- [x] test/egregoros/direct_messages_test.exs (✅ keep; privacy-critical DM scoping)
+- [x] test/egregoros/discovery/implementations_test.exs (✅ keep)
+- [x] test/egregoros/discovery_test.exs (✅ keep; delegates via Mox)
+- [x] test/egregoros/dns/cached_test.exs (✅ keep; cache TTL behavior)
+- [x] test/egregoros/dns/inet_test.exs (✅ keep)
+- [x] test/egregoros/e2ee_test.exs (✅ keep; E2EE key lifecycle)
+- [x] test/egregoros/federation/actor_discovery_test.exs (✅ keep)
+- [x] test/egregoros/federation/actor_test.exs (✅ keep; strong SSRF/signed-fetch edge coverage)
+- [x] test/egregoros/federation/announce_object_fetch_test.exs (✅ keep)
+- [x] test/egregoros/federation/delivery_test.exs (✅ keep)
+- [x] test/egregoros/federation/fetch_thread_ancestors_test.exs (✅ keep)
+- [x] test/egregoros/federation/follow_flow_test.exs (✅ keep)
+- [x] test/egregoros/federation/follow_remote_async_test.exs (✅ keep)
+- [x] test/egregoros/federation/incoming_follow_accept_test.exs (✅ keep; includes locked account flow)
+- [x] test/egregoros/federation/incoming_follow_reject_test.exs (✅ keep)
+- [x] test/egregoros/federation/incoming_undo_follow_test.exs (✅ keep)
+- [x] test/egregoros/federation/like_object_fetch_test.exs (✅ keep)
+- [x] test/egregoros/federation/outgoing_delivery_test.exs (✅ keep; broad outgoing activity coverage)
+- [x] test/egregoros/federation/signed_fetch_test.exs (✅ keep)
+- [x] test/egregoros/federation/thread_fetch_test.exs (✅ keep)
+- [x] test/egregoros/federation/thread_replies_fetch_test.exs (✅ keep)
+- [x] test/egregoros/federation/webfinger_test.exs (✅ keep)
 - [ ] test/egregoros/follow_requests_test.exs
 - [ ] test/egregoros/html_test.exs
 - [ ] test/egregoros/http/req_test.exs
@@ -138,7 +138,7 @@ Mark each file after review:
 - [ ] test/egregoros/oauth/token_schema_test.exs
 - [ ] test/egregoros/oauth_test.exs
 - [ ] test/egregoros/objects_test.exs
-- [ ] test/egregoros/passkeys/webauthn_test.exs
+- [x] test/egregoros/passkeys/webauthn_test.exs (✅ keep; WebAuthn parsing/verification)
 - [ ] test/egregoros/performance_regressions_test.exs
 - [ ] test/egregoros/pipeline_cast_and_validate_test.exs
 - [ ] test/egregoros/pipeline_test.exs
@@ -146,7 +146,7 @@ Mark each file after review:
 - [x] test/egregoros/rate_limiter/ets_test.exs
 - [ ] test/egregoros/relationship_schema_test.exs
 - [ ] test/egregoros/relationships_test.exs
-- [ ] test/egregoros/relays_test.exs
+- [x] test/egregoros/relays_test.exs (✅ keep; covers relay subscribe/unsubscribe paths)
 - [ ] test/egregoros/release_healthcheck_test.exs
 - [x] test/egregoros/runtime_config_test.exs
 - [x] test/egregoros/safe_url_test.exs
@@ -219,9 +219,9 @@ Mark each file after review:
 - [ ] test/egregoros_web/controllers/settings_controller_test.exs
 - [ ] test/egregoros_web/controllers/webfinger_controller_test.exs
 - [ ] test/egregoros_web/cors_test.exs
-- [ ] test/egregoros_web/live/bookmarks_live_test.exs
+- [x] test/egregoros_web/live/bookmarks_live_test.exs (✅ keep; validates reply modal UX + errors)
 - [ ] test/egregoros_web/live/favourites_live_test.exs
-- [ ] test/egregoros_web/live/messages_live_test.exs
+- [x] test/egregoros_web/live/messages_live_test.exs (✅ keep; validates compose + load-more + reply modal)
 - [ ] test/egregoros_web/live/notifications_live_test.exs
 - [ ] test/egregoros_web/live/privacy_live_test.exs
 - [ ] test/egregoros_web/live/profile_live_test.exs
