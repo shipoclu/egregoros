@@ -2,11 +2,35 @@ defmodule EgregorosWeb.MastodonAPI.StreamingSocketTest do
   use Egregoros.DataCase, async: true
 
   alias Egregoros.Activities.Note
+  alias Egregoros.OAuth
   alias Egregoros.Objects
   alias Egregoros.Pipeline
   alias Egregoros.Relationships
   alias Egregoros.Users
   alias EgregorosWeb.MastodonAPI.StreamingSocket
+
+  defp create_access_token!(user) do
+    {:ok, app} =
+      OAuth.create_application(%{
+        "client_name" => "Pleroma FE",
+        "redirect_uris" => "urn:ietf:wg:oauth:2.0:oob",
+        "scopes" => "read write follow"
+      })
+
+    {:ok, auth_code} =
+      OAuth.create_authorization_code(app, user, "urn:ietf:wg:oauth:2.0:oob", "read")
+
+    {:ok, token} =
+      OAuth.exchange_code_for_token(%{
+        "grant_type" => "authorization_code",
+        "code" => auth_code.code,
+        "client_id" => app.client_id,
+        "client_secret" => app.client_secret,
+        "redirect_uri" => "urn:ietf:wg:oauth:2.0:oob"
+      })
+
+    token.token
+  end
 
   test "subscribing to the user stream computes home_actor_ids" do
     {:ok, user} = Users.create_local_user("alice")
@@ -403,6 +427,50 @@ defmodule EgregorosWeb.MastodonAPI.StreamingSocketTest do
              )
 
     assert %{"error" => "Missing access token", "status" => 401} = Jason.decode!(reply)
+  end
+
+  test "handle_in supports pleroma:authenticate for streaming clients" do
+    {:ok, user} = Users.create_local_user("alice")
+    token = create_access_token!(user)
+
+    {:ok, state} = StreamingSocket.init(%{streams: [], current_user: nil, oauth_token: nil})
+
+    assert {:push, {:text, reply}, state} =
+             StreamingSocket.handle_in(
+               {Jason.encode!(%{"type" => "pleroma:authenticate", "token" => token}),
+                opcode: :text},
+               state
+             )
+
+    assert state.current_user.id == user.id
+
+    decoded = Jason.decode!(reply)
+    assert decoded["event"] == "pleroma:respond"
+
+    payload = Jason.decode!(decoded["payload"])
+    assert payload["type"] == "pleroma:authenticate"
+    assert payload["result"] == "success"
+  end
+
+  test "handle_in returns an error for invalid pleroma:authenticate tokens" do
+    {:ok, state} = StreamingSocket.init(%{streams: [], current_user: nil, oauth_token: nil})
+
+    assert {:push, {:text, reply}, state} =
+             StreamingSocket.handle_in(
+               {Jason.encode!(%{"type" => "pleroma:authenticate", "token" => "nope"}),
+                opcode: :text},
+               state
+             )
+
+    assert state.current_user == nil
+
+    decoded = Jason.decode!(reply)
+    assert decoded["event"] == "pleroma:respond"
+
+    payload = Jason.decode!(decoded["payload"])
+    assert payload["type"] == "pleroma:authenticate"
+    refute payload["result"] == "success"
+    assert is_binary(payload["error"])
   end
 
   test "handle_in returns an error when subscribing to unknown streams" do

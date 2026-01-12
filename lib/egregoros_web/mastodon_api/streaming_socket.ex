@@ -4,6 +4,8 @@ defmodule EgregorosWeb.MastodonAPI.StreamingSocket do
   alias Egregoros.Notifications
   alias Egregoros.Object
   alias Egregoros.Objects
+  alias Egregoros.OAuth
+  alias Egregoros.OAuth.Token
   alias Egregoros.Relationships
   alias Egregoros.Timeline
   alias Egregoros.User
@@ -30,6 +32,7 @@ defmodule EgregorosWeb.MastodonAPI.StreamingSocket do
       |> Map.put_new(:timeline_public_subscribed, false)
       |> Map.put_new(:timeline_user_subscribed, false)
       |> Map.put_new(:notifications_subscribed, false)
+      |> Map.put_new(:oauth_token, nil)
       |> Map.put_new(:seen_ap_ids, {MapSet.new(), :queue.new()})
       |> sync_subscriptions()
       |> schedule_heartbeat()
@@ -159,6 +162,36 @@ defmodule EgregorosWeb.MastodonAPI.StreamingSocket do
           |> sync_subscriptions()
 
         {:ok, new_state}
+    end
+  end
+
+  defp handle_client_event(%{"type" => "pleroma:authenticate", "token" => token}, state)
+       when is_binary(token) and is_map(state) do
+    token = String.trim(token)
+
+    cond do
+      token == "" ->
+        reply = encode_pleroma_auth_error("Missing access token")
+        {:push, {:text, reply}, state}
+
+      match?(%User{}, Map.get(state, :current_user)) ->
+        {:push, {:text, encode_pleroma_auth_success()}, state}
+
+      true ->
+        case OAuth.get_token(token) do
+          %Token{user: %User{} = user} = oauth_token ->
+            new_state =
+              state
+              |> Map.put(:current_user, user)
+              |> Map.put(:oauth_token, oauth_token)
+              |> sync_subscriptions()
+
+            {:push, {:text, encode_pleroma_auth_success()}, new_state}
+
+          _ ->
+            reply = encode_pleroma_auth_error("Unauthorized")
+            {:push, {:text, reply}, state}
+        end
     end
   end
 
@@ -360,6 +393,22 @@ defmodule EgregorosWeb.MastodonAPI.StreamingSocket do
 
   defp encode_error(message, status) when is_binary(message) and is_integer(status) do
     Jason.encode!(%{"error" => message, "status" => status})
+  end
+
+  defp encode_pleroma_auth_success do
+    encode_pleroma_respond(%{"type" => "pleroma:authenticate", "result" => "success"})
+  end
+
+  defp encode_pleroma_auth_error(message) when is_binary(message) do
+    encode_pleroma_respond(%{
+      "type" => "pleroma:authenticate",
+      "result" => "error",
+      "error" => message
+    })
+  end
+
+  defp encode_pleroma_respond(%{} = payload) do
+    Jason.encode!(%{"event" => "pleroma:respond", "payload" => Jason.encode!(payload)})
   end
 
   defp home_actor_ids(%User{} = user) do
