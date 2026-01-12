@@ -31,4 +31,3 @@ defmodule Egregoros.RuntimeConfig do
     end
   end
 end
-

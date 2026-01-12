@@ -26,4 +26,3 @@ defmodule Egregoros.RuntimeConfigTest do
     assert RuntimeConfig.get(:uploads_dir) == original
   end
 end
-
