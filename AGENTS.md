@@ -103,6 +103,7 @@ custom classes must fully style the input
 ## Test guidelines
 
 - **Always use `start_supervised!/1`** to start processes in tests as it guarantees cleanup between tests
+- Keep the coverage gate in mind: `mix test --cover` must stay **≥ 85%**; add tests for new branches and run cover locally when touching core modules.
 - **Avoid** `Process.sleep/1` and `Process.alive?/1` in tests
   - Instead of sleeping to wait for a process to finish, **always** use `Process.monitor/1` and assert on the DOWN message:
 
@@ -110,6 +111,8 @@ custom classes must fully style the input
       assert_receive {:DOWN, ^ref, :process, ^pid, :normal}
 
    - Instead of sleeping to synchronize before the next call, **always** use `_ = :sys.get_state/1` to ensure the process has handled prior messages
+- Prefer stable selectors in UI tests (DOM ids and `data-role`/`data-testid`) over Tailwind class assertions; assert behavior, not incidental markup.
+- If a test spawns a process/Task that touches the database, ensure it’s supervised and SQL-sandbox allowed (otherwise you can get noisy `Postgrex.Protocol disconnected` logs and post-test side effects).
 <!-- phoenix:elixir-end -->
 
 <!-- phoenix:phoenix-start -->
