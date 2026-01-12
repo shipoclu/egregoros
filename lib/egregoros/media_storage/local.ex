@@ -1,6 +1,8 @@
 defmodule Egregoros.MediaStorage.Local do
   @behaviour Egregoros.MediaStorage
 
+  alias Egregoros.MediaVariants
+
   @max_bytes 10_000_000
 
   @content_type_extensions %{
@@ -62,8 +64,8 @@ defmodule Egregoros.MediaStorage.Local do
     end
   end
 
-  defp persist(%Plug.Upload{path: path}, uploads_root, user_id, ext)
-       when is_binary(path) and is_binary(uploads_root) do
+  defp persist(%Plug.Upload{path: path, content_type: content_type}, uploads_root, user_id, ext)
+       when is_binary(path) and is_binary(uploads_root) and is_binary(content_type) do
     filename = "#{Ecto.UUID.generate()}#{ext}"
     relative_dir = Path.join(["uploads", "media", Integer.to_string(user_id)])
     relative_path = Path.join(relative_dir, filename)
@@ -72,7 +74,39 @@ defmodule Egregoros.MediaStorage.Local do
 
     with :ok <- File.mkdir_p(destination_dir),
          :ok <- File.cp(path, destination_path) do
+      _ = maybe_write_thumbnail(destination_path, destination_dir, filename, content_type)
       {:ok, "/" <> relative_path}
+    end
+  end
+
+  defp maybe_write_thumbnail(source_path, destination_dir, filename, content_type)
+       when is_binary(source_path) and is_binary(destination_dir) and is_binary(filename) and
+              is_binary(content_type) do
+    if String.starts_with?(content_type, "image/") do
+      thumb_filename = MediaVariants.thumbnail_filename(filename)
+      thumb_destination = Path.join(destination_dir, thumb_filename)
+      thumbnail_max = MediaVariants.thumbnail_max_size()
+
+      with {:ok, image} <- Image.open(source_path),
+           {:ok, image} <- maybe_flatten(image),
+           {:ok, thumb} <- Image.thumbnail(image, thumbnail_max),
+           {:ok, _} <- Image.write(thumb, thumb_destination) do
+        :ok
+      else
+        _ -> :ok
+      end
+    else
+      :ok
+    end
+  end
+
+  defp maybe_write_thumbnail(_source_path, _destination_dir, _filename, _content_type), do: :ok
+
+  defp maybe_flatten(image) do
+    if Image.has_alpha?(image) do
+      Image.flatten(image, background_color: :white)
+    else
+      {:ok, image}
     end
   end
 end

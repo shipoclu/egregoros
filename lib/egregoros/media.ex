@@ -6,6 +6,7 @@ defmodule Egregoros.Media do
   alias Egregoros.User
   alias Egregoros.Objects
   alias Egregoros.MediaMeta
+  alias Egregoros.MediaVariants
   alias EgregorosWeb.Endpoint
   alias EgregorosWeb.URL
 
@@ -15,7 +16,8 @@ defmodule Egregoros.Media do
       when is_binary(url_path) and is_list(opts) do
     ap_id = Endpoint.url() <> "/objects/" <> Ecto.UUID.generate()
     href = URL.absolute(url_path) || url_path
-    meta = MediaMeta.mastodon_meta(upload)
+    {meta, blurhash} = MediaMeta.info(upload)
+    icon = icon(upload, url_path)
 
     description =
       opts
@@ -41,6 +43,8 @@ defmodule Egregoros.Media do
           }
         ],
         "meta" => meta,
+        "blurhash" => blurhash,
+        "icon" => icon,
         "name" => description
       }
     })
@@ -120,6 +124,26 @@ defmodule Egregoros.Media do
   end
 
   defp activity_type(_), do: "Document"
+
+  defp icon(%Plug.Upload{content_type: "image/" <> _}, url_path) when is_binary(url_path) do
+    preview_url_path = MediaVariants.thumbnail_url_path(url_path)
+    preview_href = URL.absolute(preview_url_path) || preview_url_path
+    media_type = MediaVariants.thumbnail_content_type()
+
+    %{
+      "type" => "Image",
+      "mediaType" => media_type,
+      "url" => [
+        %{
+          "type" => "Link",
+          "mediaType" => media_type,
+          "href" => preview_href
+        }
+      ]
+    }
+  end
+
+  defp icon(_upload, _url_path), do: nil
 
   defp get_local_media_by_href(href) when is_binary(href) do
     href = String.trim(href)

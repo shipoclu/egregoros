@@ -446,6 +446,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusRenderer do
     object = Objects.get_by_ap_id(ap_id)
 
     url = attachment_url(attachment)
+    preview_url = attachment_preview_url(attachment, object) || url
     description = Map.get(attachment, "name")
     blurhash = Map.get(attachment, "blurhash")
     meta = attachment_meta(attachment, object)
@@ -455,7 +456,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusRenderer do
         "id" => media_id(object, ap_id),
         "type" => mastodon_type(attachment),
         "url" => url,
-        "preview_url" => url,
+        "preview_url" => preview_url,
         "remote_url" => nil,
         "meta" => meta,
         "description" => description,
@@ -466,6 +467,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusRenderer do
 
   defp render_media_attachment(attachment) when is_map(attachment) do
     url = attachment_url(attachment)
+    preview_url = attachment_preview_url(attachment, nil) || url
     meta = attachment_meta(attachment, nil)
 
     if is_binary(url) and url != "" do
@@ -473,7 +475,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusRenderer do
         "id" => Map.get(attachment, "id", "unknown"),
         "type" => mastodon_type(attachment),
         "url" => url,
-        "preview_url" => url,
+        "preview_url" => preview_url,
         "remote_url" => nil,
         "meta" => meta,
         "description" => Map.get(attachment, "name"),
@@ -509,6 +511,27 @@ defmodule EgregorosWeb.MastodonAPI.StatusRenderer do
   end
 
   defp attachment_url(_), do: nil
+
+  defp attachment_preview_url(%{"icon" => icon} = attachment, %Object{} = object)
+       when is_map(icon) do
+    attachment_preview_url(attachment, nil) || attachment_preview_url(object.data, nil)
+  end
+
+  defp attachment_preview_url(attachment, %Object{} = object) when is_map(attachment) do
+    attachment_preview_url(attachment, nil) || attachment_preview_url(object.data, nil)
+  end
+
+  defp attachment_preview_url(%{"icon" => %{"url" => [%{"href" => href} | _]}} = _attachment, _object)
+       when is_binary(href) do
+    SafeMediaURL.safe(href)
+  end
+
+  defp attachment_preview_url(%{"icon" => %{"url" => [%{"url" => href} | _]}} = _attachment, _object)
+       when is_binary(href) do
+    SafeMediaURL.safe(href)
+  end
+
+  defp attachment_preview_url(_attachment, _object), do: nil
 
   defp mastodon_type(%{"mediaType" => media_type}) when is_binary(media_type) do
     mastodon_type_from_mime(media_type)

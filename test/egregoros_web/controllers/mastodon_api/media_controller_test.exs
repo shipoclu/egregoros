@@ -30,8 +30,15 @@ defmodule EgregorosWeb.MastodonAPI.MediaControllerTest do
     assert is_binary(response["id"])
     assert response["type"] == "image"
     assert String.ends_with?(response["url"], "/uploads/media/#{user.id}/image.png")
-    assert response["preview_url"] == response["url"]
-    assert %{"original" => %{"width" => 640, "height" => 480}} = response["meta"]
+    assert is_binary(response["preview_url"])
+    assert response["preview_url"] != response["url"]
+    assert String.ends_with?(response["preview_url"], "/uploads/media/#{user.id}/image-thumb.jpg")
+    assert is_binary(response["blurhash"])
+
+    assert %{
+             "original" => %{"width" => 640, "height" => 480},
+             "small" => %{"width" => 400, "height" => 300}
+           } = response["meta"]
 
     assert %{} = Objects.get(response["id"])
   end

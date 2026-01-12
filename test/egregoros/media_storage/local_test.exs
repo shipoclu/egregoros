@@ -22,10 +22,8 @@ defmodule Egregoros.MediaStorage.LocalTest do
     root = uploads_root()
     user = %{id: 42}
 
-    upload_path = write_temp_file!("photo.png", "png")
-
     upload = %Plug.Upload{
-      path: upload_path,
+      path: fixture_path("DSCN0010.png"),
       filename: "photo.png",
       content_type: "image/png"
     }
@@ -34,6 +32,10 @@ defmodule Egregoros.MediaStorage.LocalTest do
 
     destination = Path.join([root, "media", "42", filename])
     assert File.exists?(destination)
+
+    thumb_filename = Path.rootname(filename) <> "-thumb.jpg"
+    thumb_destination = Path.join([root, "media", "42", thumb_filename])
+    assert File.exists?(thumb_destination)
   end
 
   test "supports storing video media" do
@@ -95,5 +97,9 @@ defmodule Egregoros.MediaStorage.LocalTest do
     }
 
     assert {:error, :enoent} = Local.store_media(user, upload, root)
+  end
+
+  defp fixture_path(filename) do
+    Path.expand(Path.join(["test", "fixtures", filename]), File.cwd!())
   end
 end
