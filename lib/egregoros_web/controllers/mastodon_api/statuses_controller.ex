@@ -27,27 +27,23 @@ defmodule EgregorosWeb.MastodonAPI.StatusesController do
     sensitive = Map.get(params, "sensitive")
     language = Map.get(params, "language")
 
-    if status == "" do
-      send_resp(conn, 422, "Unprocessable Entity")
-    else
-      user = conn.assigns.current_user
+    user = conn.assigns.current_user
 
-      with {:ok, attachments} <- Media.attachments_from_ids(user, media_ids),
-           {:ok, in_reply_to} <- resolve_in_reply_to(in_reply_to_id, user),
-           {:ok, create_object} <-
-             Publish.post_note(user, status,
-               attachments: attachments,
-               in_reply_to: in_reply_to,
-               visibility: visibility,
-               spoiler_text: spoiler_text,
-               sensitive: sensitive,
-               language: language
-             ),
-           %{} = object <- Objects.get_by_ap_id(create_object.object) do
-        json(conn, StatusRenderer.render_status(object, user))
-      else
-        {:error, _} -> send_resp(conn, 422, "Unprocessable Entity")
-      end
+    with {:ok, attachments} <- Media.attachments_from_ids(user, media_ids),
+         {:ok, in_reply_to} <- resolve_in_reply_to(in_reply_to_id, user),
+         {:ok, create_object} <-
+           Publish.post_note(user, status,
+             attachments: attachments,
+             in_reply_to: in_reply_to,
+             visibility: visibility,
+             spoiler_text: spoiler_text,
+             sensitive: sensitive,
+             language: language
+           ),
+         %{} = object <- Objects.get_by_ap_id(create_object.object) do
+      json(conn, StatusRenderer.render_status(object, user))
+    else
+      {:error, _} -> send_resp(conn, 422, "Unprocessable Entity")
     end
   end
 

@@ -761,6 +761,48 @@ defmodule EgregorosWeb.MastodonAPI.StatusesControllerTest do
     assert Enum.at(note.data["attachment"], 0)["type"] == "Image"
   end
 
+  test "POST /api/v1/statuses allows media-only posts", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("local")
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, user} end)
+
+    ap_id = Endpoint.url() <> "/objects/" <> Ecto.UUID.generate()
+
+    {:ok, media} =
+      Objects.create_object(%{
+        ap_id: ap_id,
+        type: "Image",
+        actor: user.ap_id,
+        local: true,
+        published: DateTime.utc_now(),
+        data: %{
+          "id" => ap_id,
+          "type" => "Image",
+          "mediaType" => "image/png",
+          "url" => [
+            %{
+              "type" => "Link",
+              "mediaType" => "image/png",
+              "href" => Endpoint.url() <> "/uploads/media/#{user.id}/image.png"
+            }
+          ],
+          "name" => ""
+        }
+      })
+
+    conn =
+      post(conn, "/api/v1/statuses", %{
+        "status" => "  ",
+        "media_ids" => [Integer.to_string(media.id)]
+      })
+
+    response = json_response(conn, 200)
+
+    assert response["content"] == ""
+    assert length(response["media_attachments"]) == 1
+  end
+
   test "POST /api/v1/statuses rejects media_ids not owned by the user", %{conn: conn} do
     {:ok, user} = Users.create_local_user("local")
     {:ok, other} = Users.create_local_user("other")
