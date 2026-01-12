@@ -13,4 +13,3 @@ defmodule Egregoros.Repo.Migrations.CreateInstanceSettings do
     """)
   end
 end
-

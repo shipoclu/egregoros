@@ -7,4 +7,3 @@ defmodule Egregoros.Repo.Migrations.AddNotificationsLastSeenIdToUsers do
     end
   end
 end
-

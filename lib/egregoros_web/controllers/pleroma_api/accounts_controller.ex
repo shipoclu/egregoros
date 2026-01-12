@@ -61,4 +61,3 @@ defmodule EgregorosWeb.PleromaAPI.AccountsController do
     |> Enum.filter(&Objects.visible_to?(&1, viewer))
   end
 end
-

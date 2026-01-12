@@ -9,4 +9,3 @@ defmodule EgregorosWeb.MastodonAPI.AnnouncementsController do
     json(conn, %{})
   end
 end
-

@@ -1022,7 +1022,10 @@ defmodule EgregorosWeb.TimelineLiveTest do
     assert has_element?(view, "#post-#{note.id} img[data-role='attachment']")
   end
 
-  test "image attachments render with thumbnail previews in the timeline", %{conn: conn, user: user} do
+  test "image attachments render with thumbnail previews in the timeline", %{
+    conn: conn,
+    user: user
+  } do
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     {:ok, view, _html} = live(conn, "/")
 

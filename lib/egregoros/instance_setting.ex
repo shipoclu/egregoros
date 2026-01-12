@@ -15,4 +15,3 @@ defmodule Egregoros.InstanceSetting do
     |> validate_required([:registrations_open])
   end
 end
-

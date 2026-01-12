@@ -57,10 +57,18 @@ defmodule EgregorosWeb.RegistrationController do
       not registrations_open? ->
         conn
         |> put_status(:forbidden)
-        |> render(:new, form: form, error: "Registrations are closed.", registrations_open?: false)
+        |> render(:new,
+          form: form,
+          error: "Registrations are closed.",
+          registrations_open?: false
+        )
 
       nickname == "" ->
-        render(conn, :new, form: form, error: "Nickname can't be empty.", registrations_open?: true)
+        render(conn, :new,
+          form: form,
+          error: "Nickname can't be empty.",
+          registrations_open?: true
+        )
 
       password == "" ->
         render(conn, :new,
@@ -77,7 +85,11 @@ defmodule EgregorosWeb.RegistrationController do
         )
 
       is_binary(email) and Users.get_by_email(email) ->
-        render(conn, :new, form: form, error: "Email is already registered.", registrations_open?: true)
+        render(conn, :new,
+          form: form,
+          error: "Email is already registered.",
+          registrations_open?: true
+        )
 
       true ->
         case Users.register_local_user(%{nickname: nickname, email: email, password: password}) do
@@ -90,10 +102,18 @@ defmodule EgregorosWeb.RegistrationController do
             |> redirect(to: redirect_to)
 
           {:error, :invalid_password} ->
-            render(conn, :new, form: form, error: "Password is invalid.", registrations_open?: true)
+            render(conn, :new,
+              form: form,
+              error: "Password is invalid.",
+              registrations_open?: true
+            )
 
           {:error, _changeset} ->
-            render(conn, :new, form: form, error: "Could not register.", registrations_open?: true)
+            render(conn, :new,
+              form: form,
+              error: "Could not register.",
+              registrations_open?: true
+            )
         end
     end
   end

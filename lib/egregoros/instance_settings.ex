@@ -38,4 +38,3 @@ defmodule Egregoros.InstanceSettings do
 
   def set_registrations_open(_open), do: {:error, :invalid_value}
 end
-

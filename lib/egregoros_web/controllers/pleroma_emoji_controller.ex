@@ -5,4 +5,3 @@ defmodule EgregorosWeb.PleromaEmojiController do
     json(conn, %{})
   end
 end
-

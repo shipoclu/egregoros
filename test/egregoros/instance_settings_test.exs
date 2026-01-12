@@ -12,4 +12,3 @@ defmodule Egregoros.InstanceSettingsTest do
     refute InstanceSettings.registrations_open?()
   end
 end
-

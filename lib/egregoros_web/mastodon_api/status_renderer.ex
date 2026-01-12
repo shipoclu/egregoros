@@ -521,12 +521,18 @@ defmodule EgregorosWeb.MastodonAPI.StatusRenderer do
     attachment_preview_url(attachment, nil) || attachment_preview_url(object.data, nil)
   end
 
-  defp attachment_preview_url(%{"icon" => %{"url" => [%{"href" => href} | _]}} = _attachment, _object)
+  defp attachment_preview_url(
+         %{"icon" => %{"url" => [%{"href" => href} | _]}} = _attachment,
+         _object
+       )
        when is_binary(href) do
     SafeMediaURL.safe(href)
   end
 
-  defp attachment_preview_url(%{"icon" => %{"url" => [%{"url" => href} | _]}} = _attachment, _object)
+  defp attachment_preview_url(
+         %{"icon" => %{"url" => [%{"url" => href} | _]}} = _attachment,
+         _object
+       )
        when is_binary(href) do
     SafeMediaURL.safe(href)
   end

@@ -150,7 +150,7 @@ defmodule EgregorosWeb.MastodonAPI.SearchControllerTest do
 
     assert Enum.any?(
              response["accounts"],
-           &(&1["username"] == "bob" and &1["acct"] == "bob@remote.example")
+             &(&1["username"] == "bob" and &1["acct"] == "bob@remote.example")
            )
   end
 

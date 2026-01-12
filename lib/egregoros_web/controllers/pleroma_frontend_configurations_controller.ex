@@ -5,4 +5,3 @@ defmodule EgregorosWeb.PleromaFrontendConfigurationsController do
     json(conn, %{"pleroma_fe" => %{}})
   end
 end
-

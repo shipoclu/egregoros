@@ -11,4 +11,3 @@ defmodule EgregorosWeb.MastodonAPI.AnnouncementsControllerTest do
     assert json_response(conn, 200) == %{}
   end
 end
-

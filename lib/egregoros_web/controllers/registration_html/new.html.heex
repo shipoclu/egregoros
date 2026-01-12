@@ -72,7 +72,10 @@
         >
         </p>
       </.form>
-      <div :if={!@registrations_open?} class="mt-6 rounded-2xl border border-slate-200 bg-white/70 p-4 dark:border-slate-700 dark:bg-slate-950/30">
+      <div
+        :if={!@registrations_open?}
+        class="mt-6 rounded-2xl border border-slate-200 bg-white/70 p-4 dark:border-slate-700 dark:bg-slate-950/30"
+      >
         <p class="text-sm text-slate-700 dark:text-slate-200">
           Registrations are currently closed on this instance.
         </p>
