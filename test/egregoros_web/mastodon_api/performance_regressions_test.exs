@@ -1,7 +1,9 @@
 defmodule EgregorosWeb.MastodonAPI.PerformanceRegressionsTest do
   use EgregorosWeb.ConnCase, async: false
 
+  alias Egregoros.Objects
   alias Egregoros.Pipeline
+  alias Egregoros.Relationships
   alias Egregoros.Users
 
   defp capture_repo_queries(fun) when is_function(fun, 0) do
@@ -98,6 +100,106 @@ defmodule EgregorosWeb.MastodonAPI.PerformanceRegressionsTest do
 
     for target <- targets do
       assert Enum.any?(response, &(&1["id"] == Integer.to_string(target.id)))
+    end
+
+    assert length(queries) <= 12
+  end
+
+  test "GET /api/v1/statuses/:id/favourited_by batches liker rendering queries", %{conn: conn} do
+    {:ok, alice} = Users.create_local_user("alice")
+
+    {:ok, note} =
+      Objects.create_object(%{
+        ap_id: "https://example.com/objects/note-1",
+        type: "Note",
+        actor: alice.ap_id,
+        local: true,
+        data: %{
+          "id" => "https://example.com/objects/note-1",
+          "type" => "Note",
+          "actor" => alice.ap_id,
+          "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+          "content" => "hi"
+        }
+      })
+
+    likers =
+      for idx <- 1..10 do
+        {:ok, liker} = Users.create_local_user("liker#{idx}")
+
+        assert {:ok, _} =
+                 Relationships.upsert_relationship(%{
+                   type: "Like",
+                   actor: liker.ap_id,
+                   object: note.ap_id,
+                   activity_ap_id: "https://example.com/activities/like/#{idx}"
+                 })
+
+        liker
+      end
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, alice} end)
+
+    {conn, queries} =
+      capture_repo_queries(fn ->
+        get(conn, "/api/v1/statuses/#{note.id}/favourited_by")
+      end)
+
+    response = json_response(conn, 200)
+
+    for liker <- likers do
+      assert Enum.any?(response, &(&1["id"] == Integer.to_string(liker.id)))
+    end
+
+    assert length(queries) <= 12
+  end
+
+  test "GET /api/v1/statuses/:id/reblogged_by batches reblogger rendering queries", %{conn: conn} do
+    {:ok, alice} = Users.create_local_user("alice")
+
+    {:ok, note} =
+      Objects.create_object(%{
+        ap_id: "https://example.com/objects/note-2",
+        type: "Note",
+        actor: alice.ap_id,
+        local: true,
+        data: %{
+          "id" => "https://example.com/objects/note-2",
+          "type" => "Note",
+          "actor" => alice.ap_id,
+          "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+          "content" => "hi"
+        }
+      })
+
+    rebloggers =
+      for idx <- 1..10 do
+        {:ok, reblogger} = Users.create_local_user("reblogger#{idx}")
+
+        assert {:ok, _} =
+                 Relationships.upsert_relationship(%{
+                   type: "Announce",
+                   actor: reblogger.ap_id,
+                   object: note.ap_id,
+                   activity_ap_id: "https://example.com/activities/announce/#{idx}"
+                 })
+
+        reblogger
+      end
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, alice} end)
+
+    {conn, queries} =
+      capture_repo_queries(fn ->
+        get(conn, "/api/v1/statuses/#{note.id}/reblogged_by")
+      end)
+
+    response = json_response(conn, 200)
+
+    for reblogger <- rebloggers do
+      assert Enum.any?(response, &(&1["id"] == Integer.to_string(reblogger.id)))
     end
 
     assert length(queries) <= 12

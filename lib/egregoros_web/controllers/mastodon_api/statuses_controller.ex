@@ -13,6 +13,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusesController do
   alias Egregoros.Pipeline
   alias Egregoros.Publish
   alias Egregoros.Relationships
+  alias Egregoros.User
   alias Egregoros.Users
   alias EgregorosWeb.MastodonAPI.AccountRenderer
   alias EgregorosWeb.MastodonAPI.Fallback
@@ -284,7 +285,8 @@ defmodule EgregorosWeb.MastodonAPI.StatusesController do
       object ->
         if Objects.visible_to?(object, current_user) do
           Relationships.list_by_type_object("Like", object.ap_id)
-          |> Enum.map(&render_actor_account(&1.actor))
+          |> Enum.map(& &1.actor)
+          |> render_accounts_by_ap_ids()
           |> then(&json(conn, &1))
         else
           send_resp(conn, 404, "Not Found")
@@ -302,7 +304,8 @@ defmodule EgregorosWeb.MastodonAPI.StatusesController do
       object ->
         if Objects.visible_to?(object, current_user) do
           Relationships.list_by_type_object("Announce", object.ap_id)
-          |> Enum.map(&render_actor_account(&1.actor))
+          |> Enum.map(& &1.actor)
+          |> render_accounts_by_ap_ids()
           |> then(&json(conn, &1))
         else
           send_resp(conn, 404, "Not Found")
@@ -450,18 +453,41 @@ defmodule EgregorosWeb.MastodonAPI.StatusesController do
     end
   end
 
-  defp render_actor_account(actor_ap_id) when is_binary(actor_ap_id) do
-    actor_ap_id
-    |> account_for_actor()
-    |> AccountRenderer.render_account()
+  defp render_accounts_by_ap_ids(ap_ids) when is_list(ap_ids) do
+    ap_ids =
+      ap_ids
+      |> Enum.filter(&is_binary/1)
+      |> Enum.map(&String.trim/1)
+      |> Enum.reject(&(&1 == ""))
+
+    ap_ids_uniq = Enum.uniq(ap_ids)
+
+    users_by_ap_id =
+      ap_ids_uniq
+      |> Users.list_by_ap_ids()
+      |> Map.new(&{&1.ap_id, &1})
+
+    followers_counts = Relationships.count_by_type_objects("Follow", ap_ids_uniq)
+    following_counts = Relationships.count_by_type_actors("Follow", ap_ids_uniq)
+    statuses_counts = Objects.count_notes_by_actors(ap_ids_uniq)
+
+    Enum.map(ap_ids, fn ap_id ->
+      case Map.get(users_by_ap_id, ap_id) do
+        %User{} = user ->
+          AccountRenderer.render_account(user,
+            followers_count: Map.get(followers_counts, ap_id, 0),
+            following_count: Map.get(following_counts, ap_id, 0),
+            statuses_count: Map.get(statuses_counts, ap_id, 0)
+          )
+
+        _ ->
+          AccountRenderer.render_account(%{
+            ap_id: ap_id,
+            nickname: Fallback.fallback_username(ap_id)
+          })
+      end
+    end)
   end
 
-  defp render_actor_account(_), do: AccountRenderer.render_account(nil)
-
-  defp account_for_actor(actor_ap_id) when is_binary(actor_ap_id) do
-    Users.get_by_ap_id(actor_ap_id) ||
-      %{ap_id: actor_ap_id, nickname: Fallback.fallback_username(actor_ap_id)}
-  end
-
-  defp account_for_actor(_), do: nil
+  defp render_accounts_by_ap_ids(_ap_ids), do: []
 end
