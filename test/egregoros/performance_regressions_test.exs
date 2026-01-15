@@ -312,6 +312,8 @@ defmodule Egregoros.PerformanceRegressionsTest do
     for name <- [
           "objects_type_id_index",
           "objects_actor_type_id_index",
+          "objects_object_index",
+          "objects_type_object_id_index",
           "relationships_object_type_index",
           "users_nickname_trgm_index",
           "users_name_trgm_index",
