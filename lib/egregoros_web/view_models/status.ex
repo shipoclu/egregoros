@@ -8,6 +8,7 @@ defmodule EgregorosWeb.ViewModels.Status do
   alias EgregorosWeb.ViewModels.Actor
 
   @reaction_emojis ["🔥", "👍", "❤️"]
+  @recipient_fields ~w(to cc bto bcc audience)
 
   def decorate(%{type: "Note"} = object, current_user) do
     %{
@@ -65,40 +66,10 @@ defmodule EgregorosWeb.ViewModels.Status do
   end
 
   def decorate_many(objects, current_user) when is_list(objects) do
-    reblog_ap_ids =
-      objects
-      |> Enum.filter(&match?(%{type: "Announce"}, &1))
-      |> Enum.map(&Map.get(&1, :object))
-      |> Enum.filter(&is_binary/1)
-      |> Enum.map(&String.trim/1)
-      |> Enum.reject(&(&1 == ""))
-      |> Enum.uniq()
-
-    reblogs_by_ap_id =
-      reblog_ap_ids
-      |> Objects.list_by_ap_ids()
-      |> Map.new(&{&1.ap_id, &1})
+    ctx = decoration_context(objects, current_user)
 
     objects
-    |> Enum.map(fn
-      %{type: "Announce", object: object_ap_id} = announce when is_binary(object_ap_id) ->
-        object_ap_id = String.trim(object_ap_id)
-
-        case Map.get(reblogs_by_ap_id, object_ap_id) do
-          %{type: "Note"} = object ->
-            if Objects.visible_to?(object, current_user) do
-              decorate_announce(announce, object, current_user)
-            else
-              nil
-            end
-
-          _ ->
-            nil
-        end
-
-      other ->
-        decorate(other, current_user)
-    end)
+    |> Enum.map(&decorate_with_context(&1, current_user, ctx))
     |> Enum.reject(&is_nil/1)
   end
 
@@ -261,19 +232,309 @@ defmodule EgregorosWeb.ViewModels.Status do
 
   defp attachment_media_type(_), do: nil
 
-  defp decorate_announce(%{type: "Announce"} = announce, %{type: "Note"} = object, current_user) do
+  defp decoration_context(objects, current_user) when is_list(objects) do
+    reblog_ap_ids =
+      objects
+      |> Enum.filter(&match?(%{type: "Announce"}, &1))
+      |> Enum.map(&Map.get(&1, :object))
+      |> Enum.filter(&is_binary/1)
+      |> Enum.map(&String.trim/1)
+      |> Enum.reject(&(&1 == ""))
+      |> Enum.uniq()
+
+    reblogs_by_ap_id =
+      reblog_ap_ids
+      |> Objects.list_by_ap_ids()
+      |> Map.new(&{&1.ap_id, &1})
+
+    note_objects =
+      objects
+      |> Enum.filter(&match?(%{type: "Note"}, &1))
+      |> Kernel.++(Map.values(reblogs_by_ap_id))
+      |> Enum.filter(&match?(%{type: "Note"}, &1))
+      |> Enum.uniq_by(& &1.ap_id)
+
+    object_ap_ids =
+      note_objects
+      |> Enum.map(& &1.ap_id)
+      |> Enum.filter(&is_binary/1)
+      |> Enum.map(&String.trim/1)
+      |> Enum.reject(&(&1 == ""))
+      |> Enum.uniq()
+
+    actor_ap_ids =
+      note_objects
+      |> Enum.map(& &1.actor)
+      |> Kernel.++(
+        objects
+        |> Enum.filter(&match?(%{type: "Announce"}, &1))
+        |> Enum.map(&Map.get(&1, :actor))
+      )
+      |> Enum.filter(&is_binary/1)
+      |> Enum.map(&String.trim/1)
+      |> Enum.reject(&(&1 == ""))
+      |> Enum.uniq()
+
+    actor_cards = Actor.cards_by_ap_id(actor_ap_ids)
+
+    status_counts = Relationships.count_by_types_objects(["Like", "Announce"], object_ap_ids)
+
+    me_relationships =
+      case current_user do
+        %User{ap_id: ap_id} when is_binary(ap_id) ->
+          Relationships.list_by_types_actor_objects(
+            ["Like", "Announce", "Bookmark"],
+            ap_id,
+            object_ap_ids
+          )
+
+        ap_id when is_binary(ap_id) ->
+          Relationships.list_by_types_actor_objects(
+            ["Like", "Announce", "Bookmark"],
+            ap_id,
+            object_ap_ids
+          )
+
+        _ ->
+          MapSet.new()
+      end
+
+    emoji_counts = Relationships.emoji_reaction_counts_for_objects(object_ap_ids)
+
+    emoji_me_relationships =
+      case current_user do
+        %User{ap_id: ap_id} when is_binary(ap_id) ->
+          ap_id
+          |> Relationships.emoji_reactions_by_actor_for_objects(object_ap_ids)
+          |> Enum.map(fn {type, emoji_url, object_ap_id} ->
+            {type, SafeMediaURL.safe(emoji_url), object_ap_id}
+          end)
+          |> MapSet.new()
+
+        ap_id when is_binary(ap_id) ->
+          ap_id
+          |> Relationships.emoji_reactions_by_actor_for_objects(object_ap_ids)
+          |> Enum.map(fn {type, emoji_url, object_ap_id} ->
+            {type, SafeMediaURL.safe(emoji_url), object_ap_id}
+          end)
+          |> MapSet.new()
+
+        _ ->
+          MapSet.new()
+      end
+
+    followed_actors =
+      case current_user do
+        %User{ap_id: ap_id} when is_binary(ap_id) ->
+          ap_id
+          |> Relationships.list_follows_by_actor_for_objects(actor_ap_ids)
+          |> Enum.map(& &1.object)
+          |> MapSet.new()
+
+        ap_id when is_binary(ap_id) ->
+          ap_id
+          |> Relationships.list_follows_by_actor_for_objects(actor_ap_ids)
+          |> Enum.map(& &1.object)
+          |> MapSet.new()
+
+        _ ->
+          MapSet.new()
+      end
+
     %{
-      feed_id: announce.id,
-      object: object,
-      actor: Actor.card(object.actor),
-      reposted_by: Actor.card(announce.actor),
-      attachments: attachments_for_object(object),
-      likes_count: Relationships.count_by_type_object("Like", object.ap_id),
-      liked?: liked_by_user?(object, current_user),
-      reposts_count: Relationships.count_by_type_object("Announce", object.ap_id),
-      reposted?: reposted_by_user?(object, current_user),
-      bookmarked?: bookmarked_by_user?(object, current_user),
-      reactions: reactions_for_object(object, current_user)
+      reblogs_by_ap_id: reblogs_by_ap_id,
+      actor_cards: actor_cards,
+      status_counts: status_counts,
+      me_relationships: me_relationships,
+      emoji_counts: emoji_counts,
+      emoji_me_relationships: emoji_me_relationships,
+      followed_actors: followed_actors
     }
   end
+
+  defp decorate_with_context(
+         %{type: "Announce", object: object_ap_id} = announce,
+         current_user,
+         ctx
+       )
+       when is_binary(object_ap_id) do
+    object_ap_id = String.trim(object_ap_id)
+
+    with true <- object_ap_id != "",
+         %{type: "Note"} = object <- Map.get(ctx.reblogs_by_ap_id, object_ap_id),
+         true <- visible_to_cached?(object, current_user, ctx.followed_actors) do
+      decorate_note_with_context(object, current_user, ctx,
+        feed_id: announce.id,
+        reposted_by: actor_card(announce.actor, ctx.actor_cards)
+      )
+    else
+      _ -> nil
+    end
+  end
+
+  defp decorate_with_context(%{type: "Note"} = object, current_user, ctx) do
+    decorate_note_with_context(object, current_user, ctx, feed_id: object.id)
+  end
+
+  defp decorate_with_context(other, current_user, _ctx) do
+    decorate(other, current_user)
+  end
+
+  defp decorate_note_with_context(%{type: "Note"} = object, current_user, ctx, opts) do
+    feed_id = Keyword.get(opts, :feed_id, object.id)
+    reposted_by = Keyword.get(opts, :reposted_by)
+
+    counts = Map.get(ctx.status_counts, object.ap_id, %{})
+    likes_count = Map.get(counts, "Like", 0)
+    reposts_count = Map.get(counts, "Announce", 0)
+
+    liked? =
+      match?(%User{}, current_user) and
+        MapSet.member?(ctx.me_relationships, {"Like", object.ap_id})
+
+    reposted? =
+      match?(%User{}, current_user) and
+        MapSet.member?(ctx.me_relationships, {"Announce", object.ap_id})
+
+    bookmarked? =
+      match?(%User{}, current_user) and
+        MapSet.member?(ctx.me_relationships, {"Bookmark", object.ap_id})
+
+    decorated = %{
+      feed_id: feed_id,
+      object: object,
+      actor: actor_card(object.actor, ctx.actor_cards),
+      attachments: attachments_for_object(object),
+      likes_count: likes_count,
+      liked?: liked?,
+      reposts_count: reposts_count,
+      reposted?: reposted?,
+      bookmarked?: bookmarked?,
+      reactions: reactions_for_object_with_context(object.ap_id, current_user, ctx)
+    }
+
+    case reposted_by do
+      %{} -> Map.put(decorated, :reposted_by, reposted_by)
+      _ -> decorated
+    end
+  end
+
+  defp decorate_note_with_context(_object, _current_user, _ctx, _opts), do: nil
+
+  defp reactions_for_object_with_context(object_ap_id, current_user, ctx)
+       when is_binary(object_ap_id) do
+    counts =
+      ctx.emoji_counts
+      |> Map.get(object_ap_id, [])
+      |> List.wrap()
+      |> Enum.reduce(%{}, fn
+        {type, emoji_url, count}, acc ->
+          emoji = String.replace_prefix(type, "EmojiReact:", "")
+
+          if emoji == "" do
+            acc
+          else
+            emoji_url = SafeMediaURL.safe(emoji_url)
+
+            Map.update(
+              acc,
+              emoji,
+              %{count: count, url: emoji_url},
+              fn existing ->
+                %{
+                  count: (existing.count || 0) + count,
+                  url: existing.url || emoji_url
+                }
+              end
+            )
+          end
+
+        _other, acc ->
+          acc
+      end)
+
+    emojis =
+      @reaction_emojis
+      |> Kernel.++(Map.keys(counts))
+      |> Enum.uniq()
+
+    for emoji <- emojis, into: %{} do
+      relationship_type = "EmojiReact:" <> emoji
+      info = Map.get(counts, emoji, %{count: 0, url: nil})
+
+      reacted? =
+        match?(%User{}, current_user) and
+          MapSet.member?(ctx.emoji_me_relationships, {relationship_type, info.url, object_ap_id})
+
+      {emoji, %{count: info.count || 0, url: info.url, reacted?: reacted?}}
+    end
+  end
+
+  defp reactions_for_object_with_context(_object_ap_id, _current_user, _ctx) do
+    for emoji <- @reaction_emojis, into: %{} do
+      {emoji, %{count: 0, reacted?: false, url: nil}}
+    end
+  end
+
+  defp actor_card(actor_ap_id, cards_by_ap_id) when is_map(cards_by_ap_id) do
+    case Map.get(cards_by_ap_id, actor_ap_id) do
+      %{} = card -> card
+      _ -> Actor.card(actor_ap_id)
+    end
+  end
+
+  defp actor_card(actor_ap_id, _cards_by_ap_id), do: Actor.card(actor_ap_id)
+
+  defp visible_to_cached?(object, nil, _followed_actors) do
+    Objects.publicly_visible?(object)
+  end
+
+  defp visible_to_cached?(object, %User{ap_id: ap_id}, followed_actors) when is_binary(ap_id) do
+    visible_to_cached?(object, ap_id, followed_actors)
+  end
+
+  defp visible_to_cached?(%{actor: actor} = object, user_ap_id, followed_actors)
+       when is_binary(actor) and is_binary(user_ap_id) do
+    cond do
+      actor == user_ap_id -> true
+      Objects.publicly_visible?(object) -> true
+      addressed_to?(object, user_ap_id) -> true
+      followers_addressed?(object) and MapSet.member?(followed_actors, actor) -> true
+      true -> false
+    end
+  end
+
+  defp visible_to_cached?(_object, _user_ap_id, _followed_actors), do: false
+
+  defp addressed_to?(%{data: %{} = data}, user_ap_id) when is_binary(user_ap_id) do
+    user_ap_id = String.trim(user_ap_id)
+
+    if user_ap_id == "" do
+      false
+    else
+      Enum.any?(@recipient_fields, fn field ->
+        data
+        |> Map.get(field)
+        |> List.wrap()
+        |> Enum.any?(fn
+          %{"id" => id} when is_binary(id) -> String.trim(id) == user_ap_id
+          %{id: id} when is_binary(id) -> String.trim(id) == user_ap_id
+          id when is_binary(id) -> String.trim(id) == user_ap_id
+          _ -> false
+        end)
+      end)
+    end
+  end
+
+  defp addressed_to?(_object, _user_ap_id), do: false
+
+  defp followers_addressed?(%{actor: actor, data: %{} = data})
+       when is_binary(actor) and actor != "" do
+    followers = actor <> "/followers"
+    to = data |> Map.get("to", []) |> List.wrap()
+    cc = data |> Map.get("cc", []) |> List.wrap()
+    followers in to or followers in cc
+  end
+
+  defp followers_addressed?(_object), do: false
 end

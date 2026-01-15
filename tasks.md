@@ -48,6 +48,21 @@ Notes:
 - [ ] Make federation ingress/egress consistently **async** (Oban) with back-pressure, retries, and rate limits.
 - [x] Benchmark suite: realistic seed + perf probes for timelines, thread views, search, ingestion bursts (see `BENCHMARKS.md`).
 - [ ] Keep caching behind behaviours so backends can be swapped (ETS → Redis, etc.).
+- [ ] **Timeline read-path performance follow-ups** (from `perfomance_audit.md` + `perfomance_addendum_by_claude.md`)
+  - [ ] Define budgets (p95, query count) and collect baselines (`EXPLAIN (ANALYZE, BUFFERS)`) for:
+    - [ ] `Objects.list_home_statuses/2` for (a) no follows, (b) dormant follows.
+    - [ ] Tag timeline + `only_media=true`.
+    - [ ] `Objects.count_note_replies_by_parent_ap_ids/1` on a page-sized parent set.
+  - [ ] Bench suite: add cases that reproduce the edge scenarios above (especially sparse home timelines).
+  - [ ] LiveView timelines: remove N+1 patterns in `EgregorosWeb.ViewModels.Status.decorate_many/2` + `EgregorosWeb.ViewModels.Actor.card/1` (batch context like `MastodonAPI.StatusRenderer.rendering_context/2`).
+  - [ ] Mastodon notifications: batch `NotificationRenderer` (accounts + statuses) and avoid per-item `StatusRenderer.render_status/2`.
+  - [ ] Add missing DB index support for notification patterns: index `objects.object` (and a composite such as `(type, object, id)` if plans need it).
+  - [ ] Rewrite hashtag predicate to hit the existing `objects_status_data_path_ops_index` (prefer `data @> %{"tag" => [...]}` over `data->'tag'` expressions).
+  - [ ] Home timeline query: split into actor-driven + addressed-to-me branches and merge (e.g. `UNION ALL` + outer `ORDER BY id DESC LIMIT ?`), with a fast-path for “no follows”.
+  - [ ] Media-only filter: make it index-friendly (denormalized `has_media`/`attachment_count` column + index, or a validated functional index).
+  - [ ] Threads/replies: add a normalized `in_reply_to_ap_id` field + index, then rework replies count + context queries to avoid per-node DB traversal (recursive CTE and/or `conversation_id` strategy).
+  - [ ] Observability: add telemetry spans + query tagging for timeline reads; optionally add lightweight ETS caches for hot `Users.get_by_ap_id/1`/counts behind behaviours.
+  - [ ] (Longer-term) Evaluate a materialized `timeline_entries` derived cache (feature-flagged, async fan-out/backfill, correctness filters for blocks/mutes/deletes).
 
 ## Security / privacy
 

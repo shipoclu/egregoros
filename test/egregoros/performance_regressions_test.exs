@@ -5,6 +5,7 @@ defmodule Egregoros.PerformanceRegressionsTest do
   alias Egregoros.Pipeline
   alias Egregoros.Users
   alias EgregorosWeb.MastodonAPI.StatusRenderer
+  alias EgregorosWeb.ViewModels.Status, as: StatusVM
 
   defp capture_repo_queries(fun) when is_function(fun, 0) do
     handler_id = {__MODULE__, System.unique_integer([:positive])}
@@ -136,6 +137,68 @@ defmodule Egregoros.PerformanceRegressionsTest do
     # emoji reactions, plus account counts), which scales linearly with the number of statuses.
     assert length(queries) <= 15
     assert length(rendered) == 3
+  end
+
+  test "status view model decoration batches relationship queries" do
+    {:ok, alice} = Users.create_local_user("alice")
+    {:ok, bob} = Users.create_local_user("bob")
+    {:ok, carol} = Users.create_local_user("carol")
+
+    {:ok, note_1} =
+      Objects.create_object(%{
+        ap_id: "https://remote.example/objects/1",
+        type: "Note",
+        actor: bob.ap_id,
+        local: false,
+        data: %{
+          "id" => "https://remote.example/objects/1",
+          "type" => "Note",
+          "actor" => bob.ap_id,
+          "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+          "content" => "hello"
+        }
+      })
+
+    {:ok, note_2} =
+      Objects.create_object(%{
+        ap_id: "https://remote.example/objects/2",
+        type: "Note",
+        actor: carol.ap_id,
+        local: false,
+        data: %{
+          "id" => "https://remote.example/objects/2",
+          "type" => "Note",
+          "actor" => carol.ap_id,
+          "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+          "content" => "hello"
+        }
+      })
+
+    {:ok, announce} =
+      Objects.create_object(%{
+        ap_id: "https://remote.example/objects/announce-1",
+        type: "Announce",
+        actor: alice.ap_id,
+        object: note_1.ap_id,
+        local: false,
+        data: %{
+          "id" => "https://remote.example/objects/announce-1",
+          "type" => "Announce",
+          "actor" => alice.ap_id,
+          "object" => note_1.ap_id
+        }
+      })
+
+    {decorated, queries} =
+      capture_repo_queries(fn ->
+        StatusVM.decorate_many([note_1, announce, note_2], alice)
+      end)
+
+    # Before batching, decoration does per-item user lookups, relationship counts, and per-emoji
+    # reacted? checks, which scales linearly with the number of statuses.
+    assert length(queries) <= 10
+    assert length(decorated) == 3
+    assert Enum.any?(decorated, &Map.has_key?(&1, :reposted_by))
   end
 
   test "critical composite indexes exist" do
