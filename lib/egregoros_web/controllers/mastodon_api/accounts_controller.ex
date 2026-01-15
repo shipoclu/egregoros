@@ -11,6 +11,7 @@ defmodule EgregorosWeb.MastodonAPI.AccountsController do
   alias Egregoros.Objects
   alias Egregoros.Pipeline
   alias Egregoros.Relationships
+  alias Egregoros.User
   alias Egregoros.Users
   alias EgregorosWeb.Endpoint
   alias EgregorosWeb.MastodonAPI.AccountRenderer
@@ -128,12 +129,12 @@ defmodule EgregorosWeb.MastodonAPI.AccountsController do
         send_resp(conn, 404, "Not Found")
 
       user ->
-        followers =
+        follower_ap_ids =
           user.ap_id
           |> Relationships.list_follows_to()
-          |> Enum.map(&Users.get_by_ap_id(&1.actor))
-          |> Enum.filter(&is_map/1)
-          |> Enum.map(&AccountRenderer.render_account/1)
+          |> Enum.map(& &1.actor)
+
+        followers = render_accounts_by_ap_ids(follower_ap_ids)
 
         json(conn, followers)
     end
@@ -145,12 +146,12 @@ defmodule EgregorosWeb.MastodonAPI.AccountsController do
         send_resp(conn, 404, "Not Found")
 
       user ->
-        following =
+        followed_ap_ids =
           user.ap_id
           |> Relationships.list_follows_by_actor()
-          |> Enum.map(&Users.get_by_ap_id(&1.object))
-          |> Enum.filter(&is_map/1)
-          |> Enum.map(&AccountRenderer.render_account/1)
+          |> Enum.map(& &1.object)
+
+        following = render_accounts_by_ap_ids(followed_ap_ids)
 
         json(conn, following)
     end
@@ -220,6 +221,43 @@ defmodule EgregorosWeb.MastodonAPI.AccountsController do
       _ -> nil
     end
   end
+
+  defp render_accounts_by_ap_ids(ap_ids) when is_list(ap_ids) do
+    ap_ids =
+      ap_ids
+      |> Enum.filter(&is_binary/1)
+      |> Enum.map(&String.trim/1)
+      |> Enum.reject(&(&1 == ""))
+
+    ap_ids_uniq = Enum.uniq(ap_ids)
+
+    users_by_ap_id =
+      ap_ids_uniq
+      |> Users.list_by_ap_ids()
+      |> Map.new(&{&1.ap_id, &1})
+
+    followers_counts = Relationships.count_by_type_objects("Follow", ap_ids_uniq)
+    following_counts = Relationships.count_by_type_actors("Follow", ap_ids_uniq)
+    statuses_counts = Objects.count_notes_by_actors(ap_ids_uniq)
+
+    Enum.flat_map(ap_ids, fn ap_id ->
+      case Map.get(users_by_ap_id, ap_id) do
+        %User{} = user ->
+          [
+            AccountRenderer.render_account(user,
+              followers_count: Map.get(followers_counts, ap_id, 0),
+              following_count: Map.get(following_counts, ap_id, 0),
+              statuses_count: Map.get(statuses_counts, ap_id, 0)
+            )
+          ]
+
+        _ ->
+          []
+      end
+    end)
+  end
+
+  defp render_accounts_by_ap_ids(_ap_ids), do: []
 
   def block(conn, %{"id" => id}) do
     actor = conn.assigns.current_user
