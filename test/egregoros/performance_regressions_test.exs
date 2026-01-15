@@ -2,8 +2,10 @@ defmodule Egregoros.PerformanceRegressionsTest do
   use Egregoros.DataCase, async: false
 
   alias Egregoros.Objects
+  alias Egregoros.Notifications
   alias Egregoros.Pipeline
   alias Egregoros.Users
+  alias EgregorosWeb.MastodonAPI.NotificationRenderer
   alias EgregorosWeb.MastodonAPI.StatusRenderer
   alias EgregorosWeb.ViewModels.Status, as: StatusVM
 
@@ -199,6 +201,100 @@ defmodule Egregoros.PerformanceRegressionsTest do
     assert length(queries) <= 10
     assert length(decorated) == 3
     assert Enum.any?(decorated, &Map.has_key?(&1, :reposted_by))
+  end
+
+  test "mastodon notifications rendering batches queries" do
+    {:ok, alice} = Users.create_local_user("alice")
+    {:ok, bob} = Users.create_local_user("bob")
+    {:ok, carol} = Users.create_local_user("carol")
+
+    {:ok, note} =
+      Objects.create_object(%{
+        ap_id: "https://remote.example/objects/note-1",
+        type: "Note",
+        actor: alice.ap_id,
+        local: true,
+        data: %{
+          "id" => "https://remote.example/objects/note-1",
+          "type" => "Note",
+          "actor" => alice.ap_id,
+          "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+          "content" => "hello"
+        }
+      })
+
+    {:ok, _follow} =
+      Objects.create_object(%{
+        ap_id: "https://remote.example/activities/follow-1",
+        type: "Follow",
+        actor: bob.ap_id,
+        object: alice.ap_id,
+        local: true,
+        data: %{
+          "id" => "https://remote.example/activities/follow-1",
+          "type" => "Follow",
+          "actor" => bob.ap_id,
+          "object" => alice.ap_id
+        }
+      })
+
+    {:ok, _like} =
+      Objects.create_object(%{
+        ap_id: "https://remote.example/activities/like-1",
+        type: "Like",
+        actor: bob.ap_id,
+        object: note.ap_id,
+        local: true,
+        data: %{
+          "id" => "https://remote.example/activities/like-1",
+          "type" => "Like",
+          "actor" => bob.ap_id,
+          "object" => note.ap_id
+        }
+      })
+
+    {:ok, _announce} =
+      Objects.create_object(%{
+        ap_id: "https://remote.example/activities/announce-1",
+        type: "Announce",
+        actor: carol.ap_id,
+        object: note.ap_id,
+        local: true,
+        data: %{
+          "id" => "https://remote.example/activities/announce-1",
+          "type" => "Announce",
+          "actor" => carol.ap_id,
+          "object" => note.ap_id
+        }
+      })
+
+    {:ok, _mention} =
+      Objects.create_object(%{
+        ap_id: "https://remote.example/objects/mention-1",
+        type: "Note",
+        actor: bob.ap_id,
+        local: true,
+        data: %{
+          "id" => "https://remote.example/objects/mention-1",
+          "type" => "Note",
+          "actor" => bob.ap_id,
+          "to" => [alice.ap_id],
+          "content" => "hi"
+        }
+      })
+
+    activities = Notifications.list_for_user(alice, limit: 20, include_reactions?: false)
+    assert length(activities) >= 4
+
+    {rendered, queries} =
+      capture_repo_queries(fn ->
+        NotificationRenderer.render_notifications(activities, alice)
+      end)
+
+    # Before batching, notification rendering does per-item account loads and per-item status
+    # rendering (which also hits the DB per notification).
+    assert length(queries) <= 25
+    assert length(rendered) == length(activities)
   end
 
   test "critical composite indexes exist" do

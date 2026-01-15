@@ -22,7 +22,7 @@ defmodule EgregorosWeb.MastodonAPI.NotificationsController do
 
     conn
     |> Pagination.maybe_put_links(activities, has_more?, pagination)
-    |> json(Enum.map(activities, &NotificationRenderer.render_notification(&1, user)))
+    |> json(NotificationRenderer.render_notifications(activities, user))
   end
 
   def clear(conn, _params) do
