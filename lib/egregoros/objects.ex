@@ -542,23 +542,50 @@ defmodule Egregoros.Objects do
         select: r.object
       )
 
+    base_query =
+      from(o in Object,
+        where: o.type == "Note" and o.actor not in subquery(ignored_actor_subquery)
+      )
+
+    actor_query =
+      from(o in base_query,
+        where: o.actor == ^actor_ap_id or o.actor in subquery(followed_subquery)
+      )
+      |> where_visible_to_home(actor_ap_id)
+
+    addressed_query =
+      from(o in base_query,
+        where:
+          o.actor != ^actor_ap_id and
+            o.actor not in subquery(followed_subquery) and
+            (fragment("? @> ?", o.data, ^%{"to" => [actor_ap_id]}) or
+               fragment("? @> ?", o.data, ^%{"cc" => [actor_ap_id]}) or
+               fragment("? @> ?", o.data, ^%{"bto" => [actor_ap_id]}) or
+               fragment("? @> ?", o.data, ^%{"bcc" => [actor_ap_id]}) or
+               fragment("? @> ?", o.data, ^%{"audience" => [actor_ap_id]}))
+      )
+
+    actor_query =
+      actor_query
+      |> maybe_where_max_id(max_id)
+      |> maybe_where_since_id(since_id)
+
+    addressed_query =
+      addressed_query
+      |> maybe_where_max_id(max_id)
+      |> maybe_where_since_id(since_id)
+
+    actor_ids = from(o in actor_query, select: %{id: o.id})
+    addressed_ids = from(o in addressed_query, select: %{id: o.id})
+
+    ids_query = Ecto.Query.union_all(actor_ids, ^addressed_ids)
+
     from(o in Object,
-      where:
-        o.type == "Note" and
-          o.actor not in subquery(ignored_actor_subquery) and
-          (o.actor == ^actor_ap_id or
-             o.actor in subquery(followed_subquery) or
-             fragment("? @> ?", o.data, ^%{"to" => [actor_ap_id]}) or
-             fragment("? @> ?", o.data, ^%{"cc" => [actor_ap_id]}) or
-             fragment("? @> ?", o.data, ^%{"bto" => [actor_ap_id]}) or
-             fragment("? @> ?", o.data, ^%{"bcc" => [actor_ap_id]}) or
-             fragment("? @> ?", o.data, ^%{"audience" => [actor_ap_id]})),
+      join: ids in subquery(ids_query),
+      on: o.id == ids.id,
       order_by: [desc: o.id],
       limit: ^limit
     )
-    |> where_visible_to_home(actor_ap_id)
-    |> maybe_where_max_id(max_id)
-    |> maybe_where_since_id(since_id)
     |> Repo.all()
   end
 
@@ -583,24 +610,51 @@ defmodule Egregoros.Objects do
         select: r.object
       )
 
+    base_query =
+      from(o in Object,
+        where: o.type in ^@status_types and o.actor not in subquery(ignored_actor_subquery)
+      )
+      |> where_announces_have_object()
+
+    actor_query =
+      from([o, _reblog] in base_query,
+        where: o.actor == ^actor_ap_id or o.actor in subquery(followed_subquery)
+      )
+      |> where_visible_to_home(actor_ap_id)
+
+    addressed_query =
+      from([o, _reblog] in base_query,
+        where:
+          o.actor != ^actor_ap_id and
+            o.actor not in subquery(followed_subquery) and
+            (fragment("? @> ?", o.data, ^%{"to" => [actor_ap_id]}) or
+               fragment("? @> ?", o.data, ^%{"cc" => [actor_ap_id]}) or
+               fragment("? @> ?", o.data, ^%{"bto" => [actor_ap_id]}) or
+               fragment("? @> ?", o.data, ^%{"bcc" => [actor_ap_id]}) or
+               fragment("? @> ?", o.data, ^%{"audience" => [actor_ap_id]}))
+      )
+
+    actor_query =
+      actor_query
+      |> maybe_where_max_id(max_id)
+      |> maybe_where_since_id(since_id)
+
+    addressed_query =
+      addressed_query
+      |> maybe_where_max_id(max_id)
+      |> maybe_where_since_id(since_id)
+
+    actor_ids = from([o, _reblog] in actor_query, select: %{id: o.id})
+    addressed_ids = from([o, _reblog] in addressed_query, select: %{id: o.id})
+
+    ids_query = Ecto.Query.union_all(actor_ids, ^addressed_ids)
+
     from(o in Object,
-      where:
-        o.type in ^@status_types and
-          o.actor not in subquery(ignored_actor_subquery) and
-          (o.actor == ^actor_ap_id or
-             o.actor in subquery(followed_subquery) or
-             fragment("? @> ?", o.data, ^%{"to" => [actor_ap_id]}) or
-             fragment("? @> ?", o.data, ^%{"cc" => [actor_ap_id]}) or
-             fragment("? @> ?", o.data, ^%{"bto" => [actor_ap_id]}) or
-             fragment("? @> ?", o.data, ^%{"bcc" => [actor_ap_id]}) or
-             fragment("? @> ?", o.data, ^%{"audience" => [actor_ap_id]})),
+      join: ids in subquery(ids_query),
+      on: o.id == ids.id,
       order_by: [desc: o.id],
       limit: ^limit
     )
-    |> where_announces_have_object()
-    |> where_visible_to_home(actor_ap_id)
-    |> maybe_where_max_id(max_id)
-    |> maybe_where_since_id(since_id)
     |> Repo.all()
   end
 
