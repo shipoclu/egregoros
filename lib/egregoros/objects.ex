@@ -495,23 +495,23 @@ defmodule Egregoros.Objects do
   defp followers_visible?(_object, _user_ap_id), do: false
 
   defp where_hashtag_tag(query, name) when is_binary(name) and name != "" do
-    match = [%{"type" => "Hashtag", "name" => name}]
+    match = %{"tag" => [%{"type" => "Hashtag", "name" => name}]}
 
     from(o in query,
-      where: fragment("coalesce(?->'tag', '[]'::jsonb) @> ?", o.data, ^match)
+      where: fragment("? @> ?", o.data, ^match)
     )
   end
 
   defp where_hashtag_tag(query, _name), do: query
 
   defp where_hashtag_tag_with_reblog(query, name) when is_binary(name) and name != "" do
-    match = [%{"type" => "Hashtag", "name" => name}]
+    match = %{"tag" => [%{"type" => "Hashtag", "name" => name}]}
 
     from([o, reblog] in query,
       where:
-        (o.type == "Note" and fragment("coalesce(?->'tag', '[]'::jsonb) @> ?", o.data, ^match)) or
+        (o.type == "Note" and fragment("? @> ?", o.data, ^match)) or
           (o.type == "Announce" and
-             fragment("coalesce(?->'tag', '[]'::jsonb) @> ?", reblog.data, ^match))
+             fragment("? @> ?", reblog.data, ^match))
     )
   end
 
