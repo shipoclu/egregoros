@@ -78,6 +78,21 @@ defmodule Egregoros.UsersTest do
     assert fetched.id == user.id
   end
 
+  test "get_or_create_instance_actor updates existing actor when ap_id changes" do
+    nickname = unique_nickname("instance.actor")
+    old_ap_id = "https://old.example"
+    new_ap_id = "https://new.example"
+
+    assert {:ok, %User{} = user} = Users.get_or_create_instance_actor(nickname, old_ap_id)
+    assert user.ap_id == old_ap_id
+
+    assert {:ok, %User{} = updated} = Users.get_or_create_instance_actor(nickname, new_ap_id)
+    assert updated.id == user.id
+    assert updated.ap_id == new_ap_id
+    assert updated.inbox == new_ap_id <> "/inbox"
+    assert updated.outbox == new_ap_id <> "/outbox"
+  end
+
   test "ap_id is unique" do
     {:ok, _} =
       Users.create_user(%{

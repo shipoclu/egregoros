@@ -160,7 +160,7 @@ defmodule Egregoros.Users do
 
         nil ->
           Repo.transaction(fn ->
-            lock_key = :erlang.phash2({__MODULE__, :instance_actor, ap_id})
+            lock_key = :erlang.phash2({__MODULE__, :instance_actor, nickname})
             _ = Repo.query!("SELECT pg_advisory_xact_lock($1)", [lock_key])
 
             case get_by_ap_id(ap_id) do
@@ -168,9 +168,24 @@ defmodule Egregoros.Users do
                 user
 
               nil ->
-                case create_instance_actor(nickname, ap_id) do
-                  {:ok, %User{} = user} -> user
-                  {:error, %Ecto.Changeset{} = changeset} -> Repo.rollback(changeset)
+                case get_by_nickname(nickname) do
+                  %User{} = user ->
+                    case user
+                         |> User.changeset(%{
+                           ap_id: ap_id,
+                           inbox: ap_id <> "/inbox",
+                           outbox: ap_id <> "/outbox"
+                         })
+                         |> Repo.update() do
+                      {:ok, %User{} = user} -> user
+                      {:error, %Ecto.Changeset{} = changeset} -> Repo.rollback(changeset)
+                    end
+
+                  nil ->
+                    case create_instance_actor(nickname, ap_id) do
+                      {:ok, %User{} = user} -> user
+                      {:error, %Ecto.Changeset{} = changeset} -> Repo.rollback(changeset)
+                    end
                 end
             end
           end)
