@@ -45,7 +45,7 @@ Notes:
 
 ## Performance / scalability
 
-- [ ] Make federation ingress/egress consistently **async** (Oban) with back-pressure, retries, and rate limits.
+- [x] Make federation ingress/egress consistently **async** (Oban) with back-pressure, retries, and rate limits (Oban workers + `RateLimitInbox`).
 - [x] Benchmark suite: realistic seed + perf probes for timelines, thread views, search, ingestion bursts (see `BENCHMARKS.md`).
 - [ ] Keep caching behind behaviours so backends can be swapped (ETS → Redis, etc.).
 - [ ] **Timeline read-path performance follow-ups** (from `perfomance_audit.md` + `perfomance_addendum_by_claude.md`)
