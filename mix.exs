@@ -9,6 +9,7 @@ defmodule Egregoros.MixProject do
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       test_coverage: [
+        tool: Egregoros.TestCoverageTool,
         summary: [threshold: 85],
         ignore_modules: [
           EgregorosWeb.AdminHTML,
@@ -16,6 +17,7 @@ defmodule Egregoros.MixProject do
           EgregorosWeb.RegistrationHTML,
           EgregorosWeb.SessionHTML,
           EgregorosWeb.SettingsHTML,
+          Egregoros.TestCoverageTool,
           Mix.Tasks.Egregoros.Admin,
           Mix.Tasks.Egregoros.Actors.Refetch,
           Mix.Tasks.Egregoros.Bench.Seed,
@@ -115,7 +117,7 @@ defmodule Egregoros.MixProject do
         "compile --warnings-as-errors",
         "deps.unlock --unused",
         "format --check-formatted",
-        "test"
+        "test --cover"
       ]
     ]
   end

@@ -105,6 +105,7 @@ custom classes must fully style the input
 
 - **Always use `start_supervised!/1`** to start processes in tests as it guarantees cleanup between tests
 - Keep the coverage gate in mind: `mix test --cover` must stay **≥ 85%**; add tests for new branches and run cover locally when touching core modules.
+- Coverage is enforced in `mix precommit` via `mix test --cover`; keep total **≥ 85%**.
 - **Avoid** `Process.sleep/1` and `Process.alive?/1` in tests
   - Instead of sleeping to wait for a process to finish, **always** use `Process.monitor/1` and assert on the DOWN message:
 
