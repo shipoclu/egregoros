@@ -9,6 +9,9 @@ defmodule EgregorosWeb.NodeinfoController do
   alias Egregoros.User
   alias EgregorosWeb.Endpoint
 
+  @default_upload_limit 40_000_000
+  @default_image_upload_limit 10_000_000
+
   def nodeinfo_index(conn, _params) do
     json(conn, %{
       "links" => [
@@ -37,6 +40,15 @@ defmodule EgregorosWeb.NodeinfoController do
       from(u in User, where: u.local == true and u.nickname != "internal.fetch")
       |> Repo.aggregate(:count, :id)
 
+    staff_accounts =
+      from(u in User,
+        where:
+          u.local == true and u.nickname != "internal.fetch" and u.admin == true and
+            not is_nil(u.ap_id),
+        select: u.ap_id
+      )
+      |> Repo.all()
+
     local_posts =
       from(o in Object, where: o.type == "Note" and o.local == true)
       |> Repo.aggregate(:count, :id)
@@ -55,7 +67,42 @@ defmodule EgregorosWeb.NodeinfoController do
       "services" => %{"inbound" => [], "outbound" => []},
       "openRegistrations" => InstanceSettings.registrations_open?(),
       "usage" => %{"users" => %{"total" => user_count}, "localPosts" => local_posts},
-      "metadata" => %{}
+      "metadata" => %{
+        "nodeName" => "Egregoros",
+        "nodeDescription" => "A reduced federation core with an opinionated UI.",
+        "private" => false,
+        "suggestions" => %{"enabled" => false},
+        "staffAccounts" => staff_accounts,
+        "federation" => %{
+          "enabled" => true,
+          "mrf_policies" => []
+        },
+        "pollLimits" => %{
+          "max_options" => 4,
+          "max_option_chars" => 50,
+          "min_expiration" => 300,
+          "max_expiration" => 2_592_000
+        },
+        "postFormats" => ["text/plain"],
+        "uploadLimits" => %{
+          "general" => @default_upload_limit,
+          "avatar" => @default_image_upload_limit,
+          "banner" => @default_image_upload_limit,
+          "background" => @default_image_upload_limit
+        },
+        "fieldsLimits" => %{
+          "maxFields" => 4,
+          "maxRemoteFields" => 4,
+          "nameLength" => 255,
+          "valueLength" => 255
+        },
+        "accountActivationRequired" => false,
+        "invitesEnabled" => false,
+        "mailerEnabled" => false,
+        "features" => [],
+        "restrictedNicknames" => [],
+        "skipThreadContainment" => false
+      }
     })
   end
 

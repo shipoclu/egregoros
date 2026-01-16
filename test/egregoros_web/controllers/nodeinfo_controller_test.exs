@@ -52,6 +52,28 @@ defmodule EgregorosWeb.NodeinfoControllerTest do
     assert body["openRegistrations"] == false
   end
 
+  test "nodeinfo includes Pleroma-FE metadata (federating, limits)", %{conn: conn} do
+    conn = get(conn, "/nodeinfo/2.0.json")
+    body = json_response(conn, 200)
+
+    assert %{} = metadata = body["metadata"]
+
+    assert is_list(metadata["features"])
+    assert is_list(metadata["staffAccounts"])
+    assert metadata["suggestions"]["enabled"] == false
+
+    assert metadata["federation"]["enabled"] == true
+    assert is_list(metadata["federation"]["mrf_policies"])
+
+    assert "text/plain" in metadata["postFormats"]
+
+    assert %{} = upload_limits = metadata["uploadLimits"]
+    assert is_integer(upload_limits["general"])
+    assert is_integer(upload_limits["avatar"])
+    assert is_integer(upload_limits["banner"])
+    assert is_integer(upload_limits["background"])
+  end
+
   test "GET /nodeinfo/2.0 returns minimal payload", %{conn: conn} do
     conn = get(conn, "/nodeinfo/2.0")
     body = json_response(conn, 200)
