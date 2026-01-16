@@ -250,7 +250,6 @@ defmodule EgregorosWeb.Router do
     get "/trends/statuses", TrendsController, :statuses
     get "/timelines/public", TimelinesController, :public
     get "/timelines/tag/:hashtag", TimelinesController, :tag
-    get "/directory", EmptyListController, :index
     get "/accounts/lookup", AccountsController, :lookup
     get "/accounts/:id", AccountsController, :show
     get "/accounts/:id/followers", AccountsController, :followers
@@ -261,6 +260,7 @@ defmodule EgregorosWeb.Router do
     pipe_through [:api, :api_optional_auth]
 
     get "/tags/:name", TagsController, :show
+    get "/directory", DirectoryController, :index
     get "/accounts/:id/statuses", AccountsController, :statuses
     get "/statuses/:id", StatusesController, :show
     get "/statuses/:id/context", StatusesController, :context
