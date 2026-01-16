@@ -82,10 +82,8 @@ defmodule Mix.Tasks.Egregoros.Bench.Explain do
     :telemetry.attach(
       handler_id,
       [:egregoros, :repo, :query],
-      fn _event, measurements, metadata, _config ->
-        send(parent, {:repo_query, measurements, metadata})
-      end,
-      nil
+      &__MODULE__.handle_repo_query/4,
+      parent
     )
 
     try do
@@ -94,6 +92,11 @@ defmodule Mix.Tasks.Egregoros.Bench.Explain do
     after
       :telemetry.detach(handler_id)
     end
+  end
+
+  def handle_repo_query(_event_name, measurements, metadata, parent)
+      when is_pid(parent) and is_map(measurements) and is_map(metadata) do
+    send(parent, {:repo_query, measurements, metadata})
   end
 
   defp flush_repo_queries(acc) do
