@@ -1,5 +1,5 @@
 defmodule Egregoros.Objects do
-  import Ecto.Query, only: [from: 2, dynamic: 2]
+  import Ecto.Query, only: [from: 2, dynamic: 2, recursive_ctes: 2, with_cte: 3]
 
   alias Egregoros.Object
   alias Egregoros.Relationship
@@ -886,77 +886,108 @@ defmodule Egregoros.Objects do
 
   def thread_ancestors(object, limit \\ 50)
 
-  def thread_ancestors(%Object{} = object, limit) when is_integer(limit) and limit > 0 do
-    object
-    |> do_thread_ancestors(MapSet.new([object.ap_id]), limit)
-    |> Enum.reverse()
+  def thread_ancestors(%Object{ap_id: ap_id}, limit)
+      when is_binary(ap_id) and is_integer(limit) and limit > 0 do
+    list_thread_ancestors_by_ap_id(ap_id, limit)
   end
 
   def thread_ancestors(_object, _limit), do: []
 
-  defp do_thread_ancestors(%Object{} = object, visited, limit)
-       when is_integer(limit) and limit > 0 do
-    parent_ap_id =
-      object.data
-      |> Map.get("inReplyTo")
-      |> in_reply_to_ap_id()
-
-    cond do
-      not is_binary(parent_ap_id) ->
-        []
-
-      MapSet.member?(visited, parent_ap_id) ->
-        []
-
-      true ->
-        case get_by_ap_id(parent_ap_id) do
-          %Object{} = parent ->
-            [parent | do_thread_ancestors(parent, MapSet.put(visited, parent_ap_id), limit - 1)]
-
-          _ ->
-            []
-        end
-    end
-  end
-
-  defp do_thread_ancestors(_object, _visited, _limit), do: []
-
   def thread_descendants(object, limit \\ 50)
 
-  def thread_descendants(%Object{} = object, limit) when is_integer(limit) and limit > 0 do
-    {acc, _visited, _remaining} =
-      do_thread_descendants(object.ap_id, MapSet.new([object.ap_id]), limit, [])
-
-    Enum.reverse(acc)
+  def thread_descendants(%Object{ap_id: ap_id}, limit)
+      when is_binary(ap_id) and is_integer(limit) and limit > 0 do
+    list_thread_descendants_by_ap_id(ap_id, limit)
   end
 
   def thread_descendants(_object, _limit), do: []
 
-  defp do_thread_descendants(ap_id, visited, remaining, acc)
-       when is_binary(ap_id) and is_integer(remaining) and remaining > 0 and is_list(acc) do
-    replies = list_replies_to(ap_id, limit: remaining)
+  defp list_thread_ancestors_by_ap_id(object_ap_id, limit)
+       when is_binary(object_ap_id) and is_integer(limit) and limit > 0 do
+    initial_query =
+      from(o in Object,
+        where: o.ap_id == ^object_ap_id,
+        select: %{
+          ap_id: o.ap_id,
+          in_reply_to_ap_id: o.in_reply_to_ap_id,
+          depth: 0,
+          visited_ap_ids: fragment("ARRAY[?]::text[]", o.ap_id)
+        }
+      )
 
-    Enum.reduce_while(replies, {acc, visited, remaining}, fn reply, {acc, visited, remaining} ->
-      if remaining <= 0 do
-        {:halt, {acc, visited, remaining}}
-      else
-        if MapSet.member?(visited, reply.ap_id) do
-          {:cont, {acc, visited, remaining}}
-        else
-          visited = MapSet.put(visited, reply.ap_id)
-          remaining = remaining - 1
-          acc = [reply | acc]
+    recursion_query =
+      from(o in Object,
+        join: t in "thread_ancestors",
+        on: o.ap_id == t.in_reply_to_ap_id,
+        where: t.depth < ^limit and fragment("NOT (? = ANY(?))", o.ap_id, t.visited_ap_ids),
+        select: %{
+          ap_id: o.ap_id,
+          in_reply_to_ap_id: o.in_reply_to_ap_id,
+          depth: t.depth + 1,
+          visited_ap_ids: fragment("array_append(?, ?)", t.visited_ap_ids, o.ap_id)
+        }
+      )
 
-          {acc, visited, remaining} =
-            do_thread_descendants(reply.ap_id, visited, remaining, acc)
+    cte_query = Ecto.Query.union_all(initial_query, ^recursion_query)
 
-          {:cont, {acc, visited, remaining}}
-        end
-      end
-    end)
+    from(o in Object,
+      join: t in "thread_ancestors",
+      on: o.ap_id == t.ap_id,
+      where: t.depth > 0,
+      order_by: [desc: t.depth],
+      limit: ^limit,
+      select: o
+    )
+    |> recursive_ctes(true)
+    |> with_cte("thread_ancestors", as: ^cte_query)
+    |> Repo.all()
   end
 
-  defp do_thread_descendants(_ap_id, visited, remaining, acc), do: {acc, visited, remaining}
+  defp list_thread_ancestors_by_ap_id(_object_ap_id, _limit), do: []
+
+  defp list_thread_descendants_by_ap_id(object_ap_id, limit)
+       when is_binary(object_ap_id) and is_integer(limit) and limit > 0 do
+    initial_query =
+      from(o in Object,
+        where: o.ap_id == ^object_ap_id,
+        select: %{
+          id: o.id,
+          ap_id: o.ap_id,
+          depth: 0,
+          path_ids: fragment("ARRAY[?]::bigint[]", o.id)
+        }
+      )
+
+    recursion_query =
+      from(o in Object,
+        join: t in "thread_descendants",
+        on: o.in_reply_to_ap_id == t.ap_id,
+        where:
+          o.type == "Note" and t.depth < ^limit and fragment("NOT (? = ANY(?))", o.id, t.path_ids),
+        select: %{
+          id: o.id,
+          ap_id: o.ap_id,
+          depth: t.depth + 1,
+          path_ids: fragment("array_append(?, ?)", t.path_ids, o.id)
+        }
+      )
+
+    cte_query = Ecto.Query.union_all(initial_query, ^recursion_query)
+
+    from(o in Object,
+      join: t in "thread_descendants",
+      on: o.id == t.id,
+      where: t.depth > 0,
+      order_by: [asc: t.path_ids],
+      limit: ^limit,
+      select: o
+    )
+    |> recursive_ctes(true)
+    |> with_cte("thread_descendants", as: ^cte_query)
+    |> Repo.all()
+  end
+
+  defp list_thread_descendants_by_ap_id(_object_ap_id, _limit), do: []
 
   def list_replies_to(object_ap_id, opts \\ [])
       when is_binary(object_ap_id) and is_list(opts) do
@@ -969,10 +1000,6 @@ defmodule Egregoros.Objects do
     )
     |> Repo.all()
   end
-
-  defp in_reply_to_ap_id(value) when is_binary(value), do: value
-  defp in_reply_to_ap_id(%{"id" => id}) when is_binary(id), do: id
-  defp in_reply_to_ap_id(_), do: nil
 
   def list_creates_by_actor(actor, limit \\ 20) when is_binary(actor) do
     from(o in Object,

@@ -297,6 +297,130 @@ defmodule Egregoros.PerformanceRegressionsTest do
     assert length(rendered) == length(activities)
   end
 
+  test "thread_ancestors fetches the chain in a single query" do
+    actor = "https://remote.example/users/thread-perf"
+
+    {:ok, root} =
+      Objects.create_object(%{
+        ap_id: "https://remote.example/objects/thread-perf-root",
+        type: "Note",
+        actor: actor,
+        local: false,
+        data: %{
+          "id" => "https://remote.example/objects/thread-perf-root",
+          "type" => "Note",
+          "actor" => actor,
+          "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+          "content" => "root"
+        }
+      })
+
+    deepest =
+      Enum.reduce(1..10, root, fn idx, parent ->
+        ap_id = "https://remote.example/objects/thread-perf-reply-#{idx}"
+
+        {:ok, reply} =
+          Objects.create_object(%{
+            ap_id: ap_id,
+            type: "Note",
+            actor: actor,
+            local: false,
+            data: %{
+              "id" => ap_id,
+              "type" => "Note",
+              "actor" => actor,
+              "inReplyTo" => parent.ap_id,
+              "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+              "content" => "reply #{idx}"
+            }
+          })
+
+        reply
+      end)
+
+    {ancestors, queries} =
+      capture_repo_queries(fn -> Objects.thread_ancestors(deepest, 50) end)
+
+    assert length(queries) == 1
+    assert List.last(ancestors).id != deepest.id
+    assert Enum.any?(ancestors, &(&1.id == root.id))
+  end
+
+  test "thread_descendants fetches replies in a single query" do
+    actor = "https://remote.example/users/thread-perf"
+
+    {:ok, root} =
+      Objects.create_object(%{
+        ap_id: "https://remote.example/objects/thread-desc-perf-root",
+        type: "Note",
+        actor: actor,
+        local: false,
+        data: %{
+          "id" => "https://remote.example/objects/thread-desc-perf-root",
+          "type" => "Note",
+          "actor" => actor,
+          "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+          "content" => "root"
+        }
+      })
+
+    {:ok, reply_1} =
+      Objects.create_object(%{
+        ap_id: "https://remote.example/objects/thread-desc-perf-reply-1",
+        type: "Note",
+        actor: actor,
+        local: false,
+        data: %{
+          "id" => "https://remote.example/objects/thread-desc-perf-reply-1",
+          "type" => "Note",
+          "actor" => actor,
+          "inReplyTo" => root.ap_id,
+          "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+          "content" => "reply 1"
+        }
+      })
+
+    {:ok, reply_2} =
+      Objects.create_object(%{
+        ap_id: "https://remote.example/objects/thread-desc-perf-reply-2",
+        type: "Note",
+        actor: actor,
+        local: false,
+        data: %{
+          "id" => "https://remote.example/objects/thread-desc-perf-reply-2",
+          "type" => "Note",
+          "actor" => actor,
+          "inReplyTo" => root.ap_id,
+          "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+          "content" => "reply 2"
+        }
+      })
+
+    {:ok, reply_1a} =
+      Objects.create_object(%{
+        ap_id: "https://remote.example/objects/thread-desc-perf-reply-1a",
+        type: "Note",
+        actor: actor,
+        local: false,
+        data: %{
+          "id" => "https://remote.example/objects/thread-desc-perf-reply-1a",
+          "type" => "Note",
+          "actor" => actor,
+          "inReplyTo" => reply_1.ap_id,
+          "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+          "content" => "reply 1a"
+        }
+      })
+
+    {descendants, queries} =
+      capture_repo_queries(fn -> Objects.thread_descendants(root, 50) end)
+
+    assert length(queries) == 1
+    assert Enum.any?(descendants, &(&1.id == reply_1.id))
+    assert Enum.any?(descendants, &(&1.id == reply_2.id))
+    assert Enum.any?(descendants, &(&1.id == reply_1a.id))
+  end
+
   test "critical composite indexes exist" do
     result =
       Repo.query!(
