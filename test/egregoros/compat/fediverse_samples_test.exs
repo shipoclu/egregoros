@@ -85,6 +85,17 @@ defmodule Egregoros.Compat.FediverseSamplesTest do
              ] = note.data["attachment"]
     end
 
+    test "accepts contentMap-only Notes by deriving content" do
+      activity = Fixtures.json!("fediverse_samples/activity/language_5.json")
+
+      assert {:ok, _create} = Pipeline.ingest(activity, local: false)
+
+      note = Objects.get_by_ap_id(activity["object"]["id"])
+      assert %{} = note
+      assert note.data["content"] == "Deutsch"
+      assert note.data["contentMap"] == %{"de" => "Deutsch"}
+    end
+
     test "sanitizes disallowed HTML tags at render time" do
       activity = Fixtures.json!("fediverse_samples/activity/html_bad_0.json")
 
