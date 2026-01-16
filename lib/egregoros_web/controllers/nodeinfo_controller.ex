@@ -7,6 +7,7 @@ defmodule EgregorosWeb.NodeinfoController do
   alias Egregoros.Object
   alias Egregoros.Repo
   alias Egregoros.User
+  alias Egregoros.Federation.InstanceActor
   alias EgregorosWeb.Endpoint
 
   @default_upload_limit 40_000_000
@@ -36,14 +37,16 @@ defmodule EgregorosWeb.NodeinfoController do
   end
 
   defp render_nodeinfo(conn, version) when is_binary(version) do
+    system_nicknames = ["internal.fetch", InstanceActor.nickname()]
+
     user_count =
-      from(u in User, where: u.local == true and u.nickname != "internal.fetch")
+      from(u in User, where: u.local == true and u.nickname not in ^system_nicknames)
       |> Repo.aggregate(:count, :id)
 
     staff_accounts =
       from(u in User,
         where:
-          u.local == true and u.nickname != "internal.fetch" and u.admin == true and
+          u.local == true and u.nickname not in ^system_nicknames and u.admin == true and
             not is_nil(u.ap_id),
         select: u.ap_id
       )

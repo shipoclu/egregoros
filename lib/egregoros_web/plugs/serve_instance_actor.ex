@@ -1,0 +1,58 @@
+defmodule EgregorosWeb.Plugs.ServeInstanceActor do
+  import Plug.Conn
+
+  alias Egregoros.Federation.InstanceActor
+
+  def init(opts), do: opts
+
+  def call(%Plug.Conn{} = conn, _opts) do
+    if conn.method == "GET" and conn.request_path == "/" and
+         Phoenix.Controller.get_format(conn) == "json" do
+      conn
+      |> put_resp_header("vary", "accept")
+      |> serve_actor()
+      |> halt()
+    else
+      conn
+    end
+  end
+
+  defp serve_actor(conn) do
+    case InstanceActor.get_actor() do
+      {:ok, actor} ->
+        payload = actor_json(actor)
+
+        conn
+        |> put_resp_content_type("application/activity+json")
+        |> send_resp(200, Jason.encode!(payload))
+
+      {:error, _reason} ->
+        send_resp(conn, 500, "Internal Server Error")
+    end
+  end
+
+  defp actor_json(actor) do
+    base_url = InstanceActor.ap_id()
+
+    %{
+      "@context" => [
+        "https://www.w3.org/ns/activitystreams",
+        "https://w3id.org/security/v1"
+      ],
+      "id" => base_url,
+      "type" => "Service",
+      "preferredUsername" => actor.nickname,
+      "name" => "Egregoros",
+      "summary" => "Egregoros instance actor.",
+      "inbox" => actor.inbox,
+      "outbox" => actor.outbox,
+      "followers" => base_url <> "/followers",
+      "following" => base_url <> "/following",
+      "publicKey" => %{
+        "id" => base_url <> "#main-key",
+        "owner" => base_url,
+        "publicKeyPem" => actor.public_key
+      }
+    }
+  end
+end

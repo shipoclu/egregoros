@@ -17,6 +17,17 @@ defmodule EgregorosWeb.Router do
     plug :put_secure_browser_headers
   end
 
+  pipeline :browser_root do
+    plug :accepts, ["html", "json"]
+    plug EgregorosWeb.Plugs.ServeInstanceActor
+    plug :fetch_session
+    plug :fetch_live_flash
+    plug EgregorosWeb.Plugs.FetchCurrentUser
+    plug :put_root_layout, html: {EgregorosWeb.Layouts, :root}
+    plug :protect_from_forgery
+    plug :put_secure_browser_headers
+  end
+
   pipeline :browser_api do
     plug :accepts, ["json"]
     plug :fetch_session
@@ -75,7 +86,6 @@ defmodule EgregorosWeb.Router do
     post "/logout", RegistrationController, :logout
 
     live "/settings/privacy", PrivacyLive
-    live "/", TimelineLive
     live "/search", SearchLive
     live "/tags/:tag", TagLive
     live "/notifications", NotificationsLive
@@ -86,6 +96,12 @@ defmodule EgregorosWeb.Router do
     live "/@:nickname/followers", RelationshipsLive, :followers
     live "/@:nickname/following", RelationshipsLive, :following
     live "/@:nickname/:uuid", StatusLive
+  end
+
+  scope "/", EgregorosWeb do
+    pipe_through :browser_root
+
+    live "/", TimelineLive
   end
 
   scope "/", EgregorosWeb do

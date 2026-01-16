@@ -7,6 +7,7 @@ defmodule EgregorosWeb.MastodonAPI.InstanceController do
   alias Egregoros.Object
   alias Egregoros.Repo
   alias Egregoros.User
+  alias Egregoros.Federation.InstanceActor
   alias EgregorosWeb.Endpoint
 
   @weeks_of_activity 12
@@ -15,9 +16,10 @@ defmodule EgregorosWeb.MastodonAPI.InstanceController do
     base_url = Endpoint.url()
     host = URI.parse(base_url).host || "localhost"
     registrations_open? = InstanceSettings.registrations_open?()
+    system_nicknames = ["internal.fetch", InstanceActor.nickname()]
 
     user_count =
-      from(u in User, where: u.nickname != "internal.fetch")
+      from(u in User, where: u.nickname not in ^system_nicknames)
       |> Repo.aggregate(:count, :id)
 
     status_count =
@@ -103,9 +105,10 @@ defmodule EgregorosWeb.MastodonAPI.InstanceController do
     base_url = Endpoint.url()
     host = URI.parse(base_url).host || "localhost"
     registrations_open? = InstanceSettings.registrations_open?()
+    system_nicknames = ["internal.fetch", InstanceActor.nickname()]
 
     active_month =
-      from(u in User, where: u.nickname != "internal.fetch")
+      from(u in User, where: u.nickname not in ^system_nicknames)
       |> Repo.aggregate(:count, :id)
 
     json(conn, %{
@@ -207,9 +210,11 @@ defmodule EgregorosWeb.MastodonAPI.InstanceController do
   end
 
   defp count_local_registrations(%DateTime{} = start_dt, %DateTime{} = end_dt) do
+    system_nicknames = ["internal.fetch", InstanceActor.nickname()]
+
     from(u in User,
       where:
-        u.local == true and u.nickname != "internal.fetch" and u.inserted_at >= ^start_dt and
+        u.local == true and u.nickname not in ^system_nicknames and u.inserted_at >= ^start_dt and
           u.inserted_at <= ^end_dt
     )
     |> Repo.aggregate(:count, :id)

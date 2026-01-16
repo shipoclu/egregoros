@@ -16,4 +16,5 @@ Ecto.Adapters.SQL.Sandbox.mode(Egregoros.Repo, :manual)
 # creating them inside long-running sandbox transactions.
 Ecto.Adapters.SQL.Sandbox.unboxed_run(Egregoros.Repo, fn ->
   {:ok, _} = Egregoros.Users.get_or_create_local_user("internal.fetch")
+  {:ok, _} = Egregoros.Federation.InstanceActor.get_actor()
 end)

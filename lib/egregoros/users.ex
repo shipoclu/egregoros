@@ -146,6 +146,59 @@ defmodule Egregoros.Users do
     end
   end
 
+  def get_or_create_instance_actor(nickname, ap_id)
+      when is_binary(nickname) and is_binary(ap_id) do
+    nickname = String.trim(nickname)
+    ap_id = String.trim(ap_id)
+
+    if nickname == "" or ap_id == "" do
+      {:error, :invalid_actor}
+    else
+      case get_by_ap_id(ap_id) do
+        %User{} = user ->
+          {:ok, user}
+
+        nil ->
+          Repo.transaction(fn ->
+            lock_key = :erlang.phash2({__MODULE__, :instance_actor, ap_id})
+            _ = Repo.query!("SELECT pg_advisory_xact_lock($1)", [lock_key])
+
+            case get_by_ap_id(ap_id) do
+              %User{} = user ->
+                user
+
+              nil ->
+                case create_instance_actor(nickname, ap_id) do
+                  {:ok, %User{} = user} -> user
+                  {:error, %Ecto.Changeset{} = changeset} -> Repo.rollback(changeset)
+                end
+            end
+          end)
+          |> case do
+            {:ok, %User{} = user} -> {:ok, user}
+            {:error, %Ecto.Changeset{} = changeset} -> {:error, changeset}
+            {:error, reason} -> {:error, reason}
+          end
+      end
+    end
+  end
+
+  def get_or_create_instance_actor(_nickname, _ap_id), do: {:error, :invalid_actor}
+
+  defp create_instance_actor(nickname, ap_id) when is_binary(nickname) and is_binary(ap_id) do
+    {public_key, private_key} = Keys.generate_rsa_keypair()
+
+    create_user(%{
+      nickname: nickname,
+      ap_id: ap_id,
+      inbox: ap_id <> "/inbox",
+      outbox: ap_id <> "/outbox",
+      public_key: public_key,
+      private_key: private_key,
+      local: true
+    })
+  end
+
   def get_by_ap_id(nil), do: nil
   def get_by_ap_id(ap_id), do: Repo.get_by(User, ap_id: ap_id)
 
