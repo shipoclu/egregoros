@@ -41,3 +41,16 @@ Filter the suite by substring:
 MIX_ENV=bench mix egregoros.bench.run --filter timeline.home
 ```
 
+## Collecting EXPLAIN baselines
+
+To collect `EXPLAIN (ANALYZE, BUFFERS)` output for one (or more) cases:
+
+```sh
+MIX_ENV=bench mix egregoros.bench.explain --filter timeline.home.edge_nofollows
+```
+
+Notes:
+
+- Output files are written to `tmp/bench_explain/` by default (pass `--out` to override).
+- Use `--no-print` to avoid printing the full plan to stdout.
+- Use `--format json` to emit Postgres `FORMAT JSON` output instead of text.

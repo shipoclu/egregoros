@@ -95,4 +95,19 @@ defmodule Egregoros.MixTasksTest do
       assert output =~ "timeline.public.list_notes"
     end
   end
+
+  describe "mix egregoros.bench.explain" do
+    test "prints explain output for a filtered case" do
+      output =
+        capture_io(fn ->
+          Mix.Tasks.Egregoros.Bench.Explain.run([
+            "--filter",
+            "timeline.public.list_notes"
+          ])
+        end)
+
+      assert output =~ "timeline.public.list_notes"
+      assert output =~ "EXPLAIN"
+    end
+  end
 end
