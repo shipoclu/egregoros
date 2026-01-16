@@ -14,14 +14,7 @@ defmodule EgregorosWeb.WebFingerController do
         _ -> base_uri.host || "localhost"
       end
 
-    local_domains =
-      (Domain.aliases_from_uri(base_uri) ++
-         Domain.aliases_from_uri(%URI{
-           scheme: conn.scheme |> Atom.to_string(),
-           host: conn.host,
-           port: conn.port
-         }))
-      |> Enum.uniq()
+    local_domains = Domain.aliases_from_uri(base_uri)
 
     case find_user(resource, local_domains, canonical_domain) do
       nil ->
