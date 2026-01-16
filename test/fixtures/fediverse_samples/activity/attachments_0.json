@@ -1,0 +1,36 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    {
+      "Hashtag": "as:Hashtag",
+      "sensitive": "as:sensitive"
+    }
+  ],
+  "type": "Create",
+  "actor": "http://pasture-one-actor/actor",
+  "to": [
+    "https://www.w3.org/ns/activitystreams#Public",
+    "http://sharkey/users/afcj40xfmzy00003"
+  ],
+  "id": "http://pasture-one-actor/activity/X2vHhwSTqeE",
+  "published": "2025-11-21T14:45:05Z",
+  "object": {
+    "type": "Note",
+    "attributedTo": "http://pasture-one-actor/actor",
+    "to": [
+      "https://www.w3.org/ns/activitystreams#Public",
+      "http://sharkey/users/afcj40xfmzy00003"
+    ],
+    "id": "http://pasture-one-actor/object/JgcBVSmhI5s",
+    "published": "2025-11-21T14:45:05Z",
+    "content": "Image",
+    "attachment": [
+      {
+        "type": "Image",
+        "url": "http://pasture-one-actor/assets/cow.jpg",
+        "mediaType": "image/jpeg",
+        "name": "a cow"
+      }
+    ]
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    {
+      "Hashtag": "as:Hashtag",
+      "sensitive": "as:sensitive"
+    }
+  ],
+  "type": "Create",
+  "actor": "http://pasture-one-actor/actor",
+  "to": [
+    "https://www.w3.org/ns/activitystreams#Public",
+    "http://sharkey/users/afcj40xfmzy00003"
+  ],
+  "id": "http://pasture-one-actor/activity/0tESDZ1eKoE",
+  "published": "2025-11-21T14:44:25Z",
+  "object": {
+    "type": "Note",
+    "attributedTo": "http://pasture-one-actor/actor",
+    "to": [
+      "https://www.w3.org/ns/activitystreams#Public",
+      "http://sharkey/users/afcj40xfmzy00003"
+    ],
+    "id": "http://pasture-one-actor/object/h3afozkvD0c",
+    "published": "2025-11-21T14:44:25Z",
+    "content": "tag 'nohash'",
+    "tag": [
+      {
+        "type": "Hashtag",
+        "name": "nohash"
+      }
+    ]
+  }
+}
