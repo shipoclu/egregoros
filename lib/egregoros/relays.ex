@@ -4,7 +4,7 @@ defmodule Egregoros.Relays do
   alias Egregoros.Activities.Follow
   alias Egregoros.Activities.Undo
   alias Egregoros.Federation.Actor
-  alias Egregoros.Federation.InternalFetchActor
+  alias Egregoros.Federation.InstanceActor
   alias Egregoros.Object
   alias Egregoros.Objects
   alias Egregoros.Pipeline
@@ -36,7 +36,7 @@ defmodule Egregoros.Relays do
 
     with :ok <- SafeURL.validate_http_url(relay_ap_id),
          {:ok, relay_user} <- Actor.fetch_and_store(relay_ap_id),
-         {:ok, internal} <- InternalFetchActor.get_actor(),
+         {:ok, internal} <- InstanceActor.get_actor(),
          {:ok, relay} <- upsert_relay(relay_user.ap_id),
          :ok <- ensure_following(internal.ap_id, relay_user.ap_id, internal, relay_user) do
       {:ok, relay}
@@ -51,7 +51,7 @@ defmodule Egregoros.Relays do
   def unsubscribe(relay_id) when is_integer(relay_id) and relay_id > 0 do
     case Repo.get(Relay, relay_id) do
       %Relay{} = relay ->
-        with {:ok, internal} <- InternalFetchActor.get_actor() do
+        with {:ok, internal} <- InstanceActor.get_actor() do
           _ = undo_follow(internal.ap_id, relay.ap_id, internal)
           _ = Repo.delete(relay)
           {:ok, relay}

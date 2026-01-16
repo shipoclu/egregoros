@@ -3,7 +3,7 @@ defmodule EgregorosWeb.AdminControllerTest do
 
   import Mox
 
-  alias Egregoros.Federation.InternalFetchActor
+  alias Egregoros.Federation.InstanceActor
   alias Egregoros.InstanceSettings
   alias Egregoros.Relationships
   alias Egregoros.Relays
@@ -57,7 +57,7 @@ defmodule EgregorosWeb.AdminControllerTest do
   test "POST /admin/relays subscribes the internal actor to the relay", %{conn: conn} do
     {:ok, user} = Users.create_local_user("alice")
     {:ok, user} = Users.set_admin(user, true)
-    {:ok, internal} = InternalFetchActor.get_actor()
+    {:ok, internal} = InstanceActor.get_actor()
 
     relay_ap_id = "https://relay.example/actor"
     relay_inbox = "https://relay.example/inbox"
@@ -113,7 +113,7 @@ defmodule EgregorosWeb.AdminControllerTest do
   test "DELETE /admin/relays/:id unsubscribes the internal actor from the relay", %{conn: conn} do
     {:ok, user} = Users.create_local_user("alice")
     {:ok, user} = Users.set_admin(user, true)
-    {:ok, internal} = InternalFetchActor.get_actor()
+    {:ok, internal} = InstanceActor.get_actor()
 
     relay_ap_id = "https://relay.example/actor"
     relay_inbox = "https://relay.example/inbox"

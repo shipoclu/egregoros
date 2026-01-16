@@ -8,6 +8,7 @@ defmodule Egregoros.Activities.Reject do
   alias Egregoros.ActivityPub.ObjectValidators.Types.ObjectID
   alias Egregoros.ActivityPub.ObjectValidators.Types.Recipients
   alias Egregoros.Federation.Delivery
+  alias Egregoros.Federation.InstanceActor
   alias Egregoros.InboxTargeting
   alias Egregoros.Object
   alias Egregoros.Objects
@@ -123,16 +124,17 @@ defmodule Egregoros.Activities.Reject do
 
   defp maybe_unsubscribe_relay(follower_ap_id, relay_ap_id)
        when is_binary(follower_ap_id) and is_binary(relay_ap_id) do
-    case Users.get_by_ap_id(follower_ap_id) do
-      %User{local: true, nickname: "internal.fetch"} ->
-        if Relays.subscribed?(relay_ap_id) do
-          _ = Relays.delete_by_ap_id(relay_ap_id)
-        end
+    instance_actor_ap_id = InstanceActor.ap_id()
+    follower_ap_id = String.trim(follower_ap_id)
 
-        :ok
+    if follower_ap_id == instance_actor_ap_id do
+      if Relays.subscribed?(relay_ap_id) do
+        _ = Relays.delete_by_ap_id(relay_ap_id)
+      end
 
-      _ ->
-        :ok
+      :ok
+    else
+      :ok
     end
   end
 

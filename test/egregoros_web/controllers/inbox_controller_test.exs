@@ -290,6 +290,113 @@ defmodule EgregorosWeb.InboxControllerTest do
     refute Relationships.get_by_type_actor_object("Like", like["actor"], like["object"])
   end
 
+  test "POST /inbox ingests public activities for the instance actor", %{conn: conn} do
+    {public_key, private_key} = Egregoros.Keys.generate_rsa_keypair()
+
+    {:ok, _} =
+      Users.create_user(%{
+        nickname: "alice",
+        ap_id: "https://remote.example/users/alice",
+        inbox: "https://remote.example/users/alice/inbox",
+        outbox: "https://remote.example/users/alice/outbox",
+        public_key: public_key,
+        private_key: private_key,
+        local: false
+      })
+
+    like = %{
+      "id" => "https://remote.example/activities/like/instance-inbox-public",
+      "type" => "Like",
+      "actor" => "https://remote.example/users/alice",
+      "object" => "https://somewhere.example/objects/1",
+      "cc" => ["https://www.w3.org/ns/activitystreams#Public"]
+    }
+
+    conn =
+      conn
+      |> sign_request(
+        "post",
+        "/inbox",
+        private_key,
+        "https://remote.example/users/alice#main-key"
+      )
+      |> post("/inbox", like)
+
+    assert response(conn, 202)
+
+    args =
+      all_enqueued(worker: IngestActivity)
+      |> Enum.map(& &1.args)
+      |> Enum.find(fn
+        %{"activity" => %{"id" => "https://remote.example/activities/like/instance-inbox-public"}} ->
+          true
+
+        _ ->
+          false
+      end)
+
+    assert is_map(args)
+    refute Map.has_key?(args, "inbox_user_ap_id")
+
+    assert :ok = perform_job(IngestActivity, args)
+    assert Objects.get_by_ap_id(like["id"])
+  end
+
+  test "POST /inbox includes inbox_user_ap_id for non-public instance actor ingestion", %{
+    conn: conn
+  } do
+    {public_key, private_key} = Egregoros.Keys.generate_rsa_keypair()
+
+    {:ok, _} =
+      Users.create_user(%{
+        nickname: "alice",
+        ap_id: "https://remote.example/users/alice",
+        inbox: "https://remote.example/users/alice/inbox",
+        outbox: "https://remote.example/users/alice/outbox",
+        public_key: public_key,
+        private_key: private_key,
+        local: false
+      })
+
+    like = %{
+      "id" => "https://remote.example/activities/like/instance-inbox-non-public",
+      "type" => "Like",
+      "actor" => "https://remote.example/users/alice",
+      "object" => "https://remote.example/objects/unknown"
+    }
+
+    conn =
+      conn
+      |> sign_request(
+        "post",
+        "/inbox",
+        private_key,
+        "https://remote.example/users/alice#main-key"
+      )
+      |> post("/inbox", like)
+
+    assert response(conn, 202)
+
+    args =
+      all_enqueued(worker: IngestActivity)
+      |> Enum.map(& &1.args)
+      |> Enum.find(fn
+        %{
+          "activity" => %{
+            "id" => "https://remote.example/activities/like/instance-inbox-non-public"
+          }
+        } ->
+          true
+
+        _ ->
+          false
+      end)
+
+    assert is_map(args)
+    expected_instance_actor_ap_id = EgregorosWeb.Endpoint.url()
+    assert %{"inbox_user_ap_id" => ^expected_instance_actor_ap_id} = args
+  end
+
   test "POST /users/:nickname/inbox ingests public activities for the internal fetch actor", %{
     conn: conn
   } do

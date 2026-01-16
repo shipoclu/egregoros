@@ -30,7 +30,7 @@ defmodule Egregoros.Federation.SignedFetchTest do
                "headers=\"(request-target) host date digest content-length\""
              )
 
-      key_id = Endpoint.url() <> "/users/internal.fetch#main-key"
+      key_id = Endpoint.url() <> "#main-key"
       assert String.contains?(signature, "keyId=\"#{key_id}\"")
 
       assert {"authorization", "Signature " <> ^signature} =

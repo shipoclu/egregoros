@@ -1,6 +1,6 @@
 defmodule Egregoros.Federation.SignedFetch do
   alias Egregoros.Domain
-  alias Egregoros.Federation.InternalFetchActor
+  alias Egregoros.Federation.InstanceActor
   alias Egregoros.HTTP
   alias Egregoros.RateLimiter
   alias Egregoros.SafeURL
@@ -16,7 +16,7 @@ defmodule Egregoros.Federation.SignedFetch do
 
     with :ok <- SafeURL.validate_http_url(url),
          :ok <- rate_limit(url),
-         {:ok, actor} <- InternalFetchActor.get_actor(),
+         {:ok, actor} <- InstanceActor.get_actor(),
          {:ok, signed} <- HTTPSignature.sign_request(actor, "get", url, "", @signed_headers),
          {:ok, response} <- HTTP.get(url, headers(signed, accept, user_agent)) do
       {:ok, response}

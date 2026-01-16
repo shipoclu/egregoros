@@ -2,7 +2,7 @@ defmodule Egregoros.RelaysTest do
   use Egregoros.DataCase, async: true
 
   alias Egregoros.Activities.Follow
-  alias Egregoros.Federation.InternalFetchActor
+  alias Egregoros.Federation.InstanceActor
   alias Egregoros.Objects
   alias Egregoros.Pipeline
   alias Egregoros.Relay
@@ -49,7 +49,7 @@ defmodule Egregoros.RelaysTest do
   end
 
   test "unsubscribe/1 deletes the relay and undoes the follow relationship" do
-    {:ok, internal} = InternalFetchActor.get_actor()
+    {:ok, internal} = InstanceActor.get_actor()
 
     {:ok, relay_user} =
       Users.create_user(%{
@@ -96,7 +96,7 @@ defmodule Egregoros.RelaysTest do
   end
 
   test "incoming Reject of a relay follow removes the relay subscription" do
-    {:ok, internal} = InternalFetchActor.get_actor()
+    {:ok, internal} = InstanceActor.get_actor()
 
     {:ok, relay_user} =
       Users.create_user(%{
