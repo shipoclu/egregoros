@@ -17,6 +17,10 @@ defmodule EgregorosWeb.SafeMediaURLTest do
     assert SafeMediaURL.safe("//evil.example/x.png") == nil
   end
 
+  test "rejects empty urls" do
+    assert SafeMediaURL.safe("") == nil
+  end
+
   test "rejects non-http schemes" do
     assert SafeMediaURL.safe("javascript:alert(1)") == nil
     assert SafeMediaURL.safe("data:image/png;base64,AAAA") == nil
@@ -30,5 +34,9 @@ defmodule EgregorosWeb.SafeMediaURLTest do
   test "allows external http(s) urls with safe hostnames" do
     url = "https://example.com/media/1.png"
     assert SafeMediaURL.safe(url) == url
+  end
+
+  test "rejects localhost urls without an explicit port" do
+    assert SafeMediaURL.safe("http://localhost/uploads/media/1.png") == nil
   end
 end

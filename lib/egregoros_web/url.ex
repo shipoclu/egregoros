@@ -9,6 +9,8 @@ defmodule EgregorosWeb.URL do
     absolute(url, Endpoint.url())
   end
 
+  def absolute(_url), do: ""
+
   def absolute(nil, _base), do: nil
   def absolute("", _base), do: ""
 

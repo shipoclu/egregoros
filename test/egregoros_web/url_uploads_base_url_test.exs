@@ -29,4 +29,22 @@ defmodule EgregorosWeb.URLUploadsBaseURLTest do
                "https://i.example.com/uploads/avatars/1/avatar.png"
     end)
   end
+
+  test "absolute/1 returns the empty string for an empty string" do
+    assert URL.absolute("") == ""
+  end
+
+  test "absolute/2 returns the empty string for empty or whitespace-only strings" do
+    assert URL.absolute("", Endpoint.url()) == ""
+    assert URL.absolute("   ", Endpoint.url()) == ""
+  end
+
+  test "absolute/2 falls back to absolute/1 for invalid bases" do
+    assert URL.absolute("objects/123", "ftp://example.com") == Endpoint.url() <> "/objects/123"
+    assert URL.absolute("objects/123", :not_a_url) == Endpoint.url() <> "/objects/123"
+  end
+
+  test "absolute/2 falls back to absolute/1 for non-binary urls" do
+    assert URL.absolute(123, Endpoint.url()) == ""
+  end
 end

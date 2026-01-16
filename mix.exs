@@ -20,6 +20,7 @@ defmodule Egregoros.MixProject do
           Mix.Tasks.Egregoros.Actors.Refetch,
           Mix.Tasks.Egregoros.Bench.Seed,
           Mix.Tasks.Egregoros.Bench.Run,
+          Mix.Tasks.Egregoros.Bench.Explain,
           Egregoros.Bench.Seed
         ]
       ],
