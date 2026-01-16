@@ -42,4 +42,5 @@ npm-debug.log
 .DS_Store
 
 # Local env files
-.env
+.env*
+!.env.example
