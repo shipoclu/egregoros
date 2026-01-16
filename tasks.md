@@ -36,7 +36,7 @@ Notes:
 
 ## Mastodon API compatibility
 
-- [ ] Fill out remaining Mastodon API gaps that clients expect:
+- [x] Fill out remaining Mastodon API gaps that clients expect:
   - [x] `GET /api/v1/conversations` (currently returns `[]`)
   - [x] `GET /api/v1/favourites` (was stubbed)
   - [x] `GET /api/v1/bookmarks` (was stubbed)
