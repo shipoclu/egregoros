@@ -39,6 +39,7 @@ defmodule EgregorosWeb.ConnCase do
     Mox.stub_with(Egregoros.HTTP.Mock, Egregoros.HTTP.Stub)
     Mox.stub_with(Egregoros.DNS.Mock, Egregoros.DNS.Stub)
     Mox.stub_with(Egregoros.AuthZ.Mock, Egregoros.AuthZ.Stub)
+    Egregoros.Config.put_impl(Egregoros.Config.Mock)
     Mox.stub_with(Egregoros.Config.Mock, Egregoros.Config.Stub)
     Mox.stub_with(Egregoros.RateLimiter.Mock, Egregoros.RateLimiter.Stub)
     Mox.stub_with(EgregorosWeb.WebSock.Mock, EgregorosWeb.WebSock.Stub)

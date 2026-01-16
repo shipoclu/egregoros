@@ -10,6 +10,6 @@ defmodule Egregoros.RateLimiter do
   def allow?(_bucket, _key, _limit, _interval_ms), do: :ok
 
   defp impl do
-    Application.get_env(:egregoros, __MODULE__, Egregoros.RateLimiter.ETS)
+    Egregoros.Config.get(__MODULE__, Egregoros.RateLimiter.ETS)
   end
 end

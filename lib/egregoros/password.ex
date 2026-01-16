@@ -38,6 +38,6 @@ defmodule Egregoros.Password do
   end
 
   defp iterations do
-    Application.get_env(:egregoros, :password_iterations, 200_000)
+    Egregoros.Config.get(:password_iterations, 200_000)
   end
 end

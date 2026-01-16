@@ -7,6 +7,6 @@ defmodule Egregoros.BannerStorage do
   end
 
   defp impl do
-    Application.get_env(:egregoros, __MODULE__, Egregoros.BannerStorage.Local)
+    Egregoros.Config.get(__MODULE__, Egregoros.BannerStorage.Local)
   end
 end

@@ -7,7 +7,7 @@ defmodule Egregoros.DNS.Cached do
 
   @impl true
   def lookup_ips(host) when is_binary(host) do
-    opts = Application.get_env(:egregoros, __MODULE__, [])
+    opts = Egregoros.Config.get(__MODULE__, [])
 
     lookup_ips(host,
       ttl_ms: Keyword.get(opts, :ttl_ms, @default_ttl_ms),

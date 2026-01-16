@@ -55,11 +55,7 @@ defmodule Egregoros.OAuth do
     if redirect_uri_allowed?(application, redirect_uri) do
       if Scopes.subset?(scopes, application.scopes) do
         ttl_seconds =
-          Elixir.Application.get_env(
-            :egregoros,
-            :oauth_code_ttl_seconds,
-            @default_code_ttl_seconds
-          )
+          Egregoros.Config.get(:oauth_code_ttl_seconds, @default_code_ttl_seconds)
 
         expires_at = DateTime.add(DateTime.utc_now(), ttl_seconds, :second)
 
@@ -412,19 +408,11 @@ defmodule Egregoros.OAuth do
   defp revoke_token_record_for_token(_application_id, _token), do: :ok
 
   defp access_token_ttl_seconds do
-    Application.get_env(
-      :egregoros,
-      :oauth_access_token_ttl_seconds,
-      @default_access_token_ttl_seconds
-    )
+    Egregoros.Config.get(:oauth_access_token_ttl_seconds, @default_access_token_ttl_seconds)
   end
 
   defp refresh_token_ttl_seconds do
-    Application.get_env(
-      :egregoros,
-      :oauth_refresh_token_ttl_seconds,
-      @default_refresh_token_ttl_seconds
-    )
+    Egregoros.Config.get(:oauth_refresh_token_ttl_seconds, @default_refresh_token_ttl_seconds)
   end
 
   defp parse_redirect_uris(nil), do: []

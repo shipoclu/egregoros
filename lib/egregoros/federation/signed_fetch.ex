@@ -42,7 +42,7 @@ defmodule Egregoros.Federation.SignedFetch do
   end
 
   defp rate_limit(url) when is_binary(url) do
-    opts = Application.get_env(:egregoros, :rate_limit_signed_fetch, [])
+    opts = Egregoros.Config.get(:rate_limit_signed_fetch, [])
     limit = opts |> Keyword.get(:limit, 200) |> normalize_limit(200)
     interval_ms = opts |> Keyword.get(:interval_ms, 10_000) |> normalize_interval_ms(10_000)
     key = url |> URI.parse() |> Domain.from_uri()

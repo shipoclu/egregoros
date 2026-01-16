@@ -8,6 +8,6 @@ defmodule Egregoros.DNS do
   end
 
   defp impl do
-    Application.get_env(:egregoros, __MODULE__, Egregoros.DNS.Inet)
+    Egregoros.Config.get(__MODULE__, Egregoros.DNS.Inet)
   end
 end

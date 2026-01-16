@@ -9,7 +9,7 @@ defmodule Egregoros.Deployment do
 
   @spec bootstrap() :: :ok
   def bootstrap do
-    nickname = Application.get_env(:egregoros, :bootstrap_admin_nickname)
+    nickname = Egregoros.Config.get(:bootstrap_admin_nickname)
 
     case bootstrap_admin(nickname) do
       :ok ->

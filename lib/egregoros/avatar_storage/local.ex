@@ -32,7 +32,7 @@ defmodule Egregoros.AvatarStorage.Local do
 
     default = Path.join([priv_dir, "static", "uploads"])
 
-    Application.get_env(:egregoros, :uploads_dir, default)
+    Egregoros.Config.get(:uploads_dir, default)
   end
 
   defp validate_size(%Plug.Upload{path: path}) when is_binary(path) do

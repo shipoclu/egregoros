@@ -12,7 +12,7 @@ defmodule Egregoros.Application do
       Egregoros.Repo,
       Egregoros.RateLimiter.ETS,
       {Oban, Application.fetch_env!(:egregoros, Oban)},
-      {DNSCluster, query: Application.get_env(:egregoros, :dns_cluster_query) || :ignore},
+      {DNSCluster, query: Egregoros.Config.get(:dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Egregoros.PubSub},
       # Start a worker by calling: Egregoros.Worker.start_link(arg)
       # {Egregoros.Worker, arg},

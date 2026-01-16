@@ -6,6 +6,6 @@ defmodule Egregoros.Auth do
   end
 
   defp impl do
-    Application.get_env(:egregoros, __MODULE__, Egregoros.Auth.Default)
+    Egregoros.Config.get(__MODULE__, Egregoros.Auth.Default)
   end
 end

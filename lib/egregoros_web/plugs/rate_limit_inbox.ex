@@ -25,7 +25,7 @@ defmodule EgregorosWeb.Plugs.RateLimitInbox do
   end
 
   defp limits do
-    opts = Application.get_env(:egregoros, :rate_limit_inbox, [])
+    opts = Egregoros.Config.get(:rate_limit_inbox, [])
 
     limit =
       case Keyword.get(opts, :limit, @default_limit) do

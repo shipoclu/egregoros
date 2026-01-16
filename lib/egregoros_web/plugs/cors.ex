@@ -10,7 +10,7 @@ defmodule EgregorosWeb.Plugs.CORS do
   @default_max_age 86_400
 
   def init(opts) do
-    config = Application.get_env(:egregoros, __MODULE__, [])
+    config = Egregoros.Config.get(__MODULE__, [])
 
     opts
     |> Keyword.merge(config)

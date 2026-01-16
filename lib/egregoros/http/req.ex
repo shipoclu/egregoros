@@ -6,11 +6,11 @@ defmodule Egregoros.HTTP.Req do
   @default_max_response_bytes 1_000_000
 
   defp req_options do
-    Application.get_env(:egregoros, :req_options, @default_req_options)
+    Egregoros.Config.get(:req_options, @default_req_options)
   end
 
   defp max_response_bytes do
-    Application.get_env(:egregoros, :http_max_response_bytes, @default_max_response_bytes)
+    Egregoros.Config.get(:http_max_response_bytes, @default_max_response_bytes)
   end
 
   defp limited_into_fun(max_bytes) when is_integer(max_bytes) and max_bytes > 0 do

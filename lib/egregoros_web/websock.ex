@@ -6,6 +6,6 @@ defmodule EgregorosWeb.WebSock do
   end
 
   defp impl do
-    Application.get_env(:egregoros, __MODULE__, EgregorosWeb.WebSockAdapter)
+    Egregoros.Config.get(__MODULE__, EgregorosWeb.WebSockAdapter)
   end
 end
