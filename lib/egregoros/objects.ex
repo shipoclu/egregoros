@@ -867,22 +867,9 @@ defmodule Egregoros.Objects do
       %{}
     else
       from(o in Object,
-        where: o.type == "Note",
-        where:
-          fragment(
-            "coalesce(?->>'inReplyTo', ?->'inReplyTo'->>'id')",
-            o.data,
-            o.data
-          ) in ^parent_ap_ids,
-        group_by:
-          fragment(
-            "coalesce(?->>'inReplyTo', ?->'inReplyTo'->>'id')",
-            o.data,
-            o.data
-          ),
-        select:
-          {fragment("coalesce(?->>'inReplyTo', ?->'inReplyTo'->>'id')", o.data, o.data),
-           count(o.id)}
+        where: o.type == "Note" and o.in_reply_to_ap_id in ^parent_ap_ids,
+        group_by: o.in_reply_to_ap_id,
+        select: {o.in_reply_to_ap_id, count(o.id)}
       )
       |> Repo.all()
       |> Map.new()
@@ -986,9 +973,7 @@ defmodule Egregoros.Objects do
     limit = opts |> Keyword.get(:limit, 20) |> normalize_limit()
 
     from(o in Object,
-      where:
-        o.type == "Note" and
-          fragment("?->>'inReplyTo' = ?", o.data, ^object_ap_id),
+      where: o.type == "Note" and o.in_reply_to_ap_id == ^object_ap_id,
       order_by: [asc: o.id],
       limit: ^limit
     )

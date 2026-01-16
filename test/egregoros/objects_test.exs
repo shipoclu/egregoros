@@ -1154,7 +1154,9 @@ defmodule Egregoros.ObjectsTest do
                }
              })
 
-    assert Enum.any?(Objects.list_replies_to(root.ap_id), &(&1.id == reply_string.id))
+    replies = Objects.list_replies_to(root.ap_id)
+    assert Enum.any?(replies, &(&1.id == reply.id))
+    assert Enum.any?(replies, &(&1.id == reply_string.id))
     assert Objects.thread_ancestors(nil, 10) == []
     assert Objects.thread_descendants(nil, 10) == []
   end
