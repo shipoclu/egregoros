@@ -1009,6 +1009,9 @@ defmodule Egregoros.ObjectsTest do
                }
              })
 
+    assert media_note.has_media == true
+    assert no_media_note.has_media == false
+
     media_only = Objects.list_public_statuses(only_media: true)
 
     assert Enum.any?(media_only, &(&1.id == media_note.id))

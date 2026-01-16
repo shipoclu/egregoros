@@ -440,18 +440,8 @@ defmodule Egregoros.Objects do
   defp maybe_where_only_media_with_reblog(query, true) do
     from([o, reblog] in query,
       where:
-        (o.type == "Note" and
-           fragment(
-             "jsonb_typeof(?->'attachment') = 'array' AND jsonb_array_length(?->'attachment') > 0",
-             o.data,
-             o.data
-           )) or
-          (o.type == "Announce" and
-             fragment(
-               "jsonb_typeof(?->'attachment') = 'array' AND jsonb_array_length(?->'attachment') > 0",
-               reblog.data,
-               reblog.data
-             ))
+        (o.type == "Note" and o.has_media == true) or
+          (o.type == "Announce" and reblog.has_media == true)
     )
   end
 

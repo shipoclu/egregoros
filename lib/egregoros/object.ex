@@ -12,6 +12,7 @@ defmodule Egregoros.Object do
     field :actor, :string
     field :object, :string
     field :in_reply_to_ap_id, :string
+    field :has_media, :boolean, default: false
     field :data, :map
     field :published, :utc_datetime_usec
     field :local, :boolean, default: true
@@ -25,6 +26,7 @@ defmodule Egregoros.Object do
     |> cast(attrs, @required_fields ++ @optional_fields)
     |> validate_required(@required_fields)
     |> put_in_reply_to_ap_id()
+    |> put_has_media()
     |> unique_constraint(:ap_id)
   end
 
@@ -49,4 +51,19 @@ defmodule Egregoros.Object do
   defp normalize_in_reply_to_ap_id(value) when is_binary(value), do: value
   defp normalize_in_reply_to_ap_id(%{"id" => id}) when is_binary(id), do: id
   defp normalize_in_reply_to_ap_id(_), do: nil
+
+  defp put_has_media(%Ecto.Changeset{} = changeset) do
+    type = get_field(changeset, :type)
+
+    has_media =
+      changeset
+      |> get_field(:data)
+      |> case do
+        %{"attachment" => attachment} when is_list(attachment) -> attachment != []
+        %{attachment: attachment} when is_list(attachment) -> attachment != []
+        _ -> false
+      end
+
+    put_change(changeset, :has_media, type == "Note" and has_media)
+  end
 end

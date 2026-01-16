@@ -315,6 +315,7 @@ defmodule Egregoros.PerformanceRegressionsTest do
           "objects_object_index",
           "objects_type_object_id_index",
           "objects_in_reply_to_ap_id_id_index",
+          "objects_note_has_media_id_index",
           "relationships_object_type_index",
           "users_nickname_trgm_index",
           "users_name_trgm_index",
