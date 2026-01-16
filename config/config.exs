@@ -20,6 +20,7 @@ config :egregoros, Oban,
   ],
   plugins: [{Oban.Plugins.Pruner, max_age: 60 * 60 * 24}]
 
+config :egregoros, Egregoros.Config, Egregoros.Config.Application
 config :egregoros, Egregoros.Signature, Egregoros.Signature.HTTP
 config :egregoros, Egregoros.Auth, Egregoros.Auth.BearerToken
 config :egregoros, Egregoros.AuthZ, Egregoros.AuthZ.OAuthScopes

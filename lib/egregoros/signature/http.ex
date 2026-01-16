@@ -1,6 +1,7 @@
 defmodule Egregoros.Signature.HTTP do
   @behaviour Egregoros.Signature
 
+  alias Egregoros.Config
   alias Egregoros.HTTPDate
   alias Egregoros.User
   alias Egregoros.Users
@@ -318,11 +319,11 @@ defmodule Egregoros.Signature.HTTP do
   end
 
   defp max_skew_seconds do
-    Application.get_env(:egregoros, :signature_skew_seconds, 300)
+    Config.get(:signature_skew_seconds, 300)
   end
 
   defp validate_required_signature_headers(headers_param, method) when is_list(headers_param) do
-    if Application.get_env(:egregoros, :signature_strict, false) do
+    if Config.get(:signature_strict, false) do
       headers_param = normalize_header_names(headers_param)
 
       request_target_header? =

@@ -1,15 +1,14 @@
 defmodule Egregoros.Signature.HTTPStrictTest do
-  use Egregoros.DataCase, async: false
+  use Egregoros.DataCase, async: true
 
   alias Egregoros.Keys
   alias Egregoros.Signature.HTTP
   alias Egregoros.Users
 
   setup do
-    previous = Application.get_env(:egregoros, :signature_strict, false)
-
-    on_exit(fn ->
-      Application.put_env(:egregoros, :signature_strict, previous)
+    stub(Egregoros.Config.Mock, :get, fn
+      :signature_strict, _default -> true
+      key, default -> Egregoros.Config.Stub.get(key, default)
     end)
 
     :ok
@@ -34,8 +33,6 @@ defmodule Egregoros.Signature.HTTPStrictTest do
   end
 
   test "strict mode rejects POST signatures missing recommended headers" do
-    Application.put_env(:egregoros, :signature_strict, true)
-
     {public_key, private_key} = Keys.generate_rsa_keypair()
 
     {:ok, user} =
@@ -61,8 +58,6 @@ defmodule Egregoros.Signature.HTTPStrictTest do
   end
 
   test "strict mode accepts POST signatures including recommended headers" do
-    Application.put_env(:egregoros, :signature_strict, true)
-
     {public_key, private_key} = Keys.generate_rsa_keypair()
 
     {:ok, user} =

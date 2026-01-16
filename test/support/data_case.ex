@@ -35,6 +35,7 @@ defmodule Egregoros.DataCase do
     Mox.stub_with(Egregoros.HTTP.Mock, Egregoros.HTTP.Stub)
     Mox.stub_with(Egregoros.DNS.Mock, Egregoros.DNS.Stub)
     Mox.stub_with(Egregoros.AuthZ.Mock, Egregoros.AuthZ.Stub)
+    Mox.stub_with(Egregoros.Config.Mock, Egregoros.Config.Stub)
     Mox.stub_with(Egregoros.RateLimiter.Mock, Egregoros.RateLimiter.Stub)
     Mox.stub_with(EgregorosWeb.WebSock.Mock, EgregorosWeb.WebSock.Stub)
     Mox.verify_on_exit!(tags)

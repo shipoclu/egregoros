@@ -67,6 +67,7 @@ config :egregoros, Egregoros.Discovery, Egregoros.Discovery.Mock
 config :egregoros, Egregoros.HTTP, Egregoros.HTTP.Mock
 config :egregoros, Egregoros.DNS, Egregoros.DNS.Mock
 config :egregoros, Egregoros.AuthZ, Egregoros.AuthZ.Mock
+config :egregoros, Egregoros.Config, Egregoros.Config.Mock
 config :egregoros, Egregoros.AvatarStorage, Egregoros.AvatarStorage.Mock
 config :egregoros, Egregoros.BannerStorage, Egregoros.BannerStorage.Mock
 config :egregoros, Egregoros.MediaStorage, Egregoros.MediaStorage.Mock
