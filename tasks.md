@@ -49,10 +49,12 @@ Notes:
 - [x] Benchmark suite: realistic seed + perf probes for timelines, thread views, search, ingestion bursts (see `BENCHMARKS.md`).
 - [ ] Keep caching behind behaviours so backends can be swapped (ETS → Redis, etc.).
 - [ ] **Timeline read-path performance follow-ups** (from `perfomance_audit.md` + `perfomance_addendum_by_claude.md`)
-  - [ ] Define budgets (p95, query count) and collect baselines (`EXPLAIN (ANALYZE, BUFFERS)`) for:
-    - [ ] `Objects.list_home_statuses/2` for (a) no follows, (b) dormant follows.
-    - [ ] Tag timeline + `only_media=true`.
-    - [ ] `Objects.count_note_replies_by_parent_ap_ids/1` on a page-sized parent set.
+  - [x] Collect baselines (`EXPLAIN (ANALYZE, BUFFERS)`) and record snapshots in `perf/` for:
+    - [x] `Objects.list_home_statuses/2` for (a) no follows, (b) dormant follows.
+    - [x] Tag timeline + `only_media=true`.
+    - [x] `Objects.count_note_replies_by_parent_ap_ids/1` on a page-sized parent set.
+  - [x] Enforce query-count budgets for the cases above (CI).
+  - [ ] Define p95 budgets / SLOs for the cases above (CI enforcement may be flaky; consider “watch” thresholds in `perf/`).
   - [x] Bench suite: add cases that reproduce the edge scenarios above (especially sparse home timelines).
   - [x] LiveView timelines: remove N+1 patterns in `EgregorosWeb.ViewModels.Status.decorate_many/2` + `EgregorosWeb.ViewModels.Actor.card/1` (batch context like `MastodonAPI.StatusRenderer.rendering_context/2`).
   - [x] Mastodon notifications: batch `NotificationRenderer` (accounts + statuses) and avoid per-item `StatusRenderer.render_status/2`.

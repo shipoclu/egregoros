@@ -65,4 +65,9 @@ jobs:
       - name: Run tests
         env:
           MIX_ENV: test
-        run: mix test
+        run: mix test --exclude performance_budget
+
+      - name: Run performance budgets
+        env:
+          MIX_ENV: test
+        run: mix test --only performance_budget
