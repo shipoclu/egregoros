@@ -125,6 +125,28 @@ ActivityPub IDs and API URLs are generated from the configured endpoint URL. To 
 
 These are read in `config/runtime.exs`.
 
+### HTTP signature strictness (optional)
+
+By default, Egregoros verifies HTTP signatures in a compatibility-focused way (e.g. allowing signatures that only
+cover `(request-target)` + `date`).
+
+For hardened deployments you can enable **strict** mode, which requires the signature to cover:
+
+- `(request-target)` (or `@request-target`)
+- `host` + `date`
+- and for `POST`/`PUT`/`PATCH`: also `digest` + `content-length`
+
+Enable it in `config/runtime.exs` or `config/prod.exs`:
+
+```elixir
+config :egregoros, :signature_strict, true
+
+# Optional: max allowed clock skew for the signed Date header, in seconds (default: 300)
+config :egregoros, :signature_skew_seconds, 300
+```
+
+Note: strict mode can break federation with servers that sign fewer headers.
+
 ### Tests
 
 ```sh
