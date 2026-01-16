@@ -54,8 +54,8 @@ Notes:
     - [ ] Tag timeline + `only_media=true`.
     - [ ] `Objects.count_note_replies_by_parent_ap_ids/1` on a page-sized parent set.
   - [ ] Bench suite: add cases that reproduce the edge scenarios above (especially sparse home timelines).
-  - [ ] LiveView timelines: remove N+1 patterns in `EgregorosWeb.ViewModels.Status.decorate_many/2` + `EgregorosWeb.ViewModels.Actor.card/1` (batch context like `MastodonAPI.StatusRenderer.rendering_context/2`).
-  - [ ] Mastodon notifications: batch `NotificationRenderer` (accounts + statuses) and avoid per-item `StatusRenderer.render_status/2`.
+  - [x] LiveView timelines: remove N+1 patterns in `EgregorosWeb.ViewModels.Status.decorate_many/2` + `EgregorosWeb.ViewModels.Actor.card/1` (batch context like `MastodonAPI.StatusRenderer.rendering_context/2`).
+  - [x] Mastodon notifications: batch `NotificationRenderer` (accounts + statuses) and avoid per-item `StatusRenderer.render_status/2`.
   - [x] Add missing DB index support for notification patterns: index `objects.object` (and a composite such as `(type, object, id)` if plans need it).
   - [x] Rewrite hashtag predicate to hit the existing `objects_status_data_path_ops_index` (prefer `data @> %{"tag" => [...]}` over `data->'tag'` expressions).
   - [x] Home timeline query: split into actor-driven + addressed-to-me branches and merge (e.g. `UNION ALL` + outer `ORDER BY id DESC LIMIT ?`), with a fast-path for “no follows”.
