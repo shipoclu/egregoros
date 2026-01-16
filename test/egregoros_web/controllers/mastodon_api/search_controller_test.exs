@@ -164,6 +164,17 @@ defmodule EgregorosWeb.MastodonAPI.SearchControllerTest do
     assert Enum.any?(response["statuses"], &(&1["content"] == "<p>Hello from search</p>"))
   end
 
+  test "GET /api/v2/search returns matching hashtags", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("local")
+    assert {:ok, _} = Publish.post_note(user, "Hello #linux #Linux")
+
+    conn = get(conn, "/api/v2/search", %{"q" => "lin"})
+    response = json_response(conn, 200)
+
+    assert is_list(response["hashtags"])
+    assert Enum.any?(response["hashtags"], &(&1["name"] == "linux"))
+  end
+
   test "GET /api/v2/search does not leak direct statuses and returns them for recipients", %{
     conn: conn
   } do
