@@ -20,10 +20,9 @@ defmodule Egregoros.Bench.Seed do
       end
 
       now_usec = DateTime.utc_now() |> DateTime.truncate(:microsecond)
-      now_sec = DateTime.truncate(now_usec, :second)
 
       {local_users, remote_users} = insert_users(now_usec, opts)
-      follows = insert_follow_relationships(now_sec, local_users, remote_users, opts)
+      follows = insert_follow_relationships(now_usec, local_users, remote_users, opts)
       notes = insert_notes(now_usec, local_users, remote_users, opts)
 
       %{

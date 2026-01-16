@@ -67,4 +67,22 @@ defmodule Egregoros.Bench.SeedTest do
 
     assert summary.objects.notes == notes
   end
+
+  test "seed!/1 supports follow relationship seeding" do
+    summary =
+      Seed.seed!(
+        local_users: 1,
+        remote_users: 10,
+        days: 1,
+        posts_per_day: 1,
+        follows_per_user: 5,
+        reset?: true,
+        seed: 123
+      )
+
+    assert summary.users.local == 3
+    assert summary.users.remote == 10
+    assert summary.objects.notes == 1
+    assert summary.relationships.follows > 0
+  end
 end
