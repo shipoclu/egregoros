@@ -28,7 +28,7 @@ defmodule EgregorosWeb.MediaViewer do
       aria-hidden={if @open, do: "false", else: "true"}
       phx-hook="MediaViewer"
       class={[
-        "fixed inset-0 z-50 flex items-center justify-center bg-[color:var(--text-primary)]/80 p-4",
+        "fixed inset-0 z-50 flex items-center justify-center bg-[color:var(--text-primary)]/80 dark:bg-black/90 p-4",
         !@open && "hidden"
       ]}
     >
