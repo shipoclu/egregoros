@@ -200,16 +200,29 @@ defmodule Egregoros.Objects do
       since_id = Keyword.get(opts, :since_id)
       tag_name = "#" <> tag
 
-      from(o in Object,
-        where: o.type == "Note",
-        order_by: [desc: o.id],
-        limit: ^limit
+      :telemetry.span(
+        [:egregoros, :timeline, :read],
+        %{name: :list_notes_by_hashtag, limit: limit},
+        fn ->
+          query =
+            from(o in Object,
+              where: o.type == "Note",
+              order_by: [desc: o.id],
+              limit: ^limit
+            )
+            |> where_publicly_visible()
+            |> where_hashtag_tag(tag_name)
+            |> maybe_where_max_id(max_id)
+            |> maybe_where_since_id(since_id)
+
+          objects =
+            Repo.all(query,
+              telemetry_options: [feature: :timeline, name: :list_notes_by_hashtag]
+            )
+
+          {objects, %{count: length(objects), name: :list_notes_by_hashtag}}
+        end
       )
-      |> where_publicly_visible()
-      |> where_hashtag_tag(tag_name)
-      |> maybe_where_max_id(max_id)
-      |> maybe_where_since_id(since_id)
-      |> Repo.all()
     end
   end
 
@@ -327,18 +340,37 @@ defmodule Egregoros.Objects do
     remote_only? = Keyword.get(opts, :remote, false) == true
     only_media? = Keyword.get(opts, :only_media, false) == true
 
-    from(o in Object,
-      where: o.type in ^@status_types,
-      order_by: [desc: o.id],
-      limit: ^limit
+    :telemetry.span(
+      [:egregoros, :timeline, :read],
+      %{
+        name: :list_public_statuses,
+        local_only?: local_only?,
+        remote_only?: remote_only?,
+        only_media?: only_media?,
+        limit: limit
+      },
+      fn ->
+        query =
+          from(o in Object,
+            where: o.type in ^@status_types,
+            order_by: [desc: o.id],
+            limit: ^limit
+          )
+          |> where_announces_have_object()
+          |> where_publicly_listed()
+          |> maybe_where_origin(local_only?, remote_only?)
+          |> maybe_where_only_media_with_reblog(only_media?)
+          |> maybe_where_max_id(max_id)
+          |> maybe_where_since_id(since_id)
+
+        objects =
+          Repo.all(query,
+            telemetry_options: [feature: :timeline, name: :list_public_statuses]
+          )
+
+        {objects, %{count: length(objects), name: :list_public_statuses}}
+      end
     )
-    |> where_announces_have_object()
-    |> where_publicly_listed()
-    |> maybe_where_origin(local_only?, remote_only?)
-    |> maybe_where_only_media_with_reblog(only_media?)
-    |> maybe_where_max_id(max_id)
-    |> maybe_where_since_id(since_id)
-    |> Repo.all()
   end
 
   def list_public_statuses_by_hashtag(tag, opts \\ [])
@@ -361,19 +393,38 @@ defmodule Egregoros.Objects do
       only_media? = Keyword.get(opts, :only_media, false) == true
       tag_name = "#" <> tag
 
-      from(o in Object,
-        where: o.type in ^@status_types,
-        order_by: [desc: o.id],
-        limit: ^limit
+      :telemetry.span(
+        [:egregoros, :timeline, :read],
+        %{
+          name: :list_public_statuses_by_hashtag,
+          local_only?: local_only?,
+          remote_only?: remote_only?,
+          only_media?: only_media?,
+          limit: limit
+        },
+        fn ->
+          query =
+            from(o in Object,
+              where: o.type in ^@status_types,
+              order_by: [desc: o.id],
+              limit: ^limit
+            )
+            |> where_announces_have_object()
+            |> where_publicly_listed()
+            |> where_hashtag_tag_with_reblog(tag_name)
+            |> maybe_where_origin(local_only?, remote_only?)
+            |> maybe_where_only_media_with_reblog(only_media?)
+            |> maybe_where_max_id(max_id)
+            |> maybe_where_since_id(since_id)
+
+          objects =
+            Repo.all(query,
+              telemetry_options: [feature: :timeline, name: :list_public_statuses_by_hashtag]
+            )
+
+          {objects, %{count: length(objects), name: :list_public_statuses_by_hashtag}}
+        end
       )
-      |> where_announces_have_object()
-      |> where_publicly_listed()
-      |> where_hashtag_tag_with_reblog(tag_name)
-      |> maybe_where_origin(local_only?, remote_only?)
-      |> maybe_where_only_media_with_reblog(only_media?)
-      |> maybe_where_max_id(max_id)
-      |> maybe_where_since_id(since_id)
-      |> Repo.all()
     end
   end
 
@@ -588,64 +639,77 @@ defmodule Egregoros.Objects do
     max_id = Keyword.get(opts, :max_id)
     since_id = Keyword.get(opts, :since_id)
 
-    ignored_actor_subquery =
-      from(r in Relationship,
-        where: r.actor == ^actor_ap_id and r.type in ["Block", "Mute"],
-        select: r.object
-      )
+    :telemetry.span(
+      [:egregoros, :timeline, :read],
+      %{name: :list_home_statuses, limit: limit},
+      fn ->
+        ignored_actor_subquery =
+          from(r in Relationship,
+            where: r.actor == ^actor_ap_id and r.type in ["Block", "Mute"],
+            select: r.object
+          )
 
-    followed_subquery =
-      from(r in Relationship,
-        where: r.type == "Follow" and r.actor == ^actor_ap_id,
-        select: r.object
-      )
+        followed_subquery =
+          from(r in Relationship,
+            where: r.type == "Follow" and r.actor == ^actor_ap_id,
+            select: r.object
+          )
 
-    base_query =
-      from(o in Object,
-        where: o.type in ^@status_types and o.actor not in subquery(ignored_actor_subquery)
-      )
-      |> where_announces_have_object()
+        base_query =
+          from(o in Object,
+            where: o.type in ^@status_types and o.actor not in subquery(ignored_actor_subquery)
+          )
+          |> where_announces_have_object()
 
-    actor_query =
-      from([o, _reblog] in base_query,
-        where: o.actor == ^actor_ap_id or o.actor in subquery(followed_subquery)
-      )
-      |> where_visible_to_home(actor_ap_id)
+        actor_query =
+          from([o, _reblog] in base_query,
+            where: o.actor == ^actor_ap_id or o.actor in subquery(followed_subquery)
+          )
+          |> where_visible_to_home(actor_ap_id)
 
-    addressed_query =
-      from([o, _reblog] in base_query,
-        where:
-          o.actor != ^actor_ap_id and
-            o.actor not in subquery(followed_subquery) and
-            (fragment("? @> ?", o.data, ^%{"to" => [actor_ap_id]}) or
-               fragment("? @> ?", o.data, ^%{"cc" => [actor_ap_id]}) or
-               fragment("? @> ?", o.data, ^%{"bto" => [actor_ap_id]}) or
-               fragment("? @> ?", o.data, ^%{"bcc" => [actor_ap_id]}) or
-               fragment("? @> ?", o.data, ^%{"audience" => [actor_ap_id]}))
-      )
+        addressed_query =
+          from([o, _reblog] in base_query,
+            where:
+              o.actor != ^actor_ap_id and
+                o.actor not in subquery(followed_subquery) and
+                (fragment("? @> ?", o.data, ^%{"to" => [actor_ap_id]}) or
+                   fragment("? @> ?", o.data, ^%{"cc" => [actor_ap_id]}) or
+                   fragment("? @> ?", o.data, ^%{"bto" => [actor_ap_id]}) or
+                   fragment("? @> ?", o.data, ^%{"bcc" => [actor_ap_id]}) or
+                   fragment("? @> ?", o.data, ^%{"audience" => [actor_ap_id]}))
+          )
 
-    actor_query =
-      actor_query
-      |> maybe_where_max_id(max_id)
-      |> maybe_where_since_id(since_id)
+        actor_query =
+          actor_query
+          |> maybe_where_max_id(max_id)
+          |> maybe_where_since_id(since_id)
 
-    addressed_query =
-      addressed_query
-      |> maybe_where_max_id(max_id)
-      |> maybe_where_since_id(since_id)
+        addressed_query =
+          addressed_query
+          |> maybe_where_max_id(max_id)
+          |> maybe_where_since_id(since_id)
 
-    actor_ids = from([o, _reblog] in actor_query, select: %{id: o.id})
-    addressed_ids = from([o, _reblog] in addressed_query, select: %{id: o.id})
+        actor_ids = from([o, _reblog] in actor_query, select: %{id: o.id})
+        addressed_ids = from([o, _reblog] in addressed_query, select: %{id: o.id})
 
-    ids_query = Ecto.Query.union_all(actor_ids, ^addressed_ids)
+        ids_query = Ecto.Query.union_all(actor_ids, ^addressed_ids)
 
-    from(o in Object,
-      join: ids in subquery(ids_query),
-      on: o.id == ids.id,
-      order_by: [desc: o.id],
-      limit: ^limit
+        query =
+          from(o in Object,
+            join: ids in subquery(ids_query),
+            on: o.id == ids.id,
+            order_by: [desc: o.id],
+            limit: ^limit
+          )
+
+        objects =
+          Repo.all(query,
+            telemetry_options: [feature: :timeline, name: :list_home_statuses]
+          )
+
+        {objects, %{count: length(objects), name: :list_home_statuses}}
+      end
     )
-    |> Repo.all()
   end
 
   defp where_visible_to_home(query, user_ap_id) when is_binary(user_ap_id) do
@@ -766,16 +830,29 @@ defmodule Egregoros.Objects do
         _ -> nil
       end
 
-    from(o in Object,
-      where: o.type in ^@status_types and o.actor == ^actor,
-      order_by: [desc: o.id],
-      limit: ^limit
+    :telemetry.span(
+      [:egregoros, :timeline, :read],
+      %{name: :list_visible_statuses_by_actor, limit: limit},
+      fn ->
+        query =
+          from(o in Object,
+            where: o.type in ^@status_types and o.actor == ^actor,
+            order_by: [desc: o.id],
+            limit: ^limit
+          )
+          |> where_announces_have_object()
+          |> where_visible_on_profile(actor, viewer_ap_id)
+          |> maybe_where_max_id(max_id)
+          |> maybe_where_since_id(since_id)
+
+        objects =
+          Repo.all(query,
+            telemetry_options: [feature: :timeline, name: :list_visible_statuses_by_actor]
+          )
+
+        {objects, %{count: length(objects), name: :list_visible_statuses_by_actor}}
+      end
     )
-    |> where_announces_have_object()
-    |> where_visible_on_profile(actor, viewer_ap_id)
-    |> maybe_where_max_id(max_id)
-    |> maybe_where_since_id(since_id)
-    |> Repo.all()
   end
 
   def list_visible_statuses_by_actor(_actor, _viewer, _opts), do: []

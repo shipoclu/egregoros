@@ -28,47 +28,61 @@ defmodule Egregoros.Notifications do
     since_id = opts |> Keyword.get(:since_id) |> normalize_id()
     include_reactions? = opts |> Keyword.get(:include_reactions?, true) |> normalize_boolean(true)
 
-    note_ap_ids =
-      from(n in Object,
-        where: n.type == "Note" and n.actor == ^user.ap_id,
-        select: n.ap_id
-      )
+    :telemetry.span(
+      [:egregoros, :timeline, :read],
+      %{name: :list_notifications, include_reactions?: include_reactions?, limit: limit},
+      fn ->
+        note_ap_ids =
+          from(n in Object,
+            where: n.type == "Note" and n.actor == ^user.ap_id,
+            select: n.ap_id
+          )
 
-    interaction_types =
-      if include_reactions? do
-        ["Like", "Announce", "EmojiReact"]
-      else
-        ["Like", "Announce"]
+        interaction_types =
+          if include_reactions? do
+            ["Like", "Announce", "EmojiReact"]
+          else
+            ["Like", "Announce"]
+          end
+
+        follow_predicate =
+          dynamic([a], a.type == "Follow" and a.object == ^user.ap_id and a.actor != ^user.ap_id)
+
+        interaction_predicate =
+          dynamic(
+            [a],
+            a.type in ^interaction_types and a.object in subquery(note_ap_ids) and
+              a.actor != ^user.ap_id
+          )
+
+        mention_predicate =
+          dynamic(
+            [a],
+            a.type == "Note" and a.actor != ^user.ap_id and
+              (fragment("? @> ?", a.data, ^%{"to" => [user.ap_id]}) or
+                 fragment("? @> ?", a.data, ^%{"cc" => [user.ap_id]}))
+          )
+
+        predicate =
+          dynamic([a], ^follow_predicate or ^interaction_predicate or ^mention_predicate)
+
+        query =
+          from(a in Object,
+            where: ^predicate,
+            order_by: [desc: a.id],
+            limit: ^limit
+          )
+          |> maybe_where_max_id(max_id)
+          |> maybe_where_since_id(since_id)
+
+        activities =
+          Repo.all(query,
+            telemetry_options: [feature: :timeline, name: :list_notifications]
+          )
+
+        {activities, %{count: length(activities), name: :list_notifications}}
       end
-
-    follow_predicate =
-      dynamic([a], a.type == "Follow" and a.object == ^user.ap_id and a.actor != ^user.ap_id)
-
-    interaction_predicate =
-      dynamic(
-        [a],
-        a.type in ^interaction_types and a.object in subquery(note_ap_ids) and
-          a.actor != ^user.ap_id
-      )
-
-    mention_predicate =
-      dynamic(
-        [a],
-        a.type == "Note" and a.actor != ^user.ap_id and
-          (fragment("? @> ?", a.data, ^%{"to" => [user.ap_id]}) or
-             fragment("? @> ?", a.data, ^%{"cc" => [user.ap_id]}))
-      )
-
-    predicate = dynamic([a], ^follow_predicate or ^interaction_predicate or ^mention_predicate)
-
-    from(a in Object,
-      where: ^predicate,
-      order_by: [desc: a.id],
-      limit: ^limit
     )
-    |> maybe_where_max_id(max_id)
-    |> maybe_where_since_id(since_id)
-    |> Repo.all()
   end
 
   def list_for_user(_user, _opts), do: []
