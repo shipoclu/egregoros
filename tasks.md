@@ -67,7 +67,7 @@ Notes:
 ## Security / privacy
 
 - [x] Work through remaining open items in `security.md` and mark them as addressed.
-- [ ] Signature strictness tightening (keep **off by default** for now; provide a config toggle).
+- [x] Signature strictness tightening (keep **off by default**; enable via `config :egregoros, :signature_strict, true`).
 - [ ] Continuous audit for privacy leaks (public timelines, streaming, media access, DM visibility).
 
 ## UX / UI (LiveView)
