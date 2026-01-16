@@ -1,4 +1,6 @@
 defmodule Egregoros.Bench.Seed do
+  import Ecto.Query, only: [from: 2]
+
   alias Egregoros.Keys
   alias Egregoros.Password
   alias Egregoros.Relationship
@@ -24,10 +26,11 @@ defmodule Egregoros.Bench.Seed do
       {local_users, remote_users} = insert_users(now_usec, opts)
       follows = insert_follow_relationships(now_usec, local_users, remote_users, opts)
       notes = insert_notes(now_usec, local_users, remote_users, opts)
+      replies = insert_note_replies(now_usec, local_users, remote_users, opts)
 
       %{
         users: %{local: length(local_users), remote: length(remote_users)},
-        objects: %{notes: notes},
+        objects: %{notes: notes, replies: replies},
         relationships: %{follows: follows}
       }
     end)
@@ -222,6 +225,106 @@ defmodule Egregoros.Bench.Seed do
       end)
     end
   end
+
+  defp insert_note_replies(now, local_users, remote_users, opts) do
+    local_note_users =
+      Enum.reject(local_users, fn local_user ->
+        Map.get(local_user, :nickname) in ["edge_nofollows", "edge_dormant"]
+      end)
+
+    remote_note_users =
+      Enum.reject(remote_users, fn remote_user ->
+        nickname = remote_user |> Map.get(:nickname) |> to_string()
+        String.starts_with?(nickname, "dormant")
+      end)
+
+    actors = Enum.map(local_note_users ++ remote_note_users, & &1.ap_id)
+    local_actor_ids = local_note_users |> Enum.map(& &1.ap_id) |> MapSet.new()
+
+    reply_parents =
+      (opts.days * opts.posts_per_day)
+      |> div(20)
+      |> min(10_000)
+
+    if actors == [] or reply_parents <= 0 do
+      0
+    else
+      parent_ap_ids =
+        from(o in Object,
+          where: o.type == "Note" and is_nil(o.in_reply_to_ap_id),
+          order_by: [asc: o.id],
+          limit: ^reply_parents,
+          select: o.ap_id
+        )
+        |> Repo.all()
+
+      sample_row =
+        case parent_ap_ids do
+          [parent_ap_id | _] -> reply_row(parent_ap_id, 0, actors, local_actor_ids, now)
+          _ -> nil
+        end
+
+      chunk_size = insert_all_chunk_size(sample_row)
+
+      parent_ap_ids
+      |> Enum.with_index()
+      |> Enum.chunk_every(chunk_size)
+      |> Enum.reduce(0, fn parents, inserted ->
+        rows =
+          Enum.map(parents, fn {parent_ap_id, idx} ->
+            reply_row(parent_ap_id, idx, actors, local_actor_ids, now)
+          end)
+
+        {_count, _} = Repo.insert_all(Object, rows)
+        inserted + length(rows)
+      end)
+    end
+  end
+
+  defp reply_row(parent_ap_id, i, actors, local_actor_ids, now)
+       when is_binary(parent_ap_id) and is_integer(i) and is_list(actors) and
+              is_map(local_actor_ids) do
+    actor = Enum.at(actors, :rand.uniform(length(actors)) - 1)
+    local? = MapSet.member?(local_actor_ids, actor)
+
+    published =
+      now
+      |> DateTime.add(:rand.uniform(86_400) - 1, :second)
+      |> DateTime.truncate(:microsecond)
+
+    ap_id = object_ap_id_for_actor(actor, local?)
+
+    tags = [%{"type" => "Hashtag", "name" => "#bench"}]
+
+    data = %{
+      "id" => ap_id,
+      "type" => "Note",
+      "actor" => actor,
+      "attributedTo" => actor,
+      "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+      "cc" => [actor <> "/followers"],
+      "content" => "bench reply #{i} #bench",
+      "tag" => tags,
+      "inReplyTo" => parent_ap_id,
+      "published" => DateTime.to_iso8601(published)
+    }
+
+    %{
+      ap_id: ap_id,
+      type: "Note",
+      actor: actor,
+      object: nil,
+      in_reply_to_ap_id: parent_ap_id,
+      data: data,
+      published: published,
+      has_media: false,
+      local: local?,
+      inserted_at: published,
+      updated_at: published
+    }
+  end
+
+  defp reply_row(_parent_ap_id, _i, _actors, _local_actor_ids, _now), do: nil
 
   defp note_row(i, actors, local_actor_ids, start_dt, posts_per_day)
        when is_integer(i) and is_list(actors) and is_map(local_actor_ids) and

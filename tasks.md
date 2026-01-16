@@ -53,7 +53,7 @@ Notes:
     - [ ] `Objects.list_home_statuses/2` for (a) no follows, (b) dormant follows.
     - [ ] Tag timeline + `only_media=true`.
     - [ ] `Objects.count_note_replies_by_parent_ap_ids/1` on a page-sized parent set.
-  - [ ] Bench suite: add cases that reproduce the edge scenarios above (especially sparse home timelines).
+  - [x] Bench suite: add cases that reproduce the edge scenarios above (especially sparse home timelines).
   - [x] LiveView timelines: remove N+1 patterns in `EgregorosWeb.ViewModels.Status.decorate_many/2` + `EgregorosWeb.ViewModels.Actor.card/1` (batch context like `MastodonAPI.StatusRenderer.rendering_context/2`).
   - [x] Mastodon notifications: batch `NotificationRenderer` (accounts + statuses) and avoid per-item `StatusRenderer.render_status/2`.
   - [x] Add missing DB index support for notification patterns: index `objects.object` (and a composite such as `(type, object, id)` if plans need it).

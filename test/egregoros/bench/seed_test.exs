@@ -85,4 +85,25 @@ defmodule Egregoros.Bench.SeedTest do
     assert summary.objects.notes == 1
     assert summary.relationships.follows > 0
   end
+
+  test "seed!/1 inserts replies for larger datasets" do
+    summary =
+      Seed.seed!(
+        local_users: 1,
+        remote_users: 0,
+        days: 1,
+        posts_per_day: 40,
+        follows_per_user: 0,
+        reset?: true,
+        seed: 123
+      )
+
+    assert summary.objects.notes == 40
+
+    reply_count =
+      from(o in Object, where: o.type == "Note" and not is_nil(o.in_reply_to_ap_id))
+      |> Repo.aggregate(:count)
+
+    assert reply_count > 0
+  end
 end

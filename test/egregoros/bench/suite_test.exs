@@ -18,7 +18,9 @@ defmodule Egregoros.Bench.SuiteTest do
     for expected <- [
           "timeline.public.list_notes(limit=20)",
           "timeline.home.list_home_notes(limit=20)",
+          "timeline.tag.list_public_statuses_by_hashtag(tag='bench', limit=20, only_media=true)",
           "render.status_vm.decorate_many(20)",
+          "thread.count_note_replies_by_parent_ap_ids(parent_count=20)",
           "notifications.list_for_user(limit=20)"
         ] do
       assert expected in case_names

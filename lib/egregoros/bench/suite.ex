@@ -4,6 +4,7 @@ defmodule Egregoros.Bench.Suite do
   import Ecto.Query, only: [from: 2]
 
   alias Egregoros.Notifications
+  alias Egregoros.Object
   alias Egregoros.Objects
   alias Egregoros.Repo
   alias Egregoros.User
@@ -15,6 +16,7 @@ defmodule Egregoros.Bench.Suite do
     current_user = pick_local_user()
     no_follows_user = Users.get_by_nickname("edge_nofollows")
     dormant_user = Users.get_by_nickname("edge_dormant")
+    reply_parent_ap_ids = pick_parent_note_ap_ids_with_replies(20)
 
     [
       %{
@@ -70,12 +72,25 @@ defmodule Egregoros.Bench.Suite do
         fun: fn -> Objects.list_public_statuses_by_hashtag("bench", limit: 20) end
       },
       %{
+        name:
+          "timeline.tag.list_public_statuses_by_hashtag(tag='bench', limit=20, only_media=true)",
+        fun: fn ->
+          Objects.list_public_statuses_by_hashtag("bench", limit: 20, only_media: true)
+        end
+      },
+      %{
         name: "timeline.tag.list_public_statuses_by_hashtag(tag='rare', limit=20)",
         fun: fn -> Objects.list_public_statuses_by_hashtag("rare", limit: 20) end
       },
       %{
         name: "timeline.tag.list_public_statuses_by_hashtag(tag='missing', limit=20)",
         fun: fn -> Objects.list_public_statuses_by_hashtag("missing", limit: 20) end
+      },
+      %{
+        name: "thread.count_note_replies_by_parent_ap_ids(parent_count=20)",
+        fun: fn ->
+          Objects.count_note_replies_by_parent_ap_ids(reply_parent_ap_ids) |> Map.to_list()
+        end
       },
       %{
         name: "render.status_vm.decorate_many(20)",
@@ -110,6 +125,18 @@ defmodule Egregoros.Bench.Suite do
       }
     ]
   end
+
+  defp pick_parent_note_ap_ids_with_replies(limit) when is_integer(limit) and limit > 0 do
+    from(o in Object,
+      where: o.type == "Note" and not is_nil(o.in_reply_to_ap_id),
+      distinct: o.in_reply_to_ap_id,
+      limit: ^limit,
+      select: o.in_reply_to_ap_id
+    )
+    |> Repo.all()
+  end
+
+  defp pick_parent_note_ap_ids_with_replies(_limit), do: []
 
   defp pick_local_user do
     from(u in User,
