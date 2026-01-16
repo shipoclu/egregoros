@@ -84,6 +84,11 @@ cp .env.example .env
 docker compose -f docker-compose.yml -f docker-compose.local.yml up --build
 ```
 
+The local override also publishes two optional web front-ends:
+
+- Pleroma-FE: `http://localhost:4001`
+- pl-fe: `http://localhost:4002`
+
 For production, change `POSTGRES_PASSWORD` (and use URL-safe characters or URL-encode it in `DATABASE_URL`).
 
 The container runs migrations automatically on startup via `Egregoros.Release.migrate/0`.

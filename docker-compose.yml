@@ -56,6 +56,22 @@ services:
     expose:
       - "80"
 
+  pl_fe:
+    build:
+      context: .
+      dockerfile: docker/pl-fe/Dockerfile
+      args:
+        PL_FE_REPO: ${PL_FE_REPO:-https://github.com/mkljczk/pl-fe.git}
+        PL_FE_REF: ${PL_FE_REF:-develop}
+        PL_FE_BACKEND_URL: ${PL_FE_BACKEND_URL:-}
+        PL_FE_FE_SUBDIRECTORY: ${PL_FE_FE_SUBDIRECTORY:-}
+        PL_FE_WITH_LANDING_PAGE: ${PL_FE_WITH_LANDING_PAGE:-false}
+    restart: unless-stopped
+    depends_on:
+      - web
+    expose:
+      - "80"
+
 volumes:
   egregoros_db:
   egregoros_uploads:
