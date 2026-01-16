@@ -1,6 +1,8 @@
 defmodule EgregorosWeb.Admin.LiveDashboardTest do
   use EgregorosWeb.ConnCase, async: true
 
+  import ExUnit.CaptureLog
+
   alias Egregoros.Users
 
   test "GET /admin/dashboard redirects guests to login", %{conn: conn} do
@@ -33,8 +35,11 @@ defmodule EgregorosWeb.Admin.LiveDashboardTest do
     {:ok, user} = Users.set_admin(user, true)
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
 
-    conn = get(conn, "/admin/dashboard/os_mon")
-    assert html_response(conn, 200)
+    _log =
+      capture_log(fn ->
+        conn = get(conn, "/admin/dashboard/os_mon")
+        assert html_response(conn, 200)
+      end)
   end
 
   test "GET /admin/dashboard/ecto_stats renders for admins", %{conn: conn} do

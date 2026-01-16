@@ -24,3 +24,9 @@ config :swoosh, :api_client, false
 
 # Keep logs readable for interactive bench runs.
 config :logger, level: :info
+
+# Avoid noisy shutdown logs / alarms from os_mon during benches.
+config :os_mon,
+  start_cpu_sup: false,
+  start_memsup: false,
+  start_disksup: false

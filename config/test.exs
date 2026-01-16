@@ -45,6 +45,12 @@ config :swoosh, :api_client, false
 # Print only warnings and errors during test
 config :logger, level: :warning
 
+# Avoid noisy shutdown logs / alarms from os_mon during tests.
+config :os_mon,
+  start_cpu_sup: false,
+  start_memsup: false,
+  start_disksup: false
+
 # Initialize plugs at runtime for faster test compilation
 config :phoenix, :plug_init_mode, :runtime
 
