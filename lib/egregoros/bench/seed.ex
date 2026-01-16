@@ -47,45 +47,41 @@ defmodule Egregoros.Bench.Seed do
   defp insert_users(now, opts) do
     base = Endpoint.url()
 
-    local_users =
+    local_rows =
       if opts.local_users > 0 do
-        local_rows =
-          for i <- 1..opts.local_users do
-            nickname = "local#{i}"
-            actor_ap_id = base <> "/users/" <> nickname
-            {public_key, private_key} = Keys.generate_rsa_keypair()
-
-            %{
-              nickname: nickname,
-              domain: nil,
-              ap_id: actor_ap_id,
-              inbox: actor_ap_id <> "/inbox",
-              outbox: actor_ap_id <> "/outbox",
-              public_key: public_key,
-              private_key: private_key,
-              local: true,
-              email: "#{nickname}@example.com",
-              password_hash: Password.hash(@default_password),
-              inserted_at: now,
-              updated_at: now
-            }
-          end
-
-        {_count, users} =
-          Repo.insert_all(User, local_rows, returning: [:ap_id, :local, :nickname])
-
-        users
+        for i <- 1..opts.local_users do
+          nickname = "local#{i}"
+          actor_ap_id = base <> "/users/" <> nickname
+          local_user_row(nickname, actor_ap_id, now)
+        end
       else
         []
+      end ++
+        [
+          local_user_row("edge_nofollows", base <> "/users/edge_nofollows", now),
+          local_user_row("edge_dormant", base <> "/users/edge_dormant", now)
+        ]
+
+    local_users =
+      case local_rows do
+        [] ->
+          []
+
+        rows ->
+          {_count, users} =
+            Repo.insert_all(User, rows, returning: [:ap_id, :local, :nickname])
+
+          users
       end
 
     remote_users =
       if opts.remote_users > 0 do
         {shared_remote_public_key, _private} = Keys.generate_rsa_keypair()
+        dormant_count = dormant_remote_users_count(opts.remote_users)
 
         remote_rows =
           for i <- 1..opts.remote_users do
-            nickname = "remote#{i}"
+            nickname = if i <= dormant_count, do: "dormant#{i}", else: "remote#{i}"
             domain = remote_domain(i)
             actor_ap_id = "https://#{domain}/users/#{nickname}"
 
@@ -114,13 +110,55 @@ defmodule Egregoros.Bench.Seed do
     {local_users, remote_users}
   end
 
+  defp local_user_row(nickname, actor_ap_id, now) do
+    {public_key, private_key} = Keys.generate_rsa_keypair()
+
+    %{
+      nickname: nickname,
+      domain: nil,
+      ap_id: actor_ap_id,
+      inbox: actor_ap_id <> "/inbox",
+      outbox: actor_ap_id <> "/outbox",
+      public_key: public_key,
+      private_key: private_key,
+      local: true,
+      email: "#{nickname}@example.com",
+      password_hash: Password.hash(@default_password),
+      inserted_at: now,
+      updated_at: now
+    }
+  end
+
+  defp dormant_remote_users_count(0), do: 0
+
+  defp dormant_remote_users_count(remote_users)
+       when is_integer(remote_users) and remote_users > 0 do
+    desired = remote_users |> div(10) |> max(1) |> min(25)
+    max_dormant = max(remote_users - 1, 0)
+    min(desired, max_dormant)
+  end
+
+  defp dormant_remote_users_count(_remote_users), do: 0
+
   defp insert_follow_relationships(now, local_users, remote_users, opts) do
-    remote_actor_ids = Enum.map(remote_users, & &1.ap_id)
+    {dormant_remote_actor_ids, active_remote_actor_ids} =
+      Enum.split_with(remote_users, fn remote_user ->
+        nickname = remote_user |> Map.get(:nickname) |> to_string()
+        String.starts_with?(nickname, "dormant")
+      end)
+      |> then(fn {dormant, active} ->
+        {Enum.map(dormant, & &1.ap_id), Enum.map(active, & &1.ap_id)}
+      end)
 
     rows =
       local_users
       |> Enum.flat_map(fn local_user ->
-        follow_targets = sample(remote_actor_ids, opts.follows_per_user)
+        follow_targets =
+          case Map.get(local_user, :nickname) do
+            "edge_nofollows" -> []
+            "edge_dormant" -> sample(dormant_remote_actor_ids, opts.follows_per_user)
+            _ -> sample(active_remote_actor_ids, opts.follows_per_user)
+          end
 
         Enum.map(follow_targets, fn target ->
           %{
@@ -145,8 +183,19 @@ defmodule Egregoros.Bench.Seed do
   end
 
   defp insert_notes(now, local_users, remote_users, opts) do
-    actors = Enum.map(local_users ++ remote_users, & &1.ap_id)
-    local_actor_ids = local_users |> Enum.map(& &1.ap_id) |> MapSet.new()
+    local_note_users =
+      Enum.reject(local_users, fn local_user ->
+        Map.get(local_user, :nickname) in ["edge_nofollows", "edge_dormant"]
+      end)
+
+    remote_note_users =
+      Enum.reject(remote_users, fn remote_user ->
+        nickname = remote_user |> Map.get(:nickname) |> to_string()
+        String.starts_with?(nickname, "dormant")
+      end)
+
+    actors = Enum.map(local_note_users ++ remote_note_users, & &1.ap_id)
+    local_actor_ids = local_note_users |> Enum.map(& &1.ap_id) |> MapSet.new()
 
     total_notes = opts.days * opts.posts_per_day
 
@@ -189,6 +238,12 @@ defmodule Egregoros.Bench.Seed do
 
     ap_id = object_ap_id_for_actor(actor, local?)
 
+    has_media = rem(i, 100) == 0
+
+    tags =
+      [%{"type" => "Hashtag", "name" => "#bench"}]
+      |> maybe_add_rare_tag(i)
+
     data = %{
       "id" => ap_id,
       "type" => "Note",
@@ -197,8 +252,22 @@ defmodule Egregoros.Bench.Seed do
       "to" => ["https://www.w3.org/ns/activitystreams#Public"],
       "cc" => [actor <> "/followers"],
       "content" => note_content(i),
+      "tag" => tags,
       "published" => DateTime.to_iso8601(published)
     }
+
+    data =
+      if has_media do
+        Map.put(data, "attachment", [
+          %{
+            "type" => "Document",
+            "mediaType" => "image/png",
+            "url" => [%{"href" => "https://cdn.example/bench/#{i}.png"}]
+          }
+        ])
+      else
+        data
+      end
 
     %{
       ap_id: ap_id,
@@ -207,6 +276,7 @@ defmodule Egregoros.Bench.Seed do
       object: nil,
       data: data,
       published: published,
+      has_media: has_media,
       local: local?,
       inserted_at: published,
       updated_at: published
@@ -214,6 +284,16 @@ defmodule Egregoros.Bench.Seed do
   end
 
   defp note_row(_i, _actors, _local_actor_ids, _start_dt, _posts_per_day), do: nil
+
+  defp maybe_add_rare_tag(tags, i) when is_integer(i) and is_list(tags) do
+    if rem(i, 500) == 0 do
+      [%{"type" => "Hashtag", "name" => "#rare"} | tags]
+    else
+      tags
+    end
+  end
+
+  defp maybe_add_rare_tag(tags, _i), do: tags
 
   defp insert_all_chunk_size(%{} = sample_row) do
     fields_per_row = map_size(sample_row)

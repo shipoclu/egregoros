@@ -13,11 +13,21 @@ defmodule Egregoros.Bench.Suite do
 
   def default_cases do
     current_user = pick_local_user()
+    no_follows_user = Users.get_by_nickname("edge_nofollows")
+    dormant_user = Users.get_by_nickname("edge_dormant")
 
     [
       %{
         name: "timeline.public.list_notes(limit=20)",
         fun: fn -> Objects.list_notes(limit: 20) end
+      },
+      %{
+        name: "timeline.public.list_public_statuses(limit=20)",
+        fun: fn -> Objects.list_public_statuses(limit: 20) end
+      },
+      %{
+        name: "timeline.public.list_public_statuses(limit=20, only_media=true)",
+        fun: fn -> Objects.list_public_statuses(limit: 20, only_media: true) end
       },
       %{
         name: "timeline.home.list_home_notes(limit=20)",
@@ -27,6 +37,45 @@ defmodule Egregoros.Bench.Suite do
             _ -> []
           end
         end
+      },
+      %{
+        name: "timeline.home.list_home_statuses(limit=20)",
+        fun: fn ->
+          case current_user do
+            %User{} = user -> Objects.list_home_statuses(user.ap_id, limit: 20)
+            _ -> []
+          end
+        end
+      },
+      %{
+        name: "timeline.home.edge_nofollows.list_home_statuses(limit=20)",
+        fun: fn ->
+          case no_follows_user do
+            %User{} = user -> Objects.list_home_statuses(user.ap_id, limit: 20)
+            _ -> []
+          end
+        end
+      },
+      %{
+        name: "timeline.home.edge_dormant.list_home_statuses(limit=20)",
+        fun: fn ->
+          case dormant_user do
+            %User{} = user -> Objects.list_home_statuses(user.ap_id, limit: 20)
+            _ -> []
+          end
+        end
+      },
+      %{
+        name: "timeline.tag.list_public_statuses_by_hashtag(tag='bench', limit=20)",
+        fun: fn -> Objects.list_public_statuses_by_hashtag("bench", limit: 20) end
+      },
+      %{
+        name: "timeline.tag.list_public_statuses_by_hashtag(tag='rare', limit=20)",
+        fun: fn -> Objects.list_public_statuses_by_hashtag("rare", limit: 20) end
+      },
+      %{
+        name: "timeline.tag.list_public_statuses_by_hashtag(tag='missing', limit=20)",
+        fun: fn -> Objects.list_public_statuses_by_hashtag("missing", limit: 20) end
       },
       %{
         name: "render.status_vm.decorate_many(20)",
@@ -63,7 +112,19 @@ defmodule Egregoros.Bench.Suite do
   end
 
   defp pick_local_user do
-    from(u in User, where: u.local == true, order_by: [asc: u.id], limit: 1)
+    from(u in User,
+      where: u.local == true and u.nickname not in ["edge_nofollows", "edge_dormant"],
+      order_by: [asc: u.id],
+      limit: 1
+    )
     |> Repo.one()
+    |> case do
+      %User{} = user ->
+        user
+
+      _ ->
+        from(u in User, where: u.local == true, order_by: [asc: u.id], limit: 1)
+        |> Repo.one()
+    end
   end
 end
