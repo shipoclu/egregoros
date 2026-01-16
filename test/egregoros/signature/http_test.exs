@@ -135,6 +135,59 @@ defmodule Egregoros.Signature.HTTPTest do
       assert {:error, :invalid_method} = HTTP.verify_request(conn)
     end
 
+    test "verifies signatures when digest uses a lowercase sha-256 prefix" do
+      {public_key, private_key} = Keys.generate_rsa_keypair()
+
+      {:ok, user} =
+        create_remote_user(%{
+          public_key: public_key,
+          private_key: private_key
+        })
+
+      body = Jason.encode!(%{"id" => "https://remote.example/activities/1", "type" => "Like"})
+      date = HTTPDate.format_rfc1123(DateTime.utc_now())
+      digest = "sha-256=" <> Base.encode64(:crypto.hash(:sha256, body))
+
+      request_target = "post /users/frank/inbox"
+
+      signature_string =
+        Enum.join(
+          [
+            "(request-target): #{request_target}",
+            "host: local.example",
+            "date: #{date}",
+            "digest: #{digest}",
+            "content-type: application/activity+json"
+          ],
+          "\n"
+        )
+
+      [entry] = :public_key.pem_decode(private_key)
+      decoded_private_key = :public_key.pem_entry_decode(entry)
+
+      signature =
+        :public_key.sign(signature_string, :sha256, decoded_private_key) |> Base.encode64()
+
+      signature_header =
+        "Signature " <>
+          "keyId=\"#{user.ap_id}#main-key\"," <>
+          "headers=\"(request-target) host date digest content-type\"," <>
+          "signature=\"#{signature}\""
+
+      conn =
+        Plug.Test.conn(:post, "/users/frank/inbox", body)
+        |> Plug.Conn.assign(:raw_body, body)
+        |> Plug.Conn.put_req_header("date", date)
+        |> Plug.Conn.put_req_header("digest", digest)
+        |> Plug.Conn.put_req_header("content-type", "application/activity+json")
+        |> Plug.Conn.put_req_header("signature", signature_header)
+
+      conn = %{conn | host: "local.example", scheme: :https, port: 443}
+
+      assert {:ok, signer_ap_id} = HTTP.verify_request(conn)
+      assert signer_ap_id == user.ap_id
+    end
+
     test "verifies requests using x-forwarded host/proto/port" do
       {public_key, private_key} = Keys.generate_rsa_keypair()
 

@@ -15,6 +15,7 @@ defmodule Egregoros.Signature.HTTP do
          signer_ap_id when is_binary(signer_ap_id) <- signer_ap_id_from_key_id(key_id),
          {:ok, key} <- public_key_for_key_id(key_id),
          :ok <- validate_date(headers, headers_param),
+         :ok <- validate_digest(headers, conn, headers_param),
          {:ok, method} <- method_atom(conn.method) do
       headers_param = normalize_header_names(headers_param)
       headers = augment_headers(headers, conn, headers_param)
@@ -263,6 +264,54 @@ defmodule Egregoros.Signature.HTTP do
     end
   end
 
+  defp validate_digest(headers, conn, headers_param) do
+    headers_param = normalize_header_names(headers_param)
+
+    if "digest" in headers_param do
+      with digest_header when is_binary(digest_header) <- Map.get(headers, "digest"),
+           body when is_binary(body) <- raw_body(conn),
+           {:ok, expected_digest} <- sha256_digest_value(digest_header) do
+        actual_digest = :crypto.hash(:sha256, body) |> Base.encode64()
+
+        if expected_digest == actual_digest do
+          :ok
+        else
+          {:error, :digest_mismatch}
+        end
+      else
+        nil -> {:error, :missing_digest}
+        {:error, _} = error -> error
+        _ -> {:error, :invalid_digest}
+      end
+    else
+      :ok
+    end
+  end
+
+  defp sha256_digest_value(value) when is_binary(value) do
+    value
+    |> String.split(",")
+    |> Enum.map(&String.trim/1)
+    |> Enum.find_value({:error, :invalid_digest}, fn part ->
+      case String.split(part, "=", parts: 2) do
+        [algorithm, digest] ->
+          algorithm = algorithm |> String.trim() |> String.downcase()
+          digest = String.trim(digest)
+
+          if algorithm == "sha-256" and digest != "" do
+            {:ok, digest}
+          else
+            nil
+          end
+
+        _ ->
+          nil
+      end
+    end)
+  end
+
+  defp sha256_digest_value(_value), do: {:error, :invalid_digest}
+
   defp parse_http_date(date_header) when is_binary(date_header) do
     HTTPDate.parse_rfc1123(date_header)
   end
@@ -294,7 +343,8 @@ defmodule Egregoros.Signature.HTTP do
   end
 
   defp maybe_put_content_length(headers, conn, headers_param_set) do
-    if MapSet.member?(headers_param_set, "content-length") and is_binary(raw_body(conn)) do
+    if MapSet.member?(headers_param_set, "content-length") and is_binary(raw_body(conn)) and
+         not Map.has_key?(headers, "content-length") do
       Map.put(headers, "content-length", Integer.to_string(byte_size(raw_body(conn))))
     else
       headers
@@ -302,7 +352,8 @@ defmodule Egregoros.Signature.HTTP do
   end
 
   defp maybe_put_digest(headers, conn, headers_param_set) do
-    if MapSet.member?(headers_param_set, "digest") and is_binary(raw_body(conn)) do
+    if MapSet.member?(headers_param_set, "digest") and is_binary(raw_body(conn)) and
+         not Map.has_key?(headers, "digest") do
       Map.put(headers, "digest", digest_for(raw_body(conn)))
     else
       headers
