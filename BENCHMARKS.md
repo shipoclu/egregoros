@@ -54,3 +54,7 @@ Notes:
 - Output files are written to `tmp/bench_explain/` by default (pass `--out` to override).
 - Use `--no-print` to avoid printing the full plan to stdout.
 - Use `--format json` to emit Postgres `FORMAT JSON` output instead of text.
+
+## Tracking results over time
+
+This repo keeps lightweight, append-only performance snapshots under `perf/` (see `perf/README.md`).
