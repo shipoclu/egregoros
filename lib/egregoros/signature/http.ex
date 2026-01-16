@@ -14,9 +14,10 @@ defmodule Egregoros.Signature.HTTP do
     with {:ok, key_id, signature, headers_param} <- parse_signature(headers),
          signer_ap_id when is_binary(signer_ap_id) <- signer_ap_id_from_key_id(key_id),
          {:ok, key} <- public_key_for_key_id(key_id),
+         {:ok, method} <- method_atom(conn.method),
+         :ok <- validate_required_signature_headers(headers_param, method),
          :ok <- validate_date(headers, headers_param),
-         :ok <- validate_digest(headers, conn, headers_param),
-         {:ok, method} <- method_atom(conn.method) do
+         :ok <- validate_digest(headers, conn, headers_param) do
       headers_param = normalize_header_names(headers_param)
       headers = augment_headers(headers, conn, headers_param)
 
@@ -318,6 +319,36 @@ defmodule Egregoros.Signature.HTTP do
 
   defp max_skew_seconds do
     Application.get_env(:egregoros, :signature_skew_seconds, 300)
+  end
+
+  defp validate_required_signature_headers(headers_param, method) when is_list(headers_param) do
+    if Application.get_env(:egregoros, :signature_strict, false) do
+      headers_param = normalize_header_names(headers_param)
+
+      request_target_header? =
+        "(request-target)" in headers_param or "@request-target" in headers_param
+
+      required_headers = required_signature_headers_for_method(method)
+      missing = Enum.reject(required_headers, &(&1 in headers_param))
+
+      if request_target_header? and missing == [] do
+        :ok
+      else
+        {:error, :missing_required_signature_headers}
+      end
+    else
+      :ok
+    end
+  end
+
+  defp validate_required_signature_headers(_headers_param, _method), do: :ok
+
+  defp required_signature_headers_for_method(method) when method in ["post", "put", "patch"] do
+    ["host", "date", "digest", "content-length"]
+  end
+
+  defp required_signature_headers_for_method(_method) do
+    ["host", "date"]
   end
 
   defp normalize_header_names(headers_param) do
