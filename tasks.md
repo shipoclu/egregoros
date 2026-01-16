@@ -61,7 +61,7 @@ Notes:
   - [x] Home timeline query: split into actor-driven + addressed-to-me branches and merge (e.g. `UNION ALL` + outer `ORDER BY id DESC LIMIT ?`), with a fast-path for “no follows”.
   - [x] Media-only filter: make it index-friendly (denormalized `has_media`/`attachment_count` column + index, or a validated functional index).
   - [x] Threads/replies: add a normalized `in_reply_to_ap_id` field + index, then rework replies count + context queries to avoid per-node DB traversal (recursive CTE and/or `conversation_id` strategy).
-  - [ ] Observability: add telemetry spans + query tagging for timeline reads; optionally add lightweight ETS caches for hot `Users.get_by_ap_id/1`/counts behind behaviours.
+  - [x] Observability: add telemetry spans + query tagging for timeline reads; optionally add lightweight ETS caches for hot `Users.get_by_ap_id/1`/counts behind behaviours.
   - [ ] (Longer-term) Evaluate a materialized `timeline_entries` derived cache (feature-flagged, async fan-out/backfill, correctness filters for blocks/mutes/deletes).
 
 ## Security / privacy
