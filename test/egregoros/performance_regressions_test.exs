@@ -203,6 +203,36 @@ defmodule Egregoros.PerformanceRegressionsTest do
     assert Enum.any?(decorated, &Map.has_key?(&1, :reposted_by))
   end
 
+  test "status view model single-item decoration is batched" do
+    {:ok, alice} = Users.create_local_user("alice")
+    {:ok, bob} = Users.create_local_user("bob")
+
+    {:ok, note} =
+      Objects.create_object(%{
+        ap_id: "https://remote.example/objects/single-decoration-1",
+        type: "Note",
+        actor: bob.ap_id,
+        local: false,
+        data: %{
+          "id" => "https://remote.example/objects/single-decoration-1",
+          "type" => "Note",
+          "actor" => bob.ap_id,
+          "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+          "content" => "hello"
+        }
+      })
+
+    {decorated, queries} =
+      capture_repo_queries(fn ->
+        StatusVM.decorate(note, alice)
+      end)
+
+    # This used to perform per-emoji reacted? checks and per-status count queries.
+    assert length(queries) <= 6
+    assert is_map(decorated)
+    assert decorated.object.ap_id == note.ap_id
+  end
+
   test "mastodon notifications rendering batches queries" do
     {:ok, alice} = Users.create_local_user("alice")
     {:ok, bob} = Users.create_local_user("bob")

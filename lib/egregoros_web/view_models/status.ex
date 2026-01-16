@@ -11,43 +11,12 @@ defmodule EgregorosWeb.ViewModels.Status do
   @recipient_fields ~w(to cc bto bcc audience)
 
   def decorate(%{type: "Note"} = object, current_user) do
-    %{
-      feed_id: object.id,
-      object: object,
-      actor: Actor.card(object.actor),
-      attachments: attachments_for_object(object),
-      likes_count: Relationships.count_by_type_object("Like", object.ap_id),
-      liked?: liked_by_user?(object, current_user),
-      reposts_count: Relationships.count_by_type_object("Announce", object.ap_id),
-      reposted?: reposted_by_user?(object, current_user),
-      bookmarked?: bookmarked_by_user?(object, current_user),
-      reactions: reactions_for_object(object, current_user)
-    }
+    decorate_one(object, current_user)
   end
 
   def decorate(%{type: "Announce", object: object_ap_id} = announce, current_user)
       when is_binary(object_ap_id) do
-    object_ap_id = String.trim(object_ap_id)
-
-    with true <- object_ap_id != "",
-         %{type: "Note"} = object <- Objects.get_by_ap_id(object_ap_id),
-         true <- Objects.visible_to?(object, current_user) do
-      %{
-        feed_id: announce.id,
-        object: object,
-        actor: Actor.card(object.actor),
-        reposted_by: Actor.card(announce.actor),
-        attachments: attachments_for_object(object),
-        likes_count: Relationships.count_by_type_object("Like", object.ap_id),
-        liked?: liked_by_user?(object, current_user),
-        reposts_count: Relationships.count_by_type_object("Announce", object.ap_id),
-        reposted?: reposted_by_user?(object, current_user),
-        bookmarked?: bookmarked_by_user?(object, current_user),
-        reactions: reactions_for_object(object, current_user)
-      }
-    else
-      _ -> nil
-    end
+    decorate_one(announce, current_user)
   end
 
   def decorate(object, current_user) when is_map(object) do
@@ -75,22 +44,11 @@ defmodule EgregorosWeb.ViewModels.Status do
 
   def reaction_emojis, do: @reaction_emojis
 
-  defp liked_by_user?(_object, nil), do: false
-
-  defp liked_by_user?(object, %User{} = current_user) do
-    Relationships.get_by_type_actor_object("Like", current_user.ap_id, object.ap_id) != nil
-  end
-
-  defp reposted_by_user?(_object, nil), do: false
-
-  defp reposted_by_user?(object, %User{} = current_user) do
-    Relationships.get_by_type_actor_object("Announce", current_user.ap_id, object.ap_id) != nil
-  end
-
-  defp bookmarked_by_user?(_object, nil), do: false
-
-  defp bookmarked_by_user?(object, %User{} = current_user) do
-    Relationships.get_by_type_actor_object("Bookmark", current_user.ap_id, object.ap_id) != nil
+  defp decorate_one(object, current_user) do
+    case decorate_many([object], current_user) do
+      [entry] -> entry
+      _ -> nil
+    end
   end
 
   defp reactions_for_object(%{ap_id: ap_id}, current_user) when is_binary(ap_id) do
@@ -323,15 +281,17 @@ defmodule EgregorosWeb.ViewModels.Status do
           MapSet.new()
       end
 
+    needs_followed_actors? = map_size(reblogs_by_ap_id) > 0
+
     followed_actors =
       case current_user do
-        %User{ap_id: ap_id} when is_binary(ap_id) ->
+        %User{ap_id: ap_id} when needs_followed_actors? and is_binary(ap_id) ->
           ap_id
           |> Relationships.list_follows_by_actor_for_objects(actor_ap_ids)
           |> Enum.map(& &1.object)
           |> MapSet.new()
 
-        ap_id when is_binary(ap_id) ->
+        ap_id when needs_followed_actors? and is_binary(ap_id) ->
           ap_id
           |> Relationships.list_follows_by_actor_for_objects(actor_ap_ids)
           |> Enum.map(& &1.object)
