@@ -75,6 +75,12 @@ defmodule EgregorosWeb.Telemetry do
           "The time the connection spent waiting before being checked out for the query"
       ),
 
+      # Timeline read metrics (spans)
+      summary("egregoros.timeline.read.stop.duration",
+        unit: {:native, :millisecond},
+        tags: [:name]
+      ),
+
       # VM Metrics
       summary("vm.memory.total", unit: {:byte, :kilobyte}),
       summary("vm.total_run_queue_lengths.total"),
