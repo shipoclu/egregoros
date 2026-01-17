@@ -34,7 +34,11 @@ defmodule EgregorosWeb.MessagesLive do
       )
     end
 
-    conversations = conversations_for_user(current_user)
+    {conversations, conversations_seen_peers, conversations_max_id, conversations_has_more?} =
+      case current_user do
+        %User{} = user -> conversations_page(user, MapSet.new())
+        _ -> {[], MapSet.new(), nil, false}
+      end
 
     dm_markers =
       case current_user do
@@ -64,6 +68,15 @@ defmodule EgregorosWeb.MessagesLive do
 
     conversation_e2ee? = Enum.any?(messages, &encrypted_message?/1)
 
+    chat_messages_oldest_id =
+      case List.first(messages) do
+        %{id: id} when is_integer(id) -> id
+        _ -> nil
+      end
+
+    chat_messages_has_more? =
+      length(messages) == @messages_page_size and is_integer(chat_messages_oldest_id)
+
     dm_markers =
       case {current_user, List.first(conversations)} do
         {%User{} = user, %{peer: %{ap_id: peer_ap_id}, last_message: %{id: id}}}
@@ -91,6 +104,11 @@ defmodule EgregorosWeb.MessagesLive do
        current_user: current_user,
        dm_markers: dm_markers,
        dm_encrypt?: true,
+       chat_messages_has_more?: chat_messages_has_more?,
+       chat_messages_oldest_id: chat_messages_oldest_id,
+       conversations_has_more?: conversations_has_more?,
+       conversations_max_id: conversations_max_id,
+       conversations_seen_peers: conversations_seen_peers,
        notifications_count: notifications_count(current_user),
        recipient_suggestions: [],
        selected_peer_ap_id: selected_peer_ap_id,
@@ -109,9 +127,20 @@ defmodule EgregorosWeb.MessagesLive do
         if include_dm?(post, user) do
           peer_ap_id = peer_ap_id_for_dm(post, user.ap_id)
 
+          {conversations, conversations_seen_peers, conversations_max_id, conversations_has_more?} =
+            conversations_page(user, MapSet.new())
+
+          dm_markers = dm_markers_for_conversations(user, conversations)
+
           socket =
             socket
-            |> stream(:conversations, conversations_for_user(user), reset: true)
+            |> assign(
+              conversations_has_more?: conversations_has_more?,
+              conversations_max_id: conversations_max_id,
+              conversations_seen_peers: conversations_seen_peers,
+              dm_markers: dm_markers
+            )
+            |> stream(:conversations, conversations, reset: true)
 
           socket =
             if is_binary(peer_ap_id) and peer_ap_id == socket.assigns.selected_peer_ap_id do
@@ -162,6 +191,15 @@ defmodule EgregorosWeb.MessagesLive do
 
         conversation_e2ee? = Enum.any?(messages, &encrypted_message?/1)
 
+        chat_messages_oldest_id =
+          case List.first(messages) do
+            %{id: id} when is_integer(id) -> id
+            _ -> nil
+          end
+
+        chat_messages_has_more? =
+          length(messages) == @messages_page_size and is_integer(chat_messages_oldest_id)
+
         dm_markers =
           case List.last(messages) do
             %{id: id} when is_integer(id) ->
@@ -177,11 +215,25 @@ defmodule EgregorosWeb.MessagesLive do
            selected_peer_ap_id: peer_ap_id,
            selected_peer: selected_peer,
            conversation_e2ee?: conversation_e2ee?,
+           chat_messages_has_more?: chat_messages_has_more?,
+           chat_messages_oldest_id: chat_messages_oldest_id,
            dm_markers: dm_markers,
            recipient_suggestions: [],
            dm_form: dm_form
          )
-         |> stream(:chat_messages, messages, reset: true)}
+         |> stream(:chat_messages, messages, reset: true)
+         |> then(fn socket ->
+           case List.last(messages) do
+             %{id: id} = last_message when is_integer(id) ->
+               stream_insert(socket, :conversations, %{
+                 peer: selected_peer,
+                 last_message: last_message
+               })
+
+             _ ->
+               socket
+           end
+         end)}
 
       _ ->
         {:noreply, socket}
@@ -205,6 +257,8 @@ defmodule EgregorosWeb.MessagesLive do
            selected_peer_ap_id: nil,
            selected_peer: nil,
            conversation_e2ee?: false,
+           chat_messages_has_more?: false,
+           chat_messages_oldest_id: nil,
            recipient_suggestions: [],
            dm_form: dm_form
          )
@@ -257,6 +311,15 @@ defmodule EgregorosWeb.MessagesLive do
 
         conversation_e2ee? = Enum.any?(messages, &encrypted_message?/1)
 
+        chat_messages_oldest_id =
+          case List.first(messages) do
+            %{id: id} when is_integer(id) -> id
+            _ -> nil
+          end
+
+        chat_messages_has_more? =
+          length(messages) == @messages_page_size and is_integer(chat_messages_oldest_id)
+
         dm_form =
           Phoenix.Component.to_form(%{"recipient" => handle, "content" => "", "e2ee_dm" => ""},
             as: :dm
@@ -277,6 +340,8 @@ defmodule EgregorosWeb.MessagesLive do
            selected_peer_ap_id: ap_id,
            selected_peer: selected_peer,
            conversation_e2ee?: conversation_e2ee?,
+           chat_messages_has_more?: chat_messages_has_more?,
+           chat_messages_oldest_id: chat_messages_oldest_id,
            dm_markers: dm_markers,
            recipient_suggestions: [],
            dm_form: dm_form
@@ -289,6 +354,80 @@ defmodule EgregorosWeb.MessagesLive do
   end
 
   def handle_event("pick_recipient", _params, socket), do: {:noreply, socket}
+
+  @impl true
+  def handle_event("load_older_messages", _params, socket) do
+    case {socket.assigns.current_user, socket.assigns.selected_peer_ap_id,
+          socket.assigns.chat_messages_oldest_id} do
+      {%User{} = user, peer_ap_id, oldest_id}
+      when is_binary(peer_ap_id) and peer_ap_id != "" and is_integer(oldest_id) ->
+        older_messages =
+          DirectMessages.list_conversation(user, peer_ap_id,
+            max_id: oldest_id,
+            limit: @messages_page_size
+          )
+
+        socket =
+          Enum.reduce(older_messages, socket, fn message, socket ->
+            stream_insert(socket, :chat_messages, message, at: 0)
+          end)
+
+        chat_messages_oldest_id =
+          case List.last(older_messages) do
+            %{id: id} when is_integer(id) -> id
+            _ -> oldest_id
+          end
+
+        chat_messages_has_more? =
+          length(older_messages) == @messages_page_size and is_integer(chat_messages_oldest_id)
+
+        socket =
+          if socket.assigns.conversation_e2ee? do
+            socket
+          else
+            if Enum.any?(older_messages, &encrypted_message?/1),
+              do: assign(socket, :conversation_e2ee?, true),
+              else: socket
+          end
+
+        {:noreply,
+         socket
+         |> assign(
+           chat_messages_has_more?: chat_messages_has_more?,
+           chat_messages_oldest_id: chat_messages_oldest_id
+         )}
+
+      _ ->
+        {:noreply, socket}
+    end
+  end
+
+  @impl true
+  def handle_event("load_more_conversations", _params, socket) do
+    case {socket.assigns.current_user, socket.assigns.conversations_seen_peers,
+          socket.assigns.conversations_max_id} do
+      {%User{} = user, %MapSet{} = seen_peers, max_id} when is_integer(max_id) ->
+        {conversations, seen_peers, conversations_max_id, conversations_has_more?} =
+          conversations_page(user, seen_peers, max_id: max_id)
+
+        dm_markers =
+          socket.assigns.dm_markers
+          |> Map.merge(dm_markers_for_conversations(user, conversations))
+
+        {:noreply,
+         socket
+         |> assign(
+           conversations_has_more?: conversations_has_more?,
+           conversations_max_id: conversations_max_id,
+           conversations_seen_peers: seen_peers,
+           dm_markers: dm_markers
+         )
+         |> stream(:conversations, conversations)}
+
+      _ ->
+        {:noreply, socket}
+    end
+  end
 
   @impl true
   def handle_event("toggle_dm_encrypt", _params, socket) do
@@ -348,12 +487,20 @@ defmodule EgregorosWeb.MessagesLive do
                 as: :dm
               )
 
-            conversations = conversations_for_user(socket.assigns.current_user)
+            {conversations, conversations_seen_peers, conversations_max_id,
+             conversations_has_more?} =
+              conversations_page(socket.assigns.current_user, MapSet.new())
+
+            dm_markers = dm_markers_for_conversations(socket.assigns.current_user, conversations)
 
             socket =
               socket
               |> put_flash(:info, "Message sent.")
               |> assign(
+                conversations_has_more?: conversations_has_more?,
+                conversations_max_id: conversations_max_id,
+                conversations_seen_peers: conversations_seen_peers,
+                dm_markers: dm_markers,
                 selected_peer_ap_id: peer_ap_id,
                 selected_peer: selected_peer,
                 recipient_suggestions: [],
@@ -367,6 +514,15 @@ defmodule EgregorosWeb.MessagesLive do
                   socket.assigns.current_user
                   |> DirectMessages.list_conversation(peer_ap_id, limit: @messages_page_size)
                   |> Enum.reverse()
+
+                chat_messages_oldest_id =
+                  case List.first(messages) do
+                    %{id: id} when is_integer(id) -> id
+                    _ -> nil
+                  end
+
+                chat_messages_has_more? =
+                  length(messages) == @messages_page_size and is_integer(chat_messages_oldest_id)
 
                 dm_markers =
                   case List.last(messages) do
@@ -385,10 +541,15 @@ defmodule EgregorosWeb.MessagesLive do
                 socket
                 |> assign(:conversation_e2ee?, Enum.any?(messages, &encrypted_message?/1))
                 |> assign(:dm_markers, dm_markers)
+                |> assign(:chat_messages_has_more?, chat_messages_has_more?)
+                |> assign(:chat_messages_oldest_id, chat_messages_oldest_id)
                 |> assign(:recipient_suggestions, [])
                 |> stream(:chat_messages, messages, reset: true)
               else
-                assign(socket, :conversation_e2ee?, false)
+                socket
+                |> assign(:conversation_e2ee?, false)
+                |> assign(:chat_messages_has_more?, false)
+                |> assign(:chat_messages_oldest_id, nil)
               end
 
             {:noreply, socket}
@@ -433,7 +594,12 @@ defmodule EgregorosWeb.MessagesLive do
                   </button>
                 </header>
 
-                <div data-role="dm-conversations" class="max-h-[70vh] overflow-y-auto">
+                <div
+                  data-role="dm-conversations"
+                  id="dm-conversations"
+                  phx-update="stream"
+                  class="max-h-[70vh] overflow-y-auto"
+                >
                   <button
                     :for={{id, conversation} <- @streams.conversations}
                     id={id}
@@ -490,6 +656,16 @@ defmodule EgregorosWeb.MessagesLive do
                     </span>
                   </button>
                 </div>
+
+                <button
+                  :if={@conversations_has_more?}
+                  type="button"
+                  data-role="dm-load-more-conversations"
+                  phx-click="load_more_conversations"
+                  class="w-full border-t border-[color:var(--border-muted)] bg-[color:var(--bg-base)] px-4 py-3 text-center text-xs font-bold uppercase tracking-widest text-[color:var(--text-primary)] transition hover:bg-[color:var(--bg-subtle)] focus-visible:outline-none focus-brutal"
+                >
+                  Load more
+                </button>
               </aside>
 
               <main class="flex min-h-[70vh] flex-col border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)]">
@@ -536,6 +712,17 @@ defmodule EgregorosWeb.MessagesLive do
                     </span>
                   <% end %>
                 </header>
+
+                <button
+                  :if={@chat_messages_has_more?}
+                  id="dm-load-older"
+                  type="button"
+                  data-role="dm-load-older"
+                  phx-click="load_older_messages"
+                  class="border-b-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-5 py-3 text-center text-xs font-bold uppercase tracking-widest text-[color:var(--text-primary)] transition hover:shadow-[4px_4px_0_var(--border-default)] hover:-translate-x-0.5 hover:-translate-y-0.5 focus-visible:outline-none focus-brutal"
+                >
+                  Load older messages
+                </button>
 
                 <div
                   data-role="dm-chat-messages"
@@ -807,25 +994,38 @@ defmodule EgregorosWeb.MessagesLive do
     """
   end
 
-  defp conversations_for_user(%User{} = user) do
-    user
-    |> DirectMessages.list_for_user(limit: @conversations_page_size)
-    |> Enum.reduce({[], MapSet.new()}, fn message, {acc, seen} ->
-      peer_ap_id = peer_ap_id_for_dm(message, user.ap_id)
+  defp conversations_page(user, seen_peers, opts \\ [])
 
-      if is_binary(peer_ap_id) and peer_ap_id != "" and not MapSet.member?(seen, peer_ap_id) do
-        peer = Actor.card(peer_ap_id)
-        {[{peer_ap_id, %{peer: peer, last_message: message}} | acc], MapSet.put(seen, peer_ap_id)}
-      else
-        {acc, seen}
+  defp conversations_page(%User{} = user, %MapSet{} = seen_peers, opts) when is_list(opts) do
+    messages =
+      DirectMessages.list_for_user(user, Keyword.merge([limit: @conversations_page_size], opts))
+
+    next_max_id =
+      case List.last(messages) do
+        %{id: id} when is_integer(id) -> id
+        _ -> nil
       end
-    end)
-    |> elem(0)
-    |> Enum.reverse()
-    |> Enum.map(fn {_peer_ap_id, conversation} -> conversation end)
+
+    conversations_has_more? =
+      length(messages) == @conversations_page_size and is_integer(next_max_id)
+
+    {conversations, seen_peers} =
+      Enum.reduce(messages, {[], seen_peers}, fn message, {acc, seen_peers} ->
+        peer_ap_id = peer_ap_id_for_dm(message, user.ap_id)
+
+        if is_binary(peer_ap_id) and peer_ap_id != "" and
+             not MapSet.member?(seen_peers, peer_ap_id) do
+          peer = Actor.card(peer_ap_id)
+          {[%{peer: peer, last_message: message} | acc], MapSet.put(seen_peers, peer_ap_id)}
+        else
+          {acc, seen_peers}
+        end
+      end)
+
+    {Enum.reverse(conversations), seen_peers, next_max_id, conversations_has_more?}
   end
 
-  defp conversations_for_user(_user), do: []
+  defp conversations_page(_user, %MapSet{} = seen_peers, _opts), do: {[], seen_peers, nil, false}
 
   defp peer_ap_id_for_dm(%{actor: actor} = message, current_user_ap_id)
        when is_binary(actor) and is_binary(current_user_ap_id) do

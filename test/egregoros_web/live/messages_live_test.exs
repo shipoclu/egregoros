@@ -338,4 +338,56 @@ defmodule EgregorosWeb.MessagesLiveTest do
     assert has_element?(view, "[data-role='dm-encrypt-enabled'][value='false']")
     refute has_element?(view, "[data-role='dm-composer-lock']")
   end
+
+  test "loads older messages in the current conversation", %{
+    conn: conn,
+    alice: alice,
+    bob: bob
+  } do
+    for i <- 1..41 do
+      suffix = i |> Integer.to_string() |> String.pad_leading(3, "0")
+      {:ok, _} = Publish.post_note(bob, "@alice dm-#{suffix}", visibility: "direct")
+    end
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: alice.id})
+    {:ok, view, _html} = live(conn, "/messages")
+
+    assert has_element?(view, "[data-role='dm-load-older']")
+    assert has_element?(view, "[data-role='dm-message-body']", "dm-041")
+    refute has_element?(view, "[data-role='dm-message-body']", "dm-001")
+
+    view
+    |> element("[data-role='dm-load-older']")
+    |> render_click()
+
+    assert has_element?(view, "[data-role='dm-message-body']", "dm-001")
+    refute has_element?(view, "[data-role='dm-load-older']")
+  end
+
+  test "loads more conversations", %{conn: conn, alice: alice} do
+    peers =
+      Enum.map(1..41, fn i ->
+        {:ok, user} = Users.create_local_user("peer#{i}")
+        user
+      end)
+
+    Enum.each(peers, fn peer ->
+      {:ok, _} =
+        Publish.post_note(peer, "@alice hello from #{peer.nickname}", visibility: "direct")
+    end)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: alice.id})
+    {:ok, view, _html} = live(conn, "/messages")
+
+    assert has_element?(view, "[data-role='dm-load-more-conversations']")
+    assert has_element?(view, "[data-role='dm-conversation'][data-peer-handle='@peer41']")
+    refute has_element?(view, "[data-role='dm-conversation'][data-peer-handle='@peer1']")
+
+    view
+    |> element("[data-role='dm-load-more-conversations']")
+    |> render_click()
+
+    assert has_element?(view, "[data-role='dm-conversation'][data-peer-handle='@peer1']")
+    refute has_element?(view, "[data-role='dm-load-more-conversations']")
+  end
 end
