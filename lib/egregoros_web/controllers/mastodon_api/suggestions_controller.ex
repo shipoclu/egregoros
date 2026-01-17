@@ -11,6 +11,7 @@ defmodule EgregorosWeb.MastodonAPI.SuggestionsController do
   @default_limit 20
   @max_limit 80
   @system_nicknames ["internal.fetch", "instance.actor"]
+  @follow_graph_relationship_types ["Follow", "GraphFollow"]
   @exclusion_relationship_types ["Follow", "FollowRequest", "Block", "Mute"]
 
   def index(conn, params) do
@@ -36,7 +37,8 @@ defmodule EgregorosWeb.MastodonAPI.SuggestionsController do
 
     candidate_counts =
       from(r in Relationship,
-        where: r.type == "Follow" and r.actor in subquery(followed_subquery),
+        where:
+          r.type in ^@follow_graph_relationship_types and r.actor in subquery(followed_subquery),
         group_by: r.object,
         select: %{ap_id: r.object, mutuals: count(r.id)}
       )

@@ -18,6 +18,7 @@ defmodule EgregorosWeb.ExploreLive do
   @page_size 12
   @tag_sample_size 200
   @system_nicknames ["internal.fetch", "instance.actor"]
+  @follow_graph_relationship_types ["Follow", "GraphFollow"]
   @suggestion_exclusion_relationship_types ["Follow", "FollowRequest", "Block", "Mute"]
 
   @impl true
@@ -276,7 +277,8 @@ defmodule EgregorosWeb.ExploreLive do
 
     candidate_counts =
       from(r in Relationship,
-        where: r.type == "Follow" and r.actor in subquery(followed_subquery),
+        where:
+          r.type in ^@follow_graph_relationship_types and r.actor in subquery(followed_subquery),
         group_by: r.object,
         select: %{ap_id: r.object, mutuals: count(r.id)}
       )
