@@ -12,6 +12,7 @@ defmodule EgregorosWeb.MessagesLive do
   alias Egregoros.User
   alias Egregoros.Users
   alias EgregorosWeb.MentionAutocomplete
+  alias EgregorosWeb.URL
   alias EgregorosWeb.ViewModels.Actor
 
   @conversations_page_size 40
@@ -808,9 +809,9 @@ defmodule EgregorosWeb.MessagesLive do
                   >
                     <span class="mt-1 inline-flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] text-xs font-bold">
                       <%= if message.actor == @current_user.ap_id do %>
-                        <%= if @current_user.avatar_url do %>
+                        <%= if avatar_url = avatar_src(@current_user.avatar_url, @current_user.ap_id) do %>
                           <img
-                            src={@current_user.avatar_url}
+                            src={avatar_url}
                             alt=""
                             class="h-full w-full object-cover"
                           />
@@ -1389,6 +1390,28 @@ defmodule EgregorosWeb.MessagesLive do
         {content, visibility: "direct"}
     end
   end
+
+  defp avatar_src(avatar_url, base) when is_binary(avatar_url) and is_binary(base) do
+    avatar_url =
+      avatar_url
+      |> URL.absolute(base)
+      |> to_string()
+      |> String.trim()
+
+    if avatar_url == "", do: nil, else: avatar_url
+  end
+
+  defp avatar_src(avatar_url, _base) when is_binary(avatar_url) do
+    avatar_url =
+      avatar_url
+      |> URL.absolute()
+      |> to_string()
+      |> String.trim()
+
+    if avatar_url == "", do: nil, else: avatar_url
+  end
+
+  defp avatar_src(_avatar_url, _base), do: nil
 
   defp notifications_count(nil), do: 0
 

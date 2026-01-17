@@ -8,6 +8,7 @@ defmodule EgregorosWeb.MessagesLiveTest do
   alias Egregoros.Keys
   alias Egregoros.Publish
   alias Egregoros.Users
+  alias EgregorosWeb.URL
 
   setup do
     {:ok, alice} = Users.create_local_user("alice")
@@ -145,6 +146,24 @@ defmodule EgregorosWeb.MessagesLiveTest do
 
     assert has_element?(view, "img[src='https://cdn.example/bob.png']")
     assert has_element?(view, "img[src='https://cdn.example/alice.png']")
+  end
+
+  test "uses uploads_base_url for the current user avatar in chat messages", %{
+    conn: conn,
+    alice: alice,
+    bob: bob
+  } do
+    avatar_path = "/uploads/avatars/#{alice.id}/avatar.png"
+    {:ok, _} = Users.update_profile(alice, %{"avatar_url" => avatar_path})
+
+    {:ok, _} = Publish.post_note(alice, "@#{bob.nickname} dm-from-alice", visibility: "direct")
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: alice.id})
+    {:ok, view, _html} = live(conn, "/messages")
+
+    expected = URL.absolute(avatar_path, alice.ap_id)
+
+    assert has_element?(view, "img[src='#{expected}']")
   end
 
   test "sending an encrypted DM stores the payload and renders unlock controls", %{
