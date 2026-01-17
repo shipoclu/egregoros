@@ -1,5 +1,6 @@
 defmodule Egregoros.Publish do
   alias Egregoros.Activities.Create
+  alias Egregoros.Activities.EncryptedMessage
   alias Egregoros.Activities.Note
   alias Egregoros.Domain
   alias Egregoros.HTML
@@ -205,7 +206,9 @@ defmodule Egregoros.Publish do
     if map_size(payload) == 0 do
       note
     else
-      Map.put(note, "egregoros:e2ee_dm", payload)
+      note
+      |> Map.put("egregoros:e2ee_dm", payload)
+      |> Map.put("type", EncryptedMessage.type())
     end
   end
 

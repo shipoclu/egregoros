@@ -620,7 +620,8 @@ defmodule EgregorosWeb.MessagesLive do
     """
   end
 
-  defp include_dm?(%{type: "Note"} = note, %User{} = current_user) do
+  defp include_dm?(%{type: type} = note, %User{} = current_user)
+       when type in ["Note", "EncryptedMessage"] do
     DirectMessages.direct?(note) and Objects.visible_to?(note, current_user)
   end
 

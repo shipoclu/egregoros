@@ -180,7 +180,45 @@ defmodule EgregorosWeb.MessagesLiveTest do
     refute has_element?(view, "article", "this-should-not-be-stored")
 
     [dm] = DirectMessages.list_for_user(alice, limit: 1)
+    assert dm.type == "EncryptedMessage"
     assert dm.data["egregoros:e2ee_dm"] == payload
+  end
+
+  test "encrypted DMs are inserted into the list when received live", %{
+    conn: conn,
+    alice: alice,
+    bob: bob
+  } do
+    conn = Plug.Test.init_test_session(conn, %{user_id: alice.id})
+    {:ok, view, _html} = live(conn, "/messages")
+
+    refute has_element?(view, "article", "Encrypted message")
+
+    assert {:ok, dm} =
+             Objects.create_object(%{
+               ap_id: "https://example.com/objects/encrypted-dm-live",
+               type: "EncryptedMessage",
+               actor: bob.ap_id,
+               object: nil,
+               local: true,
+               data: %{
+                 "id" => "https://example.com/objects/encrypted-dm-live",
+                 "type" => "EncryptedMessage",
+                 "actor" => bob.ap_id,
+                 "to" => [alice.ap_id],
+                 "cc" => [],
+                 "content" => "Encrypted message",
+                 "egregoros:e2ee_dm" => %{
+                   "version" => 1,
+                   "alg" => "ECDH-P256+HKDF-SHA256+AES-256-GCM",
+                   "ciphertext" => "ciphertext"
+                 }
+               }
+             })
+
+    send(view.pid, {:post_created, dm})
+
+    assert has_element?(view, "article", "Encrypted message")
   end
 
   test "open_reply_modal defaults to public visibility for non-DM parents", %{

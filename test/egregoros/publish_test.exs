@@ -458,6 +458,8 @@ defmodule Egregoros.PublishTest do
              )
 
     assert %{} = note = Objects.get_by_ap_id(create.object)
+    assert note.type == "EncryptedMessage"
+    assert note.data["type"] == "EncryptedMessage"
     assert note.data["egregoros:e2ee_dm"] == payload
   end
 end

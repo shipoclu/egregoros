@@ -6,6 +6,7 @@ defmodule Egregoros.DirectMessages do
   alias Egregoros.User
 
   @as_public "https://www.w3.org/ns/activitystreams#Public"
+  @direct_message_types ~w(Note EncryptedMessage)
 
   def list_for_user(user, opts \\ [])
 
@@ -17,7 +18,7 @@ defmodule Egregoros.DirectMessages do
 
     from(o in Object,
       where:
-        o.type == "Note" and
+        o.type in ^@direct_message_types and
           (o.actor == ^user_ap_id or fragment("? @> ?", o.data, ^%{"to" => [user_ap_id]}) or
              fragment("? @> ?", o.data, ^%{"cc" => [user_ap_id]}) or
              fragment("? @> ?", o.data, ^%{"bto" => [user_ap_id]}) or
