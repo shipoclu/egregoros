@@ -217,6 +217,7 @@ defmodule EgregorosWeb.Router do
     get "/blocks", BlocksController, :index
     get "/mutes", MutesController, :index
     get "/followed_tags", FollowedTagsController, :index
+    get "/suggestions", SuggestionsController, :index
     get "/follow_requests", FollowRequestsController, :index
     get "/markers", MarkersController, :index
     get "/statuses/:id/favourited_by", StatusesController, :favourited_by
