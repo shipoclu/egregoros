@@ -229,8 +229,6 @@
 
       <.card
         data_role="e2ee-settings"
-        data-user-id={@current_user.id}
-        data-nickname={@current_user.nickname}
         class="p-6"
       >
         <.header>
@@ -264,14 +262,43 @@
           <p data-role="e2ee-feedback" class="hidden text-sm" role="status" aria-live="polite">
           </p>
 
+          <div
+            data-role="e2ee-mnemonic-box"
+            class="hidden space-y-3 border-2 border-[color:var(--border-muted)] bg-[color:var(--bg-subtle)] p-4"
+          >
+            <div class="flex items-center justify-between gap-4">
+              <p class="text-xs font-bold uppercase tracking-wide text-[color:var(--text-muted)]">
+                Recovery phrase (24 words)
+              </p>
+
+              <.button
+                type="button"
+                size="sm"
+                variant="secondary"
+                data-role="e2ee-mnemonic-copy"
+              >
+                <.icon name="hero-clipboard-document" class="size-4" /> Copy
+              </.button>
+            </div>
+
+            <pre
+              data-role="e2ee-mnemonic"
+              class="whitespace-pre-wrap rounded-lg border border-[color:var(--border-default)] bg-[color:var(--bg-base)] p-3 font-mono text-sm text-[color:var(--text-primary)]"
+            ></pre>
+
+            <p class="text-xs text-[color:var(--text-secondary)]">
+              This is shown only once. Store it somewhere safe.
+            </p>
+          </div>
+
           <.button
             :if={!@e2ee_key}
             type="button"
             variant="secondary"
             class="w-full"
-            data-role="e2ee-enable-passkey"
+            data-role="e2ee-enable-mnemonic"
           >
-            Enable with passkey
+            Enable with recovery phrase
           </.button>
         </div>
       </.card>

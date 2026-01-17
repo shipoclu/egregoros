@@ -37,6 +37,7 @@ import StatusAutoScroll from "./hooks/status_auto_scroll"
 import AudioPlayer from "./hooks/audio_player"
 import VideoPlayer from "./hooks/video_player"
 import {initImageCropper} from "./hooks/image_cropper"
+import {BIP39_ENGLISH_WORDS} from "./bip39_english_words"
 
 const base64UrlEncode = bytes => {
   let binary = ""
@@ -65,6 +66,76 @@ const randomBytes = len => {
   const out = new Uint8Array(len)
   crypto.getRandomValues(out)
   return out
+}
+
+const bytesToBinary = bytes => Array.from(bytes).map(byte => byte.toString(2).padStart(8, "0")).join("")
+
+const sha256Bytes = async bytes => {
+  const digest = await crypto.subtle.digest("SHA-256", bytes)
+  return new Uint8Array(digest)
+}
+
+const bip39WordIndex = new Map(BIP39_ENGLISH_WORDS.map((word, i) => [word, i]))
+
+const entropyToMnemonic24 = async entropyBytes => {
+  if (!(entropyBytes instanceof Uint8Array) || entropyBytes.length !== 32) {
+    throw new Error("invalid_entropy")
+  }
+
+  const entropyBits = bytesToBinary(entropyBytes)
+  const checksumBits = bytesToBinary(await sha256Bytes(entropyBytes)).slice(0, 8)
+  const bits = entropyBits + checksumBits
+
+  const words = []
+  for (let i = 0; i < 24; i++) {
+    const chunk = bits.slice(i * 11, i * 11 + 11)
+    const index = Number.parseInt(chunk, 2)
+    const word = BIP39_ENGLISH_WORDS[index]
+    if (!word) throw new Error("invalid_word_index")
+    words.push(word)
+  }
+
+  return words.join(" ")
+}
+
+const normalizeMnemonic = phrase => {
+  if (typeof phrase !== "string") return ""
+  return phrase
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .join(" ")
+}
+
+const mnemonic24ToEntropy = async phrase => {
+  const normalized = normalizeMnemonic(phrase)
+  if (!normalized) throw new Error("invalid_mnemonic")
+
+  const words = normalized.split(" ")
+  if (words.length !== 24) throw new Error("invalid_mnemonic_length")
+
+  const bits = words
+    .map(word => {
+      const index = bip39WordIndex.get(word)
+      if (typeof index !== "number") throw new Error("invalid_mnemonic_word")
+      return index.toString(2).padStart(11, "0")
+    })
+    .join("")
+
+  const entropyBits = bits.slice(0, 256)
+  const checksumBits = bits.slice(256)
+
+  const entropyBytes = new Uint8Array(32)
+  for (let i = 0; i < 32; i++) {
+    const byteBits = entropyBits.slice(i * 8, i * 8 + 8)
+    entropyBytes[i] = Number.parseInt(byteBits, 2)
+  }
+
+  const checksumExpected = bytesToBinary(await sha256Bytes(entropyBytes)).slice(0, 8)
+  if (checksumBits !== checksumExpected) throw new Error("invalid_mnemonic_checksum")
+
+  return entropyBytes
 }
 
 const parseJsonBody = async response => response.json().catch(() => ({}))
@@ -388,14 +459,9 @@ const initPasskeyAuth = () => {
   }
 }
 
-const enableE2EEWithPasskey = async (section, button, csrfToken) => {
-  if (!window.PublicKeyCredential || !navigator.credentials?.create || !navigator.credentials?.get) {
-    setE2EEFeedback(section, "Passkeys (WebAuthn) are not supported in this browser.", "error")
-    return
-  }
-
+const enableE2EEWithMnemonic = async (section, button, csrfToken) => {
   if (!window.isSecureContext) {
-    setE2EEFeedback(section, "Passkeys require HTTPS (secure context).", "error")
+    setE2EEFeedback(section, "Encrypted DMs require HTTPS (secure context).", "error")
     return
   }
 
@@ -404,93 +470,53 @@ const enableE2EEWithPasskey = async (section, button, csrfToken) => {
     return
   }
 
-  const userId = section.dataset.userId
-  const nickname = section.dataset.nickname
-
-  if (!userId || !nickname) {
-    setE2EEFeedback(section, "Missing user metadata for passkey registration.", "error")
-    return
-  }
-
   button.disabled = true
-  setE2EEFeedback(section, "Creating passkey…", "info")
+  setE2EEFeedback(section, "Generating a 24-word recovery phrase…", "info")
 
-  const userHandle = utf8Bytes(`egregoros:user:${userId}`)
-  const prfSalt = randomBytes(32)
+  let entropy
+  let mnemonic
 
-  const creationOptions = {
-    challenge: randomBytes(32),
-    rp: {name: "Egregoros", id: window.location.hostname},
-    user: {
-      id: userHandle,
-      name: nickname,
-      displayName: nickname,
-    },
-    pubKeyCredParams: [{type: "public-key", alg: -7}],
-    timeout: 60_000,
-    attestation: "none",
-    authenticatorSelection: {
-      residentKey: "required",
-      userVerification: "required",
-    },
-    extensions: {hmacCreateSecret: true, prf: {eval: {first: prfSalt}}},
-  }
-
-  let created
   try {
-    created = await navigator.credentials.create({publicKey: creationOptions})
+    entropy = randomBytes(32)
+    mnemonic = await entropyToMnemonic24(entropy)
   } catch (error) {
-    console.error("passkey create failed", error)
-    setE2EEFeedback(section, "Could not create a passkey (cancelled or unsupported).", "error")
+    console.error("mnemonic generation failed", error)
+    setE2EEFeedback(section, "Could not generate a recovery phrase.", "error")
     button.disabled = false
     return
   }
 
-  const createExt = created?.getClientExtensionResults?.() || {}
-  setE2EEFeedback(section, "Deriving recovery key from passkey…", "info")
+  const mnemonicBox = section.querySelector("[data-role='e2ee-mnemonic-box']")
+  if (mnemonicBox) mnemonicBox.classList.remove("hidden")
 
-  const assertionOptions = {
-    challenge: randomBytes(32),
-    rpId: window.location.hostname,
-    allowCredentials: [{type: "public-key", id: created.rawId}],
-    userVerification: "required",
-    extensions: {hmacGetSecret: {salt1: prfSalt}, prf: {eval: {first: prfSalt}}},
+  const mnemonicEl = section.querySelector("[data-role='e2ee-mnemonic']")
+  if (mnemonicEl) {
+    mnemonicEl.textContent = mnemonic
+    mnemonicEl.classList.remove("hidden")
   }
 
-  let assertion
-  try {
-    assertion = await navigator.credentials.get({publicKey: assertionOptions})
-  } catch (error) {
-    console.error("passkey get failed", error)
-    setE2EEFeedback(section, "Could not use the passkey to derive a wrapping key.", "error")
-    button.disabled = false
-    return
-  }
-
-  const getExt = assertion?.getClientExtensionResults?.() || {}
-  const prfOutput = getExt.prf?.results?.first || getExt.hmacGetSecret?.output1
-
-  if (!prfOutput) {
-    console.error("passkey extension results", {createExt, getExt})
-    setE2EEFeedback(
-      section,
-      "This passkey provider does not support the WebAuthn PRF / hmac-secret extensions, so it can’t be used for encrypted DM key recovery. Try a platform passkey provider (iCloud Keychain / Google Password Manager) or use a recovery code instead.",
-      "error"
+  if (
+    !window.confirm(
+      "Write down these 24 words somewhere safe. They are the only way to unlock encrypted DMs on a new device.\n\nContinue?"
     )
+  ) {
+    setE2EEFeedback(section, "Cancelled.", "info")
     button.disabled = false
     return
   }
+
+  setE2EEFeedback(section, "Generating E2EE identity key…", "info")
 
   const hkdfSalt = randomBytes(32)
-  const info = utf8Bytes("egregoros:e2ee:wrap:v1")
+  const infoStr = "egregoros:e2ee:wrap:mnemonic:v1"
 
   let wrapKey
   try {
-    const prfKey = await crypto.subtle.importKey("raw", prfOutput, "HKDF", false, ["deriveKey"])
+    const secretKey = await crypto.subtle.importKey("raw", entropy, "HKDF", false, ["deriveKey"])
 
     wrapKey = await crypto.subtle.deriveKey(
-      {name: "HKDF", hash: "SHA-256", salt: hkdfSalt, info},
-      prfKey,
+      {name: "HKDF", hash: "SHA-256", salt: hkdfSalt, info: utf8Bytes(infoStr)},
+      secretKey,
       {name: "AES-GCM", length: 256},
       false,
       ["encrypt", "decrypt"]
@@ -501,8 +527,6 @@ const enableE2EEWithPasskey = async (section, button, csrfToken) => {
     button.disabled = false
     return
   }
-
-  setE2EEFeedback(section, "Generating E2EE identity key…", "info")
 
   let e2eeKeyPair
   try {
@@ -527,7 +551,6 @@ const enableE2EEWithPasskey = async (section, button, csrfToken) => {
   }
 
   const kid = `e2ee-${new Date().toISOString()}`
-
   const plaintext = utf8Bytes(JSON.stringify(privateJwkFull))
   const iv = randomBytes(12)
 
@@ -547,23 +570,23 @@ const enableE2EEWithPasskey = async (section, button, csrfToken) => {
     kid,
     public_key_jwk: publicJwk,
     wrapper: {
-      type: "webauthn_hmac_secret",
+      type: "recovery_mnemonic_v1",
       wrapped_private_key: base64UrlEncode(new Uint8Array(ciphertext)),
       params: {
-        credential_id: base64UrlEncode(new Uint8Array(created.rawId)),
-        prf_salt: base64UrlEncode(prfSalt),
         hkdf_salt: base64UrlEncode(hkdfSalt),
         iv: base64UrlEncode(iv),
         alg: "A256GCM",
         kdf: "HKDF-SHA256",
-        info: "egregoros:e2ee:wrap:v1",
+        info: infoStr,
+        wordlist: "bip39-en",
+        words: 24,
       },
     },
   }
 
   let response
   try {
-    response = await fetch("/settings/e2ee/passkey", {
+    response = await fetch("/settings/e2ee/mnemonic", {
       method: "POST",
       credentials: "same-origin",
       headers: {
@@ -600,11 +623,22 @@ const enableE2EEWithPasskey = async (section, button, csrfToken) => {
 
   const fingerprintEl = section.querySelector("[data-role='e2ee-fingerprint']")
   if (fingerprintEl) {
-    fingerprintEl.textContent = body.fingerprint ? `Fingerprint: ${body.fingerprint}` : "Fingerprint: (unknown)"
+    fingerprintEl.textContent = body.fingerprint
+      ? `Fingerprint: ${body.fingerprint}`
+      : "Fingerprint: (unknown)"
     fingerprintEl.classList.remove("hidden")
   }
 
-  setE2EEFeedback(section, "Encrypted DMs enabled.", "success")
+  e2eeIdentity = {
+    kid,
+    publicKeyJwk: publicJwk,
+    privateKey: e2eeKeyPair.privateKey,
+  }
+
+  window.egregorosE2EE = e2eeIdentity
+  e2eeStatusCache = null
+
+  setE2EEFeedback(section, "Encrypted DMs enabled. Store your recovery phrase somewhere safe.", "success")
   button.classList.add("hidden")
 }
 
@@ -613,10 +647,27 @@ const initE2EESettings = () => {
     if (section.dataset.e2eeInitialized === "true") return
     section.dataset.e2eeInitialized = "true"
 
-    const button = section.querySelector("[data-role='e2ee-enable-passkey']")
+    const copyButton = section.querySelector("[data-role='e2ee-mnemonic-copy']")
+    if (copyButton) {
+      copyButton.addEventListener("click", async () => {
+        const mnemonic = section.querySelector("[data-role='e2ee-mnemonic']")?.textContent || ""
+        if (!mnemonic) return
+
+        try {
+          if (!navigator.clipboard?.writeText) throw new Error("clipboard_unsupported")
+          await navigator.clipboard.writeText(mnemonic)
+          setE2EEFeedback(section, "Copied recovery phrase.", "success")
+        } catch (error) {
+          console.error("mnemonic copy failed", error)
+          setE2EEFeedback(section, "Could not copy recovery phrase.", "error")
+        }
+      })
+    }
+
+    const button = section.querySelector("[data-role='e2ee-enable-mnemonic']")
     if (!button) return
 
-    button.addEventListener("click", () => enableE2EEWithPasskey(section, button, csrfToken))
+    button.addEventListener("click", () => enableE2EEWithMnemonic(section, button, csrfToken))
   })
 }
 
@@ -666,57 +717,36 @@ const unlockE2EEIdentity = async () => {
 
     if (!status?.enabled || !status?.active_key) throw new Error("e2ee_not_enabled")
 
-    const wrapper = (status?.wrappers || []).find(w => w?.type === "webauthn_hmac_secret")
-    if (!wrapper) throw new Error("e2ee_no_passkey_wrapper")
+    const wrapper = (status?.wrappers || []).find(w => w?.type === "recovery_mnemonic_v1")
+    if (!wrapper) throw new Error("e2ee_no_mnemonic_wrapper")
 
     const params = wrapper.params || {}
-    const credentialId = params.credential_id
-    const prfSalt = params.prf_salt
     const hkdfSalt = params.hkdf_salt
     const iv = params.iv
-    const info = params.info || "egregoros:e2ee:wrap:v1"
+    const info = params.info || "egregoros:e2ee:wrap:mnemonic:v1"
 
-    if (!credentialId || !prfSalt || !hkdfSalt || !iv) throw new Error("e2ee_wrapper_invalid")
+    if (!hkdfSalt || !iv) throw new Error("e2ee_wrapper_invalid")
 
-    const credentialBytes = base64UrlDecode(credentialId)
-    const prfSaltBytes = base64UrlDecode(prfSalt)
+    const phrase = window.prompt("Enter your 24-word recovery phrase to unlock encrypted DMs:")
+    if (!phrase) throw new Error("e2ee_mnemonic_cancelled")
 
-    const assertionOptions = {
-      challenge: randomBytes(32),
-      rpId: window.location.hostname,
-      allowCredentials: [{type: "public-key", id: sliceArrayBuffer(credentialBytes)}],
-      userVerification: "required",
-      extensions: {
-        hmacGetSecret: {salt1: prfSaltBytes},
-        prf: {eval: {first: prfSaltBytes}},
-      },
-    }
-
-    let assertion
+    let entropy
     try {
-      assertion = await navigator.credentials.get({publicKey: assertionOptions})
+      entropy = await mnemonic24ToEntropy(phrase)
     } catch (error) {
-      console.error("e2ee unlock passkey get failed", error)
-      throw new Error("e2ee_passkey_failed")
-    }
-
-    const getExt = assertion?.getClientExtensionResults?.() || {}
-    const prfOutput = getExt.prf?.results?.first || getExt.hmacGetSecret?.output1
-
-    if (!prfOutput) {
-      console.error("e2ee unlock extension results", {getExt})
-      throw new Error("e2ee_prf_unsupported")
+      console.error("mnemonic parse failed", error)
+      throw new Error("e2ee_mnemonic_invalid")
     }
 
     const hkdfSaltBytes = base64UrlDecode(hkdfSalt)
     const ivBytes = base64UrlDecode(iv)
     const wrappedBytes = base64UrlDecode(wrapper.wrapped_private_key)
 
-    const prfKey = await crypto.subtle.importKey("raw", prfOutput, "HKDF", false, ["deriveKey"])
+    const secretKey = await crypto.subtle.importKey("raw", entropy, "HKDF", false, ["deriveKey"])
 
     const wrapKey = await crypto.subtle.deriveKey(
       {name: "HKDF", hash: "SHA-256", salt: hkdfSaltBytes, info: utf8Bytes(info)},
-      prfKey,
+      secretKey,
       {name: "AES-GCM", length: 256},
       false,
       ["decrypt"]
@@ -990,12 +1020,14 @@ const E2EEDMComposer = {
         this.el.requestSubmit()
       } catch (error) {
         console.error("e2ee dm encrypt failed", error)
-        setDmE2EEFeedback(
-          this.el,
-          error?.message === "e2ee_prf_unsupported"
-            ? "This passkey provider does not support PRF/hmac-secret, so it can’t be used for encrypted DM key recovery."
-            : "Could not encrypt this message."
-        )
+        const message =
+          error?.message === "e2ee_mnemonic_cancelled"
+            ? "Unlock cancelled."
+            : error?.message === "e2ee_mnemonic_invalid"
+              ? "Invalid recovery phrase."
+              : "Could not encrypt this message."
+
+        setDmE2EEFeedback(this.el, message)
         this.submitting = false
       }
     }

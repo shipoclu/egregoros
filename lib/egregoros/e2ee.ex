@@ -6,6 +6,8 @@ defmodule Egregoros.E2EE do
   alias Egregoros.Repo
   alias Egregoros.User
 
+  @allowed_wrapper_types ~w(recovery_mnemonic_v1)
+
   def get_active_key(%User{} = user) do
     from(k in Key, where: k.user_id == ^user.id and k.active, limit: 1)
     |> Repo.one()
@@ -32,6 +34,7 @@ defmodule Egregoros.E2EE do
            {:ok, public_key_jwk} <- fetch_map_key(attrs, :public_key_jwk),
            {:ok, wrapper_attrs} <- fetch_map_key(attrs, :wrapper),
            {:ok, wrapper_type} <- fetch_string_key(wrapper_attrs, :type),
+           :ok <- validate_wrapper_type(wrapper_type),
            {:ok, wrapped_private_key} <- fetch_binary_key(wrapper_attrs, :wrapped_private_key),
            {:ok, params} <- fetch_map_key(wrapper_attrs, :params),
            {:ok, fingerprint} <- fingerprint_public_key_jwk(public_key_jwk) do
@@ -100,6 +103,12 @@ defmodule Egregoros.E2EE do
   end
 
   def fingerprint_public_key_jwk(_), do: {:error, :invalid_jwk}
+
+  defp validate_wrapper_type(type) when is_binary(type) do
+    if type in @allowed_wrapper_types, do: :ok, else: {:error, :invalid_key}
+  end
+
+  defp validate_wrapper_type(_type), do: {:error, :invalid_key}
 
   defp fetch_string_key(%{} = map, key) when is_binary(key) do
     case Map.get(map, key) do

@@ -76,16 +76,14 @@ defmodule EgregorosWeb.ActorControllerTest do
                kid: kid,
                public_key_jwk: public_key_jwk,
                wrapper: %{
-                 type: "webauthn_hmac_secret",
+                 type: "recovery_mnemonic_v1",
                  wrapped_private_key: <<1, 2, 3>>,
                  params: %{
-                   "credential_id" => Base.url_encode64("cred", padding: false),
-                   "prf_salt" => Base.url_encode64("prf-salt", padding: false),
                    "hkdf_salt" => Base.url_encode64("hkdf-salt", padding: false),
                    "iv" => Base.url_encode64("iv", padding: false),
                    "alg" => "A256GCM",
                    "kdf" => "HKDF-SHA256",
-                   "info" => "egregoros:e2ee:wrap:v1"
+                   "info" => "egregoros:e2ee:wrap:mnemonic:v1"
                  }
                }
              })

@@ -77,10 +77,11 @@ Notes:
 See also: `e2ee_dm.md` (design notes + threat model).
 
 - [ ] **E2EE DMs: 24-word recovery phrase (mnemonic)**
-  - [ ] Add server-side support for adding a new wrapper to the active E2EE key (new endpoint + `Egregoros.E2EE` API), with tests for: 401/409/422/201.
-  - [ ] Add a `recovery_mnemonic_v1` wrapper type (explicit allowlist) and document the stored params (e.g. `hkdf_salt`, `iv`, `info`, `alg`).
-  - [ ] Add settings UI + JS to generate a 24-word mnemonic (BIP39-style), display it once, require confirmation, and upload the wrapper.
-  - [ ] Add unlock UI + JS to paste the 24 words and unlock `E2EE_PRIV` using the mnemonic wrapper (device without passkey).
+  - [x] Add mnemonic enable endpoint (`POST /settings/e2ee/mnemonic`) and store encrypted key material.
+  - [x] Add `recovery_mnemonic_v1` wrapper type allowlist (and store params like `hkdf_salt`, `iv`, `info`, `alg`).
+  - [x] Add settings UI + JS to generate a 24-word mnemonic (BIP39-style), confirm, and upload the wrapper.
+  - [x] Add unlock flow that prompts for the 24 words and unlocks `E2EE_PRIV` using the mnemonic wrapper.
+  - [ ] Add server-side support to add/rotate wrappers for an existing active key (so we can introduce new unlock mechanisms later without regenerating keys).
 
 - [ ] **E2EE DMs: cross-server key discovery (browser CORS-safe)**
   - [ ] Add an authenticated endpoint to resolve `@user@domain` → actor AP id (WebFinger) and fetch `egregoros:e2ee` keys server-side (signed fetch when needed), returning `{actor_ap_id, keys}`.

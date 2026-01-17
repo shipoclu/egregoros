@@ -16,7 +16,7 @@ defmodule EgregorosWeb.E2EEController do
     end
   end
 
-  def enable_passkey(conn, %{
+  def enable_mnemonic(conn, %{
         "kid" => kid,
         "public_key_jwk" => %{} = public_key_jwk,
         "wrapper" => %{
@@ -68,7 +68,7 @@ defmodule EgregorosWeb.E2EEController do
     end
   end
 
-  def enable_passkey(conn, _params) do
+  def enable_mnemonic(conn, _params) do
     conn
     |> put_status(:unprocessable_entity)
     |> json(%{"error" => "invalid_payload"})

@@ -20,13 +20,11 @@ defmodule Egregoros.E2EETest do
       wrapped_private_key = <<1, 2, 3, 4, 5, 6>>
 
       params = %{
-        "credential_id" => Base.url_encode64("cred", padding: false),
-        "prf_salt" => Base.url_encode64("prf-salt", padding: false),
         "hkdf_salt" => Base.url_encode64("hkdf-salt", padding: false),
         "iv" => Base.url_encode64("iv", padding: false),
         "alg" => "A256GCM",
         "kdf" => "HKDF-SHA256",
-        "info" => "egregoros:e2ee:wrap:v1"
+        "info" => "egregoros:e2ee:wrap:mnemonic:v1"
       }
 
       assert {:ok, %{key: key, wrapper: wrapper}} =
@@ -34,7 +32,7 @@ defmodule Egregoros.E2EETest do
                  kid: kid,
                  public_key_jwk: public_key_jwk,
                  wrapper: %{
-                   type: "webauthn_hmac_secret",
+                   type: "recovery_mnemonic_v1",
                    wrapped_private_key: wrapped_private_key,
                    params: params
                  }
@@ -49,7 +47,7 @@ defmodule Egregoros.E2EETest do
 
       assert wrapper.user_id == user.id
       assert wrapper.kid == kid
-      assert wrapper.type == "webauthn_hmac_secret"
+      assert wrapper.type == "recovery_mnemonic_v1"
       assert wrapper.wrapped_private_key == wrapped_private_key
       assert wrapper.params == params
 
@@ -69,16 +67,14 @@ defmodule Egregoros.E2EETest do
       }
 
       wrapper = %{
-        type: "webauthn_hmac_secret",
+        type: "recovery_mnemonic_v1",
         wrapped_private_key: <<1, 2, 3>>,
         params: %{
-          "credential_id" => Base.url_encode64("cred", padding: false),
-          "prf_salt" => Base.url_encode64("prf-salt", padding: false),
           "hkdf_salt" => Base.url_encode64("hkdf-salt", padding: false),
           "iv" => Base.url_encode64("iv", padding: false),
           "alg" => "A256GCM",
           "kdf" => "HKDF-SHA256",
-          "info" => "egregoros:e2ee:wrap:v1"
+          "info" => "egregoros:e2ee:wrap:mnemonic:v1"
         }
       }
 

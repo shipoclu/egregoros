@@ -23,21 +23,19 @@ defmodule EgregorosWeb.E2EEControllerTest do
     }
   end
 
-  defp passkey_payload(kid, wrapped_private_key) do
+  defp mnemonic_payload(kid, wrapped_private_key) do
     %{
       "kid" => kid,
       "public_key_jwk" => public_key_jwk(),
       "wrapper" => %{
-        "type" => "webauthn_hmac_secret",
+        "type" => "recovery_mnemonic_v1",
         "wrapped_private_key" => wrapped_private_key,
         "params" => %{
-          "credential_id" => Base.url_encode64("cred", padding: false),
-          "prf_salt" => Base.url_encode64("prf-salt", padding: false),
           "hkdf_salt" => Base.url_encode64("hkdf-salt", padding: false),
           "iv" => Base.url_encode64("iv", padding: false),
           "alg" => "A256GCM",
           "kdf" => "HKDF-SHA256",
-          "info" => "egregoros:e2ee:wrap:v1"
+          "info" => "egregoros:e2ee:wrap:mnemonic:v1"
         }
       }
     }
@@ -61,7 +59,9 @@ defmodule EgregorosWeb.E2EEControllerTest do
     assert %{"enabled" => false, "active_key" => nil, "wrappers" => []} = json_response(conn, 200)
   end
 
-  test "POST /settings/e2ee/passkey enables E2EE and stores encrypted key material", %{conn: conn} do
+  test "POST /settings/e2ee/mnemonic enables E2EE and stores encrypted key material", %{
+    conn: conn
+  } do
     uniq = System.unique_integer([:positive])
     user = register_user!(uniq)
 
@@ -74,7 +74,7 @@ defmodule EgregorosWeb.E2EEControllerTest do
     conn =
       conn
       |> Plug.Test.init_test_session(%{user_id: user.id})
-      |> post("/settings/e2ee/passkey", passkey_payload(kid, wrapped_private_key_b64))
+      |> post("/settings/e2ee/mnemonic", mnemonic_payload(kid, wrapped_private_key_b64))
 
     assert conn.status == 201
     decoded = json_response(conn, 201)
@@ -90,80 +90,80 @@ defmodule EgregorosWeb.E2EEControllerTest do
     assert length(status["wrappers"]) == 1
   end
 
-  test "POST /settings/e2ee/passkey returns 401 when not logged in", %{conn: conn} do
+  test "POST /settings/e2ee/mnemonic returns 401 when not logged in", %{conn: conn} do
     kid = "e2ee-unauthorized"
     wrapped_private_key_b64 = Base.url_encode64(<<1, 2, 3>>, padding: false)
 
-    conn = post(conn, "/settings/e2ee/passkey", passkey_payload(kid, wrapped_private_key_b64))
+    conn = post(conn, "/settings/e2ee/mnemonic", mnemonic_payload(kid, wrapped_private_key_b64))
 
     assert conn.status == 401
     assert %{"error" => "unauthorized"} = json_response(conn, 401)
   end
 
-  test "POST /settings/e2ee/passkey returns 409 when already enabled", %{conn: conn} do
+  test "POST /settings/e2ee/mnemonic returns 409 when already enabled", %{conn: conn} do
     uniq = System.unique_integer([:positive])
     user = register_user!(uniq)
     kid = "e2ee-already-enabled"
     wrapped_private_key_b64 = Base.url_encode64(<<1, 2, 3>>, padding: false)
-    payload = passkey_payload(kid, wrapped_private_key_b64)
+    payload = mnemonic_payload(kid, wrapped_private_key_b64)
 
     conn =
       conn
       |> Plug.Test.init_test_session(%{user_id: user.id})
-      |> post("/settings/e2ee/passkey", payload)
+      |> post("/settings/e2ee/mnemonic", payload)
 
     assert conn.status == 201
 
-    conn = post(conn, "/settings/e2ee/passkey", payload)
+    conn = post(conn, "/settings/e2ee/mnemonic", payload)
 
     assert conn.status == 409
     assert %{"error" => "already_enabled"} = json_response(conn, 409)
   end
 
-  test "POST /settings/e2ee/passkey returns 422 for invalid payloads", %{conn: conn} do
+  test "POST /settings/e2ee/mnemonic returns 422 for invalid payloads", %{conn: conn} do
     uniq = System.unique_integer([:positive])
     user = register_user!(uniq)
 
     conn =
       conn
       |> Plug.Test.init_test_session(%{user_id: user.id})
-      |> post("/settings/e2ee/passkey", %{})
+      |> post("/settings/e2ee/mnemonic", %{})
 
     assert conn.status == 422
     assert %{"error" => "invalid_payload"} = json_response(conn, 422)
   end
 
-  test "POST /settings/e2ee/passkey returns 422 for invalid base64 key material", %{conn: conn} do
+  test "POST /settings/e2ee/mnemonic returns 422 for invalid base64 key material", %{conn: conn} do
     uniq = System.unique_integer([:positive])
     user = register_user!(uniq)
 
     conn =
       conn
       |> Plug.Test.init_test_session(%{user_id: user.id})
-      |> post("/settings/e2ee/passkey", passkey_payload("e2ee-invalid-base64", "!!!not-b64!!!"))
+      |> post("/settings/e2ee/mnemonic", mnemonic_payload("e2ee-invalid-base64", "!!!not-b64!!!"))
 
     assert conn.status == 422
     assert %{"error" => "invalid_payload"} = json_response(conn, 422)
   end
 
-  test "POST /settings/e2ee/passkey returns 422 for non-base64 key material", %{conn: conn} do
+  test "POST /settings/e2ee/mnemonic returns 422 for non-base64 key material", %{conn: conn} do
     uniq = System.unique_integer([:positive])
     user = register_user!(uniq)
 
     payload =
       "e2ee-non-b64"
-      |> passkey_payload(123)
+      |> mnemonic_payload(123)
 
     conn =
       conn
       |> Plug.Test.init_test_session(%{user_id: user.id})
-      |> post("/settings/e2ee/passkey", payload)
+      |> post("/settings/e2ee/mnemonic", payload)
 
     assert conn.status == 422
     assert %{"error" => "invalid_payload"} = json_response(conn, 422)
   end
 
-  test "POST /settings/e2ee/passkey returns 422 for invalid JWKs", %{conn: conn} do
+  test "POST /settings/e2ee/mnemonic returns 422 for invalid JWKs", %{conn: conn} do
     uniq = System.unique_integer([:positive])
     user = register_user!(uniq)
 
@@ -171,7 +171,7 @@ defmodule EgregorosWeb.E2EEControllerTest do
 
     payload =
       "e2ee-invalid-jwk"
-      |> passkey_payload(wrapped_private_key_b64)
+      |> mnemonic_payload(wrapped_private_key_b64)
       |> Map.put("public_key_jwk", %{
         "kty" => "EC",
         "crv" => "P-256",
@@ -181,13 +181,13 @@ defmodule EgregorosWeb.E2EEControllerTest do
     conn =
       conn
       |> Plug.Test.init_test_session(%{user_id: user.id})
-      |> post("/settings/e2ee/passkey", payload)
+      |> post("/settings/e2ee/mnemonic", payload)
 
     assert conn.status == 422
     assert %{"error" => "invalid_payload"} = json_response(conn, 422)
   end
 
-  test "POST /settings/e2ee/passkey returns 422 with details for invalid changesets", %{
+  test "POST /settings/e2ee/mnemonic returns 422 with details for invalid changesets", %{
     conn: conn
   } do
     uniq = System.unique_integer([:positive])
@@ -199,7 +199,7 @@ defmodule EgregorosWeb.E2EEControllerTest do
     conn =
       conn
       |> Plug.Test.init_test_session(%{user_id: user.id})
-      |> post("/settings/e2ee/passkey", passkey_payload(kid, wrapped_private_key_b64))
+      |> post("/settings/e2ee/mnemonic", mnemonic_payload(kid, wrapped_private_key_b64))
 
     assert conn.status == 422
 
