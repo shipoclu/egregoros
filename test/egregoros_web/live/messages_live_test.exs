@@ -4,6 +4,7 @@ defmodule EgregorosWeb.MessagesLiveTest do
   import Phoenix.LiveViewTest
 
   alias Egregoros.DirectMessages
+  alias Egregoros.E2EE
   alias Egregoros.Keys
   alias Egregoros.Publish
   alias Egregoros.Users
@@ -262,6 +263,36 @@ defmodule EgregorosWeb.MessagesLiveTest do
     }
   end
 
+  defp enable_e2ee_key!(user) do
+    kid = "e2ee-#{System.unique_integer([:positive])}"
+
+    public_key_jwk = %{
+      "kty" => "EC",
+      "crv" => "P-256",
+      "x" => "pQECAwQFBgcICQoLDA0ODw",
+      "y" => "AQIDBAUGBwgJCgsMDQ4PEA"
+    }
+
+    assert {:ok, _} =
+             E2EE.enable_key_with_wrapper(user, %{
+               kid: kid,
+               public_key_jwk: public_key_jwk,
+               wrapper: %{
+                 type: "recovery_mnemonic_v1",
+                 wrapped_private_key: <<1, 2, 3>>,
+                 params: %{
+                   "hkdf_salt" => Base.url_encode64("hkdf-salt", padding: false),
+                   "iv" => Base.url_encode64("iv", padding: false),
+                   "alg" => "A256GCM",
+                   "kdf" => "HKDF-SHA256",
+                   "info" => "egregoros:e2ee:wrap:mnemonic:v1"
+                 }
+               }
+             })
+
+    :ok
+  end
+
   test "recipient suggestions appear in a new chat and selecting one starts the chat", %{
     conn: conn,
     alice: alice,
@@ -314,11 +345,48 @@ defmodule EgregorosWeb.MessagesLiveTest do
            )
   end
 
+  test "encrypt controls are hidden when the recipient does not support e2ee", %{
+    conn: conn,
+    alice: alice
+  } do
+    {public_key, _private_key} = Keys.generate_rsa_keypair()
+
+    {:ok, remote} =
+      Users.create_user(%{
+        nickname: "dave",
+        ap_id: "https://remote.example/users/dave",
+        inbox: "https://remote.example/users/dave/inbox",
+        outbox: "https://remote.example/users/dave/outbox",
+        public_key: public_key,
+        local: false
+      })
+
+    {:ok, _} =
+      Publish.post_note(alice, "@dave@remote.example hello", visibility: "direct")
+
+    stub(Egregoros.HTTP.Mock, :get, fn url, _headers ->
+      if url == remote.ap_id do
+        {:ok, %{status: 200, body: %{"id" => remote.ap_id, "type" => "Person"}, headers: []}}
+      else
+        {:ok, %{status: 200, body: %{}, headers: []}}
+      end
+    end)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: alice.id})
+    {:ok, view, _html} = live(conn, "/messages")
+
+    assert has_element?(view, "[data-role='dm-chat-peer-handle']", "@dave@remote.example")
+    assert has_element?(view, "[data-role='dm-encrypt-enabled'][value='false']")
+    refute has_element?(view, "[data-role='dm-encrypt-toggle']")
+  end
+
   test "the DM encrypt toggle is server authoritative", %{
     conn: conn,
     alice: alice,
     bob: bob
   } do
+    enable_e2ee_key!(bob)
+
     {:ok, _} =
       Publish.post_note(bob, "@alice Encrypted message",
         visibility: "direct",

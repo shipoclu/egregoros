@@ -3,6 +3,7 @@ defmodule EgregorosWeb.MessagesLive do
 
   alias Egregoros.CustomEmojis
   alias Egregoros.DirectMessages
+  alias Egregoros.E2EE.ActorKeys
   alias Egregoros.HTML
   alias Egregoros.Markers
   alias Egregoros.Notifications
@@ -68,6 +69,15 @@ defmodule EgregorosWeb.MessagesLive do
 
     conversation_e2ee? = Enum.any?(messages, &encrypted_message?/1)
 
+    dm_peer_supports_e2ee? =
+      if is_binary(selected_peer_ap_id) and selected_peer_ap_id != "" do
+        ActorKeys.supports_e2ee_dm?(selected_peer_ap_id)
+      else
+        false
+      end
+
+    dm_encrypt? = dm_peer_supports_e2ee?
+
     chat_messages_oldest_id =
       case List.first(messages) do
         %{id: id} when is_integer(id) -> id
@@ -103,7 +113,8 @@ defmodule EgregorosWeb.MessagesLive do
      |> assign(
        current_user: current_user,
        dm_markers: dm_markers,
-       dm_encrypt?: true,
+       dm_peer_supports_e2ee?: dm_peer_supports_e2ee?,
+       dm_encrypt?: dm_encrypt?,
        chat_messages_has_more?: chat_messages_has_more?,
        chat_messages_oldest_id: chat_messages_oldest_id,
        conversations_has_more?: conversations_has_more?,
@@ -200,6 +211,9 @@ defmodule EgregorosWeb.MessagesLive do
         chat_messages_has_more? =
           length(messages) == @messages_page_size and is_integer(chat_messages_oldest_id)
 
+        dm_peer_supports_e2ee? = ActorKeys.supports_e2ee_dm?(peer_ap_id)
+        dm_encrypt? = dm_peer_supports_e2ee?
+
         dm_markers =
           case List.last(messages) do
             %{id: id} when is_integer(id) ->
@@ -215,6 +229,8 @@ defmodule EgregorosWeb.MessagesLive do
            selected_peer_ap_id: peer_ap_id,
            selected_peer: selected_peer,
            conversation_e2ee?: conversation_e2ee?,
+           dm_peer_supports_e2ee?: dm_peer_supports_e2ee?,
+           dm_encrypt?: dm_encrypt?,
            chat_messages_has_more?: chat_messages_has_more?,
            chat_messages_oldest_id: chat_messages_oldest_id,
            dm_markers: dm_markers,
@@ -257,6 +273,8 @@ defmodule EgregorosWeb.MessagesLive do
            selected_peer_ap_id: nil,
            selected_peer: nil,
            conversation_e2ee?: false,
+           dm_peer_supports_e2ee?: false,
+           dm_encrypt?: false,
            chat_messages_has_more?: false,
            chat_messages_oldest_id: nil,
            recipient_suggestions: [],
@@ -320,6 +338,9 @@ defmodule EgregorosWeb.MessagesLive do
         chat_messages_has_more? =
           length(messages) == @messages_page_size and is_integer(chat_messages_oldest_id)
 
+        dm_peer_supports_e2ee? = ActorKeys.supports_e2ee_dm?(ap_id)
+        dm_encrypt? = dm_peer_supports_e2ee?
+
         dm_form =
           Phoenix.Component.to_form(%{"recipient" => handle, "content" => "", "e2ee_dm" => ""},
             as: :dm
@@ -340,6 +361,8 @@ defmodule EgregorosWeb.MessagesLive do
            selected_peer_ap_id: ap_id,
            selected_peer: selected_peer,
            conversation_e2ee?: conversation_e2ee?,
+           dm_peer_supports_e2ee?: dm_peer_supports_e2ee?,
+           dm_encrypt?: dm_encrypt?,
            chat_messages_has_more?: chat_messages_has_more?,
            chat_messages_oldest_id: chat_messages_oldest_id,
            dm_markers: dm_markers,
@@ -431,7 +454,11 @@ defmodule EgregorosWeb.MessagesLive do
 
   @impl true
   def handle_event("toggle_dm_encrypt", _params, socket) do
-    {:noreply, assign(socket, :dm_encrypt?, not socket.assigns.dm_encrypt?)}
+    if socket.assigns.dm_peer_supports_e2ee? do
+      {:noreply, assign(socket, :dm_encrypt?, not socket.assigns.dm_encrypt?)}
+    else
+      {:noreply, socket}
+    end
   end
 
   @impl true
@@ -493,6 +520,15 @@ defmodule EgregorosWeb.MessagesLive do
 
             dm_markers = dm_markers_for_conversations(socket.assigns.current_user, conversations)
 
+            dm_peer_supports_e2ee? =
+              if is_binary(peer_ap_id) and peer_ap_id != "" do
+                ActorKeys.supports_e2ee_dm?(peer_ap_id)
+              else
+                false
+              end
+
+            dm_encrypt? = dm_peer_supports_e2ee?
+
             socket =
               socket
               |> put_flash(:info, "Message sent.")
@@ -503,6 +539,8 @@ defmodule EgregorosWeb.MessagesLive do
                 dm_markers: dm_markers,
                 selected_peer_ap_id: peer_ap_id,
                 selected_peer: selected_peer,
+                dm_peer_supports_e2ee?: dm_peer_supports_e2ee?,
+                dm_encrypt?: dm_encrypt?,
                 recipient_suggestions: [],
                 dm_form: dm_form
               )
@@ -895,7 +933,7 @@ defmodule EgregorosWeb.MessagesLive do
                           name="dm[content]"
                           rows="2"
                           placeholder={
-                            if(@conversation_e2ee? and @dm_encrypt?,
+                            if(@dm_encrypt?,
                               do: "Type an encrypted message...",
                               else: "Type a message..."
                             )
@@ -903,7 +941,7 @@ defmodule EgregorosWeb.MessagesLive do
                           class="w-full resize-none border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-3 py-2 pr-10 text-sm text-[color:var(--text-primary)] focus:outline-none focus-brutal placeholder:text-[color:var(--text-muted)]"
                         ><%= @dm_form.params["content"] || "" %></textarea>
                         <span
-                          :if={@conversation_e2ee? and @dm_encrypt?}
+                          :if={@dm_encrypt?}
                           data-role="dm-composer-lock"
                           class="pointer-events-none absolute bottom-3 right-3 text-[color:var(--success)]"
                         >
@@ -912,6 +950,7 @@ defmodule EgregorosWeb.MessagesLive do
                       </div>
 
                       <button
+                        :if={@dm_peer_supports_e2ee?}
                         type="button"
                         data-role="dm-encrypt-toggle"
                         phx-click="toggle_dm_encrypt"
