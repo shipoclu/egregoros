@@ -636,6 +636,8 @@ const enableE2EEWithMnemonic = async (section, button, csrfToken) => {
   }
 
   window.egregorosE2EE = e2eeIdentity
+  storeE2EEPrivateJwk(kid, privateJwkFull)
+  window.dispatchEvent(new CustomEvent("egregoros:e2ee-unlocked", {detail: {kid}}))
   e2eeStatusCache = null
 
   setE2EEFeedback(section, "Encrypted DMs enabled. Store your recovery phrase somewhere safe.", "success")
@@ -708,6 +710,102 @@ const sliceArrayBuffer = bytes => {
 let e2eeIdentity = null
 let e2eeUnlockPromise = null
 
+const e2eeIdentityStorageKey = kid => {
+  if (!kid) return null
+  return `egregoros:e2ee:identity:v1:${kid}`
+}
+
+const loadStoredE2EEPrivateJwk = kid => {
+  const key = e2eeIdentityStorageKey(kid)
+  if (!key) return null
+
+  try {
+    const raw = window.localStorage?.getItem?.(key)
+    if (!raw) return null
+    const decoded = JSON.parse(raw)
+    if (!decoded?.private_jwk) return null
+    return decoded.private_jwk
+  } catch (_error) {
+    return null
+  }
+}
+
+const storeE2EEPrivateJwk = (kid, privateJwk) => {
+  const key = e2eeIdentityStorageKey(kid)
+  if (!key || !privateJwk) return
+
+  try {
+    window.localStorage?.setItem?.(
+      key,
+      JSON.stringify({kid, private_jwk: privateJwk, stored_at: new Date().toISOString()})
+    )
+  } catch (_error) {
+    // ignore storage failures (private mode, quota, disabled storage)
+  }
+}
+
+const clearStoredE2EEPrivateJwk = kid => {
+  const key = e2eeIdentityStorageKey(kid)
+  if (!key) return
+
+  try {
+    window.localStorage?.removeItem?.(key)
+  } catch (_error) {
+    // ignore storage failures
+  }
+}
+
+let e2eeRestorePromise = null
+
+const restoreE2EEIdentityFromStorage = async () => {
+  if (e2eeIdentity?.privateKey) return e2eeIdentity
+  if (e2eeRestorePromise) return e2eeRestorePromise
+
+  e2eeRestorePromise = (async () => {
+    let status
+    try {
+      status = await fetchE2EEStatus()
+    } catch (_error) {
+      return null
+    }
+
+    if (!status?.enabled || !status?.active_key?.kid) return null
+
+    const kid = status.active_key.kid
+    const stored = loadStoredE2EEPrivateJwk(kid)
+    if (!stored) return null
+
+    let privateKey
+    try {
+      privateKey = await crypto.subtle.importKey(
+        "jwk",
+        stored,
+        {name: "ECDH", namedCurve: "P-256"},
+        false,
+        ["deriveBits"]
+      )
+    } catch (error) {
+      console.error("stored e2ee identity import failed", error)
+      clearStoredE2EEPrivateJwk(kid)
+      return null
+    }
+
+    e2eeIdentity = {
+      kid,
+      publicKeyJwk: status.active_key.public_key_jwk,
+      privateKey,
+    }
+
+    window.egregorosE2EE = e2eeIdentity
+    window.dispatchEvent(new CustomEvent("egregoros:e2ee-unlocked", {detail: {kid}}))
+    return e2eeIdentity
+  })().finally(() => {
+    e2eeRestorePromise = null
+  })
+
+  return e2eeRestorePromise
+}
+
 const unlockE2EEIdentity = async () => {
   if (e2eeIdentity?.privateKey) return e2eeIdentity
   if (e2eeUnlockPromise) return e2eeUnlockPromise
@@ -716,6 +814,33 @@ const unlockE2EEIdentity = async () => {
     const status = await fetchE2EEStatus()
 
     if (!status?.enabled || !status?.active_key) throw new Error("e2ee_not_enabled")
+
+    const stored = loadStoredE2EEPrivateJwk(status.active_key.kid)
+
+    if (stored) {
+      try {
+        const privateKey = await crypto.subtle.importKey(
+          "jwk",
+          stored,
+          {name: "ECDH", namedCurve: "P-256"},
+          false,
+          ["deriveBits"]
+        )
+
+        e2eeIdentity = {
+          kid: status.active_key.kid,
+          publicKeyJwk: status.active_key.public_key_jwk,
+          privateKey,
+        }
+
+        window.egregorosE2EE = e2eeIdentity
+        window.dispatchEvent(new CustomEvent("egregoros:e2ee-unlocked", {detail: {kid: e2eeIdentity.kid}}))
+        return e2eeIdentity
+      } catch (error) {
+        console.error("stored e2ee identity unlock failed", error)
+        clearStoredE2EEPrivateJwk(status.active_key.kid)
+      }
+    }
 
     const wrapper = (status?.wrappers || []).find(w => w?.type === "recovery_mnemonic_v1")
     if (!wrapper) throw new Error("e2ee_no_mnemonic_wrapper")
@@ -776,6 +901,8 @@ const unlockE2EEIdentity = async () => {
     }
 
     window.egregorosE2EE = e2eeIdentity
+    storeE2EEPrivateJwk(status.active_key.kid, privateJwk)
+    window.dispatchEvent(new CustomEvent("egregoros:e2ee-unlocked", {detail: {kid: e2eeIdentity.kid}}))
     return e2eeIdentity
   })()
     .catch(error => {
@@ -1002,9 +1129,15 @@ const clearDmE2EEFeedback = form => {
 
 const E2EEDMComposer = {
   mounted() {
-    this.submitting = false
+    this.encrypting = false
+    this.skipNextSubmit = false
+    restoreE2EEIdentityFromStorage()
+
     this.onSubmit = async e => {
-      if (this.submitting) return
+      if (this.skipNextSubmit) {
+        this.skipNextSubmit = false
+        return
+      }
 
       const recipientInput = this.el.querySelector("input[name='dm[recipient]']")
       const contentInput = this.el.querySelector("textarea[name='dm[content]']")
@@ -1014,31 +1147,44 @@ const E2EEDMComposer = {
       if (!recipientInput || !contentInput || !payloadInput) return
 
       clearDmE2EEFeedback(this.el)
-      payloadInput.value = ""
 
       const encryptEnabled = ((encryptInput?.value || "true") + "").trim() !== "false"
       const recipientRaw = (recipientInput.value || "").trim()
       const plaintext = (contentInput.value || "").trim()
       if (!recipientRaw || !plaintext) return
+      if (!encryptEnabled) {
+        payloadInput.value = ""
+        return
+      }
 
       const {nickname, domain} = parseHandle(recipientRaw)
       if (!nickname) return
+
+      e.preventDefault()
+      e.stopPropagation()
+      e.stopImmediatePropagation()
+
+      if (this.encrypting) return
+
+      this.encrypting = true
+      payloadInput.value = ""
 
       let status
       try {
         status = await fetchE2EEStatus()
       } catch (error) {
         console.error("e2ee status fetch failed", error)
-        e.preventDefault()
         setDmE2EEFeedback(this.el, "Could not check encrypted DM status.")
+        this.encrypting = false
         return
       }
 
-      if (!status?.enabled) return
-      if (!encryptEnabled) return
+      if (!status?.enabled) {
+        setDmE2EEFeedback(this.el, "Encrypted DMs are not enabled.")
+        this.encrypting = false
+        return
+      }
 
-      e.preventDefault()
-      this.submitting = true
       setDmE2EEFeedback(this.el, "Encrypting…")
 
       try {
@@ -1072,6 +1218,8 @@ const E2EEDMComposer = {
         contentInput.value = "Encrypted message"
         setDmE2EEFeedback(this.el, "Encrypted. Sending…")
 
+        this.encrypting = false
+        this.skipNextSubmit = true
         this.el.requestSubmit()
       } catch (error) {
         console.error("e2ee dm encrypt failed", error)
@@ -1080,16 +1228,16 @@ const E2EEDMComposer = {
             ? "Recipient does not support encrypted DMs."
             : error?.message === "e2ee_not_enabled"
               ? "Encrypted DMs are not enabled."
-              : error?.message === "e2ee_no_mnemonic_wrapper"
-                ? "Encrypted DMs are locked on this device."
-                : error?.message === "e2ee_mnemonic_cancelled"
-                  ? "Unlock cancelled."
-                  : error?.message === "e2ee_mnemonic_invalid"
-                    ? "Invalid recovery phrase."
-                    : "Could not encrypt this message."
+            : error?.message === "e2ee_no_mnemonic_wrapper"
+              ? "Encrypted DMs are locked on this device."
+            : error?.message === "e2ee_mnemonic_cancelled"
+              ? "Unlock cancelled."
+            : error?.message === "e2ee_mnemonic_invalid"
+              ? "Invalid recovery phrase."
+            : "Could not encrypt this message."
 
         setDmE2EEFeedback(this.el, message)
-        this.submitting = false
+        this.encrypting = false
       }
     }
 
@@ -1108,6 +1256,8 @@ const E2EEDMMessage = {
     this.actionsEl = this.el.querySelector("[data-role='e2ee-dm-actions']")
     this.unlockButton = this.el.querySelector("[data-role='e2ee-dm-unlock']")
 
+    restoreE2EEIdentityFromStorage()
+
     this.onUnlock = async e => {
       e.preventDefault()
       try {
@@ -1117,6 +1267,12 @@ const E2EEDMMessage = {
         console.error("e2ee dm unlock failed", error)
       }
     }
+
+    this.onUnlocked = () => {
+      this.tryDecrypt(false)
+    }
+
+    window.addEventListener("egregoros:e2ee-unlocked", this.onUnlocked)
 
     if (this.unlockButton) this.unlockButton.addEventListener("click", this.onUnlock)
     this.tryDecrypt(false)
@@ -1128,6 +1284,7 @@ const E2EEDMMessage = {
 
   destroyed() {
     if (this.unlockButton) this.unlockButton.removeEventListener("click", this.onUnlock)
+    window.removeEventListener("egregoros:e2ee-unlocked", this.onUnlocked)
   },
 
   readPayload() {
