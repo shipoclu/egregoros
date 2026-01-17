@@ -39,6 +39,49 @@ defmodule Egregoros.DirectMessages do
 
   def list_for_user(_user, _opts), do: []
 
+  def list_conversation(user, peer_ap_id, opts \\ [])
+
+  def list_conversation(%User{ap_id: user_ap_id} = _user, peer_ap_id, opts)
+      when is_binary(user_ap_id) and is_binary(peer_ap_id) and is_list(opts) do
+    limit = opts |> Keyword.get(:limit, 20) |> normalize_limit()
+    max_id = opts |> Keyword.get(:max_id) |> normalize_id()
+    since_id = opts |> Keyword.get(:since_id) |> normalize_id()
+    peer_ap_id = String.trim(peer_ap_id)
+
+    if peer_ap_id == "" do
+      []
+    else
+      from(o in Object,
+        where:
+          o.type in ^@direct_message_types and
+            ((o.actor == ^user_ap_id and
+                (fragment("? @> ?", o.data, ^%{"to" => [peer_ap_id]}) or
+                   fragment("? @> ?", o.data, ^%{"cc" => [peer_ap_id]}) or
+                   fragment("? @> ?", o.data, ^%{"bto" => [peer_ap_id]}) or
+                   fragment("? @> ?", o.data, ^%{"bcc" => [peer_ap_id]}) or
+                   fragment("? @> ?", o.data, ^%{"audience" => [peer_ap_id]}))) or
+               (o.actor == ^peer_ap_id and
+                  (fragment("? @> ?", o.data, ^%{"to" => [user_ap_id]}) or
+                     fragment("? @> ?", o.data, ^%{"cc" => [user_ap_id]}) or
+                     fragment("? @> ?", o.data, ^%{"bto" => [user_ap_id]}) or
+                     fragment("? @> ?", o.data, ^%{"bcc" => [user_ap_id]}) or
+                     fragment("? @> ?", o.data, ^%{"audience" => [user_ap_id]})))) and
+            not fragment("? @> ?", o.data, ^%{"to" => [@as_public]}) and
+            not fragment("? @> ?", o.data, ^%{"cc" => [@as_public]}) and
+            not fragment("? @> ?", o.data, ^%{"audience" => [@as_public]}) and
+            not fragment("jsonb_exists((?->'to'), (? || '/followers'))", o.data, o.actor) and
+            not fragment("jsonb_exists((?->'cc'), (? || '/followers'))", o.data, o.actor),
+        order_by: [desc: o.id],
+        limit: ^limit
+      )
+      |> maybe_where_max_id(max_id)
+      |> maybe_where_since_id(since_id)
+      |> Repo.all()
+    end
+  end
+
+  def list_conversation(_user, _peer_ap_id, _opts), do: []
+
   def direct?(%Object{actor: actor, data: %{} = data}) when is_binary(actor) do
     to = data |> Map.get("to", []) |> List.wrap()
     cc = data |> Map.get("cc", []) |> List.wrap()

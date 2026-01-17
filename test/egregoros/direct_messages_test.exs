@@ -39,6 +39,32 @@ defmodule Egregoros.DirectMessagesTest do
     assert Enum.any?(messages, &(&1.id == dm.id))
   end
 
+  test "list_conversation returns only messages between the user and the peer" do
+    {:ok, alice} = Users.create_local_user("alice")
+    {:ok, bob} = Users.create_local_user("bob")
+    {:ok, carol} = Users.create_local_user("carol")
+
+    received =
+      create_note!("https://remote.example/objects/dm-from-bob", bob.ap_id, %{
+        "to" => [alice.ap_id],
+        "content" => "hi alice"
+      })
+
+    sent =
+      create_note!("https://example.com/objects/dm-to-bob", alice.ap_id, %{
+        "to" => [bob.ap_id],
+        "content" => "hi bob"
+      })
+
+    _other =
+      create_note!("https://example.com/objects/dm-to-carol", alice.ap_id, %{
+        "to" => [carol.ap_id],
+        "content" => "hi carol"
+      })
+
+    assert [^sent, ^received] = DirectMessages.list_conversation(alice, bob.ap_id)
+  end
+
   test "list_for_user includes direct messages addressed via bto/bcc/audience" do
     {:ok, alice} = Users.create_local_user("alice")
 
