@@ -34,6 +34,7 @@ import MediaViewer from "./hooks/media_viewer"
 import ReplyModal from "./hooks/reply_modal"
 import ScrollRestore from "./hooks/scroll_restore"
 import StatusAutoScroll from "./hooks/status_auto_scroll"
+import DMChatScroller from "./hooks/dm_chat_scroller"
 import AudioPlayer from "./hooks/audio_player"
 import VideoPlayer from "./hooks/video_player"
 import {initImageCropper} from "./hooks/image_cropper"
@@ -1364,6 +1365,7 @@ const liveSocket = new LiveSocket("/live", Socket, {
     ReplyModal,
     ScrollRestore,
     StatusAutoScroll,
+    DMChatScroller,
     AudioPlayer,
     VideoPlayer,
     E2EEDMComposer,

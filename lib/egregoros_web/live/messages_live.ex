@@ -781,7 +781,9 @@ defmodule EgregorosWeb.MessagesLive do
                 <div
                   data-role="dm-chat-messages"
                   id="dm-chat-messages"
+                  phx-hook="DMChatScroller"
                   phx-update="stream"
+                  data-peer={@selected_peer_ap_id || ""}
                   class="min-h-0 flex-1 space-y-4 overflow-y-auto bg-[color:var(--bg-subtle)] p-5"
                 >
                   <div

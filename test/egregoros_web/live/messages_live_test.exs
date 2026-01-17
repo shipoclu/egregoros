@@ -132,6 +132,13 @@ defmodule EgregorosWeb.MessagesLiveTest do
     refute has_element?(view, "button[aria-label='Send message'][phx-disable-with='']")
   end
 
+  test "chat window uses a DMChatScroller hook", %{conn: conn, alice: alice} do
+    conn = Plug.Test.init_test_session(conn, %{user_id: alice.id})
+    {:ok, view, _html} = live(conn, "/messages")
+
+    assert has_element?(view, "#dm-chat-messages[phx-hook='DMChatScroller']")
+  end
+
   test "renders avatar images when available", %{
     conn: conn,
     alice: alice,
