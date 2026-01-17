@@ -104,3 +104,9 @@ See also: `e2ee_dm.md` (design notes + threat model).
 - [ ] Work through `frontend_checklist.md` (prioritized UX parity with Mastodon/Pleroma clients).
 - [ ] Composer polish: unify controls, fix edge cases, add missing attachments flows, improve keyboard UX.
 - [ ] Thread/status view polish (navigation, scroll restoration, reply modal UX).
+- [ ] **Messages UI: E2EE chat frontend parity**
+  - [ ] “New” button should start a new chat (no selected peer; recipient input visible).
+  - [ ] Conversation list should show preview + timestamp + unread state (and show an E2EE indicator only when the last message is encrypted).
+  - [ ] New-chat recipient suggestions/autocomplete (handles + remote).
+  - [ ] Make plaintext DMs possible even when E2EE is enabled (toggle per message/conversation).
+  - [ ] Add pagination (“load more”) for conversations + thread messages.
