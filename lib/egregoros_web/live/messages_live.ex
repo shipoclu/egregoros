@@ -158,6 +158,30 @@ defmodule EgregorosWeb.MessagesLive do
   def handle_event("select_conversation", _params, socket), do: {:noreply, socket}
 
   @impl true
+  def handle_event("new_chat", _params, socket) do
+    case socket.assigns.current_user do
+      %User{} ->
+        dm_form =
+          Phoenix.Component.to_form(%{"recipient" => "", "content" => "", "e2ee_dm" => ""},
+            as: :dm
+          )
+
+        {:noreply,
+         socket
+         |> assign(
+           selected_peer_ap_id: nil,
+           selected_peer: nil,
+           conversation_e2ee?: false,
+           dm_form: dm_form
+         )
+         |> stream(:chat_messages, [], reset: true)}
+
+      _ ->
+        {:noreply, socket}
+    end
+  end
+
+  @impl true
   def handle_event("send_dm", %{"dm" => %{} = params}, socket) do
     recipient = params |> Map.get("recipient", "") |> to_string() |> String.trim()
     body = params |> Map.get("content", "") |> to_string() |> String.trim()
@@ -270,6 +294,8 @@ defmodule EgregorosWeb.MessagesLive do
                   </h2>
                   <button
                     type="button"
+                    data-role="dm-new-chat"
+                    phx-click="new_chat"
                     class="border-2 border-[color:var(--border-default)] bg-[color:var(--text-primary)] px-2 py-1 text-xs font-bold uppercase text-[color:var(--bg-base)] transition hover:shadow-[3px_3px_0_var(--border-default)] hover:-translate-x-0.5 hover:-translate-y-0.5"
                   >
                     + New
@@ -438,16 +464,23 @@ defmodule EgregorosWeb.MessagesLive do
                     >
                     </p>
 
-                    <input
-                      type="text"
-                      name="dm[recipient]"
-                      value={@dm_form.params["recipient"] || ""}
-                      placeholder="@alice or @alice@remote.example"
-                      class={[
-                        "w-full border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-3 py-2 font-mono text-sm text-[color:var(--text-primary)] focus:outline-none focus-brutal placeholder:text-[color:var(--text-muted)]",
-                        @selected_peer && "hidden"
-                      ]}
-                    />
+                    <%= if @selected_peer do %>
+                      <input
+                        type="hidden"
+                        name="dm[recipient]"
+                        value={@dm_form.params["recipient"] || ""}
+                        data-role="dm-recipient"
+                      />
+                    <% else %>
+                      <input
+                        type="text"
+                        name="dm[recipient]"
+                        value={@dm_form.params["recipient"] || ""}
+                        data-role="dm-recipient"
+                        placeholder="@alice or @alice@remote.example"
+                        class="w-full border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-3 py-2 font-mono text-sm text-[color:var(--text-primary)] focus:outline-none focus-brutal placeholder:text-[color:var(--text-muted)]"
+                      />
+                    <% end %>
 
                     <div class="flex items-end gap-3">
                       <div class="relative flex-1">

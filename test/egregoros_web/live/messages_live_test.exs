@@ -64,6 +64,26 @@ defmodule EgregorosWeb.MessagesLiveTest do
     refute has_element?(view, "[data-role='dm-message-body']", "DM from carol")
   end
 
+  test "new chat clears the selected conversation and shows the recipient field", %{
+    conn: conn,
+    alice: alice,
+    bob: bob
+  } do
+    {:ok, _} = Publish.post_note(bob, "@alice DM from bob", visibility: "direct")
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: alice.id})
+    {:ok, view, _html} = live(conn, "/messages")
+
+    assert has_element?(view, "[data-role='dm-chat-peer-handle']", "@bob")
+
+    view
+    |> element("[data-role='dm-new-chat']")
+    |> render_click()
+
+    refute has_element?(view, "[data-role='dm-chat-peer-handle']")
+    assert has_element?(view, "input[data-role='dm-recipient'][type='text']")
+  end
+
   test "sending a DM inserts it into the current conversation", %{
     conn: conn,
     alice: alice,
