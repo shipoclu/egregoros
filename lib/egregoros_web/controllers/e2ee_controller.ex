@@ -20,8 +20,7 @@ defmodule EgregorosWeb.E2EEController do
   def actor_key(conn, params) when is_map(params) do
     with %User{} <- conn.assigns.current_user,
          {:ok, actor_ap_id} <- ActorKeys.resolve_actor_ap_id(params),
-         {:ok, actor} <- ActorKeys.fetch_actor(actor_ap_id),
-         {:ok, key} <- ActorKeys.extract_actor_key(actor, params["kid"]) do
+         {:ok, key} <- ActorKeys.get_actor_key(actor_ap_id, params["kid"]) do
       json(conn, %{"actor_ap_id" => actor_ap_id, "key" => key})
     else
       nil ->
