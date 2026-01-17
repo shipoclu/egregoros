@@ -18,7 +18,13 @@ config :egregoros, Oban,
     federation_incoming: 10,
     federation_outgoing: 25
   ],
-  plugins: [{Oban.Plugins.Pruner, max_age: 60 * 60 * 24}]
+  plugins: [
+    {Oban.Plugins.Pruner, max_age: 60 * 60 * 24},
+    {Oban.Plugins.Cron,
+     crontab: [
+       {"@daily", Egregoros.Workers.RefreshRemoteFollowingGraphsDaily}
+     ]}
+  ]
 
 config :egregoros, Egregoros.Config, Egregoros.Config.Application
 config :egregoros, Egregoros.Signature, Egregoros.Signature.HTTP
