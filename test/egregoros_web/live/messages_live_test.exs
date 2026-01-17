@@ -124,6 +124,29 @@ defmodule EgregorosWeb.MessagesLiveTest do
     assert has_element?(view, "[data-role='dm-message-body']", "hi bob")
   end
 
+  test "renders avatar images when available", %{
+    conn: conn,
+    alice: alice,
+    bob: bob
+  } do
+    {:ok, _} = Users.update_profile(alice, %{"avatar_url" => "https://cdn.example/alice.png"})
+    {:ok, _} = Users.update_profile(bob, %{"avatar_url" => "https://cdn.example/bob.png"})
+
+    {:ok, _} = Publish.post_note(bob, "@alice DM from bob", visibility: "direct")
+    {:ok, _} = Publish.post_note(alice, "@bob DM from alice", visibility: "direct")
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: alice.id})
+    {:ok, view, _html} = live(conn, "/messages")
+
+    assert has_element?(
+             view,
+             "[data-role='dm-conversation'][data-peer-handle='@bob'] img[src='https://cdn.example/bob.png']"
+           )
+
+    assert has_element?(view, "img[src='https://cdn.example/bob.png']")
+    assert has_element?(view, "img[src='https://cdn.example/alice.png']")
+  end
+
   test "sending an encrypted DM stores the payload and renders unlock controls", %{
     conn: conn,
     alice: alice,

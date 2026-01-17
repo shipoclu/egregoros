@@ -646,13 +646,21 @@ defmodule EgregorosWeb.MessagesLive do
                     phx-click="select_conversation"
                     phx-value-peer={conversation.peer.ap_id}
                     class={[
-                      "flex w-full items-start gap-3 border-b border-[color:var(--border-muted)] px-4 py-4 text-left transition hover:bg-[color:var(--bg-subtle)] focus-visible:outline-none focus-brutal",
+                      "flex w-full cursor-pointer items-start gap-3 border-b border-[color:var(--border-muted)] px-4 py-4 text-left transition hover:bg-[color:var(--bg-subtle)] focus-visible:outline-none focus-brutal",
                       conversation.peer.ap_id == @selected_peer_ap_id &&
                         "bg-[color:var(--bg-subtle)] border-l-4 border-l-[color:var(--text-primary)] pl-3"
                     ]}
                   >
-                    <span class="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center border-2 border-[color:var(--border-default)] bg-[color:var(--bg-subtle)] font-bold">
-                      {avatar_initial(conversation.peer.display_name)}
+                    <span class="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden border-2 border-[color:var(--border-default)] bg-[color:var(--bg-subtle)] font-bold">
+                      <%= if conversation.peer.avatar_url do %>
+                        <img
+                          src={conversation.peer.avatar_url}
+                          alt=""
+                          class="h-full w-full object-cover"
+                        />
+                      <% else %>
+                        {avatar_initial(conversation.peer.display_name)}
+                      <% end %>
                     </span>
                     <span class="min-w-0 flex-1">
                       <span class="flex items-start justify-between gap-3">
@@ -705,12 +713,20 @@ defmodule EgregorosWeb.MessagesLive do
                 </button>
               </aside>
 
-              <main class="flex min-h-[70vh] flex-col border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)]">
-                <header class="flex items-center justify-between border-b-2 border-[color:var(--border-default)] px-5 py-4">
+              <main class="flex h-[70vh] flex-col border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)]">
+                <header class="flex shrink-0 items-center justify-between border-b-2 border-[color:var(--border-default)] px-5 py-4">
                   <%= if @selected_peer do %>
                     <div class="flex min-w-0 items-center gap-3">
-                      <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center border-2 border-[color:var(--border-default)] bg-[color:var(--bg-subtle)] font-bold">
-                        {avatar_initial(@selected_peer.display_name)}
+                      <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden border-2 border-[color:var(--border-default)] bg-[color:var(--bg-subtle)] font-bold">
+                        <%= if @selected_peer.avatar_url do %>
+                          <img
+                            src={@selected_peer.avatar_url}
+                            alt=""
+                            class="h-full w-full object-cover"
+                          />
+                        <% else %>
+                          {avatar_initial(@selected_peer.display_name)}
+                        <% end %>
                       </span>
                       <div class="min-w-0">
                         <p class="truncate font-bold text-[color:var(--text-primary)]">
@@ -756,7 +772,7 @@ defmodule EgregorosWeb.MessagesLive do
                   type="button"
                   data-role="dm-load-older"
                   phx-click="load_older_messages"
-                  class="border-b-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-5 py-3 text-center text-xs font-bold uppercase tracking-widest text-[color:var(--text-primary)] transition hover:shadow-[4px_4px_0_var(--border-default)] hover:-translate-x-0.5 hover:-translate-y-0.5 focus-visible:outline-none focus-brutal"
+                  class="shrink-0 border-b-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-5 py-3 text-center text-xs font-bold uppercase tracking-widest text-[color:var(--text-primary)] transition hover:shadow-[4px_4px_0_var(--border-default)] hover:-translate-x-0.5 hover:-translate-y-0.5 focus-visible:outline-none focus-brutal"
                 >
                   Load older messages
                 </button>
@@ -765,7 +781,7 @@ defmodule EgregorosWeb.MessagesLive do
                   data-role="dm-chat-messages"
                   id="dm-chat-messages"
                   phx-update="stream"
-                  class="flex-1 space-y-4 overflow-y-auto bg-[color:var(--bg-subtle)] p-5"
+                  class="min-h-0 flex-1 space-y-4 overflow-y-auto bg-[color:var(--bg-subtle)] p-5"
                 >
                   <div
                     id="dm-chat-empty"
@@ -790,10 +806,28 @@ defmodule EgregorosWeb.MessagesLive do
                       message.actor == @current_user.ap_id && "flex-row-reverse ml-auto"
                     ]}
                   >
-                    <span class="mt-1 inline-flex h-8 w-8 shrink-0 items-center justify-center border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] text-xs font-bold">
-                      {if message.actor == @current_user.ap_id,
-                        do: avatar_initial(@current_user.nickname),
-                        else: avatar_initial(@selected_peer && @selected_peer.display_name)}
+                    <span class="mt-1 inline-flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] text-xs font-bold">
+                      <%= if message.actor == @current_user.ap_id do %>
+                        <%= if @current_user.avatar_url do %>
+                          <img
+                            src={@current_user.avatar_url}
+                            alt=""
+                            class="h-full w-full object-cover"
+                          />
+                        <% else %>
+                          {avatar_initial(@current_user.nickname)}
+                        <% end %>
+                      <% else %>
+                        <%= if @selected_peer && @selected_peer.avatar_url do %>
+                          <img
+                            src={@selected_peer.avatar_url}
+                            alt=""
+                            class="h-full w-full object-cover"
+                          />
+                        <% else %>
+                          {avatar_initial(@selected_peer && @selected_peer.display_name)}
+                        <% end %>
+                      <% end %>
                     </span>
 
                     <div class={[
@@ -822,7 +856,7 @@ defmodule EgregorosWeb.MessagesLive do
                   </div>
                 </div>
 
-                <div class="border-t-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-5 py-4">
+                <div class="shrink-0 border-t-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-5 py-4">
                   <.form
                     for={@dm_form}
                     id="dm-form"
