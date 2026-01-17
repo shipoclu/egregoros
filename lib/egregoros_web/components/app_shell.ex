@@ -11,6 +11,7 @@ defmodule EgregorosWeb.AppShell do
   attr :active, :atom,
     values: [
       :timeline,
+      :explore,
       :search,
       :notifications,
       :messages,
@@ -103,6 +104,14 @@ defmodule EgregorosWeb.AppShell do
                   icon="hero-home"
                   label="Timeline"
                   navigate={timeline_href(@current_user)}
+                />
+
+                <.nav_link
+                  role="nav-explore"
+                  active={@active == :explore}
+                  icon="hero-compass"
+                  label="Explore"
+                  navigate={~p"/explore"}
                 />
 
                 <.nav_link
@@ -226,6 +235,14 @@ defmodule EgregorosWeb.AppShell do
             icon="hero-home"
             label="Timeline"
             navigate={timeline_href(@current_user)}
+          />
+
+          <.bottom_nav_link
+            role="nav-explore"
+            active={@active == :explore}
+            icon="hero-compass"
+            label="Explore"
+            navigate={~p"/explore"}
           />
 
           <.bottom_nav_link

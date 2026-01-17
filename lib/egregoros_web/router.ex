@@ -87,6 +87,7 @@ defmodule EgregorosWeb.Router do
 
     live "/settings/privacy", PrivacyLive
     live "/search", SearchLive
+    live "/explore", ExploreLive
     live "/tags/:tag", TagLive
     live "/notifications", NotificationsLive
     live "/messages", MessagesLive
