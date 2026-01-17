@@ -831,31 +831,74 @@ const fetchActorE2EEKey = async (actorApId, kid) => {
   const cacheKey = `${actorApId}#${kid || ""}`
   if (actorKeyCache.has(cacheKey)) return actorKeyCache.get(cacheKey)
 
-  const response = await fetch(actorApId, {
-    method: "GET",
-    credentials: "same-origin",
-    headers: {accept: "application/activity+json"},
-  })
+  const payload = {actor_ap_id: actorApId}
+  if (kid) payload.kid = kid
+
+  let response
+  try {
+    response = await fetch("/settings/e2ee/actor_key", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "content-type": "application/json",
+        accept: "application/json",
+        "x-csrf-token": csrfToken,
+      },
+      body: JSON.stringify(payload),
+    })
+  } catch (error) {
+    console.error("e2ee actor_key fetch failed", error)
+    return null
+  }
 
   if (!response.ok) return null
-  const actor = await response.json().catch(() => null)
-  if (!actor) return null
 
-  const e2ee = actor["egregoros:e2ee"]
-  const keys = e2ee?.keys
-  if (!Array.isArray(keys) || keys.length === 0) return null
+  const body = await response.json().catch(() => null)
+  const key = body?.key
 
-  const selected = kid ? keys.find(k => k?.kid === kid) : keys[0]
-  if (!selected?.kty || !selected?.crv || !selected?.x || !selected?.y || !selected?.kid) return null
-
-  const key = {
-    kid: selected.kid,
-    jwk: {kty: selected.kty, crv: selected.crv, x: selected.x, y: selected.y},
-    fingerprint: selected.fingerprint || null,
-  }
+  if (!key?.kid || !key?.jwk?.kty || !key?.jwk?.crv || !key?.jwk?.x || !key?.jwk?.y) return null
 
   actorKeyCache.set(cacheKey, key)
   return key
+}
+
+const resolveHandleE2EEKey = async handle => {
+  if (typeof handle !== "string") return null
+
+  const normalized = handle.trim()
+  if (!normalized) return null
+
+  let response
+  try {
+    response = await fetch("/settings/e2ee/actor_key", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "content-type": "application/json",
+        accept: "application/json",
+        "x-csrf-token": csrfToken,
+      },
+      body: JSON.stringify({handle: normalized}),
+    })
+  } catch (error) {
+    console.error("e2ee actor_key handle fetch failed", error)
+    return null
+  }
+
+  if (!response.ok) return null
+
+  const body = await response.json().catch(() => null)
+  const actorApId = body?.actor_ap_id
+  const key = body?.key
+
+  if (!actorApId || !key?.kid || !key?.jwk?.kty || !key?.jwk?.crv || !key?.jwk?.x || !key?.jwk?.y) {
+    return null
+  }
+
+  actorKeyCache.set(`${actorApId}#${key.kid}`, key)
+  actorKeyCache.set(`${actorApId}#`, key)
+
+  return {actorApId, key}
 }
 
 const deriveDmKey = async (myPrivateKey, otherPublicKey, saltBytes, infoBytes) => {
@@ -979,18 +1022,13 @@ const E2EEDMComposer = {
       const {nickname, domain} = parseHandle(recipientRaw)
       if (!nickname) return
 
-      // v1: only encrypt when the recipient is local to this instance
-      if (domain && !localHostMatches(domain)) return
-
-      const recipientApId = `${window.location.origin}/users/${nickname}`
-      const recipientKey = await fetchActorE2EEKey(recipientApId, null)
-      if (!recipientKey) return
-
       let status
       try {
         status = await fetchE2EEStatus()
       } catch (error) {
         console.error("e2ee status fetch failed", error)
+        e.preventDefault()
+        setDmE2EEFeedback(this.el, "Could not check encrypted DM status.")
         return
       }
 
@@ -1001,6 +1039,20 @@ const E2EEDMComposer = {
       setDmE2EEFeedback(this.el, "Encrypting…")
 
       try {
+        let recipientApId
+        let recipientKey
+
+        if (domain && !localHostMatches(domain)) {
+          const resolved = await resolveHandleE2EEKey(recipientRaw)
+          if (!resolved?.actorApId || !resolved?.key) throw new Error("e2ee_recipient_no_key")
+          recipientApId = resolved.actorApId
+          recipientKey = resolved.key
+        } else {
+          recipientApId = `${window.location.origin}/users/${nickname}`
+          recipientKey = await fetchActorE2EEKey(recipientApId, null)
+          if (!recipientKey) throw new Error("e2ee_recipient_no_key")
+        }
+
         const identity = await unlockE2EEIdentity()
 
         const payload = await encryptE2EEDM({
@@ -1021,11 +1073,17 @@ const E2EEDMComposer = {
       } catch (error) {
         console.error("e2ee dm encrypt failed", error)
         const message =
-          error?.message === "e2ee_mnemonic_cancelled"
-            ? "Unlock cancelled."
-            : error?.message === "e2ee_mnemonic_invalid"
-              ? "Invalid recovery phrase."
-              : "Could not encrypt this message."
+          error?.message === "e2ee_recipient_no_key"
+            ? "Recipient does not support encrypted DMs."
+            : error?.message === "e2ee_not_enabled"
+              ? "Encrypted DMs are not enabled."
+              : error?.message === "e2ee_no_mnemonic_wrapper"
+                ? "Encrypted DMs are locked on this device."
+                : error?.message === "e2ee_mnemonic_cancelled"
+                  ? "Unlock cancelled."
+                  : error?.message === "e2ee_mnemonic_invalid"
+                    ? "Invalid recovery phrase."
+                    : "Could not encrypt this message."
 
         setDmE2EEFeedback(this.el, message)
         this.submitting = false
