@@ -953,6 +953,8 @@ const stableStringify = value => {
 
 const actorKeyCache = new Map()
 const actorKeyRequestCache = new Map()
+const handleE2EEKeyCache = new Map()
+const handleE2EEKeyRequestCache = new Map()
 
 const seedActorE2EEKeys = (actorApId, keys) => {
   if (typeof actorApId !== "string") return
@@ -1031,37 +1033,54 @@ const resolveHandleE2EEKey = async handle => {
   const normalized = handle.trim()
   if (!normalized) return null
 
-  let response
+  const cachedResolved = handleE2EEKeyCache.get(normalized)
+  if (cachedResolved) return cachedResolved
+  const cachedPromise = handleE2EEKeyRequestCache.get(normalized)
+  if (cachedPromise) return cachedPromise
+
+  const requestPromise = (async () => {
+    let response
+    try {
+      response = await fetch("/settings/e2ee/actor_key", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          "content-type": "application/json",
+          accept: "application/json",
+          "x-csrf-token": csrfToken,
+        },
+        body: JSON.stringify({handle: normalized}),
+      })
+    } catch (error) {
+      console.error("e2ee actor_key handle fetch failed", error)
+      return null
+    }
+
+    if (!response.ok) return null
+
+    const body = await response.json().catch(() => null)
+    const actorApId = body?.actor_ap_id
+    const key = body?.key
+
+    if (!actorApId || !key?.kid || !key?.jwk?.kty || !key?.jwk?.crv || !key?.jwk?.x || !key?.jwk?.y) {
+      return null
+    }
+
+    actorKeyCache.set(`${actorApId}#${key.kid}`, key)
+    actorKeyCache.set(`${actorApId}#`, key)
+
+    return {actorApId, key}
+  })()
+
+  handleE2EEKeyRequestCache.set(normalized, requestPromise)
+
   try {
-    response = await fetch("/settings/e2ee/actor_key", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: {
-        "content-type": "application/json",
-        accept: "application/json",
-        "x-csrf-token": csrfToken,
-      },
-      body: JSON.stringify({handle: normalized}),
-    })
-  } catch (error) {
-    console.error("e2ee actor_key handle fetch failed", error)
-    return null
+    const resolved = await requestPromise
+    if (resolved) handleE2EEKeyCache.set(normalized, resolved)
+    return resolved
+  } finally {
+    handleE2EEKeyRequestCache.delete(normalized)
   }
-
-  if (!response.ok) return null
-
-  const body = await response.json().catch(() => null)
-  const actorApId = body?.actor_ap_id
-  const key = body?.key
-
-  if (!actorApId || !key?.kid || !key?.jwk?.kty || !key?.jwk?.crv || !key?.jwk?.x || !key?.jwk?.y) {
-    return null
-  }
-
-  actorKeyCache.set(`${actorApId}#${key.kid}`, key)
-  actorKeyCache.set(`${actorApId}#`, key)
-
-  return {actorApId, key}
 }
 
 const deriveDmKey = async (myPrivateKey, otherPublicKey, saltBytes, infoBytes) => {
@@ -1227,7 +1246,13 @@ const E2EEDMComposer = {
         let recipientApId
         let recipientKey
 
-        if (domain && !localHostMatches(domain)) {
+        const peerApId = (this.el.dataset.peerApId || "").trim()
+
+        if (peerApId) {
+          recipientApId = peerApId
+          recipientKey = await fetchActorE2EEKey(recipientApId, null)
+          if (!recipientKey) throw new Error("e2ee_recipient_no_key")
+        } else if (domain && !localHostMatches(domain)) {
           const resolved = await resolveHandleE2EEKey(recipientRaw)
           if (!resolved?.actorApId || !resolved?.key) throw new Error("e2ee_recipient_no_key")
           recipientApId = resolved.actorApId

@@ -902,6 +902,7 @@ defmodule EgregorosWeb.MessagesLive do
                     phx-hook="E2EEDMComposer"
                     data-role="dm-composer"
                     data-user-ap-id={@current_user.ap_id}
+                    data-peer-ap-id={@selected_peer_ap_id || ""}
                     class="space-y-3"
                   >
                     <input
