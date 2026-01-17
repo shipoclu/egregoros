@@ -11,10 +11,11 @@ defmodule EgregorosWeb.TimelineLive do
   alias Egregoros.Timeline
   alias Egregoros.User
   alias Egregoros.Users
+  alias EgregorosWeb.Components.TimelineItems.TimelineItem
   alias EgregorosWeb.Live.Uploads, as: LiveUploads
+  alias EgregorosWeb.MentionAutocomplete
   alias EgregorosWeb.Param
   alias EgregorosWeb.ViewModels.Status, as: StatusVM
-  alias EgregorosWeb.MentionAutocomplete
 
   @page_size 20
   @impl true
@@ -933,7 +934,7 @@ defmodule EgregorosWeb.TimelineLive do
               No posts yet.
             </div>
 
-            <StatusCard.status_card
+            <TimelineItem.timeline_item
               :for={{id, entry} <- @streams.posts}
               id={id}
               entry={entry}
