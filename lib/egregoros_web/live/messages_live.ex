@@ -1058,20 +1058,34 @@ defmodule EgregorosWeb.MessagesLive do
       phx-hook={if is_binary(e2ee_payload), do: "E2EEDMMessage", else: nil}
     >
       <%= if is_binary(e2ee_payload) do %>
-        <span data-role="e2ee-dm-body"><span class="italic opacity-60">[Encrypted]</span></span><span
-          data-role="e2ee-dm-actions"
-          class="ml-2"
-        ><button
-          type="button"
-          data-role="e2ee-dm-unlock"
-          class={[
-            "inline-flex cursor-pointer items-center gap-1 border px-2 py-0.5 align-middle font-mono text-[10px] font-bold uppercase tracking-wide transition focus-visible:outline-none",
-            @is_own &&
-              "border-[color:var(--bg-base)] text-[color:var(--bg-base)] hover:bg-[color:var(--bg-base)] hover:text-[color:var(--text-primary)]",
-            !@is_own &&
-              "border-[color:var(--border-default)] text-[color:var(--text-primary)] hover:bg-[color:var(--text-primary)] hover:text-[color:var(--bg-base)]"
-          ]}
-        ><.icon name="hero-lock-open" class="size-3" /> Unlock</button></span>
+        <span data-role="e2ee-dm-body">
+          <span data-role="e2ee-dm-placeholder" class="italic opacity-60">[Encrypted]</span>
+          <span
+            data-role="e2ee-dm-decrypting"
+            class="hidden ml-2 inline-flex items-center gap-1 italic opacity-60"
+          >
+            <span class="inline-flex animate-spin">
+              <.icon name="hero-arrow-path" class="size-3" />
+            </span>
+            Decrypting…
+          </span>
+        </span>
+
+        <span data-role="e2ee-dm-actions" class="ml-2">
+          <button
+            type="button"
+            data-role="e2ee-dm-unlock"
+            class={[
+              "inline-flex cursor-pointer items-center gap-1 border px-2 py-0.5 align-middle font-mono text-[10px] font-bold uppercase tracking-wide transition focus-visible:outline-none",
+              @is_own &&
+                "border-[color:var(--bg-base)] text-[color:var(--bg-base)] hover:bg-[color:var(--bg-base)] hover:text-[color:var(--text-primary)]",
+              !@is_own &&
+                "border-[color:var(--border-default)] text-[color:var(--text-primary)] hover:bg-[color:var(--text-primary)] hover:text-[color:var(--bg-base)]"
+            ]}
+          >
+            <.icon name="hero-lock-open" class="size-3" /> Unlock
+          </button>
+        </span>
       <% else %>
         {dm_content_html(@message)}
       <% end %>

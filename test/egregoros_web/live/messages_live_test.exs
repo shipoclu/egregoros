@@ -215,6 +215,7 @@ defmodule EgregorosWeb.MessagesLiveTest do
     |> render_submit()
 
     assert has_element?(view, "[data-role='e2ee-dm-body']", "[Encrypted]")
+    assert has_element?(view, "[data-role='e2ee-dm-decrypting']")
     refute has_element?(view, "[data-role='dm-message-body']", "this-should-not-be-stored")
 
     assert has_element?(view, "[data-role='dm-e2ee-badge']")

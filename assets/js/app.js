@@ -1253,6 +1253,7 @@ const E2EEDMComposer = {
 const E2EEDMMessage = {
   mounted() {
     this.decrypted = false
+    this.decrypting = false
 
     restoreE2EEIdentityFromStorage()
 
@@ -1290,6 +1291,8 @@ const E2EEDMMessage = {
   syncElements() {
     this.bodyEl = this.el.querySelector("[data-role='e2ee-dm-body']")
     this.actionsEl = this.el.querySelector("[data-role='e2ee-dm-actions']")
+    this.decryptingEl = this.el.querySelector("[data-role='e2ee-dm-decrypting']")
+    this.placeholderEl = this.el.querySelector("[data-role='e2ee-dm-placeholder']")
 
     const nextUnlockButton = this.el.querySelector("[data-role='e2ee-dm-unlock']")
     if (nextUnlockButton === this.unlockButton) return
@@ -1308,6 +1311,11 @@ const E2EEDMMessage = {
     } catch (_error) {
       return null
     }
+  },
+
+  setDecrypting(nextDecrypting) {
+    if (this.decryptingEl) this.decryptingEl.classList.toggle("hidden", !nextDecrypting)
+    if (this.placeholderEl) this.placeholderEl.classList.toggle("hidden", nextDecrypting)
   },
 
   async tryDecrypt(triggeredByUser) {
@@ -1331,6 +1339,11 @@ const E2EEDMMessage = {
 
     if (this.decrypted && this.actionsEl?.classList?.contains("hidden")) return
 
+    if (this.decrypting) return
+
+    this.decrypting = true
+    this.setDecrypting(true)
+
     try {
       const plaintext = await decryptE2EEDM({
         payload,
@@ -1345,6 +1358,9 @@ const E2EEDMMessage = {
       this.decrypted = true
     } catch (error) {
       if (triggeredByUser) console.error("e2ee dm decrypt failed", error)
+    } finally {
+      this.decrypting = false
+      this.setDecrypting(false)
     }
   },
 }
