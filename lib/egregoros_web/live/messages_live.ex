@@ -90,6 +90,7 @@ defmodule EgregorosWeb.MessagesLive do
      |> assign(
        current_user: current_user,
        dm_markers: dm_markers,
+       dm_encrypt?: true,
        notifications_count: notifications_count(current_user),
        recipient_suggestions: [],
        selected_peer_ap_id: selected_peer_ap_id,
@@ -288,6 +289,11 @@ defmodule EgregorosWeb.MessagesLive do
   end
 
   def handle_event("pick_recipient", _params, socket), do: {:noreply, socket}
+
+  @impl true
+  def handle_event("toggle_dm_encrypt", _params, socket) do
+    {:noreply, assign(socket, :dm_encrypt?, not socket.assigns.dm_encrypt?)}
+  end
 
   @impl true
   def handle_event("send_dm", %{"dm" => %{} = params}, socket) do
@@ -613,6 +619,13 @@ defmodule EgregorosWeb.MessagesLive do
                       tabindex="-1"
                     />
 
+                    <input
+                      type="hidden"
+                      name="dm[encrypt]"
+                      value={if @dm_encrypt?, do: "true", else: "false"}
+                      data-role="dm-encrypt-enabled"
+                    />
+
                     <p
                       data-role="dm-e2ee-feedback"
                       class="hidden border border-[color:var(--border-default)] bg-[color:var(--bg-subtle)] px-3 py-2 text-sm text-[color:var(--text-secondary)]"
@@ -695,7 +708,7 @@ defmodule EgregorosWeb.MessagesLive do
                           name="dm[content]"
                           rows="2"
                           placeholder={
-                            if(@conversation_e2ee?,
+                            if(@conversation_e2ee? and @dm_encrypt?,
                               do: "Type an encrypted message...",
                               else: "Type a message..."
                             )
@@ -703,12 +716,32 @@ defmodule EgregorosWeb.MessagesLive do
                           class="w-full resize-none border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-3 py-2 pr-10 text-sm text-[color:var(--text-primary)] focus:outline-none focus-brutal placeholder:text-[color:var(--text-muted)]"
                         ><%= @dm_form.params["content"] || "" %></textarea>
                         <span
-                          :if={@conversation_e2ee?}
+                          :if={@conversation_e2ee? and @dm_encrypt?}
+                          data-role="dm-composer-lock"
                           class="pointer-events-none absolute bottom-3 right-3 text-[color:var(--success)]"
                         >
                           <.icon name="hero-lock-closed" class="size-5" />
                         </span>
                       </div>
+
+                      <button
+                        type="button"
+                        data-role="dm-encrypt-toggle"
+                        phx-click="toggle_dm_encrypt"
+                        class={[
+                          "inline-flex h-10 items-center gap-2 border-2 border-[color:var(--border-default)] px-3 text-xs font-bold uppercase tracking-widest transition focus-visible:outline-none focus-brutal",
+                          @dm_encrypt? &&
+                            "bg-[color:var(--success-subtle)] text-[color:var(--success)] hover:shadow-[3px_3px_0_var(--success)]",
+                          !@dm_encrypt? &&
+                            "bg-[color:var(--bg-subtle)] text-[color:var(--text-muted)] hover:shadow-[3px_3px_0_var(--border-default)]"
+                        ]}
+                      >
+                        <.icon
+                          name={if @dm_encrypt?, do: "hero-lock-closed", else: "hero-lock-open"}
+                          class="size-4"
+                        />
+                        {if @dm_encrypt?, do: "Encrypt", else: "Plain"}
+                      </button>
 
                       <.button type="submit" phx-disable-with="Sending..." aria-label="Send message">
                         <.icon name="hero-paper-airplane" class="size-4" />

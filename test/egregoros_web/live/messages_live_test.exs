@@ -313,4 +313,29 @@ defmodule EgregorosWeb.MessagesLiveTest do
              "[data-role='dm-recipient-suggestion'][data-handle='@dave@remote.example']"
            )
   end
+
+  test "the DM encrypt toggle is server authoritative", %{
+    conn: conn,
+    alice: alice,
+    bob: bob
+  } do
+    {:ok, _} =
+      Publish.post_note(bob, "@alice Encrypted message",
+        visibility: "direct",
+        e2ee_dm: e2ee_payload(bob, alice)
+      )
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: alice.id})
+    {:ok, view, _html} = live(conn, "/messages")
+
+    assert has_element?(view, "[data-role='dm-encrypt-enabled'][value='true']")
+    assert has_element?(view, "[data-role='dm-composer-lock']")
+
+    view
+    |> element("[data-role='dm-encrypt-toggle']")
+    |> render_click()
+
+    assert has_element?(view, "[data-role='dm-encrypt-enabled'][value='false']")
+    refute has_element?(view, "[data-role='dm-composer-lock']")
+  end
 end

@@ -1009,12 +1009,14 @@ const E2EEDMComposer = {
       const recipientInput = this.el.querySelector("input[name='dm[recipient]']")
       const contentInput = this.el.querySelector("textarea[name='dm[content]']")
       const payloadInput = this.el.querySelector("[data-role='dm-e2ee-payload']")
+      const encryptInput = this.el.querySelector("[data-role='dm-encrypt-enabled']")
 
       if (!recipientInput || !contentInput || !payloadInput) return
 
       clearDmE2EEFeedback(this.el)
       payloadInput.value = ""
 
+      const encryptEnabled = ((encryptInput?.value || "true") + "").trim() !== "false"
       const recipientRaw = (recipientInput.value || "").trim()
       const plaintext = (contentInput.value || "").trim()
       if (!recipientRaw || !plaintext) return
@@ -1033,6 +1035,7 @@ const E2EEDMComposer = {
       }
 
       if (!status?.enabled) return
+      if (!encryptEnabled) return
 
       e.preventDefault()
       this.submitting = true
