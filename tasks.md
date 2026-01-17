@@ -72,6 +72,32 @@ Notes:
 - [x] Signature strictness tightening (keep **off by default**; enable via `config :egregoros, :signature_strict, true`).
 - [ ] Continuous audit for privacy leaks (public timelines, streaming, media access, DM visibility).
 
+## Messaging / E2EE (Encrypted DMs)
+
+See also: `e2ee_dm.md` (design notes + threat model).
+
+- [ ] **E2EE DMs: 24-word recovery phrase (mnemonic)**
+  - [ ] Add server-side support for adding a new wrapper to the active E2EE key (new endpoint + `Egregoros.E2EE` API), with tests for: 401/409/422/201.
+  - [ ] Add a `recovery_mnemonic_v1` wrapper type (explicit allowlist) and document the stored params (e.g. `hkdf_salt`, `iv`, `info`, `alg`).
+  - [ ] Add settings UI + JS to generate a 24-word mnemonic (BIP39-style), display it once, require confirmation, and upload the wrapper.
+  - [ ] Add unlock UI + JS to paste the 24 words and unlock `E2EE_PRIV` using the mnemonic wrapper (device without passkey).
+
+- [ ] **E2EE DMs: cross-server key discovery (browser CORS-safe)**
+  - [ ] Add an authenticated endpoint to resolve `@user@domain` → actor AP id (WebFinger) and fetch `egregoros:e2ee` keys server-side (signed fetch when needed), returning `{actor_ap_id, keys}`.
+  - [ ] Update `E2EEDMComposer` to encrypt for remote recipients using the endpoint (remove the “local-only” guard) and show clear UX when the recipient has no published E2EE keys.
+  - [ ] Update `E2EEDMMessage` decryption to fetch sender keys via the same endpoint (avoid cross-origin actor fetches), with a useful “can’t decrypt yet” state.
+
+- [ ] **TOFU pinning + key-change warnings**
+  - [ ] Add `e2ee_pins` table + schema for `{owner_user_id, remote_actor_ap_id, kid, fingerprint, first_seen_at, last_seen_at}` (plus optional `public_key_jwk`), and keep access behind a behaviour (Mox in tests).
+  - [ ] Add an endpoint + UI flow to “trust new key” when a remote actor’s key fingerprint changes.
+  - [ ] Block silent encryption to changed keys unless the user re-trusts.
+
+- [ ] **ActivityPub: dedicated `EncryptedMessage` object type**
+  - [ ] Introduce `Egregoros.Activities.EncryptedMessage` and validate it as a direct-only object carrying `egregoros:e2ee_dm`.
+  - [ ] Emit `EncryptedMessage` instead of `Note` for encrypted DMs (likely behind a config flag) and ensure inbox targeting + delivery still works.
+  - [ ] Update DM listing/query paths (`DirectMessages`, `MessagesLive`, etc.) to include `EncryptedMessage`.
+  - [ ] Add fixtures + tests covering ingest, rendering placeholder vs decrypted content, and “unknown type” handling on non-supporting instances.
+
 ## UX / UI (LiveView)
 
 - [ ] Work through `frontend_checklist.md` (prioritized UX parity with Mastodon/Pleroma clients).
