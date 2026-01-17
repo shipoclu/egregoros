@@ -954,6 +954,29 @@ const stableStringify = value => {
 const actorKeyCache = new Map()
 const actorKeyRequestCache = new Map()
 
+const seedActorE2EEKeys = (actorApId, keys) => {
+  if (typeof actorApId !== "string") return
+  const normalized = actorApId.trim()
+  if (!normalized) return
+  if (!Array.isArray(keys)) return
+
+  let firstKey = null
+
+  for (const key of keys) {
+    const kid = key?.kid
+    const jwk = key?.jwk
+
+    if (!kid || !jwk?.kty || !jwk?.crv || !jwk?.x || !jwk?.y) continue
+
+    actorKeyCache.set(`${normalized}#${kid}`, key)
+    if (!firstKey) firstKey = key
+  }
+
+  if (firstKey) actorKeyCache.set(`${normalized}#`, firstKey)
+}
+
+window.egregorosSeedActorE2EEKeys = seedActorE2EEKeys
+
 const fetchActorE2EEKey = async (actorApId, kid) => {
   if (!actorApId) return null
 

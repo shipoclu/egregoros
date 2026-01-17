@@ -39,6 +39,47 @@ defmodule EgregorosWeb.MessagesLiveTest do
     assert has_element?(view, "[data-role='messages-auth-required']")
   end
 
+  test "incoming DMs from a different peer do not replace the open thread", %{
+    conn: conn,
+    alice: alice,
+    bob: bob,
+    carol: carol
+  } do
+    {:ok, _} = Publish.post_note(bob, "@alice DM from bob", visibility: "direct")
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: alice.id})
+    {:ok, view, _html} = live(conn, "/messages")
+
+    assert has_element?(view, "[data-role='dm-chat-peer-handle']", "@bob")
+    assert has_element?(view, "[data-role='dm-message-body']", "DM from bob")
+
+    {:ok, _} = Publish.post_note(carol, "@alice DM from carol", visibility: "direct")
+    [carol_dm] = DirectMessages.list_conversation(alice, carol.ap_id, limit: 1)
+
+    send(view.pid, {:post_created, carol_dm})
+    _ = :sys.get_state(view.pid)
+
+    assert has_element?(view, "[data-role='dm-conversation'][data-peer-handle='@carol']")
+    assert has_element?(view, "[data-role='dm-chat-peer-handle']", "@bob")
+    refute has_element?(view, "[data-role='dm-message-body']", "DM from carol")
+  end
+
+  test "malformed message events do not crash signed-in sessions", %{conn: conn, alice: alice} do
+    conn = Plug.Test.init_test_session(conn, %{user_id: alice.id})
+    {:ok, view, _html} = live(conn, "/messages")
+
+    _html = render_change(view, "dm_change", %{})
+    _html = render_click(view, "pick_recipient", %{})
+    _html = render_click(view, "send_dm", %{})
+
+    view
+    |> form("#dm-form", dm: %{recipient: "@#{alice.nickname}", content: "hello me"})
+    |> render_submit()
+
+    assert [_dm] = DirectMessages.list_for_user(alice, limit: 1)
+    assert has_element?(view, "#dm-form")
+  end
+
   test "shows conversations and selects the newest by default", %{
     conn: conn,
     alice: alice,
@@ -349,7 +390,7 @@ defmodule EgregorosWeb.MessagesLiveTest do
                }
              })
 
-    :ok
+    kid
   end
 
   test "recipient suggestions appear in a new chat and selecting one starts the chat", %{
@@ -444,7 +485,7 @@ defmodule EgregorosWeb.MessagesLiveTest do
     alice: alice,
     bob: bob
   } do
-    enable_e2ee_key!(bob)
+    _kid = enable_e2ee_key!(bob)
 
     {:ok, _} =
       Publish.post_note(bob, "@alice Encrypted message",
@@ -464,6 +505,16 @@ defmodule EgregorosWeb.MessagesLiveTest do
 
     assert has_element?(view, "[data-role='dm-encrypt-enabled'][value='false']")
     refute has_element?(view, "[data-role='dm-composer-lock']")
+  end
+
+  test "chat window preloads the peer's E2EE keys", %{conn: conn, alice: alice, bob: bob} do
+    kid = enable_e2ee_key!(bob)
+    {:ok, _} = Publish.post_note(bob, "@alice hi", visibility: "direct")
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: alice.id})
+    {:ok, view, _html} = live(conn, "/messages")
+
+    assert has_element?(view, "#dm-chat-messages[data-e2ee-peer-keys*='#{kid}']")
   end
 
   test "loads older messages in the current conversation", %{

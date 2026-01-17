@@ -70,12 +70,19 @@ defmodule EgregorosWeb.MessagesLive do
 
     conversation_e2ee? = Enum.any?(messages, &encrypted_message?/1)
 
-    dm_peer_supports_e2ee? =
-      if is_binary(selected_peer_ap_id) and selected_peer_ap_id != "" do
-        ActorKeys.supports_e2ee_dm?(selected_peer_ap_id)
-      else
-        false
+    dm_peer_e2ee_keys =
+      case selected_peer_ap_id do
+        ap_id when is_binary(ap_id) and ap_id != "" ->
+          case ActorKeys.list_actor_keys(ap_id) do
+            {:ok, keys} when is_list(keys) -> keys
+            _ -> []
+          end
+
+        _ ->
+          []
       end
+
+    dm_peer_supports_e2ee? = dm_peer_e2ee_keys != []
 
     dm_encrypt? = dm_peer_supports_e2ee?
 
@@ -114,6 +121,7 @@ defmodule EgregorosWeb.MessagesLive do
      |> assign(
        current_user: current_user,
        dm_markers: dm_markers,
+       dm_peer_e2ee_keys: dm_peer_e2ee_keys,
        dm_peer_supports_e2ee?: dm_peer_supports_e2ee?,
        dm_encrypt?: dm_encrypt?,
        chat_messages_has_more?: chat_messages_has_more?,
@@ -212,7 +220,13 @@ defmodule EgregorosWeb.MessagesLive do
         chat_messages_has_more? =
           length(messages) == @messages_page_size and is_integer(chat_messages_oldest_id)
 
-        dm_peer_supports_e2ee? = ActorKeys.supports_e2ee_dm?(peer_ap_id)
+        dm_peer_e2ee_keys =
+          case ActorKeys.list_actor_keys(peer_ap_id) do
+            {:ok, keys} when is_list(keys) -> keys
+            _ -> []
+          end
+
+        dm_peer_supports_e2ee? = dm_peer_e2ee_keys != []
         dm_encrypt? = dm_peer_supports_e2ee?
 
         dm_markers =
@@ -230,6 +244,7 @@ defmodule EgregorosWeb.MessagesLive do
            selected_peer_ap_id: peer_ap_id,
            selected_peer: selected_peer,
            conversation_e2ee?: conversation_e2ee?,
+           dm_peer_e2ee_keys: dm_peer_e2ee_keys,
            dm_peer_supports_e2ee?: dm_peer_supports_e2ee?,
            dm_encrypt?: dm_encrypt?,
            chat_messages_has_more?: chat_messages_has_more?,
@@ -274,6 +289,7 @@ defmodule EgregorosWeb.MessagesLive do
            selected_peer_ap_id: nil,
            selected_peer: nil,
            conversation_e2ee?: false,
+           dm_peer_e2ee_keys: [],
            dm_peer_supports_e2ee?: false,
            dm_encrypt?: false,
            chat_messages_has_more?: false,
@@ -339,7 +355,13 @@ defmodule EgregorosWeb.MessagesLive do
         chat_messages_has_more? =
           length(messages) == @messages_page_size and is_integer(chat_messages_oldest_id)
 
-        dm_peer_supports_e2ee? = ActorKeys.supports_e2ee_dm?(ap_id)
+        dm_peer_e2ee_keys =
+          case ActorKeys.list_actor_keys(ap_id) do
+            {:ok, keys} when is_list(keys) -> keys
+            _ -> []
+          end
+
+        dm_peer_supports_e2ee? = dm_peer_e2ee_keys != []
         dm_encrypt? = dm_peer_supports_e2ee?
 
         dm_form =
@@ -362,6 +384,7 @@ defmodule EgregorosWeb.MessagesLive do
            selected_peer_ap_id: ap_id,
            selected_peer: selected_peer,
            conversation_e2ee?: conversation_e2ee?,
+           dm_peer_e2ee_keys: dm_peer_e2ee_keys,
            dm_peer_supports_e2ee?: dm_peer_supports_e2ee?,
            dm_encrypt?: dm_encrypt?,
            chat_messages_has_more?: chat_messages_has_more?,
@@ -521,12 +544,19 @@ defmodule EgregorosWeb.MessagesLive do
 
             dm_markers = dm_markers_for_conversations(socket.assigns.current_user, conversations)
 
-            dm_peer_supports_e2ee? =
-              if is_binary(peer_ap_id) and peer_ap_id != "" do
-                ActorKeys.supports_e2ee_dm?(peer_ap_id)
-              else
-                false
+            dm_peer_e2ee_keys =
+              case peer_ap_id do
+                ap_id when is_binary(ap_id) and ap_id != "" ->
+                  case ActorKeys.list_actor_keys(ap_id) do
+                    {:ok, keys} when is_list(keys) -> keys
+                    _ -> []
+                  end
+
+                _ ->
+                  []
               end
+
+            dm_peer_supports_e2ee? = dm_peer_e2ee_keys != []
 
             dm_encrypt? = dm_peer_supports_e2ee?
 
@@ -539,6 +569,7 @@ defmodule EgregorosWeb.MessagesLive do
                 dm_markers: dm_markers,
                 selected_peer_ap_id: peer_ap_id,
                 selected_peer: selected_peer,
+                dm_peer_e2ee_keys: dm_peer_e2ee_keys,
                 dm_peer_supports_e2ee?: dm_peer_supports_e2ee?,
                 dm_encrypt?: dm_encrypt?,
                 recipient_suggestions: [],
@@ -579,6 +610,7 @@ defmodule EgregorosWeb.MessagesLive do
                 socket
                 |> assign(:conversation_e2ee?, Enum.any?(messages, &encrypted_message?/1))
                 |> assign(:dm_markers, dm_markers)
+                |> assign(:dm_peer_e2ee_keys, dm_peer_e2ee_keys)
                 |> assign(:chat_messages_has_more?, chat_messages_has_more?)
                 |> assign(:chat_messages_oldest_id, chat_messages_oldest_id)
                 |> assign(:recipient_suggestions, [])
@@ -588,6 +620,7 @@ defmodule EgregorosWeb.MessagesLive do
                 |> assign(:conversation_e2ee?, false)
                 |> assign(:chat_messages_has_more?, false)
                 |> assign(:chat_messages_oldest_id, nil)
+                |> assign(:dm_peer_e2ee_keys, [])
               end
 
             {:noreply, socket}
@@ -784,6 +817,7 @@ defmodule EgregorosWeb.MessagesLive do
                   phx-hook="DMChatScroller"
                   phx-update="stream"
                   data-peer={@selected_peer_ap_id || ""}
+                  data-e2ee-peer-keys={Jason.encode!(@dm_peer_e2ee_keys)}
                   class="min-h-0 flex-1 space-y-4 overflow-y-auto bg-[color:var(--bg-subtle)] p-5"
                 >
                   <div
