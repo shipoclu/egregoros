@@ -952,42 +952,54 @@ const stableStringify = value => {
 }
 
 const actorKeyCache = new Map()
+const actorKeyRequestCache = new Map()
 
 const fetchActorE2EEKey = async (actorApId, kid) => {
   if (!actorApId) return null
 
   const cacheKey = `${actorApId}#${kid || ""}`
   if (actorKeyCache.has(cacheKey)) return actorKeyCache.get(cacheKey)
+  if (actorKeyRequestCache.has(cacheKey)) return actorKeyRequestCache.get(cacheKey)
 
   const payload = {actor_ap_id: actorApId}
   if (kid) payload.kid = kid
 
-  let response
+  const requestPromise = (async () => {
+    let response
+    try {
+      response = await fetch("/settings/e2ee/actor_key", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          "content-type": "application/json",
+          accept: "application/json",
+          "x-csrf-token": csrfToken,
+        },
+        body: JSON.stringify(payload),
+      })
+    } catch (error) {
+      console.error("e2ee actor_key fetch failed", error)
+      return null
+    }
+
+    if (!response.ok) return null
+
+    const body = await response.json().catch(() => null)
+    const key = body?.key
+
+    if (!key?.kid || !key?.jwk?.kty || !key?.jwk?.crv || !key?.jwk?.x || !key?.jwk?.y) return null
+
+    actorKeyCache.set(cacheKey, key)
+    return key
+  })()
+
+  actorKeyRequestCache.set(cacheKey, requestPromise)
+
   try {
-    response = await fetch("/settings/e2ee/actor_key", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: {
-        "content-type": "application/json",
-        accept: "application/json",
-        "x-csrf-token": csrfToken,
-      },
-      body: JSON.stringify(payload),
-    })
-  } catch (error) {
-    console.error("e2ee actor_key fetch failed", error)
-    return null
+    return await requestPromise
+  } finally {
+    actorKeyRequestCache.delete(cacheKey)
   }
-
-  if (!response.ok) return null
-
-  const body = await response.json().catch(() => null)
-  const key = body?.key
-
-  if (!key?.kid || !key?.jwk?.kty || !key?.jwk?.crv || !key?.jwk?.x || !key?.jwk?.y) return null
-
-  actorKeyCache.set(cacheKey, key)
-  return key
 }
 
 const resolveHandleE2EEKey = async handle => {
