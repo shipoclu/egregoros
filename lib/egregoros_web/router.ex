@@ -159,7 +159,6 @@ defmodule EgregorosWeb.Router do
   scope "/api/v1", EgregorosWeb.MastodonAPI do
     pipe_through [:api, :api_auth]
 
-    get "/followed_tags", EmptyListController, :index
     get "/push/subscription", PushSubscriptionController, :show
     post "/push/subscription", PushSubscriptionController, :create
     put "/push/subscription", PushSubscriptionController, :update
@@ -217,6 +216,7 @@ defmodule EgregorosWeb.Router do
     get "/favourites", FavouritesController, :index
     get "/blocks", BlocksController, :index
     get "/mutes", MutesController, :index
+    get "/followed_tags", FollowedTagsController, :index
     get "/follow_requests", FollowRequestsController, :index
     get "/markers", MarkersController, :index
     get "/statuses/:id/favourited_by", StatusesController, :favourited_by
