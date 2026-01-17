@@ -206,4 +206,203 @@ defmodule EgregorosWeb.E2EEControllerTest do
     assert %{"error" => "invalid_payload", "details" => %{"kid" => _}} =
              json_response(conn, 422)
   end
+
+  describe "POST /settings/e2ee/actor_key" do
+    test "returns 401 when not logged in", %{conn: conn} do
+      conn =
+        post(conn, "/settings/e2ee/actor_key", %{
+          "actor_ap_id" => "https://remote.example/users/bob"
+        })
+
+      assert conn.status == 401
+      assert %{"error" => "unauthorized"} = json_response(conn, 401)
+    end
+
+    test "returns 422 for invalid payload", %{conn: conn} do
+      uniq = System.unique_integer([:positive])
+      user = register_user!(uniq)
+
+      conn =
+        conn
+        |> Plug.Test.init_test_session(%{user_id: user.id})
+        |> post("/settings/e2ee/actor_key", %{})
+
+      assert conn.status == 422
+      assert %{"error" => "invalid_payload"} = json_response(conn, 422)
+    end
+
+    test "returns remote actor key data when available", %{conn: conn} do
+      uniq = System.unique_integer([:positive])
+      user = register_user!(uniq)
+
+      actor_ap_id = "https://remote.example/users/bob"
+
+      actor = %{
+        "id" => actor_ap_id,
+        "type" => "Person",
+        "egregoros:e2ee" => %{
+          "version" => 1,
+          "keys" => [
+            %{
+              "kid" => "e2ee-remote",
+              "kty" => "EC",
+              "crv" => "P-256",
+              "x" => "pQECAwQFBgcICQoLDA0ODw",
+              "y" => "AQIDBAUGBwgJCgsMDQ4PEA",
+              "fingerprint" => "sha256:abc"
+            }
+          ]
+        }
+      }
+
+      expect(Egregoros.HTTP.Mock, :get, fn url, _headers ->
+        assert url == actor_ap_id
+        {:ok, %{status: 200, body: actor, headers: []}}
+      end)
+
+      conn =
+        conn
+        |> Plug.Test.init_test_session(%{user_id: user.id})
+        |> post("/settings/e2ee/actor_key", %{"actor_ap_id" => actor_ap_id})
+
+      assert conn.status == 200
+
+      assert %{
+               "actor_ap_id" => ^actor_ap_id,
+               "key" => %{
+                 "kid" => "e2ee-remote",
+                 "jwk" => %{"kty" => "EC", "crv" => "P-256", "x" => _, "y" => _},
+                 "fingerprint" => "sha256:abc"
+               }
+             } = json_response(conn, 200)
+    end
+
+    test "returns 404 when actor has no e2ee keys", %{conn: conn} do
+      uniq = System.unique_integer([:positive])
+      user = register_user!(uniq)
+
+      actor_ap_id = "https://remote.example/users/bob"
+
+      actor = %{
+        "id" => actor_ap_id,
+        "type" => "Person"
+      }
+
+      expect(Egregoros.HTTP.Mock, :get, fn url, _headers ->
+        assert url == actor_ap_id
+        {:ok, %{status: 200, body: actor, headers: []}}
+      end)
+
+      conn =
+        conn
+        |> Plug.Test.init_test_session(%{user_id: user.id})
+        |> post("/settings/e2ee/actor_key", %{"actor_ap_id" => actor_ap_id})
+
+      assert conn.status == 404
+      assert %{"error" => "no_e2ee_keys"} = json_response(conn, 404)
+    end
+
+    test "resolves handles via WebFinger when a handle is provided", %{conn: conn} do
+      uniq = System.unique_integer([:positive])
+      user = register_user!(uniq)
+
+      handle = "@bob@remote.example"
+      actor_ap_id = "https://remote.example/users/bob"
+
+      jrd = %{
+        "links" => [
+          %{
+            "rel" => "self",
+            "type" => "application/activity+json",
+            "href" => actor_ap_id
+          }
+        ]
+      }
+
+      actor = %{
+        "id" => actor_ap_id,
+        "type" => "Person",
+        "egregoros:e2ee" => %{
+          "version" => 1,
+          "keys" => [
+            %{
+              "kid" => "e2ee-remote",
+              "kty" => "EC",
+              "crv" => "P-256",
+              "x" => "pQECAwQFBgcICQoLDA0ODw",
+              "y" => "AQIDBAUGBwgJCgsMDQ4PEA",
+              "fingerprint" => "sha256:abc"
+            }
+          ]
+        }
+      }
+
+      expect(Egregoros.HTTP.Mock, :get, fn url, _headers ->
+        assert url ==
+                 "https://remote.example/.well-known/webfinger?resource=acct:bob@remote.example"
+
+        {:ok, %{status: 200, body: jrd, headers: []}}
+      end)
+
+      expect(Egregoros.HTTP.Mock, :get, fn url, _headers ->
+        assert url == actor_ap_id
+        {:ok, %{status: 200, body: actor, headers: []}}
+      end)
+
+      conn =
+        conn
+        |> Plug.Test.init_test_session(%{user_id: user.id})
+        |> post("/settings/e2ee/actor_key", %{"handle" => handle})
+
+      assert conn.status == 200
+
+      assert %{"actor_ap_id" => ^actor_ap_id, "key" => %{"kid" => "e2ee-remote"}} =
+               json_response(conn, 200)
+    end
+
+    test "falls back to signed fetch when the actor endpoint requires auth", %{conn: conn} do
+      uniq = System.unique_integer([:positive])
+      user = register_user!(uniq)
+
+      actor_ap_id = "https://remote.example/users/bob"
+
+      actor = %{
+        "id" => actor_ap_id,
+        "type" => "Person",
+        "egregoros:e2ee" => %{
+          "version" => 1,
+          "keys" => [
+            %{
+              "kid" => "e2ee-remote",
+              "kty" => "EC",
+              "crv" => "P-256",
+              "x" => "pQECAwQFBgcICQoLDA0ODw",
+              "y" => "AQIDBAUGBwgJCgsMDQ4PEA",
+              "fingerprint" => "sha256:abc"
+            }
+          ]
+        }
+      }
+
+      expect(Egregoros.HTTP.Mock, :get, fn url, _headers ->
+        assert url == actor_ap_id
+        {:ok, %{status: 401, body: %{}, headers: []}}
+      end)
+
+      expect(Egregoros.HTTP.Mock, :get, fn url, _headers ->
+        assert url == actor_ap_id
+        {:ok, %{status: 200, body: Jason.encode!(actor), headers: []}}
+      end)
+
+      conn =
+        conn
+        |> Plug.Test.init_test_session(%{user_id: user.id})
+        |> post("/settings/e2ee/actor_key", %{"actor_ap_id" => actor_ap_id})
+
+      assert conn.status == 200
+
+      assert %{"actor_ap_id" => ^actor_ap_id, "key" => %{"kid" => "e2ee-remote"}} =
+               json_response(conn, 200)
+    end
+  end
 end
