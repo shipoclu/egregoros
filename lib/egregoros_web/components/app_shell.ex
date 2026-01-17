@@ -109,7 +109,7 @@ defmodule EgregorosWeb.AppShell do
                 <.nav_link
                   role="nav-explore"
                   active={@active == :explore}
-                  icon="hero-compass"
+                  icon="hero-map"
                   label="Explore"
                   navigate={~p"/explore"}
                 />
@@ -240,7 +240,7 @@ defmodule EgregorosWeb.AppShell do
           <.bottom_nav_link
             role="nav-explore"
             active={@active == :explore}
-            icon="hero-compass"
+            icon="hero-map"
             label="Explore"
             navigate={~p"/explore"}
           />

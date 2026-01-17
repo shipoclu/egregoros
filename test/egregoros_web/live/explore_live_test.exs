@@ -13,6 +13,7 @@ defmodule EgregorosWeb.ExploreLiveTest do
 
     {:ok, view, _html} = live(conn, "/explore")
 
+    assert has_element?(view, "[data-role='nav-explore'] .hero-map")
     assert has_element?(view, "[data-role='explore-trending-tags']")
     assert has_element?(view, "[data-role='explore-trending-tag'][href='/tags/elixir']")
   end
