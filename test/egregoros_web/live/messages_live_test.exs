@@ -40,6 +40,7 @@ defmodule EgregorosWeb.MessagesLiveTest do
     assert has_element?(view, "[data-role='dm-chat-peer-handle']", "@carol")
     assert has_element?(view, "[data-role='dm-message-body']", "DM from carol")
     refute has_element?(view, "[data-role='dm-message-body']", "DM from bob")
+    refute has_element?(view, "[data-role='dm-e2ee-badge']")
   end
 
   test "selecting a conversation loads that thread", %{
@@ -122,6 +123,7 @@ defmodule EgregorosWeb.MessagesLiveTest do
     assert has_element?(view, "[data-role='dm-message-body']", "Encrypted message")
     refute has_element?(view, "[data-role='dm-message-body']", "this-should-not-be-stored")
 
+    assert has_element?(view, "[data-role='dm-e2ee-badge']")
     assert has_element?(view, "[data-role='e2ee-dm-unlock']")
 
     [dm] = DirectMessages.list_conversation(alice, bob.ap_id, limit: 1)

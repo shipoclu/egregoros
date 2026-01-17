@@ -53,6 +53,8 @@ defmodule EgregorosWeb.MessagesLive do
           []
       end
 
+    conversation_e2ee? = Enum.any?(messages, &encrypted_message?/1)
+
     recipient =
       case selected_peer do
         %{handle: handle} when is_binary(handle) -> handle
@@ -71,6 +73,7 @@ defmodule EgregorosWeb.MessagesLive do
        notifications_count: notifications_count(current_user),
        selected_peer_ap_id: selected_peer_ap_id,
        selected_peer: selected_peer,
+       conversation_e2ee?: conversation_e2ee?,
        dm_form: dm_form
      )
      |> stream(:conversations, conversations, dom_id: &conversation_dom_id/1)
@@ -90,7 +93,13 @@ defmodule EgregorosWeb.MessagesLive do
 
           socket =
             if is_binary(peer_ap_id) and peer_ap_id == socket.assigns.selected_peer_ap_id do
-              stream_insert(socket, :chat_messages, post, at: -1)
+              socket
+              |> stream_insert(:chat_messages, post, at: -1)
+              |> then(fn socket ->
+                if encrypted_message?(post),
+                  do: assign(socket, :conversation_e2ee?, true),
+                  else: socket
+              end)
             else
               socket
             end
@@ -129,11 +138,14 @@ defmodule EgregorosWeb.MessagesLive do
           |> DirectMessages.list_conversation(peer_ap_id, limit: @messages_page_size)
           |> Enum.reverse()
 
+        conversation_e2ee? = Enum.any?(messages, &encrypted_message?/1)
+
         {:noreply,
          socket
          |> assign(
            selected_peer_ap_id: peer_ap_id,
            selected_peer: selected_peer,
+           conversation_e2ee?: conversation_e2ee?,
            dm_form: dm_form
          )
          |> stream(:chat_messages, messages, reset: true)}
@@ -217,9 +229,11 @@ defmodule EgregorosWeb.MessagesLive do
                   |> DirectMessages.list_conversation(peer_ap_id, limit: @messages_page_size)
                   |> Enum.reverse()
 
-                stream(socket, :chat_messages, messages, reset: true)
-              else
                 socket
+                |> assign(:conversation_e2ee?, Enum.any?(messages, &encrypted_message?/1))
+                |> stream(:chat_messages, messages, reset: true)
+              else
+                assign(socket, :conversation_e2ee?, false)
               end
 
             {:noreply, socket}
@@ -312,7 +326,11 @@ defmodule EgregorosWeb.MessagesLive do
                       </div>
                     </div>
 
-                    <span class="inline-flex items-center gap-2 border border-[color:var(--success)] bg-[color:var(--success-subtle)] px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-[color:var(--success)]">
+                    <span
+                      :if={@conversation_e2ee?}
+                      data-role="dm-e2ee-badge"
+                      class="inline-flex items-center gap-2 border border-[color:var(--success)] bg-[color:var(--success-subtle)] px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-[color:var(--success)]"
+                    >
                       <.icon name="hero-lock-closed" class="size-4" /> E2EE
                     </span>
                   <% else %>
@@ -323,7 +341,11 @@ defmodule EgregorosWeb.MessagesLive do
                       </p>
                     </div>
 
-                    <span class="inline-flex items-center gap-2 border border-[color:var(--success)] bg-[color:var(--success-subtle)] px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-[color:var(--success)]">
+                    <span
+                      :if={@conversation_e2ee?}
+                      data-role="dm-e2ee-badge"
+                      class="inline-flex items-center gap-2 border border-[color:var(--success)] bg-[color:var(--success-subtle)] px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-[color:var(--success)]"
+                    >
                       <.icon name="hero-shield-check" class="size-4" /> E2EE
                     </span>
                   <% end %>
@@ -379,7 +401,11 @@ defmodule EgregorosWeb.MessagesLive do
                       </div>
 
                       <div class="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-widest text-[color:var(--text-muted)]">
-                        <.icon name="hero-lock-closed" class="size-3" />
+                        <.icon
+                          :if={encrypted_message?(message)}
+                          name="hero-lock-closed"
+                          class="size-3"
+                        />
                         <span>{message_timestamp(message)}</span>
                       </div>
                     </div>
@@ -428,10 +454,18 @@ defmodule EgregorosWeb.MessagesLive do
                         <textarea
                           name="dm[content]"
                           rows="2"
-                          placeholder="Type an encrypted message..."
+                          placeholder={
+                            if(@conversation_e2ee?,
+                              do: "Type an encrypted message...",
+                              else: "Type a message..."
+                            )
+                          }
                           class="w-full resize-none border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-3 py-2 pr-10 text-sm text-[color:var(--text-primary)] focus:outline-none focus-brutal placeholder:text-[color:var(--text-muted)]"
                         ><%= @dm_form.params["content"] || "" %></textarea>
-                        <span class="pointer-events-none absolute bottom-3 right-3 text-[color:var(--success)]">
+                        <span
+                          :if={@conversation_e2ee?}
+                          class="pointer-events-none absolute bottom-3 right-3 text-[color:var(--success)]"
+                        >
                           <.icon name="hero-lock-closed" class="size-5" />
                         </span>
                       </div>
@@ -610,6 +644,15 @@ defmodule EgregorosWeb.MessagesLive do
   end
 
   defp e2ee_payload_json(_message), do: nil
+
+  defp encrypted_message?(%{data: %{} = data}) do
+    case Map.get(data, "egregoros:e2ee_dm") do
+      %{} = payload -> map_size(payload) > 0
+      _ -> false
+    end
+  end
+
+  defp encrypted_message?(_message), do: false
 
   defp current_user_ap_id(%{ap_id: ap_id}) when is_binary(ap_id), do: ap_id
   defp current_user_ap_id(_current_user), do: ""
