@@ -4,6 +4,7 @@ defmodule EgregorosWeb.MessagesLiveTest do
   import Phoenix.LiveViewTest
 
   alias Egregoros.DirectMessages
+  alias Egregoros.Keys
   alias Egregoros.Publish
   alias Egregoros.Users
 
@@ -259,5 +260,57 @@ defmodule EgregorosWeb.MessagesLiveTest do
       },
       "ciphertext" => "ciphertext"
     }
+  end
+
+  test "recipient suggestions appear in a new chat and selecting one starts the chat", %{
+    conn: conn,
+    alice: alice,
+    bob: bob
+  } do
+    conn = Plug.Test.init_test_session(conn, %{user_id: alice.id})
+    {:ok, view, _html} = live(conn, "/messages")
+
+    assert has_element?(view, "input[data-role='dm-recipient'][type='text']")
+
+    view
+    |> form("#dm-form", dm: %{recipient: "@#{bob.nickname}", content: ""})
+    |> render_change()
+
+    assert has_element?(view, "[data-role='dm-recipient-suggestions']")
+    assert has_element?(view, "[data-role='dm-recipient-suggestion'][data-handle='@bob']")
+
+    view
+    |> element("[data-role='dm-recipient-suggestion'][data-handle='@bob']")
+    |> render_click()
+
+    assert has_element?(view, "[data-role='dm-chat-peer-handle']", "@bob")
+    refute has_element?(view, "[data-role='dm-recipient-suggestions']")
+    refute has_element?(view, "input[data-role='dm-recipient'][type='text']")
+  end
+
+  test "recipient suggestions include remote handles", %{conn: conn, alice: alice} do
+    {public_key, _private_key} = Keys.generate_rsa_keypair()
+
+    {:ok, _remote} =
+      Users.create_user(%{
+        nickname: "dave",
+        ap_id: "https://remote.example/users/dave",
+        inbox: "https://remote.example/users/dave/inbox",
+        outbox: "https://remote.example/users/dave/outbox",
+        public_key: public_key,
+        local: false
+      })
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: alice.id})
+    {:ok, view, _html} = live(conn, "/messages")
+
+    view
+    |> form("#dm-form", dm: %{recipient: "@dave@remote.example", content: ""})
+    |> render_change()
+
+    assert has_element?(
+             view,
+             "[data-role='dm-recipient-suggestion'][data-handle='@dave@remote.example']"
+           )
   end
 end

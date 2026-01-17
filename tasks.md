@@ -107,6 +107,6 @@ See also: `e2ee_dm.md` (design notes + threat model).
 - [ ] **Messages UI: E2EE chat frontend parity**
   - [x] “New” button should start a new chat (no selected peer; recipient input visible).
   - [x] Conversation list should show preview + timestamp + unread state (and show an E2EE indicator only when the last message is encrypted).
-  - [ ] New-chat recipient suggestions/autocomplete (handles + remote).
+  - [x] New-chat recipient suggestions/autocomplete (handles + remote).
   - [ ] Make plaintext DMs possible even when E2EE is enabled (toggle per message/conversation).
   - [ ] Add pagination (“load more”) for conversations + thread messages.

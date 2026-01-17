@@ -10,6 +10,7 @@ defmodule EgregorosWeb.MessagesLive do
   alias Egregoros.Publish
   alias Egregoros.User
   alias Egregoros.Users
+  alias EgregorosWeb.MentionAutocomplete
   alias EgregorosWeb.ViewModels.Actor
 
   @conversations_page_size 40
@@ -90,6 +91,7 @@ defmodule EgregorosWeb.MessagesLive do
        current_user: current_user,
        dm_markers: dm_markers,
        notifications_count: notifications_count(current_user),
+       recipient_suggestions: [],
        selected_peer_ap_id: selected_peer_ap_id,
        selected_peer: selected_peer,
        conversation_e2ee?: conversation_e2ee?,
@@ -175,6 +177,7 @@ defmodule EgregorosWeb.MessagesLive do
            selected_peer: selected_peer,
            conversation_e2ee?: conversation_e2ee?,
            dm_markers: dm_markers,
+           recipient_suggestions: [],
            dm_form: dm_form
          )
          |> stream(:chat_messages, messages, reset: true)}
@@ -201,6 +204,7 @@ defmodule EgregorosWeb.MessagesLive do
            selected_peer_ap_id: nil,
            selected_peer: nil,
            conversation_e2ee?: false,
+           recipient_suggestions: [],
            dm_form: dm_form
          )
          |> stream(:chat_messages, [], reset: true)}
@@ -209,6 +213,81 @@ defmodule EgregorosWeb.MessagesLive do
         {:noreply, socket}
     end
   end
+
+  @impl true
+  def handle_event("dm_change", %{"dm" => %{} = params}, socket) do
+    dm_form = Phoenix.Component.to_form(params, as: :dm)
+
+    suggestions =
+      case {socket.assigns.current_user, socket.assigns.selected_peer} do
+        {%User{} = user, nil} ->
+          recipient = params |> Map.get("recipient", "") |> to_string() |> String.trim()
+
+          if recipient == "" do
+            []
+          else
+            MentionAutocomplete.suggestions(recipient, limit: 8, current_user: user)
+          end
+
+        _ ->
+          []
+      end
+
+    {:noreply,
+     socket
+     |> assign(dm_form: dm_form, recipient_suggestions: suggestions)}
+  end
+
+  def handle_event("dm_change", _params, socket), do: {:noreply, socket}
+
+  @impl true
+  def handle_event("pick_recipient", %{"ap_id" => ap_id, "handle" => handle}, socket) do
+    ap_id = ap_id |> to_string() |> String.trim()
+    handle = handle |> to_string() |> String.trim()
+
+    case socket.assigns.current_user do
+      %User{} = user when ap_id != "" ->
+        selected_peer = Actor.card(ap_id)
+
+        messages =
+          user
+          |> DirectMessages.list_conversation(ap_id, limit: @messages_page_size)
+          |> Enum.reverse()
+
+        conversation_e2ee? = Enum.any?(messages, &encrypted_message?/1)
+
+        dm_form =
+          Phoenix.Component.to_form(%{"recipient" => handle, "content" => "", "e2ee_dm" => ""},
+            as: :dm
+          )
+
+        dm_markers =
+          case List.last(messages) do
+            %{id: id} when is_integer(id) ->
+              mark_dm_conversation_read(user, ap_id, id, socket.assigns.dm_markers)
+
+            _ ->
+              socket.assigns.dm_markers
+          end
+
+        {:noreply,
+         socket
+         |> assign(
+           selected_peer_ap_id: ap_id,
+           selected_peer: selected_peer,
+           conversation_e2ee?: conversation_e2ee?,
+           dm_markers: dm_markers,
+           recipient_suggestions: [],
+           dm_form: dm_form
+         )
+         |> stream(:chat_messages, messages, reset: true)}
+
+      _ ->
+        {:noreply, socket}
+    end
+  end
+
+  def handle_event("pick_recipient", _params, socket), do: {:noreply, socket}
 
   @impl true
   def handle_event("send_dm", %{"dm" => %{} = params}, socket) do
@@ -271,6 +350,7 @@ defmodule EgregorosWeb.MessagesLive do
               |> assign(
                 selected_peer_ap_id: peer_ap_id,
                 selected_peer: selected_peer,
+                recipient_suggestions: [],
                 dm_form: dm_form
               )
               |> stream(:conversations, conversations, reset: true)
@@ -299,6 +379,7 @@ defmodule EgregorosWeb.MessagesLive do
                 socket
                 |> assign(:conversation_e2ee?, Enum.any?(messages, &encrypted_message?/1))
                 |> assign(:dm_markers, dm_markers)
+                |> assign(:recipient_suggestions, [])
                 |> stream(:chat_messages, messages, reset: true)
               else
                 assign(socket, :conversation_e2ee?, false)
@@ -515,6 +596,7 @@ defmodule EgregorosWeb.MessagesLive do
                   <.form
                     for={@dm_form}
                     id="dm-form"
+                    phx-change="dm_change"
                     phx-submit="send_dm"
                     phx-hook="E2EEDMComposer"
                     data-role="dm-composer"
@@ -545,14 +627,66 @@ defmodule EgregorosWeb.MessagesLive do
                         data-role="dm-recipient"
                       />
                     <% else %>
-                      <input
-                        type="text"
-                        name="dm[recipient]"
-                        value={@dm_form.params["recipient"] || ""}
-                        data-role="dm-recipient"
-                        placeholder="@alice or @alice@remote.example"
-                        class="w-full border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-3 py-2 font-mono text-sm text-[color:var(--text-primary)] focus:outline-none focus-brutal placeholder:text-[color:var(--text-muted)]"
-                      />
+                      <div class="relative">
+                        <input
+                          type="text"
+                          name="dm[recipient]"
+                          value={@dm_form.params["recipient"] || ""}
+                          data-role="dm-recipient"
+                          placeholder="@alice or @alice@remote.example"
+                          autocomplete="off"
+                          phx-debounce="300"
+                          class="w-full border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-3 py-2 font-mono text-sm text-[color:var(--text-primary)] focus:outline-none focus-brutal placeholder:text-[color:var(--text-muted)]"
+                        />
+
+                        <div
+                          :if={@recipient_suggestions != []}
+                          data-role="dm-recipient-suggestions"
+                          class="absolute left-0 right-0 z-30 mt-2 overflow-hidden border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] shadow-[4px_4px_0_var(--border-default)] motion-safe:animate-rise"
+                        >
+                          <ul class="max-h-60 divide-y divide-[color:var(--border-muted)] overflow-y-auto">
+                            <li :for={suggestion <- @recipient_suggestions}>
+                              <button
+                                type="button"
+                                data-role="dm-recipient-suggestion"
+                                data-handle={
+                                  Map.get(suggestion, :handle) || Map.get(suggestion, "handle") || ""
+                                }
+                                phx-click="pick_recipient"
+                                phx-value-ap_id={
+                                  Map.get(suggestion, :ap_id) || Map.get(suggestion, "ap_id") || ""
+                                }
+                                phx-value-handle={
+                                  Map.get(suggestion, :handle) || Map.get(suggestion, "handle") || ""
+                                }
+                                class="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-[color:var(--bg-subtle)] focus-visible:outline-none focus-brutal"
+                              >
+                                <span class="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden border-2 border-[color:var(--border-default)] bg-[color:var(--bg-subtle)] text-xs font-bold text-[color:var(--text-secondary)]">
+                                  {avatar_initial(
+                                    Map.get(suggestion, :display_name) ||
+                                      Map.get(suggestion, "display_name") ||
+                                      Map.get(suggestion, :handle) || Map.get(suggestion, "handle") ||
+                                      "?"
+                                  )}
+                                </span>
+
+                                <span class="min-w-0 flex-1">
+                                  <span class="block truncate text-sm font-bold text-[color:var(--text-primary)]">
+                                    {Map.get(suggestion, :display_name) ||
+                                      Map.get(suggestion, "display_name") ||
+                                      Map.get(suggestion, :handle) || Map.get(suggestion, "handle") ||
+                                      ""}
+                                  </span>
+                                  <span class="mt-0.5 block truncate font-mono text-xs text-[color:var(--text-muted)]">
+                                    {Map.get(suggestion, :handle) || Map.get(suggestion, "handle") ||
+                                      ""}
+                                  </span>
+                                </span>
+                              </button>
+                            </li>
+                          </ul>
+                        </div>
+                      </div>
                     <% end %>
 
                     <div class="flex items-end gap-3">
