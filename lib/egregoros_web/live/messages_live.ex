@@ -1,21 +1,20 @@
 defmodule EgregorosWeb.MessagesLive do
   use EgregorosWeb, :live_view
 
+  alias Egregoros.CustomEmojis
   alias Egregoros.DirectMessages
-  alias Egregoros.Media
-  alias Egregoros.MediaStorage
+  alias Egregoros.HTML
   alias Egregoros.Notifications
   alias Egregoros.Objects
   alias Egregoros.Publish
-  alias Egregoros.Timeline
   alias Egregoros.User
   alias Egregoros.Users
-  alias EgregorosWeb.Live.Uploads, as: LiveUploads
-  alias EgregorosWeb.MentionAutocomplete
-  alias EgregorosWeb.Param
-  alias EgregorosWeb.ViewModels.Status, as: StatusVM
+  alias EgregorosWeb.ViewModels.Actor
 
-  @page_size 20
+  @conversations_page_size 40
+  @messages_page_size 40
+  @as_public "https://www.w3.org/ns/activitystreams#Public"
+  @recipient_fields ~w(to cc bto bcc audience)
 
   @impl true
   def mount(_params, session, socket) do
@@ -26,57 +25,56 @@ defmodule EgregorosWeb.MessagesLive do
       end
 
     if connected?(socket) and match?(%User{}, current_user) do
-      Phoenix.PubSub.subscribe(Egregoros.PubSub, Timeline.user_topic(current_user.ap_id))
+      Phoenix.PubSub.subscribe(
+        Egregoros.PubSub,
+        Egregoros.Timeline.user_topic(current_user.ap_id)
+      )
     end
 
-    messages = DirectMessages.list_for_user(current_user, limit: @page_size)
+    conversations = conversations_for_user(current_user)
+
+    selected_peer_ap_id =
+      case conversations do
+        [%{peer: %{ap_id: ap_id}} | _] when is_binary(ap_id) and ap_id != "" -> ap_id
+        _ -> nil
+      end
+
+    selected_peer =
+      if is_binary(selected_peer_ap_id), do: Actor.card(selected_peer_ap_id), else: nil
+
+    messages =
+      case {current_user, selected_peer_ap_id} do
+        {%User{}, ap_id} when is_binary(ap_id) and ap_id != "" ->
+          current_user
+          |> DirectMessages.list_conversation(ap_id, limit: @messages_page_size)
+          |> Enum.reverse()
+
+        _ ->
+          []
+      end
+
+    recipient =
+      case selected_peer do
+        %{handle: handle} when is_binary(handle) -> handle
+        _ -> ""
+      end
+
+    dm_form =
+      Phoenix.Component.to_form(%{"recipient" => recipient, "content" => "", "e2ee_dm" => ""},
+        as: :dm
+      )
 
     {:ok,
      socket
      |> assign(
        current_user: current_user,
        notifications_count: notifications_count(current_user),
-       dm_form:
-         Phoenix.Component.to_form(%{"recipient" => "", "content" => "", "e2ee_dm" => ""},
-           as: :dm
-         ),
-       mention_suggestions: %{},
-       reply_modal_open?: false,
-       reply_to_ap_id: nil,
-       reply_to_handle: nil,
-       reply_form: Phoenix.Component.to_form(default_reply_params(), as: :reply),
-       reply_media_alt: %{},
-       reply_options_open?: false,
-       reply_cw_open?: false,
-       dm_cursor: cursor(messages),
-       dm_end?: length(messages) < @page_size
+       selected_peer_ap_id: selected_peer_ap_id,
+       selected_peer: selected_peer,
+       dm_form: dm_form
      )
-     |> allow_upload(:reply_media,
-       accept: ~w(
-          .png
-          .jpg
-          .jpeg
-          .webp
-          .gif
-          .heic
-          .heif
-          .mp4
-          .webm
-          .mov
-          .m4a
-          .mp3
-          .ogg
-          .opus
-          .wav
-          .aac
-        ),
-       max_entries: 4,
-       max_file_size: 10_000_000,
-       auto_upload: true
-     )
-     |> stream(:messages, StatusVM.decorate_many(messages, current_user),
-       dom_id: &message_dom_id/1
-     )}
+     |> stream(:conversations, conversations, dom_id: &conversation_dom_id/1)
+     |> stream(:chat_messages, messages, dom_id: &message_dom_id/1)}
   end
 
   @impl true
@@ -84,7 +82,20 @@ defmodule EgregorosWeb.MessagesLive do
     case socket.assigns.current_user do
       %User{} = user ->
         if include_dm?(post, user) do
-          {:noreply, stream_insert(socket, :messages, StatusVM.decorate(post, user), at: 0)}
+          peer_ap_id = peer_ap_id_for_dm(post, user.ap_id)
+
+          socket =
+            socket
+            |> stream(:conversations, conversations_for_user(user), reset: true)
+
+          socket =
+            if is_binary(peer_ap_id) and peer_ap_id == socket.assigns.selected_peer_ap_id do
+              stream_insert(socket, :chat_messages, post, at: -1)
+            else
+              socket
+            end
+
+          {:noreply, socket}
         else
           {:noreply, socket}
         end
@@ -94,317 +105,47 @@ defmodule EgregorosWeb.MessagesLive do
     end
   end
 
-  def handle_event("mention_search", %{"q" => q, "scope" => scope}, socket) do
-    q = q |> to_string() |> String.trim() |> String.trim_leading("@")
-    scope = scope |> to_string() |> String.trim()
+  @impl true
+  def handle_event("select_conversation", %{"peer" => peer_ap_id}, socket) do
+    peer_ap_id = peer_ap_id |> to_string() |> String.trim()
 
-    suggestions =
-      if q == "" or scope == "" do
-        []
-      else
-        MentionAutocomplete.suggestions(q, limit: 8, current_user: socket.assigns.current_user)
-      end
+    case socket.assigns.current_user do
+      %User{} = user when peer_ap_id != "" ->
+        selected_peer = Actor.card(peer_ap_id)
 
-    mention_suggestions =
-      socket.assigns.mention_suggestions
-      |> Map.put(scope, suggestions)
-
-    {:noreply, assign(socket, mention_suggestions: mention_suggestions)}
-  end
-
-  def handle_event("mention_clear", %{"scope" => scope}, socket) do
-    scope = scope |> to_string() |> String.trim()
-
-    mention_suggestions =
-      socket.assigns.mention_suggestions
-      |> Map.delete(scope)
-
-    {:noreply, assign(socket, mention_suggestions: mention_suggestions)}
-  end
-
-  def handle_event(
-        "open_reply_modal",
-        %{"in_reply_to" => in_reply_to, "actor_handle" => actor_handle},
-        socket
-      ) do
-    if socket.assigns.current_user do
-      in_reply_to = in_reply_to |> to_string() |> String.trim()
-      actor_handle = actor_handle |> to_string() |> String.trim()
-
-      if in_reply_to == "" do
-        {:noreply, socket}
-      else
-        parent = Objects.get_by_ap_id(in_reply_to)
-
-        visibility =
-          if match?(%{}, parent) and DirectMessages.direct?(parent) do
-            "direct"
-          else
-            "public"
+        recipient =
+          case selected_peer do
+            %{handle: handle} when is_binary(handle) -> handle
+            _ -> ""
           end
 
-        reply_params =
-          default_reply_params()
-          |> Map.put("in_reply_to", in_reply_to)
-          |> Map.put("visibility", visibility)
-
-        socket =
-          socket
-          |> LiveUploads.cancel_all(:reply_media)
-          |> assign(
-            reply_modal_open?: true,
-            reply_to_ap_id: in_reply_to,
-            reply_to_handle: actor_handle,
-            reply_form: Phoenix.Component.to_form(reply_params, as: :reply),
-            reply_media_alt: %{},
-            reply_options_open?: false,
-            reply_cw_open?: false
+        dm_form =
+          Phoenix.Component.to_form(%{"recipient" => recipient, "content" => "", "e2ee_dm" => ""},
+            as: :dm
           )
 
+        messages =
+          user
+          |> DirectMessages.list_conversation(peer_ap_id, limit: @messages_page_size)
+          |> Enum.reverse()
+
+        {:noreply,
+         socket
+         |> assign(
+           selected_peer_ap_id: peer_ap_id,
+           selected_peer: selected_peer,
+           dm_form: dm_form
+         )
+         |> stream(:chat_messages, messages, reset: true)}
+
+      _ ->
         {:noreply, socket}
-      end
-    else
-      {:noreply, put_flash(socket, :error, "Register to reply.")}
     end
   end
 
-  def handle_event("close_reply_modal", _params, socket) do
-    socket =
-      socket
-      |> LiveUploads.cancel_all(:reply_media)
-      |> assign(
-        reply_modal_open?: false,
-        reply_to_ap_id: nil,
-        reply_to_handle: nil,
-        reply_form: Phoenix.Component.to_form(default_reply_params(), as: :reply),
-        reply_media_alt: %{},
-        reply_options_open?: false,
-        reply_cw_open?: false
-      )
-
-    {:noreply, socket}
-  end
-
-  def handle_event("toggle_reply_cw", _params, socket) do
-    {:noreply, assign(socket, reply_cw_open?: !socket.assigns.reply_cw_open?)}
-  end
-
-  def handle_event("reply_change", %{"reply" => %{} = reply_params}, socket) do
-    reply_params = Map.merge(default_reply_params(), reply_params)
-    media_alt = Map.get(reply_params, "media_alt", %{})
-
-    reply_options_open? = Param.truthy?(Map.get(reply_params, "ui_options_open"))
-
-    reply_cw_open? =
-      socket.assigns.reply_cw_open? ||
-        reply_params |> Map.get("spoiler_text", "") |> to_string() |> String.trim() != ""
-
-    {:noreply,
-     assign(socket,
-       reply_form: Phoenix.Component.to_form(reply_params, as: :reply),
-       reply_media_alt: media_alt,
-       reply_options_open?: reply_options_open?,
-       reply_cw_open?: reply_cw_open?
-     )}
-  end
-
-  def handle_event("cancel_reply_media", %{"ref" => ref}, socket) do
-    {:noreply,
-     socket
-     |> cancel_upload(:reply_media, ref)
-     |> assign(:reply_media_alt, Map.delete(socket.assigns.reply_media_alt, ref))}
-  end
-
-  def handle_event("create_reply", %{"reply" => %{} = reply_params}, socket) do
-    case socket.assigns.current_user do
-      nil ->
-        {:noreply, put_flash(socket, :error, "Register to reply.")}
-
-      user ->
-        in_reply_to =
-          case socket.assigns.reply_to_ap_id do
-            ap_id when is_binary(ap_id) -> String.trim(ap_id)
-            _ -> reply_params |> Map.get("in_reply_to", "") |> to_string() |> String.trim()
-          end
-
-        if in_reply_to != "" do
-          reply_params = Map.merge(default_reply_params(), reply_params)
-          content = reply_params |> Map.get("content", "") |> to_string()
-          media_alt = Map.get(reply_params, "media_alt", %{})
-          visibility = Map.get(reply_params, "visibility", "direct")
-          spoiler_text = Map.get(reply_params, "spoiler_text")
-          sensitive = Map.get(reply_params, "sensitive")
-          language = Map.get(reply_params, "language")
-
-          reply_options_open? = Param.truthy?(Map.get(reply_params, "ui_options_open"))
-
-          reply_cw_open? =
-            socket.assigns.reply_cw_open? ||
-              reply_params |> Map.get("spoiler_text", "") |> to_string() |> String.trim() != ""
-
-          upload = socket.assigns.uploads.reply_media
-
-          cond do
-            Enum.any?(upload.entries, &(!&1.done?)) ->
-              {:noreply,
-               socket
-               |> put_flash(:error, "Wait for attachments to finish uploading.")
-               |> assign(
-                 reply_form: Phoenix.Component.to_form(reply_params, as: :reply),
-                 reply_media_alt: media_alt,
-                 reply_options_open?: reply_options_open?,
-                 reply_cw_open?: reply_cw_open?
-               )}
-
-            upload.errors != [] or Enum.any?(upload.entries, &(!&1.valid?)) ->
-              {:noreply,
-               socket
-               |> put_flash(:error, "Remove invalid attachments before posting.")
-               |> assign(
-                 reply_form: Phoenix.Component.to_form(reply_params, as: :reply),
-                 reply_media_alt: media_alt,
-                 reply_options_open?: reply_options_open?,
-                 reply_cw_open?: reply_cw_open?
-               )}
-
-            true ->
-              attachments =
-                consume_uploaded_entries(socket, :reply_media, fn %{path: path}, entry ->
-                  upload = %Plug.Upload{
-                    path: path,
-                    filename: entry.client_name,
-                    content_type: entry.client_type
-                  }
-
-                  description =
-                    media_alt |> Map.get(entry.ref, "") |> to_string() |> String.trim()
-
-                  with {:ok, url_path} <- MediaStorage.store_media(user, upload),
-                       {:ok, object} <-
-                         Media.create_media_object(user, upload, url_path,
-                           description: description
-                         ) do
-                    {:ok, object.data}
-                  else
-                    {:error, reason} -> {:ok, {:error, reason}}
-                  end
-                end)
-
-              case Enum.find(attachments, &match?({:error, _}, &1)) do
-                {:error, _reason} ->
-                  {:noreply,
-                   socket
-                   |> put_flash(:error, "Could not upload attachment.")
-                   |> assign(
-                     reply_form: Phoenix.Component.to_form(reply_params, as: :reply),
-                     reply_media_alt: media_alt,
-                     reply_options_open?: reply_options_open?,
-                     reply_cw_open?: reply_cw_open?
-                   )}
-
-                nil ->
-                  case Publish.post_note(user, content,
-                         in_reply_to: in_reply_to,
-                         attachments: attachments,
-                         visibility: visibility,
-                         spoiler_text: spoiler_text,
-                         sensitive: sensitive,
-                         language: language
-                       ) do
-                    {:ok, _reply} ->
-                      {:noreply,
-                       socket
-                       |> put_flash(:info, "Reply posted.")
-                       |> assign(
-                         reply_modal_open?: false,
-                         reply_to_ap_id: nil,
-                         reply_to_handle: nil,
-                         reply_form:
-                           Phoenix.Component.to_form(default_reply_params(), as: :reply),
-                         reply_media_alt: %{},
-                         reply_options_open?: false,
-                         reply_cw_open?: false
-                       )
-                       |> push_event("reply_modal_close", %{})}
-
-                    {:error, :too_long} ->
-                      {:noreply,
-                       socket
-                       |> put_flash(:error, "Reply is too long.")
-                       |> assign(
-                         reply_form: Phoenix.Component.to_form(reply_params, as: :reply),
-                         reply_media_alt: media_alt,
-                         reply_options_open?: reply_options_open?,
-                         reply_cw_open?: reply_cw_open?
-                       )}
-
-                    {:error, :empty} ->
-                      {:noreply,
-                       socket
-                       |> put_flash(:error, "Reply can't be empty.")
-                       |> assign(
-                         reply_form: Phoenix.Component.to_form(reply_params, as: :reply),
-                         reply_media_alt: media_alt,
-                         reply_options_open?: reply_options_open?,
-                         reply_cw_open?: reply_cw_open?
-                       )}
-
-                    _ ->
-                      {:noreply,
-                       socket
-                       |> put_flash(:error, "Could not post reply.")
-                       |> assign(
-                         reply_form: Phoenix.Component.to_form(reply_params, as: :reply),
-                         reply_media_alt: media_alt,
-                         reply_options_open?: reply_options_open?,
-                         reply_cw_open?: reply_cw_open?
-                       )}
-                  end
-              end
-          end
-        else
-          {:noreply, put_flash(socket, :error, "Select a post to reply to.")}
-        end
-    end
-  end
+  def handle_event("select_conversation", _params, socket), do: {:noreply, socket}
 
   @impl true
-  def handle_event("load_more", _params, socket) do
-    cursor = socket.assigns.dm_cursor
-
-    cond do
-      socket.assigns.dm_end? ->
-        {:noreply, socket}
-
-      is_nil(cursor) ->
-        {:noreply, assign(socket, dm_end?: true)}
-
-      true ->
-        messages =
-          DirectMessages.list_for_user(socket.assigns.current_user,
-            limit: @page_size,
-            max_id: cursor
-          )
-
-        socket =
-          if messages == [] do
-            assign(socket, dm_end?: true)
-          else
-            current_user = socket.assigns.current_user
-            new_cursor = cursor(messages)
-            dm_end? = length(messages) < @page_size
-
-            Enum.reduce(StatusVM.decorate_many(messages, current_user), socket, fn entry,
-                                                                                   socket ->
-              stream_insert(socket, :messages, entry, at: -1)
-            end)
-            |> assign(dm_cursor: new_cursor, dm_end?: dm_end?)
-          end
-
-        {:noreply, socket}
-    end
-  end
-
   def handle_event("send_dm", %{"dm" => %{} = params}, socket) do
     recipient = params |> Map.get("recipient", "") |> to_string() |> String.trim()
     body = params |> Map.get("content", "") |> to_string() |> String.trim()
@@ -425,30 +166,63 @@ defmodule EgregorosWeb.MessagesLive do
 
         case Publish.post_note(socket.assigns.current_user, content, opts) do
           {:ok, create} ->
-            note = Objects.get_by_ap_id(create.object)
+            message = Objects.get_by_ap_id(create.object)
+
+            {peer_ap_id, selected_peer} =
+              case {socket.assigns.current_user, message} do
+                {%User{ap_id: ap_id}, %{} = message} when is_binary(ap_id) ->
+                  peer_ap_id = peer_ap_id_for_dm(message, ap_id)
+
+                  selected_peer =
+                    if is_binary(peer_ap_id) and peer_ap_id != "" do
+                      Actor.card(peer_ap_id)
+                    else
+                      nil
+                    end
+
+                  {peer_ap_id, selected_peer}
+
+                _ ->
+                  {nil, nil}
+              end
+
+            recipient =
+              case selected_peer do
+                %{handle: handle} when is_binary(handle) -> handle
+                _ -> recipient
+              end
+
+            dm_form =
+              Phoenix.Component.to_form(
+                %{"recipient" => recipient, "content" => "", "e2ee_dm" => ""},
+                as: :dm
+              )
+
+            conversations = conversations_for_user(socket.assigns.current_user)
 
             socket =
               socket
               |> put_flash(:info, "Message sent.")
               |> assign(
-                dm_form:
-                  Phoenix.Component.to_form(
-                    %{"recipient" => recipient, "content" => "", "e2ee_dm" => ""},
-                    as: :dm
-                  )
+                selected_peer_ap_id: peer_ap_id,
+                selected_peer: selected_peer,
+                dm_form: dm_form
               )
+              |> stream(:conversations, conversations, reset: true)
 
-            if note do
-              {:noreply,
-               stream_insert(
-                 socket,
-                 :messages,
-                 StatusVM.decorate(note, socket.assigns.current_user),
-                 at: 0
-               )}
-            else
-              {:noreply, socket}
-            end
+            socket =
+              if is_binary(peer_ap_id) and peer_ap_id != "" do
+                messages =
+                  socket.assigns.current_user
+                  |> DirectMessages.list_conversation(peer_ap_id, limit: @messages_page_size)
+                  |> Enum.reverse()
+
+                stream(socket, :chat_messages, messages, reset: true)
+              else
+                socket
+              end
+
+            {:noreply, socket}
 
           {:error, _reason} ->
             {:noreply, put_flash(socket, :error, "Could not send message.")}
@@ -473,120 +247,202 @@ defmodule EgregorosWeb.MessagesLive do
         notifications_count={@notifications_count}
       >
         <section class="space-y-4">
-          <.card class="p-6">
-            <p class="text-xs font-bold uppercase tracking-wide text-[color:var(--text-muted)]">
-              Messages
-            </p>
-            <h2 class="mt-2 text-2xl font-bold text-[color:var(--text-primary)]">
-              Direct
-            </h2>
-          </.card>
-
           <%= if @current_user do %>
-            <.card class="p-6">
-              <.form
-                for={@dm_form}
-                id="dm-form"
-                phx-submit="send_dm"
-                phx-hook="E2EEDMComposer"
-                data-role="dm-composer"
-                data-user-ap-id={@current_user.ap_id}
-                class="space-y-4"
-              >
-                <input
-                  type="text"
-                  name="dm[e2ee_dm]"
-                  value={@dm_form.params["e2ee_dm"] || ""}
-                  data-role="dm-e2ee-payload"
-                  class="hidden"
-                  aria-hidden="true"
-                  tabindex="-1"
-                />
+            <div class="grid gap-4 lg:grid-cols-[18rem_1fr]">
+              <aside class="border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)]">
+                <header class="flex items-center justify-between border-b-2 border-[color:var(--border-default)] px-4 py-3">
+                  <h2 class="text-xs font-bold uppercase tracking-widest text-[color:var(--text-muted)]">
+                    Messages
+                  </h2>
+                  <button
+                    type="button"
+                    class="border-2 border-[color:var(--border-default)] bg-[color:var(--text-primary)] px-2 py-1 text-xs font-bold uppercase text-[color:var(--bg-base)] transition hover:shadow-[3px_3px_0_var(--border-default)] hover:-translate-x-0.5 hover:-translate-y-0.5"
+                  >
+                    + New
+                  </button>
+                </header>
 
-                <p
-                  data-role="dm-e2ee-feedback"
-                  class="hidden border border-[color:var(--border-default)] bg-[color:var(--bg-subtle)] px-3 py-2 text-sm text-[color:var(--text-secondary)]"
+                <div data-role="dm-conversations" class="max-h-[70vh] overflow-y-auto">
+                  <button
+                    :for={{id, conversation} <- @streams.conversations}
+                    id={id}
+                    type="button"
+                    data-role="dm-conversation"
+                    data-peer-handle={conversation.peer.handle}
+                    phx-click="select_conversation"
+                    phx-value-peer={conversation.peer.ap_id}
+                    class={[
+                      "flex w-full items-start gap-3 border-b border-[color:var(--border-muted)] px-4 py-4 text-left transition hover:bg-[color:var(--bg-subtle)] focus-visible:outline-none focus-brutal",
+                      conversation.peer.ap_id == @selected_peer_ap_id &&
+                        "bg-[color:var(--bg-subtle)] border-l-4 border-l-[color:var(--text-primary)] pl-3"
+                    ]}
+                  >
+                    <span class="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center border-2 border-[color:var(--border-default)] bg-[color:var(--bg-subtle)] font-bold">
+                      {avatar_initial(conversation.peer.display_name)}
+                    </span>
+                    <span class="min-w-0 flex-1">
+                      <span class="block truncate font-bold text-[color:var(--text-primary)]">
+                        {conversation.peer.display_name}
+                      </span>
+                      <span class="mt-0.5 block truncate font-mono text-xs text-[color:var(--text-muted)]">
+                        {conversation.peer.handle}
+                      </span>
+                    </span>
+                  </button>
+                </div>
+              </aside>
+
+              <main class="flex min-h-[70vh] flex-col border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)]">
+                <header class="flex items-center justify-between border-b-2 border-[color:var(--border-default)] px-5 py-4">
+                  <%= if @selected_peer do %>
+                    <div class="flex min-w-0 items-center gap-3">
+                      <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center border-2 border-[color:var(--border-default)] bg-[color:var(--bg-subtle)] font-bold">
+                        {avatar_initial(@selected_peer.display_name)}
+                      </span>
+                      <div class="min-w-0">
+                        <p class="truncate font-bold text-[color:var(--text-primary)]">
+                          {@selected_peer.display_name}
+                        </p>
+                        <p
+                          data-role="dm-chat-peer-handle"
+                          class="truncate font-mono text-xs text-[color:var(--text-muted)]"
+                        >
+                          {@selected_peer.handle}
+                        </p>
+                      </div>
+                    </div>
+
+                    <span class="inline-flex items-center gap-2 border border-[color:var(--success)] bg-[color:var(--success-subtle)] px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-[color:var(--success)]">
+                      <.icon name="hero-lock-closed" class="size-4" /> E2EE
+                    </span>
+                  <% else %>
+                    <div class="min-w-0">
+                      <p class="font-bold text-[color:var(--text-primary)]">New encrypted chat</p>
+                      <p class="font-mono text-xs text-[color:var(--text-muted)]">
+                        Pick a recipient to start.
+                      </p>
+                    </div>
+
+                    <span class="inline-flex items-center gap-2 border border-[color:var(--success)] bg-[color:var(--success-subtle)] px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-[color:var(--success)]">
+                      <.icon name="hero-shield-check" class="size-4" /> E2EE
+                    </span>
+                  <% end %>
+                </header>
+
+                <div
+                  data-role="dm-chat-messages"
+                  id="dm-chat-messages"
+                  phx-update="stream"
+                  class="flex-1 space-y-4 overflow-y-auto bg-[color:var(--bg-subtle)] p-5"
                 >
-                </p>
+                  <div
+                    id="dm-chat-empty"
+                    class="hidden only:flex flex-col items-center justify-center gap-3 border-2 border-dashed border-[color:var(--border-muted)] bg-[color:var(--bg-base)] p-8 text-center"
+                  >
+                    <span class="inline-flex h-14 w-14 items-center justify-center border-2 border-[color:var(--border-default)] bg-[color:var(--bg-subtle)] text-2xl">
+                      <.icon name="hero-chat-bubble-left-right" class="size-8" />
+                    </span>
+                    <p class="font-bold text-[color:var(--text-primary)]">No messages yet</p>
+                    <p class="text-sm text-[color:var(--text-muted)]">
+                      Start a conversation by sending an encrypted message below.
+                    </p>
+                  </div>
 
-                <div class="space-y-2">
-                  <label class="block text-sm font-bold text-[color:var(--text-primary)]">
-                    To
-                  </label>
-                  <input
-                    type="text"
-                    name="dm[recipient]"
-                    value={@dm_form.params["recipient"] || ""}
-                    placeholder="@alice or @alice@remote.example"
-                    class="w-full border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-3 py-2 text-sm text-[color:var(--text-primary)] focus:outline-none focus-brutal placeholder:text-[color:var(--text-muted)]"
-                  />
+                  <div
+                    :for={{id, message} <- @streams.chat_messages}
+                    id={id}
+                    data-role="dm-message"
+                    data-kind={if message.actor == @current_user.ap_id, do: "sent", else: "received"}
+                    class={[
+                      "flex gap-3",
+                      message.actor == @current_user.ap_id && "flex-row-reverse ml-auto"
+                    ]}
+                  >
+                    <span class="mt-1 inline-flex h-8 w-8 shrink-0 items-center justify-center border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] text-xs font-bold">
+                      {if message.actor == @current_user.ap_id,
+                        do: avatar_initial(@current_user.nickname),
+                        else: avatar_initial(@selected_peer && @selected_peer.display_name)}
+                    </span>
+
+                    <div class={[
+                      "max-w-[75%] space-y-1",
+                      message.actor == @current_user.ap_id && "items-end text-right"
+                    ]}>
+                      <div class={[
+                        "border-2 border-[color:var(--border-default)] px-4 py-3",
+                        message.actor == @current_user.ap_id &&
+                          "bg-[color:var(--text-primary)] text-[color:var(--bg-base)]",
+                        message.actor != @current_user.ap_id &&
+                          "bg-[color:var(--bg-base)] text-[color:var(--text-primary)] shadow-[3px_3px_0_var(--border-default)]"
+                      ]}>
+                        <.dm_message_body message={message} current_user={@current_user} />
+                      </div>
+
+                      <div class="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-widest text-[color:var(--text-muted)]">
+                        <.icon name="hero-lock-closed" class="size-3" />
+                        <span>{message_timestamp(message)}</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
-                <div class="space-y-2">
-                  <label class="block text-sm font-bold text-[color:var(--text-primary)]">
-                    Message
-                  </label>
-                  <textarea
-                    name="dm[content]"
-                    rows="4"
-                    placeholder="Write a direct message…"
-                    class="w-full resize-none border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-3 py-2 text-sm text-[color:var(--text-primary)] focus:outline-none focus-brutal placeholder:text-[color:var(--text-muted)]"
-                  ><%= @dm_form.params["content"] || "" %></textarea>
+                <div class="border-t-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-5 py-4">
+                  <.form
+                    for={@dm_form}
+                    id="dm-form"
+                    phx-submit="send_dm"
+                    phx-hook="E2EEDMComposer"
+                    data-role="dm-composer"
+                    data-user-ap-id={@current_user.ap_id}
+                    class="space-y-3"
+                  >
+                    <input
+                      type="text"
+                      name="dm[e2ee_dm]"
+                      value={@dm_form.params["e2ee_dm"] || ""}
+                      data-role="dm-e2ee-payload"
+                      class="hidden"
+                      aria-hidden="true"
+                      tabindex="-1"
+                    />
+
+                    <p
+                      data-role="dm-e2ee-feedback"
+                      class="hidden border border-[color:var(--border-default)] bg-[color:var(--bg-subtle)] px-3 py-2 text-sm text-[color:var(--text-secondary)]"
+                    >
+                    </p>
+
+                    <input
+                      type="text"
+                      name="dm[recipient]"
+                      value={@dm_form.params["recipient"] || ""}
+                      placeholder="@alice or @alice@remote.example"
+                      class={[
+                        "w-full border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-3 py-2 font-mono text-sm text-[color:var(--text-primary)] focus:outline-none focus-brutal placeholder:text-[color:var(--text-muted)]",
+                        @selected_peer && "hidden"
+                      ]}
+                    />
+
+                    <div class="flex items-end gap-3">
+                      <div class="relative flex-1">
+                        <textarea
+                          name="dm[content]"
+                          rows="2"
+                          placeholder="Type an encrypted message..."
+                          class="w-full resize-none border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-3 py-2 pr-10 text-sm text-[color:var(--text-primary)] focus:outline-none focus-brutal placeholder:text-[color:var(--text-muted)]"
+                        ><%= @dm_form.params["content"] || "" %></textarea>
+                        <span class="pointer-events-none absolute bottom-3 right-3 text-[color:var(--success)]">
+                          <.icon name="hero-lock-closed" class="size-5" />
+                        </span>
+                      </div>
+
+                      <.button type="submit" phx-disable-with="Sending..." aria-label="Send message">
+                        <.icon name="hero-paper-airplane" class="size-4" />
+                      </.button>
+                    </div>
+                  </.form>
                 </div>
-
-                <div class="flex justify-end">
-                  <.button type="submit" phx-disable-with="Sending...">
-                    Send
-                  </.button>
-                </div>
-              </.form>
-            </.card>
-
-            <div
-              id="messages-list"
-              phx-update="stream"
-              data-role="messages-list"
-              class="space-y-4"
-            >
-              <div
-                id="messages-empty"
-                class="hidden only:block border-2 border-[color:var(--border-default)] bg-[color:var(--bg-subtle)] p-6 text-sm text-[color:var(--text-secondary)]"
-              >
-                No direct messages yet.
-              </div>
-
-              <StatusCard.status_card
-                :for={{id, entry} <- @streams.messages}
-                id={id}
-                entry={entry}
-                current_user={@current_user}
-                reply_mode={:modal}
-              />
-            </div>
-
-            <div :if={!@dm_end?} class="flex justify-center py-2">
-              <.button
-                data-role="messages-load-more"
-                phx-click={JS.show(to: "#messages-loading-more") |> JS.push("load_more")}
-                phx-disable-with="Loading..."
-                aria-label="Load more messages"
-                variant="secondary"
-              >
-                <.icon name="hero-chevron-down" class="size-4" /> Load more
-              </.button>
-            </div>
-
-            <div
-              :if={!@dm_end?}
-              id="messages-loading-more"
-              data-role="messages-loading-more"
-              class="hidden space-y-4"
-              aria-hidden="true"
-            >
-              <.skeleton_status_card
-                :for={_ <- 1..2}
-                class="border-2 border-[color:var(--border-default)]"
-              />
+              </main>
             </div>
           <% else %>
             <.card class="p-6">
@@ -604,21 +460,120 @@ defmodule EgregorosWeb.MessagesLive do
           <% end %>
         </section>
       </AppShell.app_shell>
-
-      <ReplyModal.reply_modal
-        :if={@current_user}
-        form={@reply_form}
-        upload={@uploads.reply_media}
-        media_alt={@reply_media_alt}
-        reply_to_handle={@reply_to_handle}
-        mention_suggestions={@mention_suggestions}
-        options_open?={@reply_options_open?}
-        cw_open?={@reply_cw_open?}
-        open={@reply_modal_open?}
-      />
     </Layouts.app>
     """
   end
+
+  attr :message, :map, required: true
+  attr :current_user, :any, default: nil
+
+  defp dm_message_body(assigns) do
+    ~H"""
+    <% e2ee_payload = e2ee_payload_json(@message) %>
+    <% current_user_ap_id = current_user_ap_id(@current_user) %>
+
+    <div
+      id={
+        if is_integer(@message.id), do: "dm-message-body-#{@message.id}", else: Ecto.UUID.generate()
+      }
+      data-role="dm-message-body"
+      data-e2ee-dm={e2ee_payload}
+      data-current-user-ap-id={current_user_ap_id}
+      phx-hook={if is_binary(e2ee_payload), do: "E2EEDMMessage", else: nil}
+      class={is_binary(e2ee_payload) && "whitespace-pre-wrap"}
+    >
+      <%= if is_binary(e2ee_payload) do %>
+        <div data-role="e2ee-dm-body">{dm_content_html(@message)}</div>
+        <div data-role="e2ee-dm-actions" class="mt-3">
+          <button
+            type="button"
+            data-role="e2ee-dm-unlock"
+            class="inline-flex cursor-pointer items-center gap-2 border border-[color:var(--border-default)] bg-transparent px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-widest text-[color:var(--text-primary)] transition hover:bg-[color:var(--text-primary)] hover:text-[color:var(--bg-base)] focus-visible:outline-none focus-brutal"
+          >
+            <.icon name="hero-lock-open" class="size-4" /> Unlock
+          </button>
+        </div>
+      <% else %>
+        {dm_content_html(@message)}
+      <% end %>
+    </div>
+    """
+  end
+
+  defp conversations_for_user(%User{} = user) do
+    user
+    |> DirectMessages.list_for_user(limit: @conversations_page_size)
+    |> Enum.reduce({[], MapSet.new()}, fn message, {acc, seen} ->
+      peer_ap_id = peer_ap_id_for_dm(message, user.ap_id)
+
+      if is_binary(peer_ap_id) and peer_ap_id != "" and not MapSet.member?(seen, peer_ap_id) do
+        peer = Actor.card(peer_ap_id)
+        {[{peer_ap_id, %{peer: peer, last_message: message}} | acc], MapSet.put(seen, peer_ap_id)}
+      else
+        {acc, seen}
+      end
+    end)
+    |> elem(0)
+    |> Enum.reverse()
+    |> Enum.map(fn {_peer_ap_id, conversation} -> conversation end)
+  end
+
+  defp conversations_for_user(_user), do: []
+
+  defp peer_ap_id_for_dm(%{actor: actor} = message, current_user_ap_id)
+       when is_binary(actor) and is_binary(current_user_ap_id) do
+    actor = String.trim(actor)
+
+    cond do
+      actor == "" ->
+        nil
+
+      actor == current_user_ap_id ->
+        message
+        |> dm_recipient_ap_ids()
+        |> Enum.reject(&(&1 == current_user_ap_id))
+        |> List.first()
+
+      true ->
+        actor
+    end
+  end
+
+  defp peer_ap_id_for_dm(_message, _current_user_ap_id), do: nil
+
+  defp dm_recipient_ap_ids(%{data: %{} = data}), do: dm_recipient_ap_ids(data)
+
+  defp dm_recipient_ap_ids(%{} = data) do
+    followers =
+      data
+      |> Map.get("actor")
+      |> case do
+        actor when is_binary(actor) and actor != "" -> actor <> "/followers"
+        _ -> nil
+      end
+
+    @recipient_fields
+    |> Enum.flat_map(fn field ->
+      data
+      |> Map.get(field, [])
+      |> List.wrap()
+      |> Enum.map(&extract_recipient_id/1)
+    end)
+    |> Enum.filter(&is_binary/1)
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(fn value ->
+      value == "" or value == @as_public or value == followers or
+        String.ends_with?(value, "/followers")
+    end)
+    |> Enum.uniq()
+  end
+
+  defp dm_recipient_ap_ids(_data), do: []
+
+  defp extract_recipient_id(%{"id" => id}) when is_binary(id), do: id
+  defp extract_recipient_id(%{id: id}) when is_binary(id), do: id
+  defp extract_recipient_id(id) when is_binary(id), do: id
+  defp extract_recipient_id(_recipient), do: nil
 
   defp include_dm?(%{type: type} = note, %User{} = current_user)
        when type in ["Note", "EncryptedMessage"] do
@@ -627,17 +582,58 @@ defmodule EgregorosWeb.MessagesLive do
 
   defp include_dm?(_note, _current_user), do: false
 
-  defp cursor([]), do: nil
+  defp conversation_dom_id(%{peer: %{ap_id: ap_id}}) when is_binary(ap_id) do
+    "dm-conversation-#{:erlang.phash2(ap_id)}"
+  end
 
-  defp cursor(messages) when is_list(messages) do
-    case List.last(messages) do
-      %{id: id} when is_integer(id) -> id
+  defp conversation_dom_id(_conversation), do: Ecto.UUID.generate()
+
+  defp message_dom_id(%{id: id}) when is_integer(id), do: "dm-message-#{id}"
+  defp message_dom_id(_message), do: Ecto.UUID.generate()
+
+  defp avatar_initial(name) when is_binary(name) do
+    name = String.trim(name)
+
+    case String.first(name) do
+      nil -> "?"
+      letter -> String.upcase(letter)
+    end
+  end
+
+  defp avatar_initial(_), do: "?"
+
+  defp e2ee_payload_json(%{data: %{} = data}) do
+    case Map.get(data, "egregoros:e2ee_dm") do
+      %{} = payload when map_size(payload) > 0 -> Jason.encode!(payload)
       _ -> nil
     end
   end
 
-  defp message_dom_id(%{object: %{id: id}}) when is_integer(id), do: "dm-#{id}"
-  defp message_dom_id(_), do: Ecto.UUID.generate()
+  defp e2ee_payload_json(_message), do: nil
+
+  defp current_user_ap_id(%{ap_id: ap_id}) when is_binary(ap_id), do: ap_id
+  defp current_user_ap_id(_current_user), do: ""
+
+  defp dm_content_html(%{data: %{} = data} = object) do
+    raw = Map.get(data, "content", "")
+    emojis = CustomEmojis.from_object(object)
+    ap_tags = Map.get(data, "tag", [])
+
+    raw
+    |> HTML.to_safe_html(format: :html, emojis: emojis, ap_tags: ap_tags)
+    |> Phoenix.HTML.raw()
+  end
+
+  defp dm_content_html(_message), do: ""
+
+  defp message_timestamp(%{published: %DateTime{} = published}) do
+    published
+    |> DateTime.to_time()
+    |> Time.truncate(:second)
+    |> Time.to_string()
+  end
+
+  defp message_timestamp(_message), do: "now"
 
   defp normalize_dm_content(recipient, body) when is_binary(recipient) and is_binary(body) do
     recipient =
@@ -672,17 +668,5 @@ defmodule EgregorosWeb.MessagesLive do
     user
     |> Notifications.list_for_user(limit: 20)
     |> length()
-  end
-
-  defp default_reply_params do
-    %{
-      "content" => "",
-      "spoiler_text" => "",
-      "visibility" => "direct",
-      "sensitive" => "false",
-      "language" => "",
-      "ui_options_open" => "false",
-      "media_alt" => %{}
-    }
   end
 end
