@@ -83,7 +83,7 @@ See also: `e2ee_dm.md` (design notes + threat model).
   - [x] Add unlock flow that prompts for the 24 words and unlocks `E2EE_PRIV` using the mnemonic wrapper.
   - [ ] Add server-side support to add/rotate wrappers for an existing active key (so we can introduce new unlock mechanisms later without regenerating keys).
 
-- [ ] **E2EE DMs: cross-server key discovery (browser CORS-safe)**
+- [x] **E2EE DMs: cross-server key discovery (browser CORS-safe)**
   - [x] Add an authenticated endpoint to resolve `@user@domain` → actor AP id (WebFinger) and fetch `egregoros:e2ee` keys server-side (signed fetch when needed), returning `{actor_ap_id, keys}`.
   - [x] Update `E2EEDMComposer` to encrypt for remote recipients using the endpoint (remove the “local-only” guard) and show clear UX when the recipient has no published E2EE keys.
   - [x] Update `E2EEDMMessage` decryption to fetch sender keys via the same endpoint (avoid cross-origin actor fetches), with a useful “can’t decrypt yet” state.
@@ -94,9 +94,9 @@ See also: `e2ee_dm.md` (design notes + threat model).
   - [ ] Block silent encryption to changed keys unless the user re-trusts.
 
 - [ ] **ActivityPub: dedicated `EncryptedMessage` object type**
-  - [ ] Introduce `Egregoros.Activities.EncryptedMessage` and validate it as a direct-only object carrying `egregoros:e2ee_dm`.
-  - [ ] Emit `EncryptedMessage` instead of `Note` for encrypted DMs (likely behind a config flag) and ensure inbox targeting + delivery still works.
-  - [ ] Update DM listing/query paths (`DirectMessages`, `MessagesLive`, etc.) to include `EncryptedMessage`.
+  - [x] Introduce `Egregoros.Activities.EncryptedMessage` and validate it as a direct-only object carrying `egregoros:e2ee_dm`.
+  - [x] Emit `EncryptedMessage` instead of `Note` for encrypted DMs (currently unconditional) and ensure inbox targeting + delivery still works.
+  - [x] Update DM listing/query paths (`DirectMessages`, `MessagesLive`, etc.) to include `EncryptedMessage`.
   - [ ] Add fixtures + tests covering ingest, rendering placeholder vs decrypted content, and “unknown type” handling on non-supporting instances.
 
 ## UX / UI (LiveView)
