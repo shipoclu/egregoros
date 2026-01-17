@@ -21,6 +21,21 @@ defmodule EgregorosWeb.MessagesLiveTest do
     assert has_element?(view, "[data-role='messages-auth-required']")
   end
 
+  test "guest events are ignored", %{conn: conn} do
+    {:ok, view, _html} = live(conn, "/messages")
+
+    assert has_element?(view, "[data-role='messages-auth-required']")
+
+    _html = render_click(view, "new_chat", %{})
+    _html = render_click(view, "select_conversation", %{})
+    _html = render_click(view, "select_conversation", %{"peer" => ""})
+
+    send(view.pid, {:post_created, %{}})
+    _html = render(view)
+
+    assert has_element?(view, "[data-role='messages-auth-required']")
+  end
+
   test "shows conversations and selects the newest by default", %{
     conn: conn,
     alice: alice,
@@ -149,5 +164,100 @@ defmodule EgregorosWeb.MessagesLiveTest do
     [dm] = DirectMessages.list_conversation(alice, bob.ap_id, limit: 1)
     assert dm.type == "EncryptedMessage"
     assert dm.data["egregoros:e2ee_dm"] == payload
+  end
+
+  test "conversation list shows preview, timestamp, and unread state", %{
+    conn: conn,
+    alice: alice,
+    bob: bob,
+    carol: carol
+  } do
+    {:ok, _} = Publish.post_note(bob, "@alice DM from bob", visibility: "direct")
+    {:ok, _} = Publish.post_note(carol, "@alice DM from carol", visibility: "direct")
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: alice.id})
+    {:ok, view, _html} = live(conn, "/messages")
+
+    assert has_element?(
+             view,
+             "[data-role='dm-conversation'][data-peer-handle='@bob'] [data-role='dm-conversation-preview']",
+             "DM from bob"
+           )
+
+    assert has_element?(
+             view,
+             "[data-role='dm-conversation'][data-peer-handle='@bob'] [data-role='dm-conversation-time']"
+           )
+
+    assert has_element?(
+             view,
+             "[data-role='dm-conversation'][data-peer-handle='@bob'] [data-role='dm-conversation-unread']"
+           )
+
+    refute has_element?(
+             view,
+             "[data-role='dm-conversation'][data-peer-handle='@carol'] [data-role='dm-conversation-unread']"
+           )
+
+    view
+    |> element("[data-role='dm-conversation'][data-peer-handle='@bob']")
+    |> render_click()
+
+    refute has_element?(
+             view,
+             "[data-role='dm-conversation'][data-peer-handle='@bob'] [data-role='dm-conversation-unread']"
+           )
+  end
+
+  test "conversation list E2EE indicator depends on the last message", %{
+    conn: conn,
+    alice: alice,
+    bob: bob,
+    carol: carol
+  } do
+    {:ok, _} =
+      Publish.post_note(bob, "@alice Encrypted message",
+        visibility: "direct",
+        e2ee_dm: e2ee_payload(bob, alice)
+      )
+
+    {:ok, _} = Publish.post_note(bob, "@alice DM from bob", visibility: "direct")
+
+    {:ok, _} =
+      Publish.post_note(carol, "@alice Encrypted message",
+        visibility: "direct",
+        e2ee_dm: e2ee_payload(carol, alice)
+      )
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: alice.id})
+    {:ok, view, _html} = live(conn, "/messages")
+
+    refute has_element?(
+             view,
+             "[data-role='dm-conversation'][data-peer-handle='@bob'] [data-role='dm-conversation-e2ee']"
+           )
+
+    assert has_element?(
+             view,
+             "[data-role='dm-conversation'][data-peer-handle='@carol'] [data-role='dm-conversation-e2ee']"
+           )
+  end
+
+  defp e2ee_payload(sender, recipient) do
+    %{
+      "version" => 1,
+      "alg" => "ECDH-P256+HKDF-SHA256+AES-256-GCM",
+      "sender" => %{"ap_id" => sender.ap_id, "kid" => "e2ee-#{sender.nickname}"},
+      "recipient" => %{"ap_id" => recipient.ap_id, "kid" => "e2ee-#{recipient.nickname}"},
+      "nonce" => "nonce",
+      "salt" => "salt",
+      "aad" => %{
+        "sender_ap_id" => sender.ap_id,
+        "recipient_ap_id" => recipient.ap_id,
+        "sender_kid" => "e2ee-#{sender.nickname}",
+        "recipient_kid" => "e2ee-#{recipient.nickname}"
+      },
+      "ciphertext" => "ciphertext"
+    }
   end
 end

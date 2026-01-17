@@ -4,6 +4,7 @@ defmodule EgregorosWeb.MessagesLive do
   alias Egregoros.CustomEmojis
   alias Egregoros.DirectMessages
   alias Egregoros.HTML
+  alias Egregoros.Markers
   alias Egregoros.Notifications
   alias Egregoros.Objects
   alias Egregoros.Publish
@@ -15,6 +16,7 @@ defmodule EgregorosWeb.MessagesLive do
   @messages_page_size 40
   @as_public "https://www.w3.org/ns/activitystreams#Public"
   @recipient_fields ~w(to cc bto bcc audience)
+  @dm_marker_prefix "dm:v1:"
 
   @impl true
   def mount(_params, session, socket) do
@@ -32,6 +34,12 @@ defmodule EgregorosWeb.MessagesLive do
     end
 
     conversations = conversations_for_user(current_user)
+
+    dm_markers =
+      case current_user do
+        %User{} = user -> dm_markers_for_conversations(user, conversations)
+        _ -> %{}
+      end
 
     selected_peer_ap_id =
       case conversations do
@@ -55,6 +63,16 @@ defmodule EgregorosWeb.MessagesLive do
 
     conversation_e2ee? = Enum.any?(messages, &encrypted_message?/1)
 
+    dm_markers =
+      case {current_user, List.first(conversations)} do
+        {%User{} = user, %{peer: %{ap_id: peer_ap_id}, last_message: %{id: id}}}
+        when is_binary(peer_ap_id) and peer_ap_id != "" and is_integer(id) ->
+          mark_dm_conversation_read(user, peer_ap_id, id, dm_markers)
+
+        _ ->
+          dm_markers
+      end
+
     recipient =
       case selected_peer do
         %{handle: handle} when is_binary(handle) -> handle
@@ -70,6 +88,7 @@ defmodule EgregorosWeb.MessagesLive do
      socket
      |> assign(
        current_user: current_user,
+       dm_markers: dm_markers,
        notifications_count: notifications_count(current_user),
        selected_peer_ap_id: selected_peer_ap_id,
        selected_peer: selected_peer,
@@ -93,7 +112,11 @@ defmodule EgregorosWeb.MessagesLive do
 
           socket =
             if is_binary(peer_ap_id) and peer_ap_id == socket.assigns.selected_peer_ap_id do
+              dm_markers =
+                mark_dm_conversation_read(user, peer_ap_id, post.id, socket.assigns.dm_markers)
+
               socket
+              |> assign(:dm_markers, dm_markers)
               |> stream_insert(:chat_messages, post, at: -1)
               |> then(fn socket ->
                 if encrypted_message?(post),
@@ -122,11 +145,7 @@ defmodule EgregorosWeb.MessagesLive do
       %User{} = user when peer_ap_id != "" ->
         selected_peer = Actor.card(peer_ap_id)
 
-        recipient =
-          case selected_peer do
-            %{handle: handle} when is_binary(handle) -> handle
-            _ -> ""
-          end
+        recipient = selected_peer.handle
 
         dm_form =
           Phoenix.Component.to_form(%{"recipient" => recipient, "content" => "", "e2ee_dm" => ""},
@@ -140,12 +159,22 @@ defmodule EgregorosWeb.MessagesLive do
 
         conversation_e2ee? = Enum.any?(messages, &encrypted_message?/1)
 
+        dm_markers =
+          case List.last(messages) do
+            %{id: id} when is_integer(id) ->
+              mark_dm_conversation_read(user, peer_ap_id, id, socket.assigns.dm_markers)
+
+            _ ->
+              socket.assigns.dm_markers
+          end
+
         {:noreply,
          socket
          |> assign(
            selected_peer_ap_id: peer_ap_id,
            selected_peer: selected_peer,
            conversation_e2ee?: conversation_e2ee?,
+           dm_markers: dm_markers,
            dm_form: dm_form
          )
          |> stream(:chat_messages, messages, reset: true)}
@@ -253,8 +282,23 @@ defmodule EgregorosWeb.MessagesLive do
                   |> DirectMessages.list_conversation(peer_ap_id, limit: @messages_page_size)
                   |> Enum.reverse()
 
+                dm_markers =
+                  case List.last(messages) do
+                    %{id: id} when is_integer(id) ->
+                      mark_dm_conversation_read(
+                        socket.assigns.current_user,
+                        peer_ap_id,
+                        id,
+                        socket.assigns.dm_markers
+                      )
+
+                    _ ->
+                      socket.assigns.dm_markers
+                  end
+
                 socket
                 |> assign(:conversation_e2ee?, Enum.any?(messages, &encrypted_message?/1))
+                |> assign(:dm_markers, dm_markers)
                 |> stream(:chat_messages, messages, reset: true)
               else
                 assign(socket, :conversation_e2ee?, false)
@@ -321,11 +365,40 @@ defmodule EgregorosWeb.MessagesLive do
                       {avatar_initial(conversation.peer.display_name)}
                     </span>
                     <span class="min-w-0 flex-1">
-                      <span class="block truncate font-bold text-[color:var(--text-primary)]">
-                        {conversation.peer.display_name}
+                      <span class="flex items-start justify-between gap-3">
+                        <span class="block min-w-0 truncate font-bold text-[color:var(--text-primary)]">
+                          {conversation.peer.display_name}
+                        </span>
+                        <span class="flex shrink-0 items-center gap-2">
+                          <span
+                            :if={encrypted_message?(conversation.last_message)}
+                            data-role="dm-conversation-e2ee"
+                            class="inline-flex items-center text-[color:var(--success)]"
+                            title="Last message is encrypted"
+                          >
+                            <.icon name="hero-lock-closed" class="size-4" />
+                          </span>
+                          <span
+                            :if={conversation_unread?(conversation, @dm_markers, @current_user)}
+                            data-role="dm-conversation-unread"
+                            class="inline-flex h-2 w-2 rounded-full bg-[color:var(--accent)]"
+                            title="Unread"
+                          />
+                          <.time_ago
+                            at={dm_last_message_at(conversation.last_message)}
+                            data_role="dm-conversation-time"
+                            class="text-[10px]"
+                          />
+                        </span>
                       </span>
                       <span class="mt-0.5 block truncate font-mono text-xs text-[color:var(--text-muted)]">
                         {conversation.peer.handle}
+                      </span>
+                      <span
+                        data-role="dm-conversation-preview"
+                        class="mt-1 block truncate text-xs text-[color:var(--text-muted)]"
+                      >
+                        {dm_preview_text(conversation.last_message, @current_user)}
                       </span>
                     </span>
                   </button>
@@ -669,6 +742,95 @@ defmodule EgregorosWeb.MessagesLive do
 
   defp avatar_initial(_), do: "?"
 
+  defp dm_markers_for_conversations(%User{} = user, conversations) when is_list(conversations) do
+    timelines =
+      conversations
+      |> Enum.map(fn
+        %{peer: %{ap_id: ap_id}} -> dm_marker_timeline(ap_id)
+        _ -> nil
+      end)
+      |> Enum.filter(&is_binary/1)
+
+    user
+    |> Markers.list_for_user(timelines)
+    |> Enum.reduce(%{}, fn marker, acc ->
+      Map.put(acc, marker.timeline, marker.last_read_id)
+    end)
+  end
+
+  defp dm_markers_for_conversations(_user, _conversations), do: %{}
+
+  defp dm_marker_timeline(peer_ap_id) when is_binary(peer_ap_id) do
+    peer_ap_id = String.trim(peer_ap_id)
+
+    if peer_ap_id == "" do
+      nil
+    else
+      digest = :crypto.hash(:sha256, peer_ap_id)
+      @dm_marker_prefix <> Base.url_encode64(digest, padding: false)
+    end
+  end
+
+  defp dm_marker_timeline(_peer_ap_id), do: nil
+
+  defp mark_dm_conversation_read(%User{} = user, peer_ap_id, last_message_id, dm_markers)
+       when is_binary(peer_ap_id) and is_integer(last_message_id) and is_map(dm_markers) do
+    timeline = dm_marker_timeline(peer_ap_id)
+    last_read_id = Integer.to_string(last_message_id)
+
+    if is_binary(timeline) and timeline != "" do
+      _ = Markers.upsert(user, timeline, last_read_id)
+      Map.put(dm_markers, timeline, last_read_id)
+    else
+      dm_markers
+    end
+  end
+
+  defp mark_dm_conversation_read(_user, _peer_ap_id, _last_message_id, dm_markers)
+       when is_map(dm_markers),
+       do: dm_markers
+
+  defp mark_dm_conversation_read(_user, _peer_ap_id, _last_message_id, _dm_markers), do: %{}
+
+  defp conversation_unread?(conversation, dm_markers, %User{ap_id: user_ap_id})
+       when is_binary(user_ap_id) and is_map(dm_markers) do
+    case conversation do
+      %{peer: %{ap_id: peer_ap_id}, last_message: %{id: last_message_id, actor: actor}}
+      when is_binary(peer_ap_id) and is_integer(last_message_id) and is_binary(actor) ->
+        if actor == user_ap_id do
+          false
+        else
+          timeline = dm_marker_timeline(peer_ap_id)
+          last_read_id = if is_binary(timeline), do: Map.get(dm_markers, timeline), else: nil
+
+          last_read_int =
+            case last_read_id do
+              id when is_binary(id) ->
+                case Integer.parse(id) do
+                  {int, ""} -> int
+                  _ -> 0
+                end
+
+              _ ->
+                0
+            end
+
+          last_read_int < last_message_id
+        end
+
+      _ ->
+        false
+    end
+  end
+
+  defp conversation_unread?(_conversation, _dm_markers, _current_user), do: false
+
+  defp dm_last_message_at(%{published: %DateTime{} = published}), do: published
+
+  defp dm_last_message_at(%{inserted_at: %DateTime{} = inserted_at}), do: inserted_at
+
+  defp dm_last_message_at(_message), do: nil
+
   defp e2ee_payload_json(%{data: %{} = data}) do
     case Map.get(data, "egregoros:e2ee_dm") do
       %{} = payload when map_size(payload) > 0 -> Jason.encode!(payload)
@@ -701,6 +863,46 @@ defmodule EgregorosWeb.MessagesLive do
   end
 
   defp dm_content_html(_message), do: ""
+
+  defp dm_preview_text(%{data: %{} = data} = message, %User{} = current_user) do
+    if encrypted_message?(message) do
+      "Encrypted message"
+    else
+      raw = data |> Map.get("content", "") |> to_string()
+
+      text =
+        raw
+        |> FastSanitize.strip_tags()
+        |> case do
+          {:ok, text} -> text
+          _ -> ""
+        end
+        |> String.replace(~r/\s+/, " ")
+        |> String.trim()
+        |> strip_leading_self_mention(current_user)
+
+      text =
+        if String.starts_with?(text, "Encrypted message"), do: "Encrypted message", else: text
+
+      cond do
+        text == "" -> "—"
+        String.length(text) <= 80 -> text
+        true -> String.slice(text, 0, 77) <> "..."
+      end
+    end
+  end
+
+  defp dm_preview_text(_message, _current_user), do: "—"
+
+  defp strip_leading_self_mention(text, %User{nickname: nickname})
+       when is_binary(text) and is_binary(nickname) and nickname != "" do
+    pattern = ~r/^@#{Regex.escape(nickname)}(?:@[^\s]+)?[,:]?\s+/u
+    Regex.replace(pattern, text, "")
+  end
+
+  defp strip_leading_self_mention(text, _current_user) when is_binary(text), do: text
+
+  defp strip_leading_self_mention(_text, _current_user), do: ""
 
   defp message_timestamp(%{published: %DateTime{} = published}) do
     published
