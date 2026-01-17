@@ -1252,9 +1252,6 @@ const E2EEDMComposer = {
 const E2EEDMMessage = {
   mounted() {
     this.decrypted = false
-    this.bodyEl = this.el.querySelector("[data-role='e2ee-dm-body']")
-    this.actionsEl = this.el.querySelector("[data-role='e2ee-dm-actions']")
-    this.unlockButton = this.el.querySelector("[data-role='e2ee-dm-unlock']")
 
     restoreE2EEIdentityFromStorage()
 
@@ -1272,19 +1269,33 @@ const E2EEDMMessage = {
       this.tryDecrypt(false)
     }
 
+    this.syncElements()
+
     window.addEventListener("egregoros:e2ee-unlocked", this.onUnlocked)
 
-    if (this.unlockButton) this.unlockButton.addEventListener("click", this.onUnlock)
     this.tryDecrypt(false)
   },
 
   updated() {
+    this.syncElements()
     this.tryDecrypt(false)
   },
 
   destroyed() {
-    if (this.unlockButton) this.unlockButton.removeEventListener("click", this.onUnlock)
     window.removeEventListener("egregoros:e2ee-unlocked", this.onUnlocked)
+    if (this.unlockButton) this.unlockButton.removeEventListener("click", this.onUnlock)
+  },
+
+  syncElements() {
+    this.bodyEl = this.el.querySelector("[data-role='e2ee-dm-body']")
+    this.actionsEl = this.el.querySelector("[data-role='e2ee-dm-actions']")
+
+    const nextUnlockButton = this.el.querySelector("[data-role='e2ee-dm-unlock']")
+    if (nextUnlockButton === this.unlockButton) return
+
+    if (this.unlockButton) this.unlockButton.removeEventListener("click", this.onUnlock)
+    this.unlockButton = nextUnlockButton
+    if (this.unlockButton) this.unlockButton.addEventListener("click", this.onUnlock)
   },
 
   readPayload() {
@@ -1299,7 +1310,6 @@ const E2EEDMMessage = {
   },
 
   async tryDecrypt(triggeredByUser) {
-    if (this.decrypted) return
     if (!this.bodyEl) return
 
     const payload = this.readPayload()
@@ -1317,6 +1327,8 @@ const E2EEDMMessage = {
     if (!iAmSender && !iAmRecipient) return
 
     const other = iAmSender ? payload.recipient : payload.sender
+
+    if (this.decrypted && this.actionsEl?.classList?.contains("hidden")) return
 
     try {
       const plaintext = await decryptE2EEDM({
