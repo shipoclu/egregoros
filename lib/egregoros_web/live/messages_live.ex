@@ -531,7 +531,6 @@ defmodule EgregorosWeb.MessagesLive do
 
             socket =
               socket
-              |> put_flash(:info, "Message sent.")
               |> assign(
                 conversations_has_more?: conversations_has_more?,
                 conversations_max_id: conversations_max_id,

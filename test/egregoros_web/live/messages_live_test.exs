@@ -119,6 +119,7 @@ defmodule EgregorosWeb.MessagesLiveTest do
     |> form("#dm-form", dm: %{recipient: "@#{bob.nickname}", content: "hi bob"})
     |> render_submit()
 
+    refute has_element?(view, "#flash-info")
     assert has_element?(view, "[data-role='dm-message'][data-kind='sent']")
     assert has_element?(view, "[data-role='dm-message-body']", "hi bob")
   end
