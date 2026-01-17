@@ -34,6 +34,7 @@ defmodule EgregorosWeb.SearchLive do
       |> assign(
         current_user: current_user,
         notifications_count: notifications_count(current_user),
+        followed_tags: followed_tags(current_user, 12),
         mention_suggestions: %{},
         remote_follow_queued?: false,
         reply_modal_open?: false,
@@ -485,6 +486,35 @@ defmodule EgregorosWeb.SearchLive do
             </div>
           </.card>
 
+          <section
+            :if={@query == "" and @current_user != nil and @followed_tags != []}
+            data-role="search-followed-tags"
+            class="space-y-3"
+          >
+            <.card class="p-6">
+              <p class="text-xs font-bold uppercase tracking-wide text-[color:var(--text-muted)]">
+                Your tags
+              </p>
+              <h3 class="mt-2 text-xl font-bold text-[color:var(--text-primary)]">
+                Followed hashtags
+              </h3>
+            </.card>
+
+            <.card class="p-5">
+              <div class="flex flex-wrap gap-2">
+                <.link
+                  :for={tag <- @followed_tags}
+                  navigate={~p"/tags/#{tag}"}
+                  data-role="search-followed-tag"
+                  class="inline-flex items-center gap-2 border border-[color:var(--border-default)] bg-[color:var(--bg-subtle)] px-3 py-2 text-sm font-semibold text-[color:var(--text-primary)] transition hover:bg-[color:var(--bg-base)]"
+                >
+                  <.icon name="hero-hashtag" class="size-4 text-[color:var(--text-muted)]" />
+                  <span>#{tag}</span>
+                </.link>
+              </div>
+            </.card>
+          </section>
+
           <div data-role="search-results" class="space-y-3">
             <.card
               :if={@remote_handle != nil and @current_user == nil}
@@ -799,6 +829,26 @@ defmodule EgregorosWeb.SearchLive do
   end
 
   defp valid_hashtag?(_tag), do: false
+
+  defp normalize_hashtag(name) when is_binary(name) do
+    name
+    |> String.trim()
+    |> String.trim_leading("#")
+    |> String.downcase()
+  end
+
+  defp normalize_hashtag(_name), do: ""
+
+  defp followed_tags(%User{ap_id: actor_ap_id}, limit)
+       when is_binary(actor_ap_id) and actor_ap_id != "" and is_integer(limit) do
+    Relationships.list_by_type_actor("FollowTag", actor_ap_id, limit: limit)
+    |> Enum.map(&normalize_hashtag(&1.object))
+    |> Enum.uniq()
+    |> Enum.filter(&valid_hashtag?/1)
+    |> Enum.take(limit)
+  end
+
+  defp followed_tags(_user, _limit), do: []
 
   defp parse_query(query) when is_binary(query) do
     query = String.trim(query)

@@ -19,6 +19,24 @@ defmodule EgregorosWeb.SearchLiveTest do
     refute has_element?(view, "[data-role='search-post-results']")
   end
 
+  test "signed-in empty search shows followed tags", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("alice")
+
+    assert {:ok, _} =
+             Relationships.upsert_relationship(%{
+               type: "FollowTag",
+               actor: user.ap_id,
+               object: "#elixir",
+               activity_ap_id: nil
+             })
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/search")
+
+    assert has_element?(view, "[data-role='search-followed-tags']")
+    assert has_element?(view, "[data-role='search-followed-tag'][href='/tags/elixir']")
+  end
+
   test "search form patches to the canonical query url", %{conn: conn} do
     {:ok, view, _html} = live(conn, "/search")
 
