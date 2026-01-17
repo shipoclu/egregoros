@@ -84,9 +84,9 @@ See also: `e2ee_dm.md` (design notes + threat model).
   - [ ] Add server-side support to add/rotate wrappers for an existing active key (so we can introduce new unlock mechanisms later without regenerating keys).
 
 - [ ] **E2EE DMs: cross-server key discovery (browser CORS-safe)**
-  - [ ] Add an authenticated endpoint to resolve `@user@domain` → actor AP id (WebFinger) and fetch `egregoros:e2ee` keys server-side (signed fetch when needed), returning `{actor_ap_id, keys}`.
-  - [ ] Update `E2EEDMComposer` to encrypt for remote recipients using the endpoint (remove the “local-only” guard) and show clear UX when the recipient has no published E2EE keys.
-  - [ ] Update `E2EEDMMessage` decryption to fetch sender keys via the same endpoint (avoid cross-origin actor fetches), with a useful “can’t decrypt yet” state.
+  - [x] Add an authenticated endpoint to resolve `@user@domain` → actor AP id (WebFinger) and fetch `egregoros:e2ee` keys server-side (signed fetch when needed), returning `{actor_ap_id, keys}`.
+  - [x] Update `E2EEDMComposer` to encrypt for remote recipients using the endpoint (remove the “local-only” guard) and show clear UX when the recipient has no published E2EE keys.
+  - [x] Update `E2EEDMMessage` decryption to fetch sender keys via the same endpoint (avoid cross-origin actor fetches), with a useful “can’t decrypt yet” state.
 
 - [ ] **TOFU pinning + key-change warnings**
   - [ ] Add `e2ee_pins` table + schema for `{owner_user_id, remote_actor_ap_id, kid, fingerprint, first_seen_at, last_seen_at}` (plus optional `public_key_jwk`), and keep access behind a behaviour (Mox in tests).
