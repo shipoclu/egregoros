@@ -14,6 +14,7 @@ defmodule Egregoros.Activities.Accept do
   alias Egregoros.Relationships
   alias Egregoros.User
   alias Egregoros.Users
+  alias Egregoros.Workers.RefreshRemoteFollowingGraph
   alias EgregorosWeb.Endpoint
 
   def type, do: "Accept"
@@ -108,6 +109,8 @@ defmodule Egregoros.Activities.Accept do
 
           _ =
             Relationships.delete_by_type_actor_object("FollowRequest", actor_ap_id, target_ap_id)
+
+          _ = maybe_refresh_remote_following_graph(target_ap_id)
         end
 
         :ok
@@ -120,6 +123,25 @@ defmodule Egregoros.Activities.Accept do
   defp extract_id(%{"id" => id}) when is_binary(id), do: id
   defp extract_id(id) when is_binary(id), do: id
   defp extract_id(_), do: nil
+
+  defp maybe_refresh_remote_following_graph(target_ap_id) when is_binary(target_ap_id) do
+    target_ap_id = String.trim(target_ap_id)
+
+    if target_ap_id == "" do
+      :ok
+    else
+      case Users.get_by_ap_id(target_ap_id) do
+        %User{local: false} ->
+          _ = Oban.insert(RefreshRemoteFollowingGraph.new(%{"ap_id" => target_ap_id}))
+          :ok
+
+        _ ->
+          :ok
+      end
+    end
+  end
+
+  defp maybe_refresh_remote_following_graph(_target_ap_id), do: :ok
 
   defp validate_inbox_target(%{} = activity, opts) when is_list(opts) do
     InboxTargeting.validate(opts, fn inbox_user_ap_id ->
