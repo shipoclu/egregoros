@@ -125,6 +125,13 @@ defmodule EgregorosWeb.MessagesLiveTest do
     assert has_element?(view, "[data-role='dm-message-body']", "hi bob")
   end
 
+  test "send button does not blank itself via phx-disable-with", %{conn: conn, alice: alice} do
+    conn = Plug.Test.init_test_session(conn, %{user_id: alice.id})
+    {:ok, view, _html} = live(conn, "/messages")
+
+    refute has_element?(view, "button[aria-label='Send message'][phx-disable-with='']")
+  end
+
   test "renders avatar images when available", %{
     conn: conn,
     alice: alice,

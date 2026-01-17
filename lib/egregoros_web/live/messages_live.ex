@@ -989,7 +989,7 @@ defmodule EgregorosWeb.MessagesLive do
                         data-role="dm-encrypt-toggle"
                         phx-click="toggle_dm_encrypt"
                         class={[
-                          "inline-flex h-[44px] shrink-0 items-center gap-2 border-2 border-[color:var(--border-default)] px-3 text-xs font-bold uppercase tracking-widest transition focus-visible:outline-none focus-brutal",
+                          "inline-flex h-[44px] shrink-0 cursor-pointer items-center gap-2 border-2 border-[color:var(--border-default)] px-3 text-xs font-bold uppercase tracking-widest transition focus-visible:outline-none focus-brutal",
                           @dm_encrypt? &&
                             "bg-[color:var(--success-subtle)] text-[color:var(--success)] hover:shadow-[3px_3px_0_var(--success)]",
                           !@dm_encrypt? &&
@@ -1005,9 +1005,8 @@ defmodule EgregorosWeb.MessagesLive do
 
                       <button
                         type="submit"
-                        phx-disable-with=""
                         aria-label="Send message"
-                        class="inline-flex h-[44px] w-[44px] shrink-0 items-center justify-center border-2 border-[color:var(--border-default)] bg-[color:var(--text-primary)] text-[color:var(--bg-base)] transition hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[4px_4px_0_var(--border-default)] focus-visible:outline-none focus-brutal"
+                        class="inline-flex h-[44px] w-[44px] shrink-0 cursor-pointer items-center justify-center border-2 border-[color:var(--border-default)] bg-[color:var(--text-primary)] text-[color:var(--bg-base)] transition hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[4px_4px_0_var(--border-default)] focus-visible:outline-none focus-brutal"
                       >
                         <.icon name="hero-paper-airplane" class="size-5" />
                       </button>
