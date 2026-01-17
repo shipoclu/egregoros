@@ -801,11 +801,11 @@ defmodule EgregorosWeb.MessagesLive do
                       message.actor == @current_user.ap_id && "items-end text-right"
                     ]}>
                       <div class={[
-                        "border-2 border-[color:var(--border-default)] px-4 py-3",
+                        "border-2 border-[color:var(--border-default)] px-4 py-3 text-sm",
                         message.actor == @current_user.ap_id &&
-                          "bg-[color:var(--text-primary)] text-[color:var(--bg-base)]",
+                          "bg-[color:var(--text-primary)] text-[color:var(--bg-base)] [&_a]:!text-[#88aaff] dark:[&_a]:!text-[#0000ee] [&_a:hover]:!text-[#aaccff] dark:[&_a:hover]:!text-[#0000aa]",
                         message.actor != @current_user.ap_id &&
-                          "bg-[color:var(--bg-base)] text-[color:var(--text-primary)] shadow-[3px_3px_0_var(--border-default)]"
+                          "bg-[color:var(--bg-base)] text-[color:var(--text-primary)] shadow-[3px_3px_0_var(--border-default)] [&_a]:!text-[#0000ee] dark:[&_a]:!text-[#88aaff] [&_a:hover]:!text-[#0000aa] dark:[&_a:hover]:!text-[#aaccff]"
                       ]}>
                         <.dm_message_body message={message} current_user={@current_user} />
                       </div>
@@ -926,25 +926,25 @@ defmodule EgregorosWeb.MessagesLive do
                       </div>
                     <% end %>
 
-                    <div class="flex items-end gap-3">
-                      <div class="relative flex-1">
+                    <div class="flex gap-3">
+                      <div class="relative h-[44px] flex-1">
                         <textarea
                           name="dm[content]"
-                          rows="2"
+                          rows="1"
                           placeholder={
                             if(@dm_encrypt?,
                               do: "Type an encrypted message...",
                               else: "Type a message..."
                             )
                           }
-                          class="w-full resize-none border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-3 py-2 pr-10 text-sm text-[color:var(--text-primary)] focus:outline-none focus-brutal placeholder:text-[color:var(--text-muted)]"
+                          class="absolute inset-0 resize-none border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-3 py-2 pr-10 text-sm text-[color:var(--text-primary)] focus:outline-none focus-brutal placeholder:text-[color:var(--text-muted)]"
                         ><%= @dm_form.params["content"] || "" %></textarea>
                         <span
                           :if={@dm_encrypt?}
                           data-role="dm-composer-lock"
-                          class="pointer-events-none absolute bottom-3 right-3 text-[color:var(--success)]"
+                          class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[color:var(--success)]"
                         >
-                          <.icon name="hero-lock-closed" class="size-5" />
+                          <.icon name="hero-lock-closed" class="size-4" />
                         </span>
                       </div>
 
@@ -954,7 +954,7 @@ defmodule EgregorosWeb.MessagesLive do
                         data-role="dm-encrypt-toggle"
                         phx-click="toggle_dm_encrypt"
                         class={[
-                          "inline-flex h-10 items-center gap-2 border-2 border-[color:var(--border-default)] px-3 text-xs font-bold uppercase tracking-widest transition focus-visible:outline-none focus-brutal",
+                          "inline-flex h-[44px] shrink-0 items-center gap-2 border-2 border-[color:var(--border-default)] px-3 text-xs font-bold uppercase tracking-widest transition focus-visible:outline-none focus-brutal",
                           @dm_encrypt? &&
                             "bg-[color:var(--success-subtle)] text-[color:var(--success)] hover:shadow-[3px_3px_0_var(--success)]",
                           !@dm_encrypt? &&
@@ -968,9 +968,14 @@ defmodule EgregorosWeb.MessagesLive do
                         {if @dm_encrypt?, do: "Encrypt", else: "Plain"}
                       </button>
 
-                      <.button type="submit" phx-disable-with="Sending..." aria-label="Send message">
-                        <.icon name="hero-paper-airplane" class="size-4" />
-                      </.button>
+                      <button
+                        type="submit"
+                        phx-disable-with=""
+                        aria-label="Send message"
+                        class="inline-flex h-[44px] w-[44px] shrink-0 items-center justify-center border-2 border-[color:var(--border-default)] bg-[color:var(--text-primary)] text-[color:var(--bg-base)] transition hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[4px_4px_0_var(--border-default)] focus-visible:outline-none focus-brutal"
+                      >
+                        <.icon name="hero-paper-airplane" class="size-5" />
+                      </button>
                     </div>
                   </.form>
                 </div>
@@ -1000,6 +1005,9 @@ defmodule EgregorosWeb.MessagesLive do
   attr :current_user, :any, default: nil
 
   defp dm_message_body(assigns) do
+    is_own = assigns.message.actor == current_user_ap_id(assigns.current_user)
+    assigns = assign(assigns, :is_own, is_own)
+
     ~H"""
     <% e2ee_payload = e2ee_payload_json(@message) %>
     <% current_user_ap_id = current_user_ap_id(@current_user) %>
@@ -1012,19 +1020,22 @@ defmodule EgregorosWeb.MessagesLive do
       data-e2ee-dm={e2ee_payload}
       data-current-user-ap-id={current_user_ap_id}
       phx-hook={if is_binary(e2ee_payload), do: "E2EEDMMessage", else: nil}
-      class={is_binary(e2ee_payload) && "whitespace-pre-wrap"}
     >
       <%= if is_binary(e2ee_payload) do %>
-        <div data-role="e2ee-dm-body">{dm_content_html(@message)}</div>
-        <div data-role="e2ee-dm-actions" class="mt-3">
-          <button
-            type="button"
-            data-role="e2ee-dm-unlock"
-            class="inline-flex cursor-pointer items-center gap-2 border border-[color:var(--border-default)] bg-transparent px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-widest text-[color:var(--text-primary)] transition hover:bg-[color:var(--text-primary)] hover:text-[color:var(--bg-base)] focus-visible:outline-none focus-brutal"
-          >
-            <.icon name="hero-lock-open" class="size-4" /> Unlock
-          </button>
-        </div>
+        <span data-role="e2ee-dm-body"><span class="italic opacity-60">[Encrypted]</span></span><span
+          data-role="e2ee-dm-actions"
+          class="ml-2"
+        ><button
+          type="button"
+          data-role="e2ee-dm-unlock"
+          class={[
+            "inline-flex cursor-pointer items-center gap-1 border px-2 py-0.5 align-middle font-mono text-[10px] font-bold uppercase tracking-wide transition focus-visible:outline-none",
+            @is_own &&
+              "border-[color:var(--bg-base)] text-[color:var(--bg-base)] hover:bg-[color:var(--bg-base)] hover:text-[color:var(--text-primary)]",
+            !@is_own &&
+              "border-[color:var(--border-default)] text-[color:var(--text-primary)] hover:bg-[color:var(--text-primary)] hover:text-[color:var(--bg-base)]"
+          ]}
+        ><.icon name="hero-lock-open" class="size-3" /> Unlock</button></span>
       <% else %>
         {dm_content_html(@message)}
       <% end %>

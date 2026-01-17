@@ -158,7 +158,7 @@ defmodule EgregorosWeb.MessagesLiveTest do
     )
     |> render_submit()
 
-    assert has_element?(view, "[data-role='dm-message-body']", "Encrypted message")
+    assert has_element?(view, "[data-role='e2ee-dm-body']", "[Encrypted]")
     refute has_element?(view, "[data-role='dm-message-body']", "this-should-not-be-stored")
 
     assert has_element?(view, "[data-role='dm-e2ee-badge']")
@@ -167,6 +167,7 @@ defmodule EgregorosWeb.MessagesLiveTest do
     [dm] = DirectMessages.list_conversation(alice, bob.ap_id, limit: 1)
     assert dm.type == "EncryptedMessage"
     assert dm.data["egregoros:e2ee_dm"] == payload
+    refute dm.data["source"]["content"] =~ "this-should-not-be-stored"
   end
 
   test "conversation list shows preview, timestamp, and unread state", %{
