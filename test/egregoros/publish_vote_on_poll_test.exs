@@ -67,6 +67,17 @@ defmodule Egregoros.PublishVoteOnPollTest do
       assert {:error, :already_voted} = Publish.vote_on_poll(bob, updated_poll, [1])
     end
 
+    test "rejects voting twice even when voters list is missing", %{poll: poll, bob: bob} do
+      assert {:ok, _} = Publish.vote_on_poll(bob, poll, [0])
+
+      updated_poll = Objects.get_by_ap_id(poll.ap_id)
+
+      {:ok, updated_poll} =
+        Objects.update_object(updated_poll, %{data: Map.delete(updated_poll.data, "voters")})
+
+      assert {:error, :already_voted} = Publish.vote_on_poll(bob, updated_poll, [1])
+    end
+
     test "rejects multiple choices on single-choice poll", %{poll: poll, bob: bob} do
       assert {:error, :multiple_choices_not_allowed} = Publish.vote_on_poll(bob, poll, [0, 1])
     end

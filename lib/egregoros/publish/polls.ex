@@ -8,6 +8,7 @@ defmodule Egregoros.Publish.Polls do
   alias Egregoros.Activities.Answer
   alias Egregoros.Object
   alias Egregoros.Objects
+  alias Egregoros.Objects.Polls
   alias Egregoros.Pipeline
   alias Egregoros.User
   alias EgregorosWeb.URL
@@ -54,10 +55,8 @@ defmodule Egregoros.Publish.Polls do
 
   defp validate_not_own_poll(_user, _question), do: :ok
 
-  defp validate_not_already_voted(%User{ap_id: user_ap_id}, %Object{data: data}) do
-    voters = Map.get(data, "voters") || []
-
-    if user_ap_id in voters do
+  defp validate_not_already_voted(%User{} = user, %Object{} = question) do
+    if Polls.voted?(question, user) do
       {:error, :already_voted}
     else
       :ok

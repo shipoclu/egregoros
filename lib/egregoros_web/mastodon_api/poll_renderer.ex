@@ -7,6 +7,7 @@ defmodule EgregorosWeb.MastodonAPI.PollRenderer do
   """
 
   alias Egregoros.Object
+  alias Egregoros.Objects.Polls
   alias Egregoros.User
 
   @doc """
@@ -22,7 +23,6 @@ defmodule EgregorosWeb.MastodonAPI.PollRenderer do
   def render(%Object{type: "Question", data: data} = object, current_user) when is_map(data) do
     one_of = Map.get(data, "oneOf") |> List.wrap()
     any_of = Map.get(data, "anyOf") |> List.wrap()
-    voters = Map.get(data, "voters") || []
 
     {options, multiple} =
       cond do
@@ -37,7 +37,7 @@ defmodule EgregorosWeb.MastodonAPI.PollRenderer do
     expired = expired?(expires_at)
 
     own_votes = own_votes(options, current_user, object.actor)
-    voted = voted?(voters, current_user)
+    voted = Polls.voted?(object, current_user)
 
     %{
       "id" => Integer.to_string(object.id),
@@ -45,7 +45,7 @@ defmodule EgregorosWeb.MastodonAPI.PollRenderer do
       "expired" => expired,
       "multiple" => multiple,
       "votes_count" => votes_count,
-      "voters_count" => length(voters),
+      "voters_count" => length(Map.get(data, "voters") || []),
       "options" => rendered_options,
       "emojis" => [],
       "voted" => voted,
@@ -104,14 +104,6 @@ defmodule EgregorosWeb.MastodonAPI.PollRenderer do
 
   defp format_datetime(nil), do: nil
   defp format_datetime(%DateTime{} = dt), do: DateTime.to_iso8601(dt)
-
-  defp voted?(_voters, nil), do: false
-
-  defp voted?(voters, %User{ap_id: user_ap_id}) when is_list(voters) and is_binary(user_ap_id) do
-    user_ap_id in voters
-  end
-
-  defp voted?(_voters, _current_user), do: false
 
   defp own_votes(_options, nil, _poll_actor), do: []
 

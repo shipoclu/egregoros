@@ -8,6 +8,7 @@ defmodule Egregoros.Objects.Polls do
   alias Egregoros.Object
   alias Egregoros.Objects
   alias Egregoros.Repo
+  alias Egregoros.User
 
   @doc """
   Increases the vote count for a poll option on a Question object.
@@ -48,6 +49,16 @@ defmodule Egregoros.Objects.Polls do
   end
 
   def multiple?(_object), do: false
+
+  @doc """
+  Returns true if the given user has already voted on the poll.
+  """
+  def voted?(%Object{type: "Question", ap_id: ap_id}, %User{ap_id: voter_ap_id})
+      when is_binary(ap_id) and is_binary(voter_ap_id) do
+    Objects.get_by_type_actor_object("Answer", voter_ap_id, ap_id) != nil
+  end
+
+  def voted?(_poll, _user), do: false
 
   @doc """
   Updates poll option counts from a remote Question object.

@@ -81,6 +81,29 @@ defmodule EgregorosWeb.MastodonAPI.PollsControllerTest do
       assert response["voted"] == true
     end
 
+    test "returns voted=true even when voters list is missing", %{conn: conn, poll: poll} do
+      {:ok, bob} = Users.create_local_user("bob_missing_voters")
+
+      poll_reloaded = Objects.get_by_ap_id(poll.ap_id)
+      {:ok, _} = Publish.vote_on_poll(bob, poll_reloaded, [0])
+
+      poll_after_vote = Objects.get_by_ap_id(poll.ap_id)
+
+      {:ok, _} =
+        Objects.update_object(poll_after_vote, %{data: Map.delete(poll_after_vote.data, "voters")})
+
+      Egregoros.Auth.Mock
+      |> expect(:current_user, fn _conn -> {:ok, bob} end)
+
+      conn =
+        conn
+        |> put_req_header("authorization", "Bearer token")
+        |> get("/api/v1/polls/#{poll.id}")
+
+      response = json_response(conn, 200)
+      assert response["voted"] == true
+    end
+
     test "returns 404 for non-existent poll", %{conn: conn} do
       conn = get(conn, "/api/v1/polls/999999")
       assert response(conn, 404) == "Not Found"
