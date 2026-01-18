@@ -686,7 +686,7 @@ defmodule EgregorosWeb.SearchLive do
               </p>
             </.card>
 
-            <StatusCard.status_card
+            <TimelineItem.timeline_item
               :for={entry <- @post_results}
               id={post_dom_id(entry)}
               entry={entry}
@@ -788,7 +788,7 @@ defmodule EgregorosWeb.SearchLive do
     current_user = socket.assigns.current_user
 
     case Objects.get(post_id) do
-      %{type: "Note"} = object ->
+      %{type: type} = object when type in ["Note", "Question"] ->
         if Objects.visible_to?(object, current_user) do
           entry = StatusVM.decorate(object, current_user)
 

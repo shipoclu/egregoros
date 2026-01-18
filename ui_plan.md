@@ -89,13 +89,11 @@ Add a first‑class attachment composer experience:
 ### 5) Timeline & post card UX
 Refactor timeline into smaller parts:
 - `TimelineHeader` (home/public toggle, filters later).
-- `StatusCard` component:
-  - actor avatar/name/handle/time
-  - content (sanitized)
-  - attachments grid
-  - actions row (reply placeholder, like, repost, react, more menu)
-  - counts and pressed/active states
-  - inline errors for failed actions
+- `TimelineItem` dispatcher with specialized card components:
+  - `NoteCard` for standard posts
+  - `PollCard` for Question/poll objects
+  - `AnnounceCard` for boosts/reposts
+  - Shared subcomponents: `ActorHeader`, `ContentBody`, `AttachmentGrid`, `InteractionBar`, `StatusMenu`
 
 Improve timeline behavior:
 - Infinite scroll (or “Load more”) with proper loading states.
@@ -145,8 +143,8 @@ Finish “real app” expectations:
 **Deliverables**
 - Upload and post image attachment from web UI.
 
-### UI‑3 — Status card + timeline quality
-- Extract `StatusCard` component.
+### UI‑3 — Timeline cards + quality
+- Extract `TimelineItem` dispatcher and specialized card components (NoteCard, PollCard, AnnounceCard).
 - Improve typography, spacing, and action row.
 - Add pagination/infinite scroll + loading skeletons.
 

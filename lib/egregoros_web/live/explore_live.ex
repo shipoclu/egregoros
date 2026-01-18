@@ -195,7 +195,7 @@ defmodule EgregorosWeb.ExploreLive do
               </h3>
             </.card>
 
-            <StatusCard.status_card
+            <TimelineItem.timeline_item
               :for={entry <- @posts}
               id={"explore-post-#{entry.object.id}"}
               entry={entry}
