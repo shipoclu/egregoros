@@ -19,6 +19,7 @@ defmodule Egregoros.Activities.Answer do
   import Ecto.Changeset
 
   alias Egregoros.Activities.Helpers
+  alias Egregoros.Activities.Validations
   alias Egregoros.ActivityPub.ObjectValidators.Types.ObjectID
   alias Egregoros.ActivityPub.ObjectValidators.Types.Recipients
   alias Egregoros.ActivityPub.ObjectValidators.Types.DateTime, as: APDateTime
@@ -35,8 +36,10 @@ defmodule Egregoros.Activities.Answer do
     field :id, ObjectID
     field :type, :string
     field :actor, ObjectID
+    field :attributedTo, ObjectID
     field :name, :string
     field :inReplyTo, ObjectID
+    field :context, :string
     field :to, Recipients
     field :cc, Recipients
     field :published, APDateTime
@@ -55,8 +58,11 @@ defmodule Egregoros.Activities.Answer do
     changeset =
       %__MODULE__{}
       |> cast(answer, __schema__(:fields))
-      |> validate_required([:id, :type, :actor, :name, :inReplyTo])
+      |> validate_required([:id, :type, :actor, :attributedTo, :name, :inReplyTo])
       |> validate_inclusion(:type, [type()])
+      |> Validations.validate_any_presence([:to, :cc])
+      |> Validations.validate_fields_match([:actor, :attributedTo])
+      |> Validations.validate_host_match([:id, :actor, :attributedTo])
 
     with {:ok, %__MODULE__{} = validated} <- apply_action(changeset, :insert),
          :ok <- validate_question_exists_and_permits_voter(answer, opts) do
@@ -98,8 +104,10 @@ defmodule Egregoros.Activities.Answer do
     |> Map.put("id", validated.id)
     |> Map.put("type", validated.type)
     |> Map.put("actor", validated.actor)
+    |> Helpers.maybe_put("attributedTo", validated.attributedTo)
     |> Map.put("name", validated.name)
     |> Map.put("inReplyTo", validated.inReplyTo)
+    |> Helpers.maybe_put("context", validated.context)
     |> Helpers.maybe_put("to", validated.to)
     |> Helpers.maybe_put("cc", validated.cc)
     |> Helpers.maybe_put("published", validated.published)

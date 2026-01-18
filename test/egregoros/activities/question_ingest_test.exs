@@ -4,15 +4,17 @@ defmodule Egregoros.Activities.QuestionIngestTest do
   alias Egregoros.Objects
   alias Egregoros.Pipeline
   alias Egregoros.Users
+  alias EgregorosWeb.Endpoint
 
   describe "Question ingestion" do
     test "ingests a single-choice Question (oneOf)" do
       {:ok, alice} = Users.create_local_user("alice")
 
       question = %{
-        "id" => "https://example.com/objects/" <> Ecto.UUID.generate(),
+        "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
         "type" => "Question",
         "attributedTo" => alice.ap_id,
+        "context" => Endpoint.url() <> "/contexts/" <> Ecto.UUID.generate(),
         "to" => ["https://www.w3.org/ns/activitystreams#Public"],
         "content" => "What's your favorite color?",
         "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
@@ -47,9 +49,10 @@ defmodule Egregoros.Activities.QuestionIngestTest do
       {:ok, bob} = Users.create_local_user("bob")
 
       question = %{
-        "id" => "https://example.com/objects/" <> Ecto.UUID.generate(),
+        "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
         "type" => "Question",
         "attributedTo" => bob.ap_id,
+        "context" => Endpoint.url() <> "/contexts/" <> Ecto.UUID.generate(),
         "to" => ["https://www.w3.org/ns/activitystreams#Public"],
         "content" => "Select all that apply",
         "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
@@ -69,9 +72,10 @@ defmodule Egregoros.Activities.QuestionIngestTest do
       {:ok, carol} = Users.create_local_user("carol")
 
       question = %{
-        "id" => "https://example.com/objects/" <> Ecto.UUID.generate(),
+        "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
         "type" => "Question",
         "attributedTo" => carol.ap_id,
+        "context" => Endpoint.url() <> "/contexts/" <> Ecto.UUID.generate(),
         "to" => ["https://www.w3.org/ns/activitystreams#Public"],
         "content" => "Simple poll",
         "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
@@ -92,9 +96,10 @@ defmodule Egregoros.Activities.QuestionIngestTest do
       {:ok, dave} = Users.create_local_user("dave")
 
       question = %{
-        "id" => "https://example.com/objects/" <> Ecto.UUID.generate(),
+        "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
         "type" => "Question",
         "attributedTo" => dave.ap_id,
+        "context" => Endpoint.url() <> "/contexts/" <> Ecto.UUID.generate(),
         "to" => ["https://www.w3.org/ns/activitystreams#Public"],
         "content" => "Public poll",
         "published" => DateTime.utc_now() |> DateTime.to_iso8601(),

@@ -11,9 +11,10 @@ defmodule Egregoros.Workers.RefreshPoll do
     unique: [period: 60, keys: [:ap_id]]
 
   alias Egregoros.Federation.SignedFetch
+  alias Egregoros.Activities.Question
+  alias Egregoros.Objects.Polls
   alias Egregoros.Object
   alias Egregoros.Objects
-  alias Egregoros.Pipeline
   alias Egregoros.SafeURL
   alias Egregoros.Timeline
 
@@ -23,15 +24,24 @@ defmodule Egregoros.Workers.RefreshPoll do
   def perform(%Oban.Job{args: %{"ap_id" => ap_id}}) when is_binary(ap_id) do
     ap_id = String.trim(ap_id)
 
-    with %Object{type: "Question", local: false} <- Objects.get_by_ap_id(ap_id),
+    with %Object{type: "Question", local: false} = object <- Objects.get_by_ap_id(ap_id),
          :ok <- SafeURL.validate_http_url(ap_id),
          {:ok, %{status: status, body: body}} <- SignedFetch.get(ap_id, accept: @accept),
          status when status in 200..299 <- status,
          {:ok, %{"type" => "Question"} = question} <- decode_json(body),
          :ok <- validate_id(question, ap_id),
-         {:ok, updated} <- Pipeline.ingest(question, local: false, conflict: :replace) do
-      Timeline.broadcast_post_updated(updated)
-      :ok
+         {:ok, normalized} <- Question.cast_and_validate(question) do
+      case Polls.update_from_remote(object, normalized) do
+        {:ok, updated} ->
+          Timeline.broadcast_post_updated(updated)
+          :ok
+
+        :noop ->
+          :ok
+
+        {:error, reason} ->
+          {:error, reason}
+      end
     else
       # Poll doesn't exist locally or is local - nothing to refresh
       nil ->

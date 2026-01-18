@@ -5,15 +5,18 @@ defmodule EgregorosWeb.MastodonAPI.PollsControllerTest do
   alias Egregoros.Pipeline
   alias Egregoros.Publish
   alias Egregoros.Users
+  alias EgregorosWeb.Endpoint
+  alias Egregoros.Workers.RefreshPoll
 
   describe "GET /api/v1/polls/:id" do
     setup do
       {:ok, alice} = Users.create_local_user("alice")
 
       question = %{
-        "id" => "https://example.com/objects/" <> Ecto.UUID.generate(),
+        "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
         "type" => "Question",
         "attributedTo" => alice.ap_id,
+        "context" => Endpoint.url() <> "/contexts/" <> Ecto.UUID.generate(),
         "to" => ["https://www.w3.org/ns/activitystreams#Public"],
         "content" => "What's your favorite color?",
         "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
@@ -76,6 +79,30 @@ defmodule EgregorosWeb.MastodonAPI.PollsControllerTest do
 
       response = json_response(conn, 200)
       assert response["voted"] == true
+      assert response["own_votes"] == [0]
+    end
+
+    test "returns voted=true even when voters list is missing", %{conn: conn, poll: poll} do
+      {:ok, bob} = Users.create_local_user("bob_missing_voters")
+
+      poll_reloaded = Objects.get_by_ap_id(poll.ap_id)
+      {:ok, _} = Publish.vote_on_poll(bob, poll_reloaded, [0])
+
+      poll_after_vote = Objects.get_by_ap_id(poll.ap_id)
+
+      {:ok, _} =
+        Objects.update_object(poll_after_vote, %{data: Map.delete(poll_after_vote.data, "voters")})
+
+      Egregoros.Auth.Mock
+      |> expect(:current_user, fn _conn -> {:ok, bob} end)
+
+      conn =
+        conn
+        |> put_req_header("authorization", "Bearer token")
+        |> get("/api/v1/polls/#{poll.id}")
+
+      response = json_response(conn, 200)
+      assert response["voted"] == true
     end
 
     test "returns 404 for non-existent poll", %{conn: conn} do
@@ -91,6 +118,42 @@ defmodule EgregorosWeb.MastodonAPI.PollsControllerTest do
       conn = get(conn, "/api/v1/polls/#{note.id}")
       assert response(conn, 404) == "Not Found"
     end
+
+    test "enqueues refresh for remote poll", %{conn: conn} do
+      question = %{
+        "id" => "https://remote.example/objects/" <> Ecto.UUID.generate(),
+        "type" => "Question",
+        "attributedTo" => "https://remote.example/users/alice",
+        "context" => "https://remote.example/contexts/" <> Ecto.UUID.generate(),
+        "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+        "content" => "Remote poll",
+        "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
+        "oneOf" => [
+          %{
+            "name" => "Red",
+            "type" => "Note",
+            "replies" => %{"type" => "Collection", "totalItems" => 0}
+          },
+          %{
+            "name" => "Blue",
+            "type" => "Note",
+            "replies" => %{"type" => "Collection", "totalItems" => 0}
+          }
+        ],
+        "closed" => "2030-12-31T23:59:59Z"
+      }
+
+      {:ok, poll} = Pipeline.ingest(question, local: false)
+
+      conn = get(conn, "/api/v1/polls/#{poll.id}")
+      assert response(conn, 200)
+
+      assert_enqueued(
+        worker: RefreshPoll,
+        queue: "federation_incoming",
+        args: %{"ap_id" => poll.ap_id}
+      )
+    end
   end
 
   describe "POST /api/v1/polls/:id/votes" do
@@ -99,9 +162,10 @@ defmodule EgregorosWeb.MastodonAPI.PollsControllerTest do
       {:ok, bob} = Users.create_local_user("vote_bob")
 
       question = %{
-        "id" => "https://example.com/objects/" <> Ecto.UUID.generate(),
+        "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
         "type" => "Question",
         "attributedTo" => alice.ap_id,
+        "context" => Endpoint.url() <> "/contexts/" <> Ecto.UUID.generate(),
         "to" => ["https://www.w3.org/ns/activitystreams#Public"],
         "content" => "What's your favorite color?",
         "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
@@ -164,9 +228,10 @@ defmodule EgregorosWeb.MastodonAPI.PollsControllerTest do
       {:ok, expired_alice} = Users.create_local_user("expired_poll_alice")
 
       expired_question = %{
-        "id" => "https://example.com/objects/" <> Ecto.UUID.generate(),
+        "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
         "type" => "Question",
         "attributedTo" => expired_alice.ap_id,
+        "context" => Endpoint.url() <> "/contexts/" <> Ecto.UUID.generate(),
         "to" => ["https://www.w3.org/ns/activitystreams#Public"],
         "content" => "Expired poll",
         "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
@@ -237,9 +302,10 @@ defmodule EgregorosWeb.MastodonAPI.PollsControllerTest do
       {:ok, bob} = Users.create_local_user("anyof_poll_bob")
 
       question = %{
-        "id" => "https://example.com/objects/" <> Ecto.UUID.generate(),
+        "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
         "type" => "Question",
         "attributedTo" => alice.ap_id,
+        "context" => Endpoint.url() <> "/contexts/" <> Ecto.UUID.generate(),
         "to" => ["https://www.w3.org/ns/activitystreams#Public"],
         "content" => "Select all that apply",
         "published" => DateTime.utc_now() |> DateTime.to_iso8601(),

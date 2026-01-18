@@ -7,6 +7,7 @@ defmodule EgregorosWeb.MastodonAPI.PollRenderer do
   """
 
   alias Egregoros.Object
+  alias Egregoros.Objects.Polls
   alias Egregoros.User
 
   @doc """
@@ -43,8 +44,7 @@ defmodule EgregorosWeb.MastodonAPI.PollRenderer do
     expires_at = parse_expiry(data)
     expired = expired?(expires_at)
 
-    own_votes = own_votes(options, current_user, object.actor)
-    voted = voted?(voters, current_user)
+    {own_votes, voted} = own_votes_and_voted(object, options, current_user)
 
     %{
       "id" => Integer.to_string(object.id),
@@ -112,25 +112,38 @@ defmodule EgregorosWeb.MastodonAPI.PollRenderer do
   defp format_datetime(nil), do: nil
   defp format_datetime(%DateTime{} = dt), do: DateTime.to_iso8601(dt)
 
-  defp voted?(_voters, nil), do: false
+  defp own_votes_and_voted(_object, _options, nil), do: {[], false}
 
-  defp voted?(voters, %User{ap_id: user_ap_id}) when is_list(voters) and is_binary(user_ap_id) do
-    user_ap_id in voters
-  end
-
-  defp voted?(_voters, _current_user), do: false
-
-  defp own_votes(_options, nil, _poll_actor), do: []
-
-  defp own_votes(_options, %User{ap_id: user_ap_id}, poll_actor)
+  defp own_votes_and_voted(%Object{actor: poll_actor}, _options, %User{ap_id: user_ap_id})
        when user_ap_id == poll_actor do
     # Poll owner doesn't vote on their own poll
-    []
+    {[], false}
   end
 
-  defp own_votes(_options, _current_user, _poll_actor) do
-    # TODO: Track which specific options the user voted for
-    # For now, we don't store this information, so return empty
-    []
+  defp own_votes_and_voted(%Object{} = object, options, %User{} = current_user) do
+    titles =
+      Enum.map(options, fn
+        %{} = option -> Map.get(option, "name", "")
+        _ -> ""
+      end)
+
+    votes = Polls.list_votes(object, current_user)
+
+    own_votes =
+      votes
+      |> Enum.reduce(MapSet.new(), fn
+        %Object{data: %{"name" => name}}, acc ->
+          case Enum.find_index(titles, &(&1 == name)) do
+            nil -> acc
+            index -> MapSet.put(acc, index)
+          end
+
+        _answer, acc ->
+          acc
+      end)
+      |> MapSet.to_list()
+      |> Enum.sort()
+
+    {own_votes, votes != []}
   end
 end

@@ -6,6 +6,8 @@ defmodule Egregoros.PublishVoteOnPollTest do
   alias Egregoros.Publish
   alias Egregoros.Users
   alias Egregoros.Workers.DeliverActivity
+  alias EgregorosWeb.Endpoint
+  alias EgregorosWeb.Endpoint
 
   describe "vote_on_poll/3" do
     setup do
@@ -14,9 +16,10 @@ defmodule Egregoros.PublishVoteOnPollTest do
       {:ok, carol} = Users.create_local_user("carol")
 
       question = %{
-        "id" => "https://example.com/objects/" <> Ecto.UUID.generate(),
+        "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
         "type" => "Question",
         "attributedTo" => alice.ap_id,
+        "context" => Endpoint.url() <> "/contexts/" <> Ecto.UUID.generate(),
         "to" => ["https://www.w3.org/ns/activitystreams#Public"],
         "content" => "What's your favorite color?",
         "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
@@ -66,6 +69,17 @@ defmodule Egregoros.PublishVoteOnPollTest do
       assert {:error, :already_voted} = Publish.vote_on_poll(bob, updated_poll, [1])
     end
 
+    test "rejects voting twice even when voters list is missing", %{poll: poll, bob: bob} do
+      assert {:ok, _} = Publish.vote_on_poll(bob, poll, [0])
+
+      updated_poll = Objects.get_by_ap_id(poll.ap_id)
+
+      {:ok, updated_poll} =
+        Objects.update_object(updated_poll, %{data: Map.delete(updated_poll.data, "voters")})
+
+      assert {:error, :already_voted} = Publish.vote_on_poll(bob, updated_poll, [1])
+    end
+
     test "rejects multiple choices on single-choice poll", %{poll: poll, bob: bob} do
       assert {:error, :multiple_choices_not_allowed} = Publish.vote_on_poll(bob, poll, [0, 1])
     end
@@ -85,9 +99,10 @@ defmodule Egregoros.PublishVoteOnPollTest do
 
     test "rejects voting on expired poll", %{alice: alice, bob: bob} do
       expired_question = %{
-        "id" => "https://example.com/objects/" <> Ecto.UUID.generate(),
+        "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
         "type" => "Question",
         "attributedTo" => alice.ap_id,
+        "context" => Endpoint.url() <> "/contexts/" <> Ecto.UUID.generate(),
         "to" => ["https://www.w3.org/ns/activitystreams#Public"],
         "content" => "Expired poll",
         "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
@@ -102,6 +117,58 @@ defmodule Egregoros.PublishVoteOnPollTest do
 
       assert {:error, :poll_expired} = Publish.vote_on_poll(bob, expired_poll, [0])
     end
+
+    test "federates votes to the remote poll actor", %{bob: bob} do
+      {:ok, remote_actor} =
+        Users.create_user(%{
+          nickname: "remote",
+          ap_id: "https://remote.example/users/remote",
+          inbox: "https://remote.example/users/remote/inbox",
+          outbox: "https://remote.example/users/remote/outbox",
+          public_key: "-----BEGIN PUBLIC KEY-----\nMIIB...\n-----END PUBLIC KEY-----\n",
+          local: false
+        })
+
+      question = %{
+        "id" => "https://remote.example/objects/" <> Ecto.UUID.generate(),
+        "type" => "Question",
+        "attributedTo" => remote_actor.ap_id,
+        "context" => "https://remote.example/contexts/" <> Ecto.UUID.generate(),
+        "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+        "content" => "Remote poll",
+        "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
+        "oneOf" => [
+          %{
+            "name" => "Option A",
+            "type" => "Note",
+            "replies" => %{"type" => "Collection", "totalItems" => 0}
+          },
+          %{
+            "name" => "Option B",
+            "type" => "Note",
+            "replies" => %{"type" => "Collection", "totalItems" => 0}
+          }
+        ],
+        "closed" => "2030-12-31T23:59:59Z"
+      }
+
+      {:ok, poll} = Pipeline.ingest(question, local: false)
+
+      assert {:ok, _updated_poll} = Publish.vote_on_poll(bob, poll, [1])
+
+      assert_enqueued(
+        worker: DeliverActivity,
+        queue: "federation_outgoing",
+        args: %{
+          "user_id" => bob.id,
+          "inbox_url" => remote_actor.inbox,
+          "activity" => %{
+            "type" => "Create",
+            "object" => %{"type" => "Answer"}
+          }
+        }
+      )
+    end
   end
 
   describe "vote_on_poll/3 with multiple choice (anyOf)" do
@@ -110,9 +177,10 @@ defmodule Egregoros.PublishVoteOnPollTest do
       {:ok, bob} = Users.create_local_user("multi_bob")
 
       question = %{
-        "id" => "https://example.com/objects/" <> Ecto.UUID.generate(),
+        "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
         "type" => "Question",
         "attributedTo" => alice.ap_id,
+        "context" => Endpoint.url() <> "/contexts/" <> Ecto.UUID.generate(),
         "to" => ["https://www.w3.org/ns/activitystreams#Public"],
         "content" => "Select all that apply",
         "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
@@ -181,6 +249,7 @@ defmodule Egregoros.PublishVoteOnPollTest do
         "id" => "https://remote.example/objects/" <> Ecto.UUID.generate(),
         "type" => "Question",
         "attributedTo" => poll_creator.ap_id,
+        "context" => "https://remote.example/contexts/" <> Ecto.UUID.generate(),
         "to" => ["https://www.w3.org/ns/activitystreams#Public"],
         "content" => "Remote poll",
         "published" => DateTime.utc_now() |> DateTime.to_iso8601(),

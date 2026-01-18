@@ -173,6 +173,7 @@ defmodule EgregorosWeb.TimelineLiveTest do
       "id" => EgregorosWeb.Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
       "type" => "Question",
       "attributedTo" => poll_owner.ap_id,
+      "context" => EgregorosWeb.Endpoint.url() <> "/contexts/" <> Ecto.UUID.generate(),
       "to" => ["https://www.w3.org/ns/activitystreams#Public"],
       "content" => "Boosted poll",
       "published" => DateTime.utc_now() |> DateTime.to_iso8601(),

@@ -6,13 +6,12 @@ defmodule Egregoros.Publish.Polls do
   """
 
   alias Egregoros.Activities.Answer
-  alias Egregoros.Federation.Delivery
+  alias Egregoros.Activities.Create
   alias Egregoros.Object
   alias Egregoros.Objects
+  alias Egregoros.Objects.Polls
   alias Egregoros.Pipeline
   alias Egregoros.User
-  alias Egregoros.Users
-  alias EgregorosWeb.Endpoint
   alias EgregorosWeb.URL
 
   @doc """
@@ -57,10 +56,8 @@ defmodule Egregoros.Publish.Polls do
 
   defp validate_not_own_poll(_user, _question), do: :ok
 
-  defp validate_not_already_voted(%User{ap_id: user_ap_id}, %Object{data: data}) do
-    voters = Map.get(data, "voters") || []
-
-    if user_ap_id in voters do
+  defp validate_not_already_voted(%User{} = user, %Object{} = question) do
+    if Polls.voted?(question, user) do
       {:error, :already_voted}
     else
       :ok
@@ -170,38 +167,19 @@ defmodule Egregoros.Publish.Polls do
       "attributedTo" => user.ap_id,
       "name" => option_name,
       "inReplyTo" => question.ap_id,
-      "to" => [question.actor],
+      "to" => [],
+      "cc" => [question.actor],
       "published" => DateTime.utc_now() |> DateTime.to_iso8601()
     }
 
-    with {:ok, answer_object} <- Pipeline.ingest(answer, local: true) do
-      _ = maybe_deliver_remote_vote(user, question, answer)
-      {:ok, answer_object}
-    end
-  end
+    answer =
+      case Map.get(question.data, "context") do
+        context when is_binary(context) and context != "" -> Map.put(answer, "context", context)
+        _ -> answer
+      end
 
-  defp maybe_deliver_remote_vote(%User{} = user, %Object{local: false} = question, %{} = answer) do
-    with %User{local: false, inbox: inbox_url} <- Users.get_by_ap_id(question.actor),
-         true <- is_binary(inbox_url) and inbox_url != "" do
-      create = build_vote_create(user, question.actor, answer)
-      Delivery.deliver(user, inbox_url, create)
-    else
-      _ -> :ok
-    end
-  end
+    create = Create.build(user, answer)
 
-  defp maybe_deliver_remote_vote(_user, _question, _answer), do: :ok
-
-  defp build_vote_create(%User{} = user, poll_actor_ap_id, %{} = answer)
-       when is_binary(poll_actor_ap_id) do
-    %{
-      "id" => Endpoint.url() <> "/activities/create/" <> Ecto.UUID.generate(),
-      "type" => "Create",
-      "actor" => user.ap_id,
-      "to" => [poll_actor_ap_id],
-      "cc" => [],
-      "object" => answer,
-      "published" => Map.get(answer, "published") || DateTime.utc_now() |> DateTime.to_iso8601()
-    }
+    Pipeline.ingest(create, local: true)
   end
 end

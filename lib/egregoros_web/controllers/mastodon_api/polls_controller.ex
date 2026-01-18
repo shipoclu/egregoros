@@ -31,6 +31,7 @@ defmodule EgregorosWeb.MastodonAPI.PollsController do
 
   alias Egregoros.Objects
   alias Egregoros.Publish
+  alias Egregoros.Workers.RefreshPoll
   alias EgregorosWeb.MastodonAPI.PollRenderer
 
   @doc """
@@ -44,6 +45,7 @@ defmodule EgregorosWeb.MastodonAPI.PollsController do
     case Objects.get(id) do
       %{type: "Question"} = object ->
         if Objects.visible_to?(object, current_user) do
+          _ = RefreshPoll.maybe_enqueue(object)
           json(conn, PollRenderer.render(object, current_user))
         else
           send_resp(conn, 404, "Not Found")

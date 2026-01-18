@@ -2,6 +2,7 @@ defmodule EgregorosWeb.ViewModels.Status do
   @moduledoc false
 
   alias Egregoros.Objects
+  alias Egregoros.Objects.Polls
   alias Egregoros.Relationships
   alias Egregoros.User
   alias EgregorosWeb.SafeMediaURL
@@ -398,7 +399,8 @@ defmodule EgregorosWeb.ViewModels.Status do
 
   defp decorate_content_with_context(_object, _current_user, _ctx, _opts), do: nil
 
-  defp poll_view_model(%{data: data, actor: actor_ap_id}, current_user) when is_map(data) do
+  defp poll_view_model(%{data: data, actor: actor_ap_id} = object, current_user)
+       when is_map(data) do
     one_of = Map.get(data, "oneOf") |> List.wrap()
     any_of = Map.get(data, "anyOf") |> List.wrap()
     voters = Map.get(data, "voters") || []
@@ -416,7 +418,7 @@ defmodule EgregorosWeb.ViewModels.Status do
     expired? = closed != nil and DateTime.compare(closed, DateTime.utc_now()) == :lt
 
     own_poll? = own_poll?(actor_ap_id, current_user)
-    voted? = voted?(voters, current_user)
+    voted? = voted?(object, current_user)
 
     %{
       options: options,
@@ -463,13 +465,13 @@ defmodule EgregorosWeb.ViewModels.Status do
 
   defp own_poll?(_actor_ap_id, _current_user), do: false
 
-  defp voted?(_voters, nil), do: false
+  defp voted?(_object, nil), do: false
 
-  defp voted?(voters, %User{ap_id: user_ap_id}) when is_list(voters) and is_binary(user_ap_id) do
-    user_ap_id in voters
+  defp voted?(%{} = object, %User{} = current_user) do
+    Polls.voted?(object, current_user)
   end
 
-  defp voted?(_voters, _current_user), do: false
+  defp voted?(_object, _current_user), do: false
 
   defp reactions_for_object_with_context(object_ap_id, current_user, ctx)
        when is_binary(object_ap_id) do

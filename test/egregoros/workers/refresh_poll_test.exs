@@ -1,13 +1,16 @@
 defmodule Egregoros.Workers.RefreshPollTest do
   use Egregoros.DataCase, async: true
 
-  alias Egregoros.Pipeline
   alias Egregoros.Objects
+  alias Egregoros.Pipeline
   alias Egregoros.Users
   alias Egregoros.Workers.RefreshPoll
+  alias EgregorosWeb.Endpoint
+
+  @as_public "https://www.w3.org/ns/activitystreams#Public"
 
   describe "maybe_enqueue/1" do
-    test "enqueues for remote open polls" do
+    test "enqueues refresh for open remote poll" do
       ap_id = "https://remote.example/objects/" <> Ecto.UUID.generate()
 
       poll = %Egregoros.Object{
@@ -26,16 +29,14 @@ defmodule Egregoros.Workers.RefreshPollTest do
       )
     end
 
-    test "does not enqueue for remote closed polls" do
+    test "skips enqueue for closed polls" do
       ap_id = "https://remote.example/objects/" <> Ecto.UUID.generate()
 
       poll = %Egregoros.Object{
         type: "Question",
         local: false,
         ap_id: ap_id,
-        data: %{
-          "closed" => DateTime.add(DateTime.utc_now(), -60, :second) |> DateTime.to_iso8601()
-        }
+        data: %{"closed" => "2020-01-01T00:00:00Z"}
       }
 
       assert :ok = RefreshPoll.maybe_enqueue(poll)
@@ -57,7 +58,7 @@ defmodule Egregoros.Workers.RefreshPollTest do
     end
 
     test "does not enqueue for local polls" do
-      ap_id = EgregorosWeb.Endpoint.url() <> "/objects/" <> Ecto.UUID.generate()
+      ap_id = Endpoint.url() <> "/objects/" <> Ecto.UUID.generate()
 
       poll = %Egregoros.Object{
         type: "Question",
@@ -78,7 +79,7 @@ defmodule Egregoros.Workers.RefreshPollTest do
     end
 
     test "returns :ok for local polls" do
-      ap_id = EgregorosWeb.Endpoint.url() <> "/objects/" <> Ecto.UUID.generate()
+      ap_id = Endpoint.url() <> "/objects/" <> Ecto.UUID.generate()
 
       {:ok, alice} = Users.create_local_user("refresh_poll_alice")
 
@@ -86,7 +87,8 @@ defmodule Egregoros.Workers.RefreshPollTest do
         "id" => ap_id,
         "type" => "Question",
         "attributedTo" => alice.ap_id,
-        "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+        "context" => Endpoint.url() <> "/contexts/" <> Ecto.UUID.generate(),
+        "to" => [@as_public],
         "oneOf" => [%{"name" => "A", "replies" => %{"totalItems" => 0}}]
       }
 
@@ -112,7 +114,8 @@ defmodule Egregoros.Workers.RefreshPollTest do
         "id" => ap_id,
         "type" => "Question",
         "attributedTo" => remote_actor.ap_id,
-        "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+        "context" => "https://remote.example/contexts/" <> Ecto.UUID.generate(),
+        "to" => [@as_public],
         "oneOf" => [
           %{"name" => "A", "replies" => %{"totalItems" => 0}},
           %{"name" => "B", "replies" => %{"totalItems" => 0}}
@@ -152,7 +155,8 @@ defmodule Egregoros.Workers.RefreshPollTest do
         "id" => ap_id,
         "type" => "Question",
         "attributedTo" => "https://remote.example/users/pollcreator",
-        "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+        "context" => "https://remote.example/contexts/" <> Ecto.UUID.generate(),
+        "to" => [@as_public],
         "oneOf" => [%{"name" => "A", "replies" => %{"totalItems" => 0}}]
       }
 
@@ -181,7 +185,8 @@ defmodule Egregoros.Workers.RefreshPollTest do
         "id" => ap_id,
         "type" => "Question",
         "attributedTo" => "https://remote.example/users/pollcreator",
-        "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+        "context" => "https://remote.example/contexts/" <> Ecto.UUID.generate(),
+        "to" => [@as_public],
         "oneOf" => [%{"name" => "A", "replies" => %{"totalItems" => 0}}]
       }
 
@@ -190,6 +195,31 @@ defmodule Egregoros.Workers.RefreshPollTest do
       stub(Egregoros.HTTP.Mock, :get, fn url, headers ->
         if url == ap_id do
           {:ok, %{status: 200, body: "not-json", headers: []}}
+        else
+          Egregoros.HTTP.Stub.get(url, headers)
+        end
+      end)
+
+      assert :ok = RefreshPoll.perform(%Oban.Job{args: %{"ap_id" => ap_id}})
+    end
+
+    test "does not retry for 404 responses" do
+      ap_id = "https://remote.example/objects/" <> Ecto.UUID.generate()
+
+      question = %{
+        "id" => ap_id,
+        "type" => "Question",
+        "attributedTo" => "https://remote.example/users/pollcreator",
+        "context" => "https://remote.example/contexts/" <> Ecto.UUID.generate(),
+        "to" => [@as_public],
+        "oneOf" => [%{"name" => "A", "replies" => %{"totalItems" => 0}}]
+      }
+
+      assert {:ok, _poll} = Pipeline.ingest(question, local: false)
+
+      stub(Egregoros.HTTP.Mock, :get, fn url, headers ->
+        if url == ap_id do
+          {:ok, %{status: 404, body: %{}, headers: []}}
         else
           Egregoros.HTTP.Stub.get(url, headers)
         end

@@ -165,9 +165,10 @@ defmodule EgregorosWeb.ViewModels.StatusTest do
     {:ok, viewer} = Users.create_local_user("status-poll-viewer")
 
     question = %{
-      "id" => "https://example.com/objects/" <> Ecto.UUID.generate(),
+      "id" => EgregorosWeb.Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
       "type" => "Question",
       "attributedTo" => author.ap_id,
+      "context" => EgregorosWeb.Endpoint.url() <> "/contexts/" <> Ecto.UUID.generate(),
       "to" => ["https://www.w3.org/ns/activitystreams#Public"],
       "content" => "Pick one",
       "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
@@ -198,9 +199,10 @@ defmodule EgregorosWeb.ViewModels.StatusTest do
     {:ok, voter} = Users.create_local_user("status-poll-voted-user")
 
     question = %{
-      "id" => "https://example.com/objects/" <> Ecto.UUID.generate(),
+      "id" => EgregorosWeb.Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
       "type" => "Question",
       "attributedTo" => author.ap_id,
+      "context" => EgregorosWeb.Endpoint.url() <> "/contexts/" <> Ecto.UUID.generate(),
       "to" => ["https://www.w3.org/ns/activitystreams#Public"],
       "content" => "Pick one",
       "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
@@ -228,9 +230,10 @@ defmodule EgregorosWeb.ViewModels.StatusTest do
     {:ok, viewer} = Users.create_local_user("status-poll-anyof-viewer")
 
     question = %{
-      "id" => "https://example.com/objects/" <> Ecto.UUID.generate(),
+      "id" => EgregorosWeb.Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
       "type" => "Question",
       "attributedTo" => author.ap_id,
+      "context" => EgregorosWeb.Endpoint.url() <> "/contexts/" <> Ecto.UUID.generate(),
       "to" => ["https://www.w3.org/ns/activitystreams#Public"],
       "content" => "Pick any",
       "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
