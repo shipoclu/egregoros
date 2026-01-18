@@ -1,4 +1,4 @@
-defmodule EgregorosWeb.Components.TimelineItems.TimelineItem do
+defmodule EgregorosWeb.StatusCard do
   @moduledoc """
   Dispatcher component that routes timeline entries to the appropriate
   type-specific component based on the object type.
@@ -19,23 +19,18 @@ defmodule EgregorosWeb.Components.TimelineItems.TimelineItem do
   attr :reply_mode, :atom, default: :navigate
 
   @doc """
-  Renders a timeline item by dispatching to the appropriate component
+  Renders a status card by dispatching to the appropriate component
   based on the object type.
 
   ## Supported Types
 
   - `Note` - Standard microblog post (rendered by NoteCard)
   - `Announce` - Repost/boost (rendered by AnnounceCard, which wraps NoteCard)
-
-  ## Future Types
-
-  To add support for a new object type (e.g., Question/Poll):
-  1. Create a new component module (e.g., `PollCard`)
-  2. Add a new clause to this function
+  - `Question` - Poll (rendered by PollCard)
 
   ## Examples
 
-      <TimelineItem.timeline_item
+      <StatusCard.status_card
         id="post-123"
         entry={entry}
         current_user={@current_user}
@@ -43,7 +38,7 @@ defmodule EgregorosWeb.Components.TimelineItems.TimelineItem do
         reply_mode={:modal}
       />
   """
-  def timeline_item(assigns) do
+  def status_card(assigns) do
     ~H"""
     <%= case object_type(@entry) do %>
       <% "Note" -> %>

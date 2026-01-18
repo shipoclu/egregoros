@@ -509,7 +509,7 @@ defmodule EgregorosWeb.TagLive do
               No posts yet.
             </div>
 
-            <TimelineItem.timeline_item
+            <StatusCard.status_card
               :for={entry <- @posts}
               id={"post-#{entry.object.id}"}
               entry={entry}

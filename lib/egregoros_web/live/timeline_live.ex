@@ -11,7 +11,6 @@ defmodule EgregorosWeb.TimelineLive do
   alias Egregoros.Timeline
   alias Egregoros.User
   alias Egregoros.Users
-  alias EgregorosWeb.Components.TimelineItems.TimelineItem
   alias EgregorosWeb.Live.Uploads, as: LiveUploads
   alias EgregorosWeb.MentionAutocomplete
   alias EgregorosWeb.Param
@@ -985,7 +984,7 @@ defmodule EgregorosWeb.TimelineLive do
               No posts yet.
             </div>
 
-            <TimelineItem.timeline_item
+            <StatusCard.status_card
               :for={{id, entry} <- @streams.posts}
               id={id}
               entry={entry}
@@ -1333,13 +1332,17 @@ defmodule EgregorosWeb.TimelineLive do
   defp parse_choices(choices) when is_list(choices) do
     choices
     |> Enum.map(fn
-      choice when is_integer(choice) -> choice
+      choice when is_integer(choice) ->
+        choice
+
       choice when is_binary(choice) ->
         case Integer.parse(choice) do
           {int, ""} -> int
           _ -> nil
         end
-      _ -> nil
+
+      _ ->
+        nil
     end)
     |> Enum.filter(&is_integer/1)
   end

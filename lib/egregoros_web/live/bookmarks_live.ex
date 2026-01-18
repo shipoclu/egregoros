@@ -545,7 +545,7 @@ defmodule EgregorosWeb.BookmarksLive do
                 {@empty_message}
               </div>
 
-              <TimelineItem.timeline_item
+              <StatusCard.status_card
                 :for={{id, entry} <- @streams.saved_posts}
                 id={id}
                 entry={entry}

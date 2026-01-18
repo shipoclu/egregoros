@@ -1002,7 +1002,7 @@ defmodule EgregorosWeb.ProfileLive do
                   No posts yet.
                 </div>
 
-                <TimelineItem.timeline_item
+                <StatusCard.status_card
                   :for={{id, entry} <- @streams.posts}
                   id={id}
                   entry={entry}

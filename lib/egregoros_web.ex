@@ -94,7 +94,7 @@ defmodule EgregorosWeb do
       alias EgregorosWeb.Layouts
       alias EgregorosWeb.MediaViewer
       alias EgregorosWeb.ReplyModal
-      alias EgregorosWeb.Components.TimelineItems.TimelineItem
+      alias EgregorosWeb.StatusCard
 
       # Routes generation with the ~p sigil
       unquote(verified_routes())

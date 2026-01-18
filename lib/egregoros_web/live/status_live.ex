@@ -13,7 +13,6 @@ defmodule EgregorosWeb.StatusLive do
   alias Egregoros.Timeline
   alias Egregoros.User
   alias Egregoros.Users
-  alias EgregorosWeb.Components.TimelineItems.TimelineItem
   alias EgregorosWeb.Endpoint
   alias EgregorosWeb.Live.Uploads, as: LiveUploads
   alias EgregorosWeb.MentionAutocomplete
@@ -719,7 +718,7 @@ defmodule EgregorosWeb.StatusLive do
                   </span>
                 </div>
 
-                <TimelineItem.timeline_item
+                <StatusCard.status_card
                   :for={entry <- @ancestors}
                   id={"post-#{entry.object.id}"}
                   entry={entry}
@@ -788,7 +787,7 @@ defmodule EgregorosWeb.StatusLive do
                 phx-hook="StatusAutoScroll"
                 class="ring-2 ring-[color:var(--border-default)]"
               >
-                <TimelineItem.timeline_item
+                <StatusCard.status_card
                   id={"post-#{@status.object.id}"}
                   entry={@status}
                   current_user={@current_user}
@@ -888,7 +887,7 @@ defmodule EgregorosWeb.StatusLive do
                     </a>
                   </div>
 
-                  <TimelineItem.timeline_item
+                  <StatusCard.status_card
                     id={"post-#{entry.object.id}"}
                     entry={entry}
                     current_user={@current_user}
