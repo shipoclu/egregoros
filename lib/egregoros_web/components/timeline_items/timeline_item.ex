@@ -10,6 +10,7 @@ defmodule EgregorosWeb.Components.TimelineItems.TimelineItem do
 
   alias EgregorosWeb.Components.TimelineItems.AnnounceCard
   alias EgregorosWeb.Components.TimelineItems.NoteCard
+  alias EgregorosWeb.Components.TimelineItems.PollCard
 
   attr :id, :string, required: true
   attr :entry, :map, required: true
@@ -55,6 +56,14 @@ defmodule EgregorosWeb.Components.TimelineItems.TimelineItem do
         />
       <% "Announce" -> %>
         <AnnounceCard.announce_card
+          id={@id}
+          entry={@entry}
+          current_user={@current_user}
+          back_timeline={@back_timeline}
+          reply_mode={@reply_mode}
+        />
+      <% "Question" -> %>
+        <PollCard.poll_card
           id={@id}
           entry={@entry}
           current_user={@current_user}

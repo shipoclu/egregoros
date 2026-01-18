@@ -14,6 +14,10 @@ defmodule EgregorosWeb.ViewModels.Status do
     decorate_one(object, current_user)
   end
 
+  def decorate(%{type: "Question"} = object, current_user) do
+    decorate_one(object, current_user)
+  end
+
   def decorate(%{type: "Announce", object: object_ap_id} = announce, current_user)
       when is_binary(object_ap_id) do
     decorate_one(announce, current_user)
@@ -205,15 +209,15 @@ defmodule EgregorosWeb.ViewModels.Status do
       |> Objects.list_by_ap_ids()
       |> Map.new(&{&1.ap_id, &1})
 
-    note_objects =
+    content_objects =
       objects
-      |> Enum.filter(&match?(%{type: "Note"}, &1))
+      |> Enum.filter(&match?(%{type: type} when type in ["Note", "Question"], &1))
       |> Kernel.++(Map.values(reblogs_by_ap_id))
-      |> Enum.filter(&match?(%{type: "Note"}, &1))
+      |> Enum.filter(&match?(%{type: type} when type in ["Note", "Question"], &1))
       |> Enum.uniq_by(& &1.ap_id)
 
     object_ap_ids =
-      note_objects
+      content_objects
       |> Enum.map(& &1.ap_id)
       |> Enum.filter(&is_binary/1)
       |> Enum.map(&String.trim/1)
@@ -221,7 +225,7 @@ defmodule EgregorosWeb.ViewModels.Status do
       |> Enum.uniq()
 
     actor_ap_ids =
-      note_objects
+      content_objects
       |> Enum.map(& &1.actor)
       |> Kernel.++(
         objects
@@ -321,9 +325,10 @@ defmodule EgregorosWeb.ViewModels.Status do
     object_ap_id = String.trim(object_ap_id)
 
     with true <- object_ap_id != "",
-         %{type: "Note"} = object <- Map.get(ctx.reblogs_by_ap_id, object_ap_id),
+         %{type: type} = object when type in ["Note", "Question"] <-
+           Map.get(ctx.reblogs_by_ap_id, object_ap_id),
          true <- visible_to_cached?(object, current_user, ctx.followed_actors) do
-      decorate_note_with_context(object, current_user, ctx,
+      decorate_content_with_context(object, current_user, ctx,
         feed_id: announce.id,
         reposted_by: actor_card(announce.actor, ctx.actor_cards)
       )
@@ -333,14 +338,19 @@ defmodule EgregorosWeb.ViewModels.Status do
   end
 
   defp decorate_with_context(%{type: "Note"} = object, current_user, ctx) do
-    decorate_note_with_context(object, current_user, ctx, feed_id: object.id)
+    decorate_content_with_context(object, current_user, ctx, feed_id: object.id)
+  end
+
+  defp decorate_with_context(%{type: "Question"} = object, current_user, ctx) do
+    decorate_content_with_context(object, current_user, ctx, feed_id: object.id)
   end
 
   defp decorate_with_context(other, current_user, _ctx) do
     decorate(other, current_user)
   end
 
-  defp decorate_note_with_context(%{type: "Note"} = object, current_user, ctx, opts) do
+  defp decorate_content_with_context(%{type: type} = object, current_user, ctx, opts)
+       when type in ["Note", "Question"] do
     feed_id = Keyword.get(opts, :feed_id, object.id)
     reposted_by = Keyword.get(opts, :reposted_by)
 
@@ -373,13 +383,93 @@ defmodule EgregorosWeb.ViewModels.Status do
       reactions: reactions_for_object_with_context(object.ap_id, current_user, ctx)
     }
 
+    decorated =
+      if type == "Question" do
+        Map.put(decorated, :poll, poll_view_model(object, current_user))
+      else
+        decorated
+      end
+
     case reposted_by do
       %{} -> Map.put(decorated, :reposted_by, reposted_by)
       _ -> decorated
     end
   end
 
-  defp decorate_note_with_context(_object, _current_user, _ctx, _opts), do: nil
+  defp decorate_content_with_context(_object, _current_user, _ctx, _opts), do: nil
+
+  defp poll_view_model(%{data: data, actor: actor_ap_id}, current_user) when is_map(data) do
+    one_of = Map.get(data, "oneOf") |> List.wrap()
+    any_of = Map.get(data, "anyOf") |> List.wrap()
+    voters = Map.get(data, "voters") || []
+
+    {options, multiple?} =
+      cond do
+        any_of != [] -> {any_of, true}
+        one_of != [] -> {one_of, false}
+        true -> {[], false}
+      end
+
+    options = Enum.map(options, &poll_option_view_model/1)
+    total_votes = Enum.reduce(options, 0, fn opt, acc -> acc + opt.votes end)
+    closed = parse_poll_closed(data)
+    expired? = closed != nil and DateTime.compare(closed, DateTime.utc_now()) == :lt
+
+    own_poll? = own_poll?(actor_ap_id, current_user)
+    voted? = voted?(voters, current_user)
+
+    %{
+      options: options,
+      multiple?: multiple?,
+      total_votes: total_votes,
+      voters_count: length(voters),
+      closed: closed,
+      expired?: expired?,
+      own_poll?: own_poll?,
+      voted?: voted?
+    }
+  end
+
+  defp poll_view_model(_object, _current_user), do: nil
+
+  defp poll_option_view_model(%{"name" => name} = option) when is_binary(name) do
+    votes =
+      option
+      |> Map.get("replies", %{})
+      |> Map.get("totalItems", 0)
+
+    votes = if is_integer(votes), do: votes, else: 0
+
+    %{name: name, votes: votes}
+  end
+
+  defp poll_option_view_model(_option), do: %{name: "", votes: 0}
+
+  defp parse_poll_closed(%{"closed" => closed}) when is_binary(closed) do
+    case DateTime.from_iso8601(closed) do
+      {:ok, dt, _} -> dt
+      _ -> nil
+    end
+  end
+
+  defp parse_poll_closed(_data), do: nil
+
+  defp own_poll?(_actor_ap_id, nil), do: false
+
+  defp own_poll?(actor_ap_id, %User{ap_id: user_ap_id})
+       when is_binary(actor_ap_id) and is_binary(user_ap_id) do
+    actor_ap_id == user_ap_id
+  end
+
+  defp own_poll?(_actor_ap_id, _current_user), do: false
+
+  defp voted?(_voters, nil), do: false
+
+  defp voted?(voters, %User{ap_id: user_ap_id}) when is_list(voters) and is_binary(user_ap_id) do
+    user_ap_id in voters
+  end
+
+  defp voted?(_voters, _current_user), do: false
 
   defp reactions_for_object_with_context(object_ap_id, current_user, ctx)
        when is_binary(object_ap_id) do

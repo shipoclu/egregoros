@@ -1093,8 +1093,10 @@ defmodule EgregorosWeb.TimelineLive do
   defp post_dom_id(%{object: %{id: id}}) when is_integer(id), do: "post-#{id}"
   defp post_dom_id(_post), do: Ecto.UUID.generate()
 
+  @timeline_types ["Note", "Announce", "Question"]
+
   defp include_post?(%{type: type} = post, :home, %User{} = user, home_actor_ids)
-       when type in ["Note", "Announce"] and is_list(home_actor_ids) do
+       when type in @timeline_types and is_list(home_actor_ids) do
     cond do
       not Objects.visible_to?(post, user) ->
         false
@@ -1114,17 +1116,17 @@ defmodule EgregorosWeb.TimelineLive do
   end
 
   defp include_post?(%{type: type} = post, :public, _user, _home_actor_ids)
-       when type in ["Note", "Announce"] do
+       when type in @timeline_types do
     Objects.publicly_listed?(post)
   end
 
   defp include_post?(%{type: type, local: true} = post, :local, _user, _home_actor_ids)
-       when type in ["Note", "Announce"] do
+       when type in @timeline_types do
     Objects.publicly_listed?(post)
   end
 
   defp include_post?(%{type: type} = _post, :local, _user, _home_actor_ids)
-       when type in ["Note", "Announce"],
+       when type in @timeline_types,
        do: false
 
   defp include_post?(_post, _timeline, _user, _home_actor_ids), do: false
