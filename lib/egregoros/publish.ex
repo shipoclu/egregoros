@@ -14,6 +14,8 @@ defmodule Egregoros.Publish do
 
   # Poll operations
   defdelegate vote_on_poll(user, question, choices), to: Polls
+  defdelegate post_poll(user, content, poll_params), to: Polls
+  defdelegate post_poll(user, content, poll_params, opts), to: Polls
 
   # Note operations
   defdelegate post_note(user, content), to: Notes

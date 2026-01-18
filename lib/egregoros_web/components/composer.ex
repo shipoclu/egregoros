@@ -25,6 +25,8 @@ defmodule EgregorosWeb.Composer do
   attr :mention_suggestions, :list, default: []
 
   slot :extra_fields
+  slot :after_editor
+  slot :toolbar_actions
 
   def composer_form(assigns) do
     assigns =
@@ -270,6 +272,8 @@ defmodule EgregorosWeb.Composer do
           </div>
         </div>
 
+        {render_slot(@after_editor)}
+
         <div
           id={@options_id}
           data-role="compose-options"
@@ -423,6 +427,8 @@ defmodule EgregorosWeb.Composer do
             >
               <.icon name="hero-adjustments-horizontal" class="size-5" />
             </button>
+
+            {render_slot(@toolbar_actions)}
 
             <.compose_emoji_picker id={@emoji_picker_id} />
           </div>

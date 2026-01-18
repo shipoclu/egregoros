@@ -91,6 +91,7 @@ defmodule EgregorosWeb do
       alias Phoenix.LiveView.JS
       alias EgregorosWeb.AppShell
       alias EgregorosWeb.Composer
+      alias EgregorosWeb.ComposerPoll
       alias EgregorosWeb.Layouts
       alias EgregorosWeb.MediaViewer
       alias EgregorosWeb.ReplyModal

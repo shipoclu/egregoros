@@ -45,6 +45,27 @@ defmodule EgregorosWeb.TimelineLiveTest do
     assert render(view) =~ "Posted."
   end
 
+  test "posting a poll creates a Question", %{conn: conn, user: user} do
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/")
+
+    _html = render_click(view, "toggle_compose_poll", %{})
+
+    view
+    |> form("#timeline-form",
+      post: %{
+        content: "Pick one",
+        poll: %{"options" => ["Red", "Blue"], "multiple" => "false", "expires_in" => 3600}
+      }
+    )
+    |> render_submit()
+
+    [poll | _] = Objects.list_public_statuses(limit: 1)
+
+    assert poll.type == "Question"
+    assert Enum.map(poll.data["oneOf"], & &1["name"]) == ["Red", "Blue"]
+  end
+
   test "create_post is rejected when signed out", %{conn: conn} do
     {:ok, view, _html} = live(conn, "/")
 
