@@ -1,3 +1,80 @@
+# Codebase Audit (2026-01-18)
+
+This is a follow-up audit pass of **Egregoros** focused on: **security/privacy**, **performance**, **maintainability/DRY**, and **test gaps**.
+
+## New findings (2026-01-18)
+
+### Security / privacy
+
+#### HIGH
+
+- [ ] **Session cookie scope across subdomains**: the “uploads on a separate origin” setup currently encourages `EGREGOROS_SESSION_COOKIE_DOMAIN=example.com` (so the cookie is sent to `i.*`), but that also sends the session cookie to other subdomains like `fe.*` / `pl-fe.*`.
+  - Risk: any compromise/XSS in those frontends can perform same-site authenticated requests with the user’s cookie (even though it’s `HttpOnly`), increasing the blast radius.
+  - Code/docs: `lib/egregoros_web/plugs/session.ex`, `docker-compose.standalone.yml`, `README.md`.
+  - Fix direction: keep the main session cookie **host-only** when possible; for uploads use a separate mechanism (signed URLs / per-request token / short-lived cookie scoped only to `i.*`) instead of widening the main cookie domain.
+
+- [ ] **Upload access-control policy mismatch**: `EgregorosWeb.Plugs.Uploads` serves `/uploads/*` via `Plug.Static` (with host restriction + `nosniff`), but with no per-object visibility checks.
+  - If we want “followers-only / direct media visibility checks”, they’re not enforced at the request layer today.
+  - Code/docs: `lib/egregoros_web/plugs/uploads.ex`, `lib/egregoros/media_storage/local.ex`, `README.md` (“followers-only/direct media visibility checks”).
+  - Fix direction: either (a) explicitly document “media URLs are bearer links” (common in fedi), or (b) implement gated media (signed URLs / token + controller) and keep `Plug.Static` only for public media.
+
+- [ ] **E2EE actor key ingestion should be bounded**: remote actor JSON can advertise an arbitrarily large `egregoros:e2ee.keys` list; we currently ingest and upsert all keys.
+  - Risk: DB growth + expensive refresh transactions per actor (even with the 1MB HTTP response cap).
+  - Code: `lib/egregoros/e2ee/actor_keys.ex` (`extract_actor_keys/1`, `refresh_actor_keys/1`), `lib/egregoros/http/req.ex` (response cap).
+  - Fix direction: cap keys per actor (e.g. `Enum.take(keys, 5)`), validate key field sizes, and prune `present: false` rows after a retention window.
+
+- [ ] **User-triggered remote fetch endpoints need throttling**: endpoints like `/settings/e2ee/actor_key` can trigger WebFinger + remote actor fetch + DB writes.
+  - Code: `lib/egregoros_web/controllers/e2ee_controller.ex`, `lib/egregoros/e2ee/actor_keys.ex`.
+  - Fix direction: rate-limit per user/IP and/or enqueue refresh work (serve cached result immediately; refresh async when stale).
+
+- [ ] **Image processing hardening**: thumbnail/blurhash generation uses `Image.open/1` + `Image.thumbnail/2` without explicit pixel-dimension limits.
+  - Risk: decompression bombs (small file, huge dimensions) causing CPU/memory spikes.
+  - Code: `lib/egregoros/media_meta.ex`, `lib/egregoros/media_storage/local.ex`.
+  - Fix direction: enforce max pixel count/dimensions before processing; consider moving heavy work to background jobs.
+
+#### LOW
+
+- [ ] **CSP (defense in depth)**: there is no explicit `Content-Security-Policy`.
+  - Code: `lib/egregoros_web/router.ex` (`put_secure_browser_headers`).
+  - Fix direction: add a baseline CSP compatible with LiveView (no inline scripts, restrict `img-src`/`media-src`, etc.).
+
+### Performance / scalability
+
+- [ ] **HTTP body accumulation is O(n²)**: `Egregoros.HTTP.Req` builds the response body with repeated binary concatenation (`resp.body <> chunk`) inside the streaming `into` callback.
+  - This is bounded by `http_max_response_bytes` (default 1MB), but it’s still avoidable.
+  - Code: `lib/egregoros/http/req.ex`.
+  - Fix direction: accumulate iodata chunks and finalize once, or store chunks in a list in `private` and join at the end.
+
+- [ ] **Avoid N+1 actor lookups in Messages**: `MessagesLive` builds conversation cards by calling `Actor.card/1` per peer.
+  - Code: `lib/egregoros_web/live/messages_live.ex` (`conversations_page/3`), `lib/egregoros_web/view_models/actor.ex` (`cards_by_ap_id/1` exists).
+  - Fix direction: bulk fetch actor cards with `Actor.cards_by_ap_id/1`.
+
+- [ ] **E2EE actor key refresh writes are per-row**: refresh currently `Repo.insert`’s each key inside a transaction.
+  - Code: `lib/egregoros/e2ee/actor_keys.ex`.
+  - Fix direction: use `Repo.insert_all` (with conflict handling) and prune old rows to keep the table bounded.
+
+### Maintainability / DRY
+
+- [ ] **Uploads root + file persistence logic is duplicated** across avatar/banner/media storages and the uploads plug.
+  - Code: `lib/egregoros/avatar_storage/local.ex`, `lib/egregoros/banner_storage/local.ex`, `lib/egregoros/media_storage/local.ex`, `lib/egregoros_web/plugs/uploads.ex`.
+  - Fix direction: extract shared helpers for `uploads_root/0`, size validation, path construction, and “safe extension from type”.
+
+- [ ] **Frontend Nginx configs are duplicated**: `docker/pleroma-fe/nginx.conf` and `docker/pl-fe/nginx.conf` are effectively the same proxy rules.
+  - Fix direction: share a single config (or template) to reduce drift.
+
+### Testing gaps
+
+- [ ] **Uploads host restriction and headers need direct tests** (host allow/deny, `nosniff`, etc.).
+  - Code: `lib/egregoros_web/plugs/uploads.ex`.
+
+- [ ] **Security regression tests for media processing**: add tests around max file size *and* dimension limits (once implemented) to prevent decompression-bomb regressions.
+  - Code: `lib/egregoros/media_meta.ex`, `lib/egregoros/media_storage/local.ex`.
+
+- [ ] **Signature strictness coverage**: add explicit tests for strict mode header requirements, date skew failures, and `@request-target` support.
+  - Code: `lib/egregoros/signature/http.ex`.
+
+---
+
 # Codebase Audit (2025-12-29)
 
 This is a follow-up audit of **Egregoros** (Postgres + Elixir/OTP + Phoenix/LiveView), focused on: **security/impersonation**, **privacy leaks**, **consistency**, **performance**, and **architecture follow-ups**.
