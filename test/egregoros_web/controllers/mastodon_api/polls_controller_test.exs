@@ -79,6 +79,7 @@ defmodule EgregorosWeb.MastodonAPI.PollsControllerTest do
 
       response = json_response(conn, 200)
       assert response["voted"] == true
+      assert response["own_votes"] == [0]
     end
 
     test "returns voted=true even when voters list is missing", %{conn: conn, poll: poll} do

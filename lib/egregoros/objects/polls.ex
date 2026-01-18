@@ -5,6 +5,8 @@ defmodule Egregoros.Objects.Polls do
   Handles vote counting and poll-specific queries for ActivityPub Question objects.
   """
 
+  import Ecto.Query
+
   alias Egregoros.Object
   alias Egregoros.Objects
   alias Egregoros.Repo
@@ -59,6 +61,20 @@ defmodule Egregoros.Objects.Polls do
   end
 
   def voted?(_poll, _user), do: false
+
+  @doc """
+  Returns Answer objects for the given poll and user.
+  """
+  def list_votes(%Object{type: "Question", ap_id: ap_id}, %User{ap_id: voter_ap_id})
+      when is_binary(ap_id) and is_binary(voter_ap_id) do
+    from(o in Object,
+      where: o.type == "Answer" and o.actor == ^voter_ap_id and o.object == ^ap_id,
+      order_by: [asc: o.inserted_at, asc: o.id]
+    )
+    |> Repo.all()
+  end
+
+  def list_votes(_poll, _user), do: []
 
   @doc """
   Updates poll option counts from a remote Question object.
