@@ -20,6 +20,7 @@ defmodule EgregorosWeb.Components.TimelineItems.PollCard do
   attr :current_user, :any, default: nil
   attr :back_timeline, :any, default: nil
   attr :reply_mode, :atom, default: :navigate
+  attr :show_reposted_by, :boolean, default: true
 
   def poll_card(assigns) do
     ~H"""
@@ -29,6 +30,11 @@ defmodule EgregorosWeb.Components.TimelineItems.PollCard do
       data-type="Question"
       class="scroll-mt-24 border-b border-[color:var(--border-muted)] bg-[color:var(--bg-base)] p-5 transition hover:bg-[color:var(--bg-subtle)] target:ring-2 target:ring-[color:var(--border-default)]"
     >
+      <.reposted_by_header
+        :if={@show_reposted_by}
+        reposted_by={Map.get(@entry, :reposted_by)}
+      />
+
       <div class="flex items-start justify-between gap-3">
         <ActorHeader.actor_header
           actor={@entry.actor}
@@ -140,8 +146,7 @@ defmodule EgregorosWeb.Components.TimelineItems.PollCard do
           type="submit"
           class="inline-flex items-center gap-2 border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-4 py-2 text-sm font-medium text-[color:var(--text-primary)] transition hover:bg-[color:var(--bg-subtle)] focus-visible:outline-none focus-brutal"
         >
-          <.icon name="hero-check" class="size-4" />
-          Vote
+          <.icon name="hero-check" class="size-4" /> Vote
         </button>
       </div>
     </form>
@@ -334,4 +339,55 @@ defmodule EgregorosWeb.Components.TimelineItems.PollCard do
   defp object_timestamp(%{inserted_at: %DateTime{} = dt}), do: dt
   defp object_timestamp(%{inserted_at: %NaiveDateTime{} = dt}), do: dt
   defp object_timestamp(_), do: nil
+
+  # Reposted by header (for Announces)
+
+  attr :reposted_by, :map, default: nil
+
+  defp reposted_by_header(assigns) do
+    ~H"""
+    <%= if @reposted_by do %>
+      <div
+        data-role="reposted-by"
+        class="mb-3 inline-flex items-center gap-1.5 bg-[color:var(--bg-muted)] py-1 pl-1 pr-2.5 text-xs font-mono text-[color:var(--text-muted)]"
+      >
+        <.avatar
+          size="xs"
+          name={@reposted_by.display_name}
+          src={@reposted_by.avatar_url}
+          class="!h-5 !w-5 !border"
+        />
+        <.icon name="hero-arrow-path" class="size-3" />
+        <%= if is_binary(repost_path = actor_profile_path(@reposted_by)) do %>
+          <.link
+            navigate={repost_path}
+            class="font-semibold text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] hover:underline underline-offset-2 focus-visible:outline-none"
+          >
+            {reposter_short_name(@reposted_by)}
+          </.link>
+        <% else %>
+          <span class="font-semibold text-[color:var(--text-secondary)]">
+            {reposter_short_name(@reposted_by)}
+          </span>
+        <% end %>
+        <span>reposted</span>
+      </div>
+    <% end %>
+    """
+  end
+
+  defp actor_profile_path(%{nickname: nickname, domain: nil}) when is_binary(nickname) do
+    "/@#{nickname}"
+  end
+
+  defp actor_profile_path(%{nickname: nickname, domain: domain})
+       when is_binary(nickname) and is_binary(domain) do
+    "/@#{nickname}@#{domain}"
+  end
+
+  defp actor_profile_path(_actor), do: nil
+
+  defp reposter_short_name(%{display_name: name}) when is_binary(name) and name != "", do: name
+  defp reposter_short_name(%{nickname: nick}) when is_binary(nick), do: nick
+  defp reposter_short_name(_), do: "Someone"
 end
