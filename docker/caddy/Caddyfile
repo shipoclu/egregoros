@@ -1,0 +1,48 @@
+{
+  # For production, make sure ports 80/443 are reachable by Let's Encrypt.
+  #
+  # If you want to set an ACME email address, add this line:
+  #   email you@example.com
+  #
+  # or edit this file to your needs.
+}
+
+(proxy_to_web) {
+  reverse_proxy web:4000
+}
+
+(proxy_to_pleroma_fe) {
+  reverse_proxy pleroma_fe:80
+}
+
+(proxy_to_pl_fe) {
+  reverse_proxy pl_fe:80
+}
+
+{$EGREGOROS_DOMAIN} {
+  encode zstd gzip
+  import proxy_to_web
+}
+
+i.{$EGREGOROS_DOMAIN} {
+  encode zstd gzip
+
+  @uploads path /uploads/*
+  handle @uploads {
+    import proxy_to_web
+  }
+
+  handle {
+    respond "Not found" 404
+  }
+}
+
+fe.{$EGREGOROS_DOMAIN} {
+  encode zstd gzip
+  import proxy_to_pleroma_fe
+}
+
+pl-fe.{$EGREGOROS_DOMAIN} {
+  encode zstd gzip
+  import proxy_to_pl_fe
+}

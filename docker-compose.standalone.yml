@@ -1,0 +1,32 @@
+services:
+  web:
+    environment:
+      # Public URL of the instance (used for ActivityPub IDs and API URLs)
+      PHX_HOST: ${EGREGOROS_DOMAIN:?set EGREGOROS_DOMAIN}
+      PHX_SCHEME: https
+      PHX_PORT: 443
+
+      # Serve uploads from a dedicated subdomain (defense in depth).
+      EGREGOROS_UPLOADS_BASE_URL: https://i.${EGREGOROS_DOMAIN}
+      EGREGOROS_SESSION_COOKIE_DOMAIN: ${EGREGOROS_DOMAIN}
+
+  caddy:
+    image: caddy:2.8
+    restart: unless-stopped
+    depends_on:
+      - web
+      - pleroma_fe
+      - pl_fe
+    environment:
+      EGREGOROS_DOMAIN: ${EGREGOROS_DOMAIN:?set EGREGOROS_DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+      - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+
+volumes:
+  caddy_data:
+  caddy_config:
