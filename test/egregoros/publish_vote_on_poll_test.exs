@@ -5,6 +5,7 @@ defmodule Egregoros.PublishVoteOnPollTest do
   alias Egregoros.Pipeline
   alias Egregoros.Publish
   alias Egregoros.Users
+  alias EgregorosWeb.Endpoint
 
   describe "vote_on_poll/3" do
     setup do
@@ -13,9 +14,10 @@ defmodule Egregoros.PublishVoteOnPollTest do
       {:ok, carol} = Users.create_local_user("carol")
 
       question = %{
-        "id" => "https://example.com/objects/" <> Ecto.UUID.generate(),
+        "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
         "type" => "Question",
         "attributedTo" => alice.ap_id,
+        "context" => Endpoint.url() <> "/contexts/" <> Ecto.UUID.generate(),
         "to" => ["https://www.w3.org/ns/activitystreams#Public"],
         "content" => "What's your favorite color?",
         "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
@@ -84,9 +86,10 @@ defmodule Egregoros.PublishVoteOnPollTest do
 
     test "rejects voting on expired poll", %{alice: alice, bob: bob} do
       expired_question = %{
-        "id" => "https://example.com/objects/" <> Ecto.UUID.generate(),
+        "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
         "type" => "Question",
         "attributedTo" => alice.ap_id,
+        "context" => Endpoint.url() <> "/contexts/" <> Ecto.UUID.generate(),
         "to" => ["https://www.w3.org/ns/activitystreams#Public"],
         "content" => "Expired poll",
         "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
@@ -109,9 +112,10 @@ defmodule Egregoros.PublishVoteOnPollTest do
       {:ok, bob} = Users.create_local_user("multi_bob")
 
       question = %{
-        "id" => "https://example.com/objects/" <> Ecto.UUID.generate(),
+        "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
         "type" => "Question",
         "attributedTo" => alice.ap_id,
+        "context" => Endpoint.url() <> "/contexts/" <> Ecto.UUID.generate(),
         "to" => ["https://www.w3.org/ns/activitystreams#Public"],
         "content" => "Select all that apply",
         "published" => DateTime.utc_now() |> DateTime.to_iso8601(),

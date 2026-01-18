@@ -10,6 +10,7 @@ defmodule Egregoros.Activities.Question do
   import Ecto.Changeset
 
   alias Egregoros.Activities.Helpers
+  alias Egregoros.Activities.Validations
   alias Egregoros.ActivityPub.ObjectValidators.Types.ObjectID
   alias Egregoros.ActivityPub.ObjectValidators.Types.Recipients
   alias Egregoros.ActivityPub.ObjectValidators.Types.DateTime, as: APDateTime
@@ -24,6 +25,8 @@ defmodule Egregoros.Activities.Question do
     field :id, ObjectID
     field :type, :string
     field :actor, ObjectID
+    field :attributedTo, ObjectID
+    field :context, :string
     field :content, :string
     field :to, Recipients
     field :cc, Recipients
@@ -42,8 +45,11 @@ defmodule Egregoros.Activities.Question do
     changeset =
       %__MODULE__{}
       |> cast(question, __schema__(:fields))
-      |> validate_required([:id, :type, :actor])
+      |> validate_required([:id, :type, :actor, :attributedTo, :context])
       |> validate_inclusion(:type, [type()])
+      |> Validations.validate_any_presence([:to, :cc])
+      |> Validations.validate_fields_match([:actor, :attributedTo])
+      |> Validations.validate_host_match([:id, :actor, :attributedTo])
       |> validate_poll_options(question)
 
     case apply_action(changeset, :insert) do
@@ -111,6 +117,8 @@ defmodule Egregoros.Activities.Question do
     |> Map.put("id", validated.id)
     |> Map.put("type", validated.type)
     |> Map.put("actor", validated.actor)
+    |> Helpers.maybe_put("attributedTo", validated.attributedTo)
+    |> Helpers.maybe_put("context", validated.context)
     |> Map.put("content", validated.content || Map.get(question, "content", ""))
     |> Helpers.maybe_put("to", validated.to)
     |> Helpers.maybe_put("cc", validated.cc)

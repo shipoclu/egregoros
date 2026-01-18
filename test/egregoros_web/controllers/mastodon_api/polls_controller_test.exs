@@ -5,15 +5,17 @@ defmodule EgregorosWeb.MastodonAPI.PollsControllerTest do
   alias Egregoros.Pipeline
   alias Egregoros.Publish
   alias Egregoros.Users
+  alias EgregorosWeb.Endpoint
 
   describe "GET /api/v1/polls/:id" do
     setup do
       {:ok, alice} = Users.create_local_user("alice")
 
       question = %{
-        "id" => "https://example.com/objects/" <> Ecto.UUID.generate(),
+        "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
         "type" => "Question",
         "attributedTo" => alice.ap_id,
+        "context" => Endpoint.url() <> "/contexts/" <> Ecto.UUID.generate(),
         "to" => ["https://www.w3.org/ns/activitystreams#Public"],
         "content" => "What's your favorite color?",
         "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
@@ -99,9 +101,10 @@ defmodule EgregorosWeb.MastodonAPI.PollsControllerTest do
       {:ok, bob} = Users.create_local_user("vote_bob")
 
       question = %{
-        "id" => "https://example.com/objects/" <> Ecto.UUID.generate(),
+        "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
         "type" => "Question",
         "attributedTo" => alice.ap_id,
+        "context" => Endpoint.url() <> "/contexts/" <> Ecto.UUID.generate(),
         "to" => ["https://www.w3.org/ns/activitystreams#Public"],
         "content" => "What's your favorite color?",
         "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
@@ -164,9 +167,10 @@ defmodule EgregorosWeb.MastodonAPI.PollsControllerTest do
       {:ok, expired_alice} = Users.create_local_user("expired_poll_alice")
 
       expired_question = %{
-        "id" => "https://example.com/objects/" <> Ecto.UUID.generate(),
+        "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
         "type" => "Question",
         "attributedTo" => expired_alice.ap_id,
+        "context" => Endpoint.url() <> "/contexts/" <> Ecto.UUID.generate(),
         "to" => ["https://www.w3.org/ns/activitystreams#Public"],
         "content" => "Expired poll",
         "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
@@ -229,9 +233,10 @@ defmodule EgregorosWeb.MastodonAPI.PollsControllerTest do
       {:ok, bob} = Users.create_local_user("anyof_poll_bob")
 
       question = %{
-        "id" => "https://example.com/objects/" <> Ecto.UUID.generate(),
+        "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
         "type" => "Question",
         "attributedTo" => alice.ap_id,
+        "context" => Endpoint.url() <> "/contexts/" <> Ecto.UUID.generate(),
         "to" => ["https://www.w3.org/ns/activitystreams#Public"],
         "content" => "Select all that apply",
         "published" => DateTime.utc_now() |> DateTime.to_iso8601(),

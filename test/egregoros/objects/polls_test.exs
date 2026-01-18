@@ -5,6 +5,7 @@ defmodule Egregoros.Objects.PollsTest do
   alias Egregoros.Objects.Polls
   alias Egregoros.Pipeline
   alias Egregoros.Users
+  alias EgregorosWeb.Endpoint
 
   describe "increase_vote_count/3" do
     setup do
@@ -101,9 +102,10 @@ defmodule Egregoros.Objects.PollsTest do
 
   defp create_single_choice_poll(owner) do
     question = %{
-      "id" => "https://example.com/objects/" <> Ecto.UUID.generate(),
+      "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
       "type" => "Question",
       "attributedTo" => owner.ap_id,
+      "context" => Endpoint.url() <> "/contexts/" <> Ecto.UUID.generate(),
       "to" => ["https://www.w3.org/ns/activitystreams#Public"],
       "content" => "Single choice poll",
       "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
@@ -133,9 +135,10 @@ defmodule Egregoros.Objects.PollsTest do
 
   defp create_multiple_choice_poll(owner) do
     question = %{
-      "id" => "https://example.com/objects/" <> Ecto.UUID.generate(),
+      "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
       "type" => "Question",
       "attributedTo" => owner.ap_id,
+      "context" => Endpoint.url() <> "/contexts/" <> Ecto.UUID.generate(),
       "to" => ["https://www.w3.org/ns/activitystreams#Public"],
       "content" => "Multiple choice poll",
       "published" => DateTime.utc_now() |> DateTime.to_iso8601(),

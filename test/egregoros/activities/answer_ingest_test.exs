@@ -4,6 +4,7 @@ defmodule Egregoros.Activities.AnswerIngestTest do
   alias Egregoros.Objects
   alias Egregoros.Pipeline
   alias Egregoros.Users
+  alias EgregorosWeb.Endpoint
 
   describe "Answer ingestion and vote counting" do
     setup do
@@ -12,9 +13,10 @@ defmodule Egregoros.Activities.AnswerIngestTest do
       {:ok, carol} = Users.create_local_user("carol")
 
       question = %{
-        "id" => "https://example.com/objects/" <> Ecto.UUID.generate(),
+        "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
         "type" => "Question",
         "attributedTo" => alice.ap_id,
+        "context" => Endpoint.url() <> "/contexts/" <> Ecto.UUID.generate(),
         "to" => ["https://www.w3.org/ns/activitystreams#Public"],
         "content" => "What's your favorite color?",
         "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
@@ -44,7 +46,7 @@ defmodule Egregoros.Activities.AnswerIngestTest do
 
     test "ingests an Answer object", %{poll: poll, bob: bob} do
       answer = %{
-        "id" => "https://example.com/objects/" <> Ecto.UUID.generate(),
+        "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
         "type" => "Answer",
         "attributedTo" => bob.ap_id,
         "to" => ["https://www.w3.org/ns/activitystreams#Public"],
@@ -61,7 +63,7 @@ defmodule Egregoros.Activities.AnswerIngestTest do
 
     test "side_effects increases vote count on Question", %{poll: poll, bob: bob} do
       answer = %{
-        "id" => "https://example.com/objects/" <> Ecto.UUID.generate(),
+        "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
         "type" => "Answer",
         "attributedTo" => bob.ap_id,
         "to" => ["https://www.w3.org/ns/activitystreams#Public"],
@@ -81,7 +83,7 @@ defmodule Egregoros.Activities.AnswerIngestTest do
 
     test "side_effects adds voter to voters array", %{poll: poll, bob: bob} do
       answer = %{
-        "id" => "https://example.com/objects/" <> Ecto.UUID.generate(),
+        "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
         "type" => "Answer",
         "attributedTo" => bob.ap_id,
         "to" => ["https://www.w3.org/ns/activitystreams#Public"],
@@ -99,7 +101,7 @@ defmodule Egregoros.Activities.AnswerIngestTest do
     test "multiple votes from different users are counted", %{poll: poll, bob: bob, carol: carol} do
       # Bob votes for Red
       answer1 = %{
-        "id" => "https://example.com/objects/" <> Ecto.UUID.generate(),
+        "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
         "type" => "Answer",
         "attributedTo" => bob.ap_id,
         "to" => ["https://www.w3.org/ns/activitystreams#Public"],
@@ -112,7 +114,7 @@ defmodule Egregoros.Activities.AnswerIngestTest do
 
       # Carol votes for Red too
       answer2 = %{
-        "id" => "https://example.com/objects/" <> Ecto.UUID.generate(),
+        "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
         "type" => "Answer",
         "attributedTo" => carol.ap_id,
         "to" => ["https://www.w3.org/ns/activitystreams#Public"],
@@ -134,7 +136,7 @@ defmodule Egregoros.Activities.AnswerIngestTest do
 
     test "vote for non-existent option does nothing", %{poll: poll, bob: bob} do
       answer = %{
-        "id" => "https://example.com/objects/" <> Ecto.UUID.generate(),
+        "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
         "type" => "Answer",
         "attributedTo" => bob.ap_id,
         "to" => ["https://www.w3.org/ns/activitystreams#Public"],
@@ -155,7 +157,7 @@ defmodule Egregoros.Activities.AnswerIngestTest do
 
     test "vote for non-existent poll does nothing", %{bob: bob} do
       answer = %{
-        "id" => "https://example.com/objects/" <> Ecto.UUID.generate(),
+        "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
         "type" => "Answer",
         "attributedTo" => bob.ap_id,
         "to" => ["https://www.w3.org/ns/activitystreams#Public"],
@@ -177,6 +179,7 @@ defmodule Egregoros.Activities.AnswerIngestTest do
         "id" => "https://remote.example/objects/" <> Ecto.UUID.generate(),
         "type" => "Question",
         "attributedTo" => "https://remote.example/users/pollcreator",
+        "context" => "https://remote.example/contexts/" <> Ecto.UUID.generate(),
         "to" => ["https://www.w3.org/ns/activitystreams#Public"],
         "cc" => [alice.ap_id <> "/followers"],
         "content" => "Public poll",
@@ -194,6 +197,7 @@ defmodule Egregoros.Activities.AnswerIngestTest do
         "id" => "https://remote.example/objects/" <> Ecto.UUID.generate(),
         "type" => "Question",
         "attributedTo" => "https://remote.example/users/pollcreator",
+        "context" => "https://remote.example/contexts/" <> Ecto.UUID.generate(),
         "to" => ["https://remote.example/users/pollcreator/followers"],
         "content" => "Followers-only poll",
         "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
@@ -213,6 +217,7 @@ defmodule Egregoros.Activities.AnswerIngestTest do
         "id" => "https://remote.example/objects/" <> Ecto.UUID.generate(),
         "type" => "Answer",
         "actor" => "https://remote.example/users/voter",
+        "attributedTo" => "https://remote.example/users/voter",
         "to" => ["https://remote.example/users/pollcreator"],
         "name" => "Yes",
         "inReplyTo" => poll.ap_id
@@ -234,6 +239,7 @@ defmodule Egregoros.Activities.AnswerIngestTest do
         "id" => "https://remote.example/objects/" <> Ecto.UUID.generate(),
         "type" => "Answer",
         "actor" => "https://remote.example/users/follower",
+        "attributedTo" => "https://remote.example/users/follower",
         "to" => ["https://remote.example/users/pollcreator"],
         "name" => "A",
         "inReplyTo" => poll.ap_id
@@ -249,6 +255,7 @@ defmodule Egregoros.Activities.AnswerIngestTest do
         "id" => "https://remote.example/objects/" <> Ecto.UUID.generate(),
         "type" => "Answer",
         "actor" => "https://remote.example/users/voter",
+        "attributedTo" => "https://remote.example/users/voter",
         "to" => ["https://remote.example/users/pollcreator"],
         "name" => "Yes",
         "inReplyTo" => "https://unknown.example/objects/nonexistent"
@@ -263,6 +270,7 @@ defmodule Egregoros.Activities.AnswerIngestTest do
         "id" => "https://remote.example/objects/" <> Ecto.UUID.generate(),
         "type" => "Question",
         "attributedTo" => "https://remote.example/users/pollcreator",
+        "context" => "https://remote.example/contexts/" <> Ecto.UUID.generate(),
         "to" => [alice.ap_id],
         "content" => "Private poll for alice only",
         "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
@@ -279,6 +287,7 @@ defmodule Egregoros.Activities.AnswerIngestTest do
         "id" => "https://remote.example/objects/" <> Ecto.UUID.generate(),
         "type" => "Answer",
         "actor" => "https://remote.example/users/unauthorized",
+        "attributedTo" => "https://remote.example/users/unauthorized",
         "to" => ["https://remote.example/users/pollcreator"],
         "name" => "X",
         "inReplyTo" => private_poll.ap_id
@@ -287,13 +296,16 @@ defmodule Egregoros.Activities.AnswerIngestTest do
       assert {:error, :voter_not_permitted} = Pipeline.ingest(answer, local: false)
     end
 
-    test "accepts remote Answer when voter is directly addressed in poll", %{alice: alice} do
+    test "accepts remote Answer when voter is directly addressed in poll", %{alice: _alice} do
+      voter_ap_id = "https://remote.example/users/alice"
+
       # Create a poll addressed to alice
       dm_question = %{
         "id" => "https://remote.example/objects/" <> Ecto.UUID.generate(),
         "type" => "Question",
         "attributedTo" => "https://remote.example/users/pollcreator",
-        "to" => [alice.ap_id],
+        "context" => "https://remote.example/contexts/" <> Ecto.UUID.generate(),
+        "to" => [voter_ap_id],
         "content" => "Poll for alice",
         "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
         "oneOf" => [
@@ -308,7 +320,8 @@ defmodule Egregoros.Activities.AnswerIngestTest do
       answer = %{
         "id" => "https://remote.example/objects/" <> Ecto.UUID.generate(),
         "type" => "Answer",
-        "actor" => alice.ap_id,
+        "actor" => voter_ap_id,
+        "attributedTo" => voter_ap_id,
         "to" => ["https://remote.example/users/pollcreator"],
         "name" => "Option1",
         "inReplyTo" => dm_poll.ap_id
@@ -325,9 +338,10 @@ defmodule Egregoros.Activities.AnswerIngestTest do
       {:ok, voter} = Users.create_local_user("vote_voter")
 
       question = %{
-        "id" => "https://example.com/objects/" <> Ecto.UUID.generate(),
+        "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
         "type" => "Question",
         "attributedTo" => alice.ap_id,
+        "context" => Endpoint.url() <> "/contexts/" <> Ecto.UUID.generate(),
         "to" => ["https://www.w3.org/ns/activitystreams#Public"],
         "content" => "Test poll",
         "oneOf" => [
@@ -363,9 +377,10 @@ defmodule Egregoros.Activities.AnswerIngestTest do
       {:ok, alice} = Users.create_local_user("noop_alice")
 
       question = %{
-        "id" => "https://example.com/objects/" <> Ecto.UUID.generate(),
+        "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
         "type" => "Question",
         "attributedTo" => alice.ap_id,
+        "context" => Endpoint.url() <> "/contexts/" <> Ecto.UUID.generate(),
         "to" => ["https://www.w3.org/ns/activitystreams#Public"],
         "content" => "Test poll",
         "oneOf" => [%{"name" => "Yes"}, %{"name" => "No"}]
@@ -382,9 +397,10 @@ defmodule Egregoros.Activities.AnswerIngestTest do
       {:ok, voter} = Users.create_local_user("anyof_voter")
 
       question = %{
-        "id" => "https://example.com/objects/" <> Ecto.UUID.generate(),
+        "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
         "type" => "Question",
         "attributedTo" => alice.ap_id,
+        "context" => Endpoint.url() <> "/contexts/" <> Ecto.UUID.generate(),
         "to" => ["https://www.w3.org/ns/activitystreams#Public"],
         "content" => "Multiple choice poll",
         "anyOf" => [
