@@ -379,7 +379,83 @@ Key principles:
 - Use `with` to safely extract required data
 - Don't crash on missing data - gracefully skip
 
-## Step 9: Type-Specific Object Operations (Optional)
+## Step 9: Type-Specific Publish Operations (Optional)
+
+If your type requires specialized publish operations (like voting on polls), create a submodule under `lib/egregoros/publish/`.
+
+### Creating a Publish Submodule
+
+Create `lib/egregoros/publish/my_type.ex`:
+
+```elixir
+defmodule Egregoros.Publish.MyType do
+  @moduledoc """
+  MyType-specific publish operations.
+
+  Handles publishing actions specific to ActivityPub MyType objects.
+  """
+
+  alias Egregoros.Object
+  alias Egregoros.Objects
+  alias Egregoros.Pipeline
+  alias Egregoros.User
+
+  @doc """
+  Example publish operation for MyType.
+
+  ## Parameters
+  - `user` - The user performing the action
+  - `object` - The MyType object to act on
+  - `data` - Additional data for the operation
+
+  ## Returns
+  - `{:ok, updated_object}` on success
+  - `{:error, reason}` on failure
+  """
+  def my_action(%User{} = user, %Object{type: "MyType"} = object, data) do
+    # Validation and business logic here
+    with :ok <- validate_something(user, object),
+         {:ok, _activity} <- create_activity(user, object, data) do
+      {:ok, Objects.get_by_ap_id(object.ap_id)}
+    end
+  end
+
+  def my_action(_user, _object, _data), do: {:error, :invalid_object}
+
+  # Private validation and helper functions...
+end
+```
+
+### Adding Delegations
+
+Add delegations in `lib/egregoros/publish.ex` to maintain the public API:
+
+```elixir
+defmodule Egregoros.Publish do
+  # ... existing aliases ...
+  alias Egregoros.Publish.MyType
+
+  # Delegations to submodules
+  defdelegate my_action(user, object, data), to: MyType
+end
+```
+
+### Key Principles
+
+- **Delegation pattern**: Keep the public API in `Publish` via `defdelegate`
+- **Type guards**: Use pattern matching to ensure operations only apply to the correct type
+- **Return tuples**: Always return `{:ok, result}` or `{:error, reason}`
+- **Validation first**: Validate all preconditions before performing actions
+
+### Existing Submodules
+
+- `Publish.Polls` - Poll (Question) specific operations:
+  - `vote_on_poll/3` - Cast votes on a poll
+- `Publish.Notes` - Note specific operations:
+  - `post_note/2` - Post a note with default options
+  - `post_note/3` - Post a note with options (attachments, visibility, etc.)
+
+## Step 10: Type-Specific Object Operations (Optional)
 
 If your type requires specialized object operations (like poll vote counting for Questions), create a submodule under `lib/egregoros/objects/`.
 
@@ -437,6 +513,123 @@ defmodule Egregoros.Objects do
   - `increase_vote_count/3` - Increments vote count for a poll option
   - `multiple?/1` - Returns whether a poll allows multiple choices
 
+## Step 11: Add Mastodon API Routes (Optional)
+
+If your type needs Mastodon API endpoints (for client apps), create a controller following Option B (documented controller modules).
+
+### Creating the Controller
+
+Create `lib/egregoros_web/controllers/mastodon_api/my_types_controller.ex`:
+
+```elixir
+defmodule EgregorosWeb.MastodonAPI.MyTypesController do
+  @moduledoc """
+  Mastodon API controller for MyType operations.
+
+  ## Routes (add to router.ex)
+
+      # In the `pipe_through [:api, :api_optional_auth]` scope:
+      get "/my_types/:id", MyTypesController, :show
+
+      # In the `pipe_through [:api, :api_auth, :oauth_write]` scope:
+      post "/my_types/:id/action", MyTypesController, :action
+
+  ## Endpoints
+
+  ### GET /api/v1/my_types/:id
+  Returns a MyType entity.
+
+  **Authentication:** Public (optional auth for user-specific data)
+
+  **Response:** MyType entity JSON
+
+  ### POST /api/v1/my_types/:id/action
+  Performs an action on a MyType.
+
+  **Authentication:** Required (OAuth scope: `write:statuses`)
+
+  **Request body:**
+  ```json
+  {
+    "param": "value"
+  }
+  ```
+
+  **Response:** Updated MyType entity JSON
+  """
+  use EgregorosWeb, :controller
+
+  alias Egregoros.Objects
+  alias Egregoros.Publish
+  alias EgregorosWeb.MastodonAPI.MyTypeRenderer
+
+  def show(conn, %{"id" => id}) do
+    with {id, ""} <- Integer.parse(id),
+         %{type: "MyType"} = object <- Objects.get(id) do
+      current_user = conn.assigns[:current_user]
+      json(conn, MyTypeRenderer.render(object, current_user))
+    else
+      _ -> conn |> put_status(:not_found) |> json(%{error: "Record not found"})
+    end
+  end
+
+  def action(conn, %{"id" => id, "param" => param}) do
+    with %{id: user_id} = user <- conn.assigns[:current_user],
+         {id, ""} <- Integer.parse(id),
+         %{type: "MyType"} = object <- Objects.get(id),
+         {:ok, updated} <- Publish.my_type_action(user, object, param) do
+      json(conn, MyTypeRenderer.render(updated, user))
+    else
+      nil -> conn |> put_status(:unauthorized) |> json(%{error: "Unauthorized"})
+      {:error, :some_error} -> conn |> put_status(:unprocessable_entity) |> json(%{error: "Error message"})
+      _ -> conn |> put_status(:not_found) |> json(%{error: "Record not found"})
+    end
+  end
+end
+```
+
+### Creating the Renderer
+
+Create `lib/egregoros_web/mastodon_api/my_type_renderer.ex`:
+
+```elixir
+defmodule EgregorosWeb.MastodonAPI.MyTypeRenderer do
+  @moduledoc """
+  Renders MyType objects for the Mastodon API.
+  """
+
+  alias Egregoros.Object
+  alias Egregoros.User
+
+  def render(%Object{type: "MyType", data: data} = object, current_user) when is_map(data) do
+    %{
+      "id" => Integer.to_string(object.id),
+      # Add type-specific fields here
+    }
+  end
+
+  def render(_object, _current_user), do: nil
+end
+```
+
+### Adding Routes
+
+Update `lib/egregoros_web/router.ex`:
+
+```elixir
+# In the scope with `pipe_through [:api, :api_optional_auth]`:
+get "/my_types/:id", MyTypesController, :show
+
+# In the scope with `pipe_through [:api, :api_auth, :oauth_write]`:
+post "/my_types/:id/action", MyTypesController, :action
+```
+
+### Existing API Controllers
+
+- `PollsController` - Poll (Question) operations:
+  - `GET /api/v1/polls/:id` - View poll details (optional auth)
+  - `POST /api/v1/polls/:id/votes` - Vote on poll (requires `write:statuses` scope)
+
 ## Summary Checklist
 
 - [ ] Create activity module in `lib/egregoros/activities/`
@@ -458,6 +651,13 @@ defmodule Egregoros.Objects do
   - [ ] Cast and validate tests
   - [ ] Ingest tests
   - [ ] Side effects tests (if applicable)
-- [ ] Create Objects submodule for type-specific operations (optional):
+- [ ] Create Publish submodule for type-specific publish operations (optional):
+  - [ ] Create `lib/egregoros/publish/my_type.ex`
+  - [ ] Add delegation in `lib/egregoros/publish.ex`
+- [ ] Create Objects submodule for type-specific object operations (optional):
   - [ ] Create `lib/egregoros/objects/my_type.ex`
   - [ ] Add delegation in `lib/egregoros/objects.ex`
+- [ ] Add Mastodon API routes (optional):
+  - [ ] Create controller in `lib/egregoros_web/controllers/mastodon_api/`
+  - [ ] Create renderer in `lib/egregoros_web/mastodon_api/`
+  - [ ] Add routes to `lib/egregoros_web/router.ex`

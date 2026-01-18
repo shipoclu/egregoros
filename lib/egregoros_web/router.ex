@@ -190,6 +190,7 @@ defmodule EgregorosWeb.Router do
     post "/statuses/:id/unreblog", StatusesController, :unreblog
     post "/notifications/clear", NotificationsController, :clear
     post "/notifications/:id/dismiss", NotificationsController, :dismiss
+    post "/polls/:id/votes", PollsController, :vote
   end
 
   scope "/api/v1", EgregorosWeb.MastodonAPI do
@@ -267,6 +268,7 @@ defmodule EgregorosWeb.Router do
     get "/accounts/:id/statuses", AccountsController, :statuses
     get "/statuses/:id", StatusesController, :show
     get "/statuses/:id/context", StatusesController, :context
+    get "/polls/:id", PollsController, :show
   end
 
   scope "/api/v2", EgregorosWeb.MastodonAPI do

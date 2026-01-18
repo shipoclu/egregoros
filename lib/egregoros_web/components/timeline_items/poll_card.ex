@@ -2,6 +2,9 @@ defmodule EgregorosWeb.Components.TimelineItems.PollCard do
   @moduledoc """
   Component for rendering a Question (poll) in timelines.
   Displays poll options with vote counts and percentages.
+
+  For authenticated users who haven't voted, shows a voting form.
+  After voting or for users who have already voted, shows results.
   """
   use EgregorosWeb, :html
 
@@ -52,8 +55,10 @@ defmodule EgregorosWeb.Components.TimelineItems.PollCard do
         current_user={@current_user}
       />
 
-      <.poll_results
+      <.poll_section
+        id={@id}
         poll={@entry.poll}
+        object_id={@entry.object.id}
         current_user={@current_user}
       />
 
@@ -67,18 +72,27 @@ defmodule EgregorosWeb.Components.TimelineItems.PollCard do
     """
   end
 
+  attr :id, :string, required: true
   attr :poll, :map, required: true
+  attr :object_id, :integer, required: true
   attr :current_user, :any, default: nil
 
-  defp poll_results(assigns) do
-    assigns =
-      assign_new(assigns, :show_results?, fn ->
-        poll = assigns.poll
-        poll.own_poll? or poll.voted? or poll.expired?
-      end)
+  defp poll_section(assigns) do
+    # Determine if user can vote:
+    # - Must be logged in
+    # - Must not be own poll
+    # - Must not have voted
+    # - Poll must not be expired
+    can_vote? =
+      assigns.current_user != nil and
+        not assigns.poll.own_poll? and
+        not assigns.poll.voted? and
+        not assigns.poll.expired?
+
+    assigns = assign(assigns, :can_vote?, can_vote?)
 
     ~H"""
-    <div class="mt-4 space-y-2" data-role="poll-results">
+    <div class="mt-4 space-y-2" data-role="poll-section" id={"poll-section-#{@id}"}>
       <div class="mb-3 flex items-center gap-2">
         <.icon name="hero-chart-bar" class="size-4 text-[color:var(--text-muted)]" />
         <span class="text-xs font-bold uppercase tracking-wide text-[color:var(--text-muted)]">
@@ -86,17 +100,89 @@ defmodule EgregorosWeb.Components.TimelineItems.PollCard do
         </span>
       </div>
 
-      <%= if @show_results? do %>
-        <.poll_option_result
-          :for={option <- @poll.options}
-          option={option}
-          total_votes={@poll.total_votes}
+      <%= if @can_vote? do %>
+        <.poll_voting_form
+          id={@id}
+          poll={@poll}
+          object_id={@object_id}
         />
       <% else %>
-        <.poll_option_stub :for={option <- @poll.options} option={option} />
+        <.poll_results poll={@poll} current_user={@current_user} />
       <% end %>
 
       <.poll_footer poll={@poll} />
+    </div>
+    """
+  end
+
+  attr :id, :string, required: true
+  attr :poll, :map, required: true
+  attr :object_id, :integer, required: true
+
+  defp poll_voting_form(assigns) do
+    ~H"""
+    <form
+      id={"poll-form-#{@id}"}
+      phx-submit="vote_on_poll"
+      phx-value-poll-id={@object_id}
+      class="space-y-2"
+    >
+      <.poll_option_input
+        :for={{option, index} <- Enum.with_index(@poll.options)}
+        option={option}
+        index={index}
+        multiple={@poll.multiple?}
+        form_id={"poll-form-#{@id}"}
+      />
+
+      <div class="mt-4">
+        <button
+          type="submit"
+          class="inline-flex items-center gap-2 border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-4 py-2 text-sm font-medium text-[color:var(--text-primary)] transition hover:bg-[color:var(--bg-subtle)] focus-visible:outline-none focus-brutal"
+        >
+          <.icon name="hero-check" class="size-4" />
+          Vote
+        </button>
+      </div>
+    </form>
+    """
+  end
+
+  attr :option, :map, required: true
+  attr :index, :integer, required: true
+  attr :multiple, :boolean, required: true
+  attr :form_id, :string, required: true
+
+  defp poll_option_input(assigns) do
+    input_type = if assigns.multiple, do: "checkbox", else: "radio"
+    assigns = assign(assigns, :input_type, input_type)
+
+    ~H"""
+    <label class="group flex cursor-pointer items-center gap-3 border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-4 py-3 transition hover:border-[color:var(--border-hover)] hover:bg-[color:var(--bg-subtle)]">
+      <input
+        type={@input_type}
+        name="choices[]"
+        value={@index}
+        class="size-4 accent-[color:var(--accent)] focus:ring-2 focus:ring-[color:var(--border-default)]"
+      />
+      <span class="min-w-0 truncate text-[color:var(--text-primary)] group-hover:text-[color:var(--text-secondary)]">
+        {@option.name}
+      </span>
+    </label>
+    """
+  end
+
+  attr :poll, :map, required: true
+  attr :current_user, :any, default: nil
+
+  defp poll_results(assigns) do
+    ~H"""
+    <div class="space-y-2" data-role="poll-results">
+      <.poll_option_result
+        :for={option <- @poll.options}
+        option={option}
+        total_votes={@poll.total_votes}
+      />
     </div>
     """
   end
@@ -133,17 +219,6 @@ defmodule EgregorosWeb.Components.TimelineItems.PollCard do
           </span>
         </div>
       </div>
-    </div>
-    """
-  end
-
-  attr :option, :map, required: true
-
-  defp poll_option_stub(assigns) do
-    ~H"""
-    <div class="border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-4 py-3 text-[color:var(--text-secondary)] opacity-75">
-      <span class="truncate">{@option.name}</span>
-      <span class="ml-2 text-xs text-[color:var(--text-muted)]">(voting coming soon)</span>
     </div>
     """
   end

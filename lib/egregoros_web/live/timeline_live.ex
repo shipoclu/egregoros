@@ -647,6 +647,57 @@ defmodule EgregorosWeb.TimelineLive do
     end
   end
 
+  def handle_event("vote_on_poll", %{"poll-id" => poll_id, "choices" => choices}, socket) do
+    with %User{} = user <- socket.assigns.current_user,
+         {poll_id, ""} <- Integer.parse(to_string(poll_id)),
+         %{type: "Question"} = question <- Objects.get(poll_id),
+         choices <- parse_choices(choices),
+         {:ok, _updated} <- Publish.vote_on_poll(user, question, choices) do
+      {:noreply,
+       socket
+       |> put_flash(:info, "Vote submitted!")
+       |> refresh_post(poll_id, poll_id)}
+    else
+      nil ->
+        {:noreply, put_flash(socket, :error, "Register to vote on polls.")}
+
+      {:error, :already_voted} ->
+        {:noreply, put_flash(socket, :error, "You have already voted on this poll.")}
+
+      {:error, :poll_expired} ->
+        {:noreply, put_flash(socket, :error, "This poll has ended.")}
+
+      {:error, :own_poll} ->
+        {:noreply, put_flash(socket, :error, "You cannot vote on your own poll.")}
+
+      {:error, :multiple_choices_not_allowed} ->
+        {:noreply, put_flash(socket, :error, "This poll only allows a single choice.")}
+
+      {:error, :invalid_choice} ->
+        {:noreply, put_flash(socket, :error, "Invalid poll option selected.")}
+
+      _ ->
+        {:noreply, put_flash(socket, :error, "Could not submit vote.")}
+    end
+  end
+
+  def handle_event("vote_on_poll", %{"poll-id" => poll_id}, socket) do
+    # Handle case where no choices were selected
+    with %User{} <- socket.assigns.current_user,
+         {poll_id, ""} <- Integer.parse(to_string(poll_id)) do
+      {:noreply,
+       socket
+       |> put_flash(:error, "Please select at least one option.")
+       |> refresh_post(poll_id, poll_id)}
+    else
+      nil ->
+        {:noreply, put_flash(socket, :error, "Register to vote on polls.")}
+
+      _ ->
+        {:noreply, put_flash(socket, :error, "Could not submit vote.")}
+    end
+  end
+
   def handle_event("delete_post", %{"id" => id}, socket) do
     with %User{} = user <- socket.assigns.current_user,
          {post_id, ""} <- Integer.parse(to_string(id)),
@@ -1231,7 +1282,7 @@ defmodule EgregorosWeb.TimelineLive do
     current_user = socket.assigns.current_user
 
     case Objects.get(post_id) do
-      %{type: "Note"} = object ->
+      %{type: type} = object when type in ["Note", "Question"] ->
         if Objects.visible_to?(object, current_user) do
           if feed_id == post_id do
             stream_insert(socket, :posts, StatusVM.decorate(object, current_user))
@@ -1278,4 +1329,27 @@ defmodule EgregorosWeb.TimelineLive do
         end
     end
   end
+
+  defp parse_choices(choices) when is_list(choices) do
+    choices
+    |> Enum.map(fn
+      choice when is_integer(choice) -> choice
+      choice when is_binary(choice) ->
+        case Integer.parse(choice) do
+          {int, ""} -> int
+          _ -> nil
+        end
+      _ -> nil
+    end)
+    |> Enum.filter(&is_integer/1)
+  end
+
+  defp parse_choices(choice) when is_binary(choice) do
+    case Integer.parse(choice) do
+      {int, ""} -> [int]
+      _ -> []
+    end
+  end
+
+  defp parse_choices(_choices), do: []
 end
