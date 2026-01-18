@@ -6,6 +6,7 @@ defmodule Egregoros.Publish.Polls do
   """
 
   alias Egregoros.Activities.Answer
+  alias Egregoros.Activities.Create
   alias Egregoros.Object
   alias Egregoros.Objects
   alias Egregoros.Objects.Polls
@@ -166,10 +167,19 @@ defmodule Egregoros.Publish.Polls do
       "attributedTo" => user.ap_id,
       "name" => option_name,
       "inReplyTo" => question.ap_id,
-      "to" => [question.actor],
+      "to" => [],
+      "cc" => [question.actor],
       "published" => DateTime.utc_now() |> DateTime.to_iso8601()
     }
 
-    Pipeline.ingest(answer, local: true)
+    answer =
+      case Map.get(question.data, "context") do
+        context when is_binary(context) and context != "" -> Map.put(answer, "context", context)
+        _ -> answer
+      end
+
+    create = Create.build(user, answer)
+
+    Pipeline.ingest(create, local: true)
   end
 end
