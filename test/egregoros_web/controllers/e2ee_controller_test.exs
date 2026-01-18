@@ -277,6 +277,44 @@ defmodule EgregorosWeb.E2EEControllerTest do
              } = json_response(conn, 200)
     end
 
+    test "caches actor keys to avoid repeated fetches", %{conn: conn} do
+      uniq = System.unique_integer([:positive])
+      user = register_user!(uniq)
+
+      actor_ap_id = "https://remote.example/users/bob"
+
+      actor = %{
+        "id" => actor_ap_id,
+        "type" => "Person",
+        "egregoros:e2ee" => %{
+          "version" => 1,
+          "keys" => [
+            %{
+              "kid" => "e2ee-remote",
+              "kty" => "EC",
+              "crv" => "P-256",
+              "x" => "pQECAwQFBgcICQoLDA0ODw",
+              "y" => "AQIDBAUGBwgJCgsMDQ4PEA",
+              "fingerprint" => "sha256:abc"
+            }
+          ]
+        }
+      }
+
+      expect(Egregoros.HTTP.Mock, :get, fn url, _headers ->
+        assert url == actor_ap_id
+        {:ok, %{status: 200, body: actor, headers: []}}
+      end)
+
+      authed_conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+
+      conn1 = post(authed_conn, "/settings/e2ee/actor_key", %{"actor_ap_id" => actor_ap_id})
+      assert conn1.status == 200
+
+      conn2 = post(authed_conn, "/settings/e2ee/actor_key", %{"actor_ap_id" => actor_ap_id})
+      assert conn2.status == 200
+    end
+
     test "returns 404 when actor has no e2ee keys", %{conn: conn} do
       uniq = System.unique_integer([:positive])
       user = register_user!(uniq)

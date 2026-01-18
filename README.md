@@ -94,6 +94,26 @@ For production, change `POSTGRES_PASSWORD` (and use URL-safe characters or URL-e
 The container runs migrations automatically on startup via `Egregoros.Release.migrate/0`.
 For multi-node deployments, run migrations as a one-off task instead of on every boot.
 
+### Standalone (Caddy on 80/443)
+
+If you’re deploying without Coolify/Traefik and want HTTPS termination + host-based routing in the compose stack,
+use `docker-compose.standalone.yml` (Caddy binds to ports 80/443 and uses Let’s Encrypt).
+
+```sh
+cp .env.example .env
+# Set: SECRET_KEY_BASE, POSTGRES_PASSWORD, EGREGOROS_DOMAIN
+docker compose -f docker-compose.yml -f docker-compose.standalone.yml up -d --build
+```
+
+DNS is expected to point at the server for:
+
+- `EGREGOROS_DOMAIN` (main app / LiveView / ActivityPub)
+- `i.EGREGOROS_DOMAIN` (uploads)
+- `fe.EGREGOROS_DOMAIN` (Pleroma-FE)
+- `pl-fe.EGREGOROS_DOMAIN` (pl-fe)
+
+You can customize routing/TLS options by editing `docker/caddy/Caddyfile`.
+
 ### Coolify notes
 
 - Use the **Docker Compose** deployment type and point it at this repo.
