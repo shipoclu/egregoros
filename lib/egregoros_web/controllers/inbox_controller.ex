@@ -1,6 +1,8 @@
 defmodule EgregorosWeb.InboxController do
   use EgregorosWeb, :controller
 
+  require Logger
+
   plug EgregorosWeb.Plugs.RateLimitInbox
   plug EgregorosWeb.Plugs.VerifySignature
 
@@ -14,6 +16,7 @@ defmodule EgregorosWeb.InboxController do
   def inbox(conn, %{"nickname" => nickname}) do
     with %{ap_id: inbox_user_ap_id} <- Users.get_by_nickname(nickname),
          activity when is_map(activity) <- conn.body_params,
+         :ok <- log_incoming_activity(activity, nickname),
          args <- ingest_args(nickname, inbox_user_ap_id, activity),
          {:ok, _job} <-
            Oban.insert(IngestActivity.new(args)) do
@@ -24,6 +27,28 @@ defmodule EgregorosWeb.InboxController do
       _ -> send_resp(conn, 400, "Bad Request")
     end
   end
+
+  defp log_incoming_activity(activity, nickname) when is_map(activity) do
+    actor = Map.get(activity, "actor")
+    type = Map.get(activity, "type")
+    object_info = extract_object_info(Map.get(activity, "object"))
+
+    Logger.debug(
+      "Inbox POST to #{nickname}: actor=#{inspect(actor)} type=#{inspect(type)} #{object_info}"
+    )
+
+    :ok
+  end
+
+  defp extract_object_info(%{"type" => object_type}) when is_binary(object_type) do
+    "object_type=#{inspect(object_type)}"
+  end
+
+  defp extract_object_info(object_url) when is_binary(object_url) do
+    "object_url=#{inspect(object_url)}"
+  end
+
+  defp extract_object_info(_), do: ""
 
   defp ingest_args(@internal_fetch_nickname, _inbox_user_ap_id, activity) when is_map(activity) do
     if public_activity?(activity) do
