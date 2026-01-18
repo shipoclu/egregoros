@@ -3,6 +3,7 @@ defmodule EgregorosWeb.StatusLive do
 
   alias Egregoros.Domain
   alias Egregoros.Federation.ThreadDiscovery
+  alias Egregoros.Workers.RefreshPoll
   alias Egregoros.Interactions
   alias Egregoros.Media
   alias Egregoros.MediaStorage
@@ -115,6 +116,12 @@ defmodule EgregorosWeb.StatusLive do
 
     if connected?(socket) and fetching_replies? do
       _ = schedule_thread_retry(:replies)
+    end
+
+    # Schedule poll refresh for remote Questions
+    if connected?(socket) and
+         match?(%Egregoros.Object{type: "Question", local: false}, thread_note) do
+      _ = RefreshPoll.maybe_enqueue(thread_note)
     end
 
     reply_to_handle =

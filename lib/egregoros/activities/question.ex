@@ -69,9 +69,11 @@ defmodule Egregoros.Activities.Question do
 
   def ingest(question, opts) do
     with :ok <- validate_inbox_target(question, opts) do
+      conflict = Keyword.get(opts, :conflict, :nothing)
+
       question
       |> to_object_attrs(opts)
-      |> Objects.upsert_object()
+      |> Objects.upsert_object(conflict: conflict)
     end
   end
 
