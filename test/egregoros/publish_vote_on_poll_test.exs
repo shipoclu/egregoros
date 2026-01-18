@@ -53,7 +53,7 @@ defmodule Egregoros.PublishVoteOnPollTest do
 
       red_option = Enum.find(updated_poll.data["oneOf"], &(&1["name"] == "Red"))
       assert red_option["replies"]["totalItems"] == 1
-      assert bob.ap_id in updated_poll.data["voters"]
+      assert bob.ap_id in get_in(updated_poll.internal, ["poll", "voters"])
     end
 
     test "rejects voting on own poll", %{poll: poll, alice: alice} do
@@ -69,13 +69,16 @@ defmodule Egregoros.PublishVoteOnPollTest do
       assert {:error, :already_voted} = Publish.vote_on_poll(bob, updated_poll, [1])
     end
 
-    test "rejects voting twice even when voters list is missing", %{poll: poll, bob: bob} do
+    test "rejects voting twice even when internal poll voter state is missing", %{
+      poll: poll,
+      bob: bob
+    } do
       assert {:ok, _} = Publish.vote_on_poll(bob, poll, [0])
 
       updated_poll = Objects.get_by_ap_id(poll.ap_id)
 
       {:ok, updated_poll} =
-        Objects.update_object(updated_poll, %{data: Map.delete(updated_poll.data, "voters")})
+        Objects.update_object(updated_poll, %{internal: %{}})
 
       assert {:error, :already_voted} = Publish.vote_on_poll(bob, updated_poll, [1])
     end
@@ -220,7 +223,7 @@ defmodule Egregoros.PublishVoteOnPollTest do
       assert opt_b["replies"]["totalItems"] == 0
       assert opt_c["replies"]["totalItems"] == 1
 
-      assert bob.ap_id in updated_poll.data["voters"]
+      assert bob.ap_id in get_in(updated_poll.internal, ["poll", "voters"])
     end
 
     test "allows single choice on anyOf poll", %{poll: poll, bob: bob} do

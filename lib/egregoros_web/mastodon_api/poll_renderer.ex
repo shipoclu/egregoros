@@ -24,14 +24,6 @@ defmodule EgregorosWeb.MastodonAPI.PollRenderer do
     one_of = Map.get(data, "oneOf") |> List.wrap()
     any_of = Map.get(data, "anyOf") |> List.wrap()
 
-    voters =
-      data
-      |> Map.get("voters", [])
-      |> case do
-        voters when is_list(voters) -> voters
-        _ -> []
-      end
-
     {options, multiple} =
       cond do
         any_of != [] -> {any_of, true}
@@ -41,6 +33,7 @@ defmodule EgregorosWeb.MastodonAPI.PollRenderer do
 
     rendered_options = Enum.with_index(options, &render_option/2)
     votes_count = Enum.reduce(rendered_options, 0, fn opt, acc -> acc + opt["votes_count"] end)
+    voters_count = Polls.voters_count(object)
     expires_at = parse_expiry(data)
     expired = expired?(expires_at)
 
@@ -52,7 +45,7 @@ defmodule EgregorosWeb.MastodonAPI.PollRenderer do
       "expired" => expired,
       "multiple" => multiple,
       "votes_count" => votes_count,
-      "voters_count" => length(voters),
+      "voters_count" => voters_count,
       "options" => rendered_options,
       "emojis" => [],
       "voted" => voted,

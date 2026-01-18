@@ -16,7 +16,7 @@ defmodule Egregoros.Objects.Polls do
   Increases the vote count for a poll option on a Question object.
 
   Finds the Question by `ap_id`, increments the `replies.totalItems` count
-  for the matching option name, and adds the voter to the `voters` array.
+  for the matching option name, and records voter metadata in the object's internal state.
 
   Returns `{:ok, object}` on success, `:noop` if the Question doesn't exist
   or if the option name doesn't match any option.
@@ -80,7 +80,7 @@ defmodule Egregoros.Objects.Polls do
   Updates poll option counts from a remote Question object.
 
   Only updates counts when the incoming poll options match the existing options
-  (ignoring reply counts). Preserves existing voters and other fields.
+  (ignoring reply counts). Preserves internal state and other fields.
   """
   def update_from_remote(%Object{type: "Question", data: data} = object, %{} = incoming)
       when is_map(data) do
@@ -97,7 +97,6 @@ defmodule Egregoros.Objects.Polls do
       updated_data =
         data
         |> Map.put(key, updated_options)
-        |> Map.put("voters", Map.get(data, "voters") || [])
 
       object
       |> Object.changeset(%{data: updated_data})
@@ -117,10 +116,16 @@ defmodule Egregoros.Objects.Polls do
 
   defp options_match?(existing_options, incoming_options)
        when is_list(existing_options) and is_list(incoming_options) do
-    strip_replies = fn option -> Map.drop(option, ["replies"]) end
+    normalize_option = fn
+      %{} = option ->
+        Map.drop(option, ["replies", "egregoros:voters"])
 
-    Enum.map(existing_options, strip_replies) ==
-      Enum.map(incoming_options, strip_replies)
+      _ ->
+        :invalid
+    end
+
+    Enum.map(existing_options, normalize_option) ==
+      Enum.map(incoming_options, normalize_option)
   end
 
   defp options_match?(_existing_options, _incoming_options), do: false
@@ -131,6 +136,8 @@ defmodule Egregoros.Objects.Polls do
   end
 
   defp update_option_count(%{} = existing, %{} = incoming) do
+    existing = Map.delete(existing, "egregoros:voters")
+
     incoming_total =
       incoming
       |> Map.get("replies", %{})
@@ -148,11 +155,14 @@ defmodule Egregoros.Objects.Polls do
   defp update_option_count(existing, _incoming), do: existing
 
   defp do_increase_vote_count(object, key, options, option_name, voter_ap_id) do
-    existing_voters = Map.get(object.data, "voters") || []
+    poll_internal = poll_internal(object)
+    existing_voters = Map.get(poll_internal, "voters", [])
 
-    # For single-choice polls (oneOf), don't count duplicate votes from same voter
-    # For multiple-choice polls (anyOf), we allow voting on multiple options
-    # but still prevent voting on the same option twice (idempotency for retries)
+    option_voters_by_name = Map.get(poll_internal, "option_voters", %{})
+
+    # For single-choice polls (oneOf), don't count duplicate votes from same voter.
+    # For multiple-choice polls (anyOf), allow voting on multiple options but prevent
+    # voting on the same option twice.
     already_voted_on_poll? = voter_ap_id in existing_voters
     is_single_choice? = key == "oneOf"
 
@@ -163,12 +173,14 @@ defmodule Egregoros.Objects.Polls do
       updated_options =
         Enum.map(options, fn
           %{"name" => ^option_name} = option ->
-            # For anyOf polls, track per-option voters so we can ignore duplicate
-            # Answer ingestions without blocking the voter from selecting other
-            # options within the same poll.
-            option_voters = Map.get(option, "egregoros:voters") |> List.wrap()
+            option = Map.delete(option, "egregoros:voters")
 
-            if key == "anyOf" and voter_ap_id in option_voters do
+            existing_option_voters =
+              option_voters_by_name
+              |> Map.get(option_name, [])
+              |> List.wrap()
+
+            if key == "anyOf" and voter_ap_id in existing_option_voters do
               option
             else
               current_count =
@@ -179,13 +191,11 @@ defmodule Egregoros.Objects.Polls do
               replies = Map.get(option, "replies", %{})
               updated_replies = Map.put(replies, "totalItems", current_count + 1)
 
-              option
-              |> Map.put("replies", updated_replies)
-              |> maybe_put_option_voter(key, option_voters, voter_ap_id)
+              Map.put(option, "replies", updated_replies)
             end
 
           option ->
-            option
+            Map.delete(option, "egregoros:voters")
         end)
 
       if updated_options == options do
@@ -193,22 +203,56 @@ defmodule Egregoros.Objects.Polls do
       else
         voters = Enum.uniq([voter_ap_id | existing_voters])
 
+        option_voters_by_name =
+          case key do
+            "anyOf" ->
+              existing =
+                option_voters_by_name
+                |> Map.get(option_name, [])
+                |> List.wrap()
+
+              Map.put(option_voters_by_name, option_name, Enum.uniq([voter_ap_id | existing]))
+
+            _ ->
+              option_voters_by_name
+          end
+
+        updated_internal =
+          object
+          |> Map.get(:internal, %{})
+          |> ensure_map()
+          |> Map.put("poll", %{
+            "voters" => voters,
+            "option_voters" => option_voters_by_name
+          })
+
         updated_data =
           object.data
           |> Map.put(key, updated_options)
-          |> Map.put("voters", voters)
 
         object
-        |> Object.changeset(%{data: updated_data})
+        |> Object.changeset(%{data: updated_data, internal: updated_internal})
         |> Repo.update()
       end
     end
   end
 
-  defp maybe_put_option_voter(option, "anyOf", existing_voters, voter_ap_id) do
-    voters = Enum.uniq([voter_ap_id | existing_voters])
-    Map.put(option, "egregoros:voters", voters)
+  def voters_count(%Object{type: "Question"} = object) do
+    poll_internal = poll_internal(object)
+    voters = Map.get(poll_internal, "voters", []) |> List.wrap()
+    length(voters)
   end
 
-  defp maybe_put_option_voter(option, _key, _existing_voters, _voter_ap_id), do: option
+  def voters_count(_object), do: 0
+
+  defp poll_internal(%Object{} = object) do
+    object
+    |> Map.get(:internal, %{})
+    |> ensure_map()
+    |> Map.get("poll", %{})
+    |> ensure_map()
+  end
+
+  defp ensure_map(%{} = value), do: value
+  defp ensure_map(_value), do: %{}
 end

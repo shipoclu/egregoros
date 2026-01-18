@@ -82,7 +82,7 @@ defmodule Egregoros.Activities.AnswerIngestTest do
       assert red_option["replies"]["totalItems"] == 1
     end
 
-    test "side_effects adds voter to voters array", %{poll: poll, bob: bob} do
+    test "side_effects records voter metadata in internal state", %{poll: poll, bob: bob} do
       answer = %{
         "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
         "type" => "Answer",
@@ -96,7 +96,7 @@ defmodule Egregoros.Activities.AnswerIngestTest do
       {:ok, _answer_object} = Pipeline.ingest(answer, local: true)
 
       updated_poll = Objects.get_by_ap_id(poll.ap_id)
-      assert bob.ap_id in updated_poll.data["voters"]
+      assert bob.ap_id in get_in(updated_poll.internal, ["poll", "voters"])
     end
 
     test "multiple votes from different users are counted", %{poll: poll, bob: bob, carol: carol} do
@@ -131,8 +131,8 @@ defmodule Egregoros.Activities.AnswerIngestTest do
       red_option = Enum.find(updated_poll.data["oneOf"], &(&1["name"] == "Red"))
       assert red_option["replies"]["totalItems"] == 2
 
-      assert bob.ap_id in updated_poll.data["voters"]
-      assert carol.ap_id in updated_poll.data["voters"]
+      assert bob.ap_id in get_in(updated_poll.internal, ["poll", "voters"])
+      assert carol.ap_id in get_in(updated_poll.internal, ["poll", "voters"])
     end
 
     test "vote for non-existent option does nothing", %{poll: poll, bob: bob} do
@@ -385,7 +385,7 @@ defmodule Egregoros.Activities.AnswerIngestTest do
 
       assert opt_a["replies"]["totalItems"] == 6
       assert opt_b["replies"]["totalItems"] == 3
-      assert voter.ap_id in updated.data["voters"]
+      assert voter.ap_id in get_in(updated.internal, ["poll", "voters"])
     end
 
     test "returns :noop for non-existent question" do

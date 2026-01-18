@@ -403,7 +403,6 @@ defmodule EgregorosWeb.ViewModels.Status do
        when is_map(data) do
     one_of = Map.get(data, "oneOf") |> List.wrap()
     any_of = Map.get(data, "anyOf") |> List.wrap()
-    voters = Map.get(data, "voters") || []
 
     {options, multiple?} =
       cond do
@@ -424,7 +423,7 @@ defmodule EgregorosWeb.ViewModels.Status do
       options: options,
       multiple?: multiple?,
       total_votes: total_votes,
-      voters_count: length(voters),
+      voters_count: Polls.voters_count(object),
       closed: closed,
       expired?: expired?,
       own_poll?: own_poll?,

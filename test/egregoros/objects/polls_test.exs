@@ -23,7 +23,11 @@ defmodule Egregoros.Objects.PollsTest do
 
       red_option = Enum.find(updated.data["oneOf"], &(&1["name"] == "Red"))
       assert red_option["replies"]["totalItems"] == 1
-      assert bob.ap_id in updated.data["voters"]
+
+      refute Map.has_key?(updated.data, "voters")
+
+      poll_internal = get_in(updated.internal, ["poll"]) || %{}
+      assert bob.ap_id in Map.get(poll_internal, "voters", [])
     end
 
     test "prevents double-counting on single-choice poll (oneOf)", %{alice: alice, bob: bob} do
@@ -66,8 +70,11 @@ defmodule Egregoros.Objects.PollsTest do
 
       red_option = Enum.find(updated.data["oneOf"], &(&1["name"] == "Red"))
       assert red_option["replies"]["totalItems"] == 2
-      assert bob.ap_id in updated.data["voters"]
-      assert carol.ap_id in updated.data["voters"]
+
+      poll_internal = get_in(updated.internal, ["poll"]) || %{}
+      voters = Map.get(poll_internal, "voters", [])
+      assert bob.ap_id in voters
+      assert carol.ap_id in voters
     end
 
     test "allows multiple options on multiple-choice poll (anyOf)", %{alice: alice, bob: bob} do
@@ -99,6 +106,8 @@ defmodule Egregoros.Objects.PollsTest do
       reloaded = Objects.get_by_ap_id(poll.ap_id)
       opt_a = Enum.find(reloaded.data["anyOf"], &(&1["name"] == "Option A"))
       assert opt_a["replies"]["totalItems"] == 1
+
+      refute Map.has_key?(opt_a, "egregoros:voters")
     end
 
     test "returns :noop for non-existent poll", %{bob: bob} do
@@ -135,7 +144,7 @@ defmodule Egregoros.Objects.PollsTest do
       poll = Objects.get_by_ap_id(poll.ap_id)
 
       {:ok, poll} =
-        Objects.update_object(poll, %{data: Map.put(poll.data, "voters", [alice.ap_id])})
+        Objects.update_object(poll, %{internal: %{"poll" => %{"voters" => [alice.ap_id]}}})
 
       %{poll: poll}
     end
@@ -159,7 +168,7 @@ defmodule Egregoros.Objects.PollsTest do
       [opt_a, opt_b] = updated.data["oneOf"]
       assert opt_a["replies"]["totalItems"] == 5
       assert opt_b["replies"]["totalItems"] == 8
-      assert updated.data["voters"] == [poll.actor]
+      assert get_in(updated.internal, ["poll", "voters"]) == [poll.actor]
     end
 
     test "returns :noop when options change", %{poll: poll} do
@@ -199,6 +208,63 @@ defmodule Egregoros.Objects.PollsTest do
       }
 
       assert :noop = Polls.update_from_remote(poll, incoming)
+    end
+  end
+
+  describe "update_from_remote/2 for anyOf polls" do
+    setup do
+      {:ok, alice} = Users.create_local_user("poll_refresh_anyof_alice")
+      {:ok, bob} = Users.create_local_user("poll_refresh_anyof_bob")
+
+      question = %{
+        "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
+        "type" => "Question",
+        "attributedTo" => alice.ap_id,
+        "context" => Endpoint.url() <> "/contexts/" <> Ecto.UUID.generate(),
+        "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+        "content" => "Refreshable multi-choice poll",
+        "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
+        "anyOf" => [
+          %{"name" => "A", "type" => "Note", "replies" => %{"totalItems" => 0}},
+          %{"name" => "B", "type" => "Note", "replies" => %{"totalItems" => 0}}
+        ]
+      }
+
+      {:ok, poll} = Pipeline.ingest(question, local: true)
+      poll = Objects.get_by_ap_id(poll.ap_id)
+
+      assert {:ok, poll} = Polls.increase_vote_count(poll.ap_id, "A", bob.ap_id)
+
+      poll = Objects.get_by_ap_id(poll.ap_id)
+
+      %{poll: poll, bob: bob}
+    end
+
+    test "updates counts even when local option voter tracking exists", %{poll: poll, bob: bob} do
+      assert bob.ap_id in get_in(poll.internal, ["poll", "voters"])
+      assert bob.ap_id in get_in(poll.internal, ["poll", "option_voters", "A"])
+
+      incoming = %{
+        "id" => poll.ap_id,
+        "type" => "Question",
+        "actor" => poll.actor,
+        "attributedTo" => poll.actor,
+        "context" => poll.data["context"],
+        "to" => poll.data["to"],
+        "anyOf" => [
+          %{"name" => "A", "type" => "Note", "replies" => %{"totalItems" => 5}},
+          %{"name" => "B", "type" => "Note", "replies" => %{"totalItems" => 8}}
+        ]
+      }
+
+      assert {:ok, updated} = Polls.update_from_remote(poll, incoming)
+
+      [updated_a, updated_b] = updated.data["anyOf"]
+      assert updated_a["replies"]["totalItems"] == 5
+      assert updated_b["replies"]["totalItems"] == 8
+
+      assert bob.ap_id in get_in(updated.internal, ["poll", "voters"])
+      assert bob.ap_id in get_in(updated.internal, ["poll", "option_voters", "A"])
     end
   end
 

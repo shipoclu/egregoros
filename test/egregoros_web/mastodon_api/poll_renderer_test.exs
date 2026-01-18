@@ -211,8 +211,7 @@ defmodule EgregorosWeb.MastodonAPI.PollRendererTest do
             %{"name" => "a", "replies" => %{"totalItems" => "5"}},
             "oops"
           ],
-          "endTime" => DateTime.to_iso8601(expires_at),
-          "voters" => "not-a-list"
+          "endTime" => DateTime.to_iso8601(expires_at)
         }
       }
 
@@ -235,10 +234,10 @@ defmodule EgregorosWeb.MastodonAPI.PollRendererTest do
         id: 1,
         type: "Question",
         actor: "https://example.com/users/alice",
+        internal: %{"poll" => %{"voters" => ["https://example.com/users/alice"]}},
         data: %{
           "anyOf" => [%{"name" => "a", "replies" => %{"totalItems" => 1}}],
-          "closed" => "not-a-date",
-          "voters" => ["https://example.com/users/alice"]
+          "closed" => "not-a-date"
         }
       }
 

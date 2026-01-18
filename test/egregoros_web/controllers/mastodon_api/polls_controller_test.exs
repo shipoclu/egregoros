@@ -82,7 +82,10 @@ defmodule EgregorosWeb.MastodonAPI.PollsControllerTest do
       assert response["own_votes"] == [0]
     end
 
-    test "returns voted=true even when voters list is missing", %{conn: conn, poll: poll} do
+    test "returns voted=true even when internal poll voter state is missing", %{
+      conn: conn,
+      poll: poll
+    } do
       {:ok, bob} = Users.create_local_user("bob_missing_voters")
 
       poll_reloaded = Objects.get_by_ap_id(poll.ap_id)
@@ -91,7 +94,7 @@ defmodule EgregorosWeb.MastodonAPI.PollsControllerTest do
       poll_after_vote = Objects.get_by_ap_id(poll.ap_id)
 
       {:ok, _} =
-        Objects.update_object(poll_after_vote, %{data: Map.delete(poll_after_vote.data, "voters")})
+        Objects.update_object(poll_after_vote, %{internal: %{}})
 
       Egregoros.Auth.Mock
       |> expect(:current_user, fn _conn -> {:ok, bob} end)
