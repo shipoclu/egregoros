@@ -65,7 +65,8 @@ defmodule EgregorosWeb.MastodonAPI.StatusesController do
 
       true ->
         with %{} = object <- Objects.get(id),
-             true <- object.type == "Note" and object.actor == user.ap_id and object.local == true,
+             true <-
+               object.type == "Note" and object.actor == user.ap_id and object.local == true,
              %{} = note <-
                build_updated_note(object, user, status, spoiler_text, sensitive, language),
              update <- Update.build(user, note),
