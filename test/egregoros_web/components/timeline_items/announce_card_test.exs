@@ -238,7 +238,7 @@ defmodule EgregorosWeb.Components.TimelineItems.AnnounceCardTest do
             reposted_by: %{
               display_name: "Remote Booster",
               nickname: "booster",
-              domain: "remote.example",
+              handle: "@booster@remote.example",
               avatar_url: nil
             },
             attachments: [],

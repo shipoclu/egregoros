@@ -86,7 +86,8 @@ defmodule Egregoros.Objects.PollsTest do
     end
 
     test "returns :noop for non-existent poll", %{bob: bob} do
-      assert :noop = Polls.increase_vote_count("https://example.com/nonexistent", "Red", bob.ap_id)
+      assert :noop =
+               Polls.increase_vote_count("https://example.com/nonexistent", "Red", bob.ap_id)
     end
 
     test "returns :noop for non-existent option", %{alice: alice, bob: bob} do
@@ -107,9 +108,21 @@ defmodule Egregoros.Objects.PollsTest do
       "content" => "Single choice poll",
       "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
       "oneOf" => [
-        %{"name" => "Red", "type" => "Note", "replies" => %{"type" => "Collection", "totalItems" => 0}},
-        %{"name" => "Blue", "type" => "Note", "replies" => %{"type" => "Collection", "totalItems" => 0}},
-        %{"name" => "Green", "type" => "Note", "replies" => %{"type" => "Collection", "totalItems" => 0}}
+        %{
+          "name" => "Red",
+          "type" => "Note",
+          "replies" => %{"type" => "Collection", "totalItems" => 0}
+        },
+        %{
+          "name" => "Blue",
+          "type" => "Note",
+          "replies" => %{"type" => "Collection", "totalItems" => 0}
+        },
+        %{
+          "name" => "Green",
+          "type" => "Note",
+          "replies" => %{"type" => "Collection", "totalItems" => 0}
+        }
       ],
       "closed" => "2030-12-31T23:59:59Z"
     }
@@ -127,9 +140,21 @@ defmodule Egregoros.Objects.PollsTest do
       "content" => "Multiple choice poll",
       "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
       "anyOf" => [
-        %{"name" => "Option A", "type" => "Note", "replies" => %{"type" => "Collection", "totalItems" => 0}},
-        %{"name" => "Option B", "type" => "Note", "replies" => %{"type" => "Collection", "totalItems" => 0}},
-        %{"name" => "Option C", "type" => "Note", "replies" => %{"type" => "Collection", "totalItems" => 0}}
+        %{
+          "name" => "Option A",
+          "type" => "Note",
+          "replies" => %{"type" => "Collection", "totalItems" => 0}
+        },
+        %{
+          "name" => "Option B",
+          "type" => "Note",
+          "replies" => %{"type" => "Collection", "totalItems" => 0}
+        },
+        %{
+          "name" => "Option C",
+          "type" => "Note",
+          "replies" => %{"type" => "Collection", "totalItems" => 0}
+        }
       ],
       "closed" => "2030-12-31T23:59:59Z"
     }
