@@ -85,6 +85,21 @@ defmodule Egregoros.Objects.PollsTest do
       assert opt_b["replies"]["totalItems"] == 1
     end
 
+    test "prevents double-counting the same option on multiple-choice poll (anyOf)", %{
+      alice: alice,
+      bob: bob
+    } do
+      poll = create_multiple_choice_poll(alice)
+
+      assert {:ok, _} = Polls.increase_vote_count(poll.ap_id, "Option A", bob.ap_id)
+
+      assert :noop = Polls.increase_vote_count(poll.ap_id, "Option A", bob.ap_id)
+
+      reloaded = Objects.get_by_ap_id(poll.ap_id)
+      opt_a = Enum.find(reloaded.data["anyOf"], &(&1["name"] == "Option A"))
+      assert opt_a["replies"]["totalItems"] == 1
+    end
+
     test "returns :noop for non-existent poll", %{bob: bob} do
       assert :noop =
                Polls.increase_vote_count("https://example.com/nonexistent", "Red", bob.ap_id)

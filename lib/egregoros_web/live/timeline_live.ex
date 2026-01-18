@@ -1333,13 +1333,17 @@ defmodule EgregorosWeb.TimelineLive do
   defp parse_choices(choices) when is_list(choices) do
     choices
     |> Enum.map(fn
-      choice when is_integer(choice) -> choice
+      choice when is_integer(choice) ->
+        choice
+
       choice when is_binary(choice) ->
         case Integer.parse(choice) do
           {int, ""} -> int
           _ -> nil
         end
-      _ -> nil
+
+      _ ->
+        nil
     end)
     |> Enum.filter(&is_integer/1)
   end

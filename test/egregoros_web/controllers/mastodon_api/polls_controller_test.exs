@@ -206,6 +206,14 @@ defmodule EgregorosWeb.MastodonAPI.PollsControllerTest do
       assert json_response(conn, 422)["error"] == "This poll only allows a single choice"
     end
 
+    test "returns 422 for non-list choices param", %{conn: conn, poll: poll, bob: bob} do
+      Egregoros.Auth.Mock
+      |> expect(:current_user, fn _conn -> {:ok, bob} end)
+
+      conn = post(conn, "/api/v1/polls/#{poll.id}/votes", %{"choices" => "0"})
+      assert json_response(conn, 422)["error"] == "Invalid poll option"
+    end
+
     test "returns 422 for missing choices param", %{conn: conn, poll: poll, bob: bob} do
       Egregoros.Auth.Mock
       |> expect(:current_user, fn _conn -> {:ok, bob} end)

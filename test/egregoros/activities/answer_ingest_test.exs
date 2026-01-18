@@ -3,6 +3,7 @@ defmodule Egregoros.Activities.AnswerIngestTest do
 
   alias Egregoros.Objects
   alias Egregoros.Pipeline
+  alias Egregoros.Relationships
   alias Egregoros.Users
 
   describe "Answer ingestion and vote counting" do
@@ -227,7 +228,7 @@ defmodule Egregoros.Activities.AnswerIngestTest do
       assert yes_option["replies"]["totalItems"] == 1
     end
 
-    test "accepts remote Answer for followers-only poll when voter could be follower", %{
+    test "rejects remote Answer for followers-only poll when voter is not a follower", %{
       followers_poll: poll
     } do
       answer = %{
@@ -239,7 +240,31 @@ defmodule Egregoros.Activities.AnswerIngestTest do
         "inReplyTo" => poll.ap_id
       }
 
-      # Should be accepted because the poll has a followers collection in audience
+      assert {:error, :voter_not_permitted} = Pipeline.ingest(answer, local: false)
+    end
+
+    test "accepts remote Answer for followers-only poll when voter follows poll creator", %{
+      followers_poll: poll
+    } do
+      voter_ap_id = "https://remote.example/users/follower"
+      poll_creator_ap_id = "https://remote.example/users/pollcreator"
+
+      assert {:ok, _relationship} =
+               Relationships.upsert_relationship(%{
+                 type: "Follow",
+                 actor: voter_ap_id,
+                 object: poll_creator_ap_id
+               })
+
+      answer = %{
+        "id" => "https://remote.example/objects/" <> Ecto.UUID.generate(),
+        "type" => "Answer",
+        "actor" => voter_ap_id,
+        "to" => [poll_creator_ap_id],
+        "name" => "A",
+        "inReplyTo" => poll.ap_id
+      }
+
       assert {:ok, object} = Pipeline.ingest(answer, local: false)
       assert object.type == "Answer"
     end

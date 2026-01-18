@@ -5,6 +5,7 @@ defmodule Egregoros.PublishVoteOnPollTest do
   alias Egregoros.Pipeline
   alias Egregoros.Publish
   alias Egregoros.Users
+  alias Egregoros.Workers.DeliverActivity
 
   describe "vote_on_poll/3" do
     setup do
@@ -159,6 +160,57 @@ defmodule Egregoros.PublishVoteOnPollTest do
 
       opt_b = Enum.find(updated_poll.data["anyOf"], &(&1["name"] == "Option B"))
       assert opt_b["replies"]["totalItems"] == 1
+    end
+  end
+
+  describe "vote_on_poll/3 with remote poll delivery" do
+    test "enqueues delivery when voting on a remote poll" do
+      {:ok, voter} = Users.create_local_user("remote_poll_voter")
+
+      {:ok, poll_creator} =
+        Users.create_user(%{
+          nickname: "pollcreator",
+          ap_id: "https://remote.example/users/pollcreator",
+          inbox: "https://remote.example/users/pollcreator/inbox",
+          outbox: "https://remote.example/users/pollcreator/outbox",
+          public_key: "pubkey",
+          local: false
+        })
+
+      question = %{
+        "id" => "https://remote.example/objects/" <> Ecto.UUID.generate(),
+        "type" => "Question",
+        "attributedTo" => poll_creator.ap_id,
+        "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+        "content" => "Remote poll",
+        "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
+        "oneOf" => [
+          %{
+            "name" => "Yes",
+            "type" => "Note",
+            "replies" => %{"type" => "Collection", "totalItems" => 0}
+          },
+          %{
+            "name" => "No",
+            "type" => "Note",
+            "replies" => %{"type" => "Collection", "totalItems" => 0}
+          }
+        ],
+        "closed" => "2030-12-31T23:59:59Z"
+      }
+
+      {:ok, poll} = Pipeline.ingest(question, local: false)
+
+      assert {:ok, _updated} = Publish.vote_on_poll(voter, poll, [0])
+
+      assert_enqueued(
+        worker: DeliverActivity,
+        queue: "federation_outgoing",
+        args: %{
+          "user_id" => voter.id,
+          "inbox_url" => poll_creator.inbox
+        }
+      )
     end
   end
 end
