@@ -98,6 +98,95 @@ defmodule Egregoros.Objects.PollsTest do
     end
   end
 
+  describe "update_from_remote/2" do
+    setup do
+      {:ok, alice} = Users.create_local_user("poll_refresh_alice")
+
+      question = %{
+        "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
+        "type" => "Question",
+        "attributedTo" => alice.ap_id,
+        "context" => Endpoint.url() <> "/contexts/" <> Ecto.UUID.generate(),
+        "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+        "content" => "Refreshable poll",
+        "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
+        "oneOf" => [
+          %{"name" => "A", "type" => "Note", "replies" => %{"totalItems" => 1}},
+          %{"name" => "B", "type" => "Note", "replies" => %{"totalItems" => 2}}
+        ]
+      }
+
+      {:ok, poll} = Pipeline.ingest(question, local: true)
+      poll = Objects.get_by_ap_id(poll.ap_id)
+
+      {:ok, poll} =
+        Objects.update_object(poll, %{data: Map.put(poll.data, "voters", [alice.ap_id])})
+
+      %{poll: poll}
+    end
+
+    test "updates counts when options match and preserves voters", %{poll: poll} do
+      incoming = %{
+        "id" => poll.ap_id,
+        "type" => "Question",
+        "actor" => poll.actor,
+        "attributedTo" => poll.actor,
+        "context" => poll.data["context"],
+        "to" => poll.data["to"],
+        "oneOf" => [
+          %{"name" => "A", "type" => "Note", "replies" => %{"totalItems" => 5}},
+          %{"name" => "B", "type" => "Note", "replies" => %{"totalItems" => 8}}
+        ]
+      }
+
+      assert {:ok, updated} = Polls.update_from_remote(poll, incoming)
+
+      [opt_a, opt_b] = updated.data["oneOf"]
+      assert opt_a["replies"]["totalItems"] == 5
+      assert opt_b["replies"]["totalItems"] == 8
+      assert updated.data["voters"] == [poll.actor]
+    end
+
+    test "returns :noop when options change", %{poll: poll} do
+      incoming = %{
+        "id" => poll.ap_id,
+        "type" => "Question",
+        "actor" => poll.actor,
+        "attributedTo" => poll.actor,
+        "context" => poll.data["context"],
+        "to" => poll.data["to"],
+        "oneOf" => [
+          %{"name" => "A", "type" => "Note", "replies" => %{"totalItems" => 5}},
+          %{"name" => "C", "type" => "Note", "replies" => %{"totalItems" => 1}}
+        ]
+      }
+
+      assert :noop = Polls.update_from_remote(poll, incoming)
+
+      reloaded = Objects.get_by_ap_id(poll.ap_id)
+      [opt_a, opt_b] = reloaded.data["oneOf"]
+      assert opt_a["replies"]["totalItems"] == 1
+      assert opt_b["replies"]["totalItems"] == 2
+    end
+
+    test "returns :noop when poll type changes", %{poll: poll} do
+      incoming = %{
+        "id" => poll.ap_id,
+        "type" => "Question",
+        "actor" => poll.actor,
+        "attributedTo" => poll.actor,
+        "context" => poll.data["context"],
+        "to" => poll.data["to"],
+        "anyOf" => [
+          %{"name" => "A", "type" => "Note", "replies" => %{"totalItems" => 5}},
+          %{"name" => "B", "type" => "Note", "replies" => %{"totalItems" => 8}}
+        ]
+      }
+
+      assert :noop = Polls.update_from_remote(poll, incoming)
+    end
+  end
+
   # Helper functions
 
   defp create_single_choice_poll(owner) do

@@ -49,7 +49,76 @@ defmodule Egregoros.Objects.Polls do
 
   def multiple?(_object), do: false
 
+  @doc """
+  Updates poll option counts from a remote Question object.
+
+  Only updates counts when the incoming poll options match the existing options
+  (ignoring reply counts). Preserves existing voters and other fields.
+  """
+  def update_from_remote(%Object{type: "Question", data: data} = object, %{} = incoming)
+      when is_map(data) do
+    key = poll_choice_key(data)
+    incoming_key = poll_choice_key(incoming)
+
+    with key when is_binary(key) <- key,
+         ^key <- incoming_key,
+         existing_options when is_list(existing_options) <- Map.get(data, key),
+         incoming_options when is_list(incoming_options) <- Map.get(incoming, key),
+         true <- options_match?(existing_options, incoming_options) do
+      updated_options = merge_option_counts(existing_options, incoming_options)
+
+      updated_data =
+        data
+        |> Map.put(key, updated_options)
+        |> Map.put("voters", Map.get(data, "voters") || [])
+
+      object
+      |> Object.changeset(%{data: updated_data})
+      |> Repo.update()
+    else
+      _ -> :noop
+    end
+  end
+
+  def update_from_remote(_object, _incoming), do: :noop
+
   # Private
+
+  defp poll_choice_key(%{"anyOf" => any_of}) when is_list(any_of) and any_of != [], do: "anyOf"
+  defp poll_choice_key(%{"oneOf" => one_of}) when is_list(one_of) and one_of != [], do: "oneOf"
+  defp poll_choice_key(_data), do: nil
+
+  defp options_match?(existing_options, incoming_options)
+       when is_list(existing_options) and is_list(incoming_options) do
+    strip_replies = fn option -> Map.drop(option, ["replies"]) end
+
+    Enum.map(existing_options, strip_replies) ==
+      Enum.map(incoming_options, strip_replies)
+  end
+
+  defp options_match?(_existing_options, _incoming_options), do: false
+
+  defp merge_option_counts(existing_options, incoming_options) do
+    Enum.zip(existing_options, incoming_options)
+    |> Enum.map(fn {existing, incoming} -> update_option_count(existing, incoming) end)
+  end
+
+  defp update_option_count(%{} = existing, %{} = incoming) do
+    incoming_total =
+      incoming
+      |> Map.get("replies", %{})
+      |> Map.get("totalItems")
+
+    if is_integer(incoming_total) do
+      replies = Map.get(existing, "replies", %{})
+      updated_replies = Map.put(replies, "totalItems", incoming_total)
+      Map.put(existing, "replies", updated_replies)
+    else
+      existing
+    end
+  end
+
+  defp update_option_count(existing, _incoming), do: existing
 
   defp do_increase_vote_count(object, key, options, option_name, voter_ap_id) do
     existing_voters = Map.get(object.data, "voters") || []
