@@ -12,6 +12,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusRenderer do
   alias EgregorosWeb.URL
   alias EgregorosWeb.MastodonAPI.AccountRenderer
   alias EgregorosWeb.MastodonAPI.Fallback
+  alias EgregorosWeb.MastodonAPI.PollRenderer
 
   def render_status(%Object{} = object) do
     render_status(object, nil)
@@ -180,7 +181,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusRenderer do
       "in_reply_to_account_id" => in_reply_to_account_id,
       "reblog" => nil,
       "quote" => nil,
-      "poll" => nil,
+      "poll" => PollRenderer.render(object, ctx.current_user),
       "card" => nil,
       "quote_approval" => nil,
       "application" => nil,

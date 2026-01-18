@@ -31,15 +31,13 @@ defmodule EgregorosWeb.MastodonAPI.PollRenderer do
         true -> {[], false}
       end
 
-    rendered_options = Enum.with_index(options, &render_option/2)
+    rendered_options = Enum.map(options, &render_option/1)
     votes_count = Enum.reduce(rendered_options, 0, fn opt, acc -> acc + opt["votes_count"] end)
     voters_count = Polls.voters_count(object)
     expires_at = parse_expiry(data)
     expired = expired?(expires_at)
 
-    {own_votes, voted} = own_votes_and_voted(object, options, current_user)
-
-    %{
+    poll = %{
       "id" => Integer.to_string(object.id),
       "expires_at" => format_datetime(expires_at),
       "expired" => expired,
@@ -47,15 +45,29 @@ defmodule EgregorosWeb.MastodonAPI.PollRenderer do
       "votes_count" => votes_count,
       "voters_count" => voters_count,
       "options" => rendered_options,
-      "emojis" => [],
-      "voted" => voted,
-      "own_votes" => own_votes
+      "emojis" => []
     }
+
+    case current_user do
+      nil ->
+        poll
+
+      %User{} ->
+        {own_votes, voted} = own_votes_and_voted(object, options, current_user)
+
+        Map.merge(poll, %{
+          "voted" => voted,
+          "own_votes" => own_votes
+        })
+
+      _ ->
+        poll
+    end
   end
 
   def render(_object, _current_user), do: nil
 
-  defp render_option(option, index) when is_map(option) do
+  defp render_option(option) when is_map(option) do
     name = Map.get(option, "name", "")
 
     votes_count =
@@ -67,16 +79,14 @@ defmodule EgregorosWeb.MastodonAPI.PollRenderer do
 
     %{
       "title" => name,
-      "votes_count" => votes_count,
-      "index" => index
+      "votes_count" => votes_count
     }
   end
 
-  defp render_option(_option, index) do
+  defp render_option(_option) do
     %{
       "title" => "",
-      "votes_count" => 0,
-      "index" => index
+      "votes_count" => 0
     }
   end
 
@@ -109,8 +119,8 @@ defmodule EgregorosWeb.MastodonAPI.PollRenderer do
 
   defp own_votes_and_voted(%Object{actor: poll_actor}, _options, %User{ap_id: user_ap_id})
        when user_ap_id == poll_actor do
-    # Poll owner doesn't vote on their own poll
-    {[], false}
+    # Mastodon considers the poll owner to have "voted" (can view results)
+    {[], true}
   end
 
   defp own_votes_and_voted(%Object{} = object, options, %User{} = current_user) do

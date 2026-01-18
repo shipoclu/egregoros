@@ -237,13 +237,27 @@ defmodule Egregoros.Objects.Polls do
     end
   end
 
+  def voters_count(%Object{type: "Question", local: false, data: %{} = data} = object) do
+    case Map.get(data, "votersCount") do
+      count when is_integer(count) and count >= 0 ->
+        count
+
+      _ ->
+        voters_count_from_internal(object)
+    end
+  end
+
   def voters_count(%Object{type: "Question"} = object) do
+    voters_count_from_internal(object)
+  end
+
+  def voters_count(_object), do: 0
+
+  defp voters_count_from_internal(%Object{} = object) do
     poll_internal = poll_internal(object)
     voters = Map.get(poll_internal, "voters", []) |> List.wrap()
     length(voters)
   end
-
-  def voters_count(_object), do: 0
 
   defp poll_internal(%Object{} = object) do
     object

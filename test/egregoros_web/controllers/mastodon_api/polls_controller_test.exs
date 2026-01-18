@@ -56,8 +56,8 @@ defmodule EgregorosWeb.MastodonAPI.PollsControllerTest do
       assert opt2["title"] == "Blue"
       assert opt2["votes_count"] == 3
 
-      assert response["voted"] == false
-      assert response["own_votes"] == []
+      refute Map.has_key?(response, "voted")
+      refute Map.has_key?(response, "own_votes")
     end
 
     test "returns voted=true for user who has voted", %{conn: conn, poll: poll} do

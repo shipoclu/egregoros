@@ -25,6 +25,8 @@ defmodule EgregorosWeb.MastodonAPI.PollRendererTest do
         data: %{}
       }
 
+      rendered = PollRenderer.render(object, nil)
+
       assert %{
                "id" => "1",
                "expires_at" => nil,
@@ -33,10 +35,11 @@ defmodule EgregorosWeb.MastodonAPI.PollRendererTest do
                "votes_count" => 0,
                "voters_count" => 0,
                "options" => [],
-               "emojis" => [],
-               "voted" => false,
-               "own_votes" => []
-             } = PollRenderer.render(object, nil)
+               "emojis" => []
+             } = rendered
+
+      refute Map.has_key?(rendered, "voted")
+      refute Map.has_key?(rendered, "own_votes")
     end
 
     test "renders a poll with options and counts" do
@@ -77,10 +80,29 @@ defmodule EgregorosWeb.MastodonAPI.PollRendererTest do
       assert is_binary(rendered["expires_at"])
 
       [opt1, opt2] = rendered["options"]
-      assert opt1["title"] == "Absolutely!"
-      assert opt1["votes_count"] == 0
-      assert opt2["title"] == "Sure"
-      assert opt2["votes_count"] == 0
+      assert opt1 == %{"title" => "Absolutely!", "votes_count" => 0}
+      assert opt2 == %{"title" => "Sure", "votes_count" => 0}
+
+      refute Map.has_key?(rendered, "voted")
+      refute Map.has_key?(rendered, "own_votes")
+    end
+
+    test "uses votersCount from ActivityPub data for remote polls" do
+      object = %Object{
+        id: 1,
+        type: "Question",
+        actor: "https://example.com/users/alice",
+        local: false,
+        data: %{
+          "oneOf" => [
+            %{"name" => "a", "replies" => %{"type" => "Collection", "totalItems" => 0}}
+          ],
+          "votersCount" => 10
+        }
+      }
+
+      rendered = PollRenderer.render(object, nil)
+      assert rendered["voters_count"] == 10
     end
 
     test "detects multiple choice and own_votes" do
@@ -124,8 +146,8 @@ defmodule EgregorosWeb.MastodonAPI.PollRendererTest do
       assert rendered["own_votes"] == [0, 1]
 
       [opt1, opt2] = rendered["options"]
-      assert opt1["votes_count"] == 1
-      assert opt2["votes_count"] == 1
+      assert opt1 == %{"title" => "Mouse", "votes_count" => 1}
+      assert opt2 == %{"title" => "Trackball", "votes_count" => 1}
     end
 
     test "does not crash on polls with no end date" do
@@ -159,6 +181,9 @@ defmodule EgregorosWeb.MastodonAPI.PollRendererTest do
 
       assert rendered["expires_at"] == nil
       assert rendered["expired"] == false
+
+      refute Map.has_key?(rendered, "voted")
+      refute Map.has_key?(rendered, "own_votes")
     end
 
     test "does not strip HTML tags from option titles" do
@@ -192,8 +217,11 @@ defmodule EgregorosWeb.MastodonAPI.PollRendererTest do
       rendered = PollRenderer.render(poll, nil)
 
       [opt1, opt2] = rendered["options"]
-      assert opt1["title"] == "<input type=\"date\">"
-      assert opt2["title"] == "<input type=\"date\" />"
+      assert opt1 == %{"title" => "<input type=\"date\">", "votes_count" => 0}
+      assert opt2 == %{"title" => "<input type=\"date\" />", "votes_count" => 0}
+
+      refute Map.has_key?(rendered, "voted")
+      refute Map.has_key?(rendered, "own_votes")
     end
 
     test "handles non-map options and non-integer vote counts" do
@@ -220,8 +248,8 @@ defmodule EgregorosWeb.MastodonAPI.PollRendererTest do
       assert rendered["expires_at"] == DateTime.to_iso8601(expires_at)
 
       assert rendered["options"] == [
-               %{"title" => "a", "votes_count" => 0, "index" => 0},
-               %{"title" => "", "votes_count" => 0, "index" => 1}
+               %{"title" => "a", "votes_count" => 0},
+               %{"title" => "", "votes_count" => 0}
              ]
 
       assert rendered["votes_count"] == 0
@@ -246,7 +274,7 @@ defmodule EgregorosWeb.MastodonAPI.PollRendererTest do
       assert rendered["multiple"] == true
       assert rendered["expires_at"] == nil
       assert rendered["own_votes"] == []
-      assert rendered["voted"] == false
+      assert rendered["voted"] == true
       assert rendered["voters_count"] == 1
       assert rendered["votes_count"] == 1
     end
