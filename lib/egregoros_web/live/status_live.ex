@@ -77,6 +77,11 @@ defmodule EgregorosWeb.StatusLive do
 
           {status_entry, ancestors, descendants, note, missing_parent?}
 
+        %{type: "Question"} = question ->
+          # Questions (polls) don't have thread context in the same way Notes do
+          status_entry = StatusVM.decorate(question, current_user)
+          {status_entry, [], [], question, false}
+
         _ ->
           {nil, [], [], nil, false}
       end
@@ -1100,6 +1105,32 @@ defmodule EgregorosWeb.StatusLive do
           thread_fetching_replies?: fetching_replies?
         )
 
+      %{object: %{type: "Question"} = question} ->
+        question =
+          case question.ap_id do
+            ap_id when is_binary(ap_id) and ap_id != "" ->
+              case Objects.get_by_ap_id(ap_id) do
+                %Egregoros.Object{} = latest -> latest
+                _ -> question
+              end
+
+            _ ->
+              question
+          end
+
+        status_entry = StatusVM.decorate(question, current_user)
+        thread_index = build_thread_index(status_entry, [], [])
+
+        socket
+        |> assign(
+          status: status_entry,
+          ancestors: [],
+          descendants: [],
+          thread_index: thread_index,
+          thread_missing_context?: false,
+          thread_fetching_replies?: false
+        )
+
       _ ->
         socket
     end
@@ -1377,13 +1408,17 @@ defmodule EgregorosWeb.StatusLive do
   defp parse_choices(choices) when is_list(choices) do
     choices
     |> Enum.map(fn
-      choice when is_integer(choice) -> choice
+      choice when is_integer(choice) ->
+        choice
+
       choice when is_binary(choice) ->
         case Integer.parse(choice) do
           {int, ""} -> int
           _ -> nil
         end
-      _ -> nil
+
+      _ ->
+        nil
     end)
     |> Enum.filter(&is_integer/1)
   end
