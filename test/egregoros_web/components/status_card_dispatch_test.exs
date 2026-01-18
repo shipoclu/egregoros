@@ -1,13 +1,13 @@
-defmodule EgregorosWeb.Components.TimelineItems.TimelineItemTest do
+defmodule EgregorosWeb.StatusCardDispatchTest do
   use EgregorosWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
 
-  alias EgregorosWeb.Components.TimelineItems.TimelineItem
+  alias EgregorosWeb.StatusCard
 
   test "dispatches decorated repost entries through the Announce branch" do
     html =
-      render_component(&TimelineItem.timeline_item/1, %{
+      render_component(&StatusCard.status_card/1, %{
         id: "post-1",
         current_user: %{id: 1},
         entry: %{
