@@ -52,36 +52,48 @@ defmodule Egregoros.Objects.Polls do
   # Private
 
   defp do_increase_vote_count(object, key, options, option_name, voter_ap_id) do
-    updated_options =
-      Enum.map(options, fn
-        %{"name" => ^option_name} = option ->
-          current_count =
-            option
-            |> Map.get("replies", %{})
-            |> Map.get("totalItems", 0)
+    existing_voters = Map.get(object.data, "voters") || []
 
-          replies = Map.get(option, "replies", %{})
-          updated_replies = Map.put(replies, "totalItems", current_count + 1)
-          Map.put(option, "replies", updated_replies)
+    # For single-choice polls (oneOf), don't count duplicate votes from same voter
+    # For multiple-choice polls (anyOf), we allow voting on multiple options
+    # but still prevent voting on the same option twice
+    already_voted_on_poll? = voter_ap_id in existing_voters
+    is_single_choice? = key == "oneOf"
 
-        option ->
-          option
-      end)
-
-    if updated_options == options do
+    if is_single_choice? and already_voted_on_poll? do
+      # Voter already voted on this single-choice poll - skip
       :noop
     else
-      existing_voters = Map.get(object.data, "voters") || []
-      voters = Enum.uniq([voter_ap_id | existing_voters])
+      updated_options =
+        Enum.map(options, fn
+          %{"name" => ^option_name} = option ->
+            current_count =
+              option
+              |> Map.get("replies", %{})
+              |> Map.get("totalItems", 0)
 
-      updated_data =
-        object.data
-        |> Map.put(key, updated_options)
-        |> Map.put("voters", voters)
+            replies = Map.get(option, "replies", %{})
+            updated_replies = Map.put(replies, "totalItems", current_count + 1)
+            Map.put(option, "replies", updated_replies)
 
-      object
-      |> Object.changeset(%{data: updated_data})
-      |> Repo.update()
+          option ->
+            option
+        end)
+
+      if updated_options == options do
+        :noop
+      else
+        voters = Enum.uniq([voter_ap_id | existing_voters])
+
+        updated_data =
+          object.data
+          |> Map.put(key, updated_options)
+          |> Map.put("voters", voters)
+
+        object
+        |> Object.changeset(%{data: updated_data})
+        |> Repo.update()
+      end
     end
   end
 end
