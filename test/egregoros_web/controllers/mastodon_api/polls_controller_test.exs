@@ -6,6 +6,7 @@ defmodule EgregorosWeb.MastodonAPI.PollsControllerTest do
   alias Egregoros.Publish
   alias Egregoros.Users
   alias EgregorosWeb.Endpoint
+  alias Egregoros.Workers.RefreshPoll
 
   describe "GET /api/v1/polls/:id" do
     setup do
@@ -92,6 +93,42 @@ defmodule EgregorosWeb.MastodonAPI.PollsControllerTest do
 
       conn = get(conn, "/api/v1/polls/#{note.id}")
       assert response(conn, 404) == "Not Found"
+    end
+
+    test "enqueues refresh for remote poll", %{conn: conn} do
+      question = %{
+        "id" => "https://remote.example/objects/" <> Ecto.UUID.generate(),
+        "type" => "Question",
+        "attributedTo" => "https://remote.example/users/alice",
+        "context" => "https://remote.example/contexts/" <> Ecto.UUID.generate(),
+        "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+        "content" => "Remote poll",
+        "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
+        "oneOf" => [
+          %{
+            "name" => "Red",
+            "type" => "Note",
+            "replies" => %{"type" => "Collection", "totalItems" => 0}
+          },
+          %{
+            "name" => "Blue",
+            "type" => "Note",
+            "replies" => %{"type" => "Collection", "totalItems" => 0}
+          }
+        ],
+        "closed" => "2030-12-31T23:59:59Z"
+      }
+
+      {:ok, poll} = Pipeline.ingest(question, local: false)
+
+      conn = get(conn, "/api/v1/polls/#{poll.id}")
+      assert response(conn, 200)
+
+      assert_enqueued(
+        worker: RefreshPoll,
+        queue: "federation_incoming",
+        args: %{"ap_id" => poll.ap_id}
+      )
     end
   end
 
