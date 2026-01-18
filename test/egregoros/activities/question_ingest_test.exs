@@ -17,9 +17,21 @@ defmodule Egregoros.Activities.QuestionIngestTest do
         "content" => "What's your favorite color?",
         "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
         "oneOf" => [
-          %{"name" => "Red", "type" => "Note", "replies" => %{"type" => "Collection", "totalItems" => 0}},
-          %{"name" => "Blue", "type" => "Note", "replies" => %{"type" => "Collection", "totalItems" => 0}},
-          %{"name" => "Green", "type" => "Note", "replies" => %{"type" => "Collection", "totalItems" => 0}}
+          %{
+            "name" => "Red",
+            "type" => "Note",
+            "replies" => %{"type" => "Collection", "totalItems" => 0}
+          },
+          %{
+            "name" => "Blue",
+            "type" => "Note",
+            "replies" => %{"type" => "Collection", "totalItems" => 0}
+          },
+          %{
+            "name" => "Green",
+            "type" => "Note",
+            "replies" => %{"type" => "Collection", "totalItems" => 0}
+          }
         ],
         "closed" => "2030-12-31T23:59:59Z"
       }

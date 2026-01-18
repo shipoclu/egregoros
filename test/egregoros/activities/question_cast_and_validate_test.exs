@@ -11,9 +11,21 @@ defmodule Egregoros.Activities.QuestionCastAndValidateTest do
         "attributedTo" => "https://example.com/users/alice",
         "content" => "What's your favorite color?",
         "oneOf" => [
-          %{"name" => "Red", "type" => "Note", "replies" => %{"type" => "Collection", "totalItems" => 5}},
-          %{"name" => "Blue", "type" => "Note", "replies" => %{"type" => "Collection", "totalItems" => 3}},
-          %{"name" => "Green", "type" => "Note", "replies" => %{"type" => "Collection", "totalItems" => 2}}
+          %{
+            "name" => "Red",
+            "type" => "Note",
+            "replies" => %{"type" => "Collection", "totalItems" => 5}
+          },
+          %{
+            "name" => "Blue",
+            "type" => "Note",
+            "replies" => %{"type" => "Collection", "totalItems" => 3}
+          },
+          %{
+            "name" => "Green",
+            "type" => "Note",
+            "replies" => %{"type" => "Collection", "totalItems" => 2}
+          }
         ],
         "closed" => "2025-12-31T23:59:59Z"
       }
@@ -164,7 +176,11 @@ defmodule Egregoros.Activities.QuestionCastAndValidateTest do
       }
 
       assert {:ok, validated} = Question.cast_and_validate(question)
-      assert validated["voters"] == ["https://example.com/users/voter1", "https://example.com/users/voter2"]
+
+      assert validated["voters"] == [
+               "https://example.com/users/voter1",
+               "https://example.com/users/voter2"
+             ]
     end
   end
 end

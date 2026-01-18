@@ -71,10 +71,11 @@ defmodule EgregorosWeb.Components.TimelineItems.PollCard do
   attr :current_user, :any, default: nil
 
   defp poll_results(assigns) do
-    assigns = assign_new(assigns, :show_results?, fn ->
-      poll = assigns.poll
-      poll.own_poll? or poll.voted? or poll.expired?
-    end)
+    assigns =
+      assign_new(assigns, :show_results?, fn ->
+        poll = assigns.poll
+        poll.own_poll? or poll.voted? or poll.expired?
+      end)
 
     ~H"""
     <div class="mt-4 space-y-2" data-role="poll-results">

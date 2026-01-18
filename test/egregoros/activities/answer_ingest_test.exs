@@ -19,9 +19,21 @@ defmodule Egregoros.Activities.AnswerIngestTest do
         "content" => "What's your favorite color?",
         "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
         "oneOf" => [
-          %{"name" => "Red", "type" => "Note", "replies" => %{"type" => "Collection", "totalItems" => 0}},
-          %{"name" => "Blue", "type" => "Note", "replies" => %{"type" => "Collection", "totalItems" => 0}},
-          %{"name" => "Green", "type" => "Note", "replies" => %{"type" => "Collection", "totalItems" => 0}}
+          %{
+            "name" => "Red",
+            "type" => "Note",
+            "replies" => %{"type" => "Collection", "totalItems" => 0}
+          },
+          %{
+            "name" => "Blue",
+            "type" => "Note",
+            "replies" => %{"type" => "Collection", "totalItems" => 0}
+          },
+          %{
+            "name" => "Green",
+            "type" => "Note",
+            "replies" => %{"type" => "Collection", "totalItems" => 0}
+          }
         ]
       }
 
@@ -186,7 +198,13 @@ defmodule Egregoros.Activities.AnswerIngestTest do
     end
 
     test "returns :noop for non-existent question" do
-      result = Objects.increase_vote_count("https://fake.example/poll", "A", "https://fake.example/voter")
+      result =
+        Objects.increase_vote_count(
+          "https://fake.example/poll",
+          "A",
+          "https://fake.example/voter"
+        )
+
       assert result == :noop
     end
 
