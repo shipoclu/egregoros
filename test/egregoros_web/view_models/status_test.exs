@@ -5,8 +5,14 @@ defmodule EgregorosWeb.ViewModels.StatusTest do
   alias Egregoros.Interactions
   alias Egregoros.Objects
   alias Egregoros.Pipeline
+  alias Egregoros.Publish
+  alias Egregoros.Relationships
   alias Egregoros.Users
   alias EgregorosWeb.ViewModels.Status
+
+  test "reaction_emojis/0 returns the default reaction set" do
+    assert Status.reaction_emojis() == ["🔥", "👍", "❤️"]
+  end
 
   test "decorates a note with actor details and counts" do
     {:ok, user} = Users.create_local_user("alice")
@@ -154,6 +160,93 @@ defmodule EgregorosWeb.ViewModels.StatusTest do
     assert entry.reactions["🤖"].reacted?
   end
 
+  test "decorates polls with a poll view model" do
+    {:ok, author} = Users.create_local_user("status-poll-author")
+    {:ok, viewer} = Users.create_local_user("status-poll-viewer")
+
+    question = %{
+      "id" => "https://example.com/objects/" <> Ecto.UUID.generate(),
+      "type" => "Question",
+      "attributedTo" => author.ap_id,
+      "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+      "content" => "Pick one",
+      "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
+      "oneOf" => [
+        %{"name" => "Red", "replies" => %{"totalItems" => 5}},
+        %{"name" => "Blue", "replies" => %{"totalItems" => 3}}
+      ],
+      "closed" => DateTime.add(DateTime.utc_now(), 3600, :second) |> DateTime.to_iso8601()
+    }
+
+    {:ok, poll} = Pipeline.ingest(question, local: true)
+
+    entry = Status.decorate(poll, viewer)
+
+    assert entry.object.type == "Question"
+    assert entry.poll.multiple? == false
+    assert entry.poll.options == [%{name: "Red", votes: 5}, %{name: "Blue", votes: 3}]
+    assert entry.poll.total_votes == 8
+    assert entry.poll.voters_count == 0
+    assert entry.poll.expired? == false
+    assert entry.poll.own_poll? == false
+    assert entry.poll.voted? == false
+    assert %DateTime{} = entry.poll.closed
+  end
+
+  test "marks polls as voted for users in the voters list" do
+    {:ok, author} = Users.create_local_user("status-poll-voted-author")
+    {:ok, voter} = Users.create_local_user("status-poll-voted-user")
+
+    question = %{
+      "id" => "https://example.com/objects/" <> Ecto.UUID.generate(),
+      "type" => "Question",
+      "attributedTo" => author.ap_id,
+      "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+      "content" => "Pick one",
+      "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
+      "oneOf" => [
+        %{"name" => "Yes", "replies" => %{"totalItems" => 0}},
+        %{"name" => "No", "replies" => %{"totalItems" => 0}}
+      ],
+      "closed" => DateTime.add(DateTime.utc_now(), 3600, :second) |> DateTime.to_iso8601()
+    }
+
+    {:ok, poll} = Pipeline.ingest(question, local: true)
+
+    assert {:ok, _updated} = Publish.vote_on_poll(voter, poll, [0])
+
+    poll = Objects.get_by_ap_id(poll.ap_id)
+    entry = Status.decorate(poll, voter)
+
+    assert entry.poll.voted? == true
+    assert entry.poll.voters_count == 1
+    assert entry.poll.total_votes == 1
+  end
+
+  test "marks anyOf polls as multiple choice" do
+    {:ok, author} = Users.create_local_user("status-poll-anyof-author")
+    {:ok, viewer} = Users.create_local_user("status-poll-anyof-viewer")
+
+    question = %{
+      "id" => "https://example.com/objects/" <> Ecto.UUID.generate(),
+      "type" => "Question",
+      "attributedTo" => author.ap_id,
+      "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+      "content" => "Pick any",
+      "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
+      "anyOf" => [
+        %{"name" => "A", "replies" => %{"totalItems" => 0}},
+        %{"name" => "B", "replies" => %{"totalItems" => 0}}
+      ],
+      "closed" => DateTime.add(DateTime.utc_now(), 3600, :second) |> DateTime.to_iso8601()
+    }
+
+    {:ok, poll} = Pipeline.ingest(question, local: true)
+
+    entry = Status.decorate(poll, viewer)
+    assert entry.poll.multiple? == true
+  end
+
   test "includes reblogs of posts addressed to the viewer" do
     uniq = System.unique_integer([:positive])
     {:ok, author} = Users.create_local_user("status-direct-author-#{uniq}")
@@ -298,5 +391,37 @@ defmodule EgregorosWeb.ViewModels.StatusTest do
              })
 
     assert Status.decorate_many([announce], reposter) == []
+  end
+
+  test "decorates unknown object maps with a feed_id and default reactions" do
+    entry = Status.decorate(%{"id" => "https://example.com/objects/1", "actor" => nil}, nil)
+
+    assert entry.feed_id == "https://example.com/objects/1"
+    assert entry.likes_count == 0
+    assert entry.reactions["🔥"].count == 0
+  end
+
+  test "returns nil for announces with blank object ids" do
+    assert Status.decorate(%{type: "Announce", object: " "}, nil) == nil
+  end
+
+  test "decorates unknown object maps with emoji reaction counts when ap_id is present" do
+    uniq = System.unique_integer([:positive])
+    {:ok, user} = Users.create_local_user("status-unknown-reactions-#{uniq}")
+    object_ap_id = "https://example.com/objects/#{uniq}"
+
+    assert {:ok, _reaction} =
+             Relationships.upsert_relationship(%{
+               type: "EmojiReact:😀",
+               actor: user.ap_id,
+               object: object_ap_id,
+               emoji_url: "https://cdn.example/emoji.png"
+             })
+
+    entry =
+      Status.decorate(%{id: uniq, type: "Mystery", ap_id: object_ap_id, actor: user.ap_id}, user)
+
+    assert entry.reactions["😀"].count == 1
+    assert entry.reactions["😀"].reacted?
   end
 end

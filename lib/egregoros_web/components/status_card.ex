@@ -90,10 +90,10 @@ defmodule EgregorosWeb.StatusCard do
     """
   end
 
-  defp object_type(%{object: %{type: type}}) when is_binary(type), do: type
-  defp object_type(%{object: %{"type" => type}}) when is_binary(type), do: type
   # For Announces that have been decorated, the entry might have :reposted_by
   # which indicates it's an Announce even though the object is a Note
   defp object_type(%{reposted_by: %{}} = _entry), do: "Announce"
+  defp object_type(%{object: %{type: type}}) when is_binary(type), do: type
+  defp object_type(%{object: %{"type" => type}}) when is_binary(type), do: type
   defp object_type(_entry), do: "unknown"
 end

@@ -137,8 +137,11 @@ defmodule EgregorosWeb.Components.Shared.StatusMenu do
     """
   end
 
-  defp can_delete_post?(%{object: %{type: "Note", local: true, actor: actor}}, %User{ap_id: actor})
-       when is_binary(actor) and actor != "" do
+  defp can_delete_post?(
+         %{object: %{type: type, local: true, actor: actor_ap_id}},
+         %User{ap_id: actor_ap_id}
+       )
+       when is_binary(actor_ap_id) and actor_ap_id != "" and type in ["Note", "Question"] do
     true
   end
 

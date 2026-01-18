@@ -65,6 +65,7 @@ defmodule EgregorosWeb.Components.TimelineItems.PollCard do
         id={@id}
         poll={@entry.poll}
         object_id={@entry.object.id}
+        feed_id={Map.get(@entry, :feed_id) || @entry.object.id}
         current_user={@current_user}
       />
 
@@ -81,6 +82,7 @@ defmodule EgregorosWeb.Components.TimelineItems.PollCard do
   attr :id, :string, required: true
   attr :poll, :map, required: true
   attr :object_id, :integer, required: true
+  attr :feed_id, :integer, required: true
   attr :current_user, :any, default: nil
 
   defp poll_section(assigns) do
@@ -111,6 +113,7 @@ defmodule EgregorosWeb.Components.TimelineItems.PollCard do
           id={@id}
           poll={@poll}
           object_id={@object_id}
+          feed_id={@feed_id}
         />
       <% else %>
         <.poll_results poll={@poll} current_user={@current_user} />
@@ -124,6 +127,7 @@ defmodule EgregorosWeb.Components.TimelineItems.PollCard do
   attr :id, :string, required: true
   attr :poll, :map, required: true
   attr :object_id, :integer, required: true
+  attr :feed_id, :integer, required: true
 
   defp poll_voting_form(assigns) do
     ~H"""
@@ -131,6 +135,7 @@ defmodule EgregorosWeb.Components.TimelineItems.PollCard do
       id={"poll-form-#{@id}"}
       phx-submit="vote_on_poll"
       phx-value-poll-id={@object_id}
+      phx-value-feed_id={@feed_id}
       class="space-y-2"
     >
       <.poll_option_input

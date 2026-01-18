@@ -110,6 +110,12 @@ defmodule EgregorosWeb.MastodonAPI.PollsController do
     end
   end
 
+  def vote(conn, %{"id" => _id, "choices" => _choices}) do
+    conn
+    |> put_status(422)
+    |> json(%{"error" => "Invalid poll option"})
+  end
+
   def vote(conn, %{"id" => _id}) do
     conn
     |> put_status(422)

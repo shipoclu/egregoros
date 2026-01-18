@@ -56,7 +56,7 @@ defmodule Egregoros.Objects.Polls do
 
     # For single-choice polls (oneOf), don't count duplicate votes from same voter
     # For multiple-choice polls (anyOf), we allow voting on multiple options
-    # but still prevent voting on the same option twice
+    # but still prevent voting on the same option twice (idempotency for retries)
     already_voted_on_poll? = voter_ap_id in existing_voters
     is_single_choice? = key == "oneOf"
 
@@ -67,14 +67,26 @@ defmodule Egregoros.Objects.Polls do
       updated_options =
         Enum.map(options, fn
           %{"name" => ^option_name} = option ->
-            current_count =
-              option
-              |> Map.get("replies", %{})
-              |> Map.get("totalItems", 0)
+            # For anyOf polls, track per-option voters so we can ignore duplicate
+            # Answer ingestions without blocking the voter from selecting other
+            # options within the same poll.
+            option_voters = Map.get(option, "egregoros:voters") |> List.wrap()
 
-            replies = Map.get(option, "replies", %{})
-            updated_replies = Map.put(replies, "totalItems", current_count + 1)
-            Map.put(option, "replies", updated_replies)
+            if key == "anyOf" and voter_ap_id in option_voters do
+              option
+            else
+              current_count =
+                option
+                |> Map.get("replies", %{})
+                |> Map.get("totalItems", 0)
+
+              replies = Map.get(option, "replies", %{})
+              updated_replies = Map.put(replies, "totalItems", current_count + 1)
+
+              option
+              |> Map.put("replies", updated_replies)
+              |> maybe_put_option_voter(key, option_voters, voter_ap_id)
+            end
 
           option ->
             option
@@ -96,4 +108,11 @@ defmodule Egregoros.Objects.Polls do
       end
     end
   end
+
+  defp maybe_put_option_voter(option, "anyOf", existing_voters, voter_ap_id) do
+    voters = Enum.uniq([voter_ap_id | existing_voters])
+    Map.put(option, "egregoros:voters", voters)
+  end
+
+  defp maybe_put_option_voter(option, _key, _existing_voters, _voter_ap_id), do: option
 end

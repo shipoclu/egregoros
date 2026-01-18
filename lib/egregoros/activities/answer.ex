@@ -24,6 +24,7 @@ defmodule Egregoros.Activities.Answer do
   alias Egregoros.ActivityPub.ObjectValidators.Types.DateTime, as: APDateTime
   alias Egregoros.Object
   alias Egregoros.Objects
+  alias Egregoros.Relationships
 
   @as_public "https://www.w3.org/ns/activitystreams#Public"
 
@@ -161,12 +162,21 @@ defmodule Egregoros.Activities.Answer do
 
   defp voter_permitted?(_question_data, _voter_ap_id), do: false
 
-  defp voter_in_followers_collection?(audience, _voter_ap_id) do
-    # Check if any audience entry is a followers collection that the voter might belong to
-    # For now, we'll be permissive and accept if there's any followers collection
-    # A more complete implementation would check if the voter actually follows that actor
-    Enum.any?(audience, fn recipient ->
-      is_binary(recipient) and String.ends_with?(recipient, "/followers")
-    end)
+  defp voter_in_followers_collection?(audience, voter_ap_id)
+       when is_list(audience) and is_binary(voter_ap_id) do
+    follower_actor_ids =
+      audience
+      |> Enum.filter(&is_binary/1)
+      |> Enum.map(&String.trim/1)
+      |> Enum.reject(&(&1 == ""))
+      |> Enum.filter(&String.ends_with?(&1, "/followers"))
+      |> Enum.map(&String.replace_suffix(&1, "/followers", ""))
+      |> Enum.reject(&(&1 == ""))
+      |> Enum.uniq()
+
+    follower_actor_ids != [] and
+      Relationships.list_follows_by_actor_for_objects(voter_ap_id, follower_actor_ids) != []
   end
+
+  defp voter_in_followers_collection?(_audience, _voter_ap_id), do: false
 end

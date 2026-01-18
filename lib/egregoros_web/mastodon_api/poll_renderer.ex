@@ -22,7 +22,14 @@ defmodule EgregorosWeb.MastodonAPI.PollRenderer do
   def render(%Object{type: "Question", data: data} = object, current_user) when is_map(data) do
     one_of = Map.get(data, "oneOf") |> List.wrap()
     any_of = Map.get(data, "anyOf") |> List.wrap()
-    voters = Map.get(data, "voters") || []
+
+    voters =
+      data
+      |> Map.get("voters", [])
+      |> case do
+        voters when is_list(voters) -> voters
+        _ -> []
+      end
 
     {options, multiple} =
       cond do

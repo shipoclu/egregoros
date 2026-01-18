@@ -6,10 +6,13 @@ defmodule Egregoros.Publish.Polls do
   """
 
   alias Egregoros.Activities.Answer
+  alias Egregoros.Federation.Delivery
   alias Egregoros.Object
   alias Egregoros.Objects
   alias Egregoros.Pipeline
   alias Egregoros.User
+  alias Egregoros.Users
+  alias EgregorosWeb.Endpoint
   alias EgregorosWeb.URL
 
   @doc """
@@ -171,6 +174,34 @@ defmodule Egregoros.Publish.Polls do
       "published" => DateTime.utc_now() |> DateTime.to_iso8601()
     }
 
-    Pipeline.ingest(answer, local: true)
+    with {:ok, answer_object} <- Pipeline.ingest(answer, local: true) do
+      _ = maybe_deliver_remote_vote(user, question, answer)
+      {:ok, answer_object}
+    end
+  end
+
+  defp maybe_deliver_remote_vote(%User{} = user, %Object{local: false} = question, %{} = answer) do
+    with %User{local: false, inbox: inbox_url} <- Users.get_by_ap_id(question.actor),
+         true <- is_binary(inbox_url) and inbox_url != "" do
+      create = build_vote_create(user, question.actor, answer)
+      Delivery.deliver(user, inbox_url, create)
+    else
+      _ -> :ok
+    end
+  end
+
+  defp maybe_deliver_remote_vote(_user, _question, _answer), do: :ok
+
+  defp build_vote_create(%User{} = user, poll_actor_ap_id, %{} = answer)
+       when is_binary(poll_actor_ap_id) do
+    %{
+      "id" => Endpoint.url() <> "/activities/create/" <> Ecto.UUID.generate(),
+      "type" => "Create",
+      "actor" => user.ap_id,
+      "to" => [poll_actor_ap_id],
+      "cc" => [],
+      "object" => answer,
+      "published" => Map.get(answer, "published") || DateTime.utc_now() |> DateTime.to_iso8601()
+    }
   end
 end

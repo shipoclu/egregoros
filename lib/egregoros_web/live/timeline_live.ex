@@ -646,7 +646,7 @@ defmodule EgregorosWeb.TimelineLive do
     end
   end
 
-  def handle_event("vote_on_poll", %{"poll-id" => poll_id, "choices" => choices}, socket) do
+  def handle_event("vote_on_poll", %{"poll-id" => poll_id, "choices" => choices} = params, socket) do
     with %User{} = user <- socket.assigns.current_user,
          {poll_id, ""} <- Integer.parse(to_string(poll_id)),
          %{type: "Question"} = question <- Objects.get(poll_id),
@@ -655,7 +655,7 @@ defmodule EgregorosWeb.TimelineLive do
       {:noreply,
        socket
        |> put_flash(:info, "Vote submitted!")
-       |> refresh_post(poll_id, poll_id)}
+       |> refresh_post(poll_id, feed_id(params, poll_id))}
     else
       nil ->
         {:noreply, put_flash(socket, :error, "Register to vote on polls.")}
@@ -680,14 +680,14 @@ defmodule EgregorosWeb.TimelineLive do
     end
   end
 
-  def handle_event("vote_on_poll", %{"poll-id" => poll_id}, socket) do
+  def handle_event("vote_on_poll", %{"poll-id" => poll_id} = params, socket) do
     # Handle case where no choices were selected
     with %User{} <- socket.assigns.current_user,
          {poll_id, ""} <- Integer.parse(to_string(poll_id)) do
       {:noreply,
        socket
        |> put_flash(:error, "Please select at least one option.")
-       |> refresh_post(poll_id, poll_id)}
+       |> refresh_post(poll_id, feed_id(params, poll_id))}
     else
       nil ->
         {:noreply, put_flash(socket, :error, "Register to vote on polls.")}
