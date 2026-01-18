@@ -2,6 +2,7 @@ defmodule Egregoros.Objects do
   import Ecto.Query, only: [from: 2, dynamic: 2, recursive_ctes: 2, with_cte: 3]
 
   alias Egregoros.Object
+  alias Egregoros.Objects.Polls
   alias Egregoros.Relationship
   alias Egregoros.Relationships
   alias Egregoros.Repo
@@ -9,6 +10,10 @@ defmodule Egregoros.Objects do
 
   @as_public "https://www.w3.org/ns/activitystreams#Public"
   @recipient_fields ~w(to cc bto bcc audience)
+
+  # Delegations to submodules
+  defdelegate increase_vote_count(question_ap_id, option_name, voter_ap_id), to: Polls
+  defdelegate poll_is_multiple?(object), to: Polls, as: :multiple?
 
   def create_object(attrs) do
     %Object{}
@@ -1040,7 +1045,8 @@ defmodule Egregoros.Objects do
         join: t in "thread_descendants",
         on: o.in_reply_to_ap_id == t.ap_id,
         where:
-          o.type == "Note" and t.depth < ^limit and fragment("NOT (? = ANY(?))", o.id, t.path_ids),
+          o.type in ^@status_types and t.depth < ^limit and
+            fragment("NOT (? = ANY(?))", o.id, t.path_ids),
         select: %{
           id: o.id,
           ap_id: o.ap_id,
@@ -1071,7 +1077,7 @@ defmodule Egregoros.Objects do
     limit = opts |> Keyword.get(:limit, 20) |> normalize_limit()
 
     from(o in Object,
-      where: o.type == "Note" and o.in_reply_to_ap_id == ^object_ap_id,
+      where: o.type in ^@status_types and o.in_reply_to_ap_id == ^object_ap_id,
       order_by: [asc: o.id],
       limit: ^limit
     )
@@ -1112,75 +1118,6 @@ defmodule Egregoros.Objects do
     from(o in Object, where: o.type == "Note")
     |> Repo.delete_all()
   end
-
-  @doc """
-  Increases the vote count for a poll option on a Question object.
-
-  Finds the Question by `ap_id`, increments the `replies.totalItems` count
-  for the matching option name, and adds the voter to the `voters` array.
-
-  Returns `{:ok, object}` on success, `:noop` if the Question doesn't exist
-  or if the option name doesn't match any option.
-  """
-  def increase_vote_count(question_ap_id, option_name, voter_ap_id)
-      when is_binary(question_ap_id) and is_binary(option_name) and is_binary(voter_ap_id) do
-    case get_by_ap_id(question_ap_id) do
-      %Object{type: "Question", data: data} = object when is_map(data) ->
-        key = if poll_is_multiple?(object), do: "anyOf", else: "oneOf"
-
-        case Map.get(data, key) do
-          options when is_list(options) and options != [] ->
-            do_increase_vote_count(object, key, options, option_name, voter_ap_id)
-
-          _ ->
-            :noop
-        end
-
-      _ ->
-        :noop
-    end
-  end
-
-  def increase_vote_count(_question_ap_id, _option_name, _voter_ap_id), do: :noop
-
-  defp do_increase_vote_count(object, key, options, option_name, voter_ap_id) do
-    updated_options =
-      Enum.map(options, fn
-        %{"name" => ^option_name} = option ->
-          current_count =
-            option
-            |> Map.get("replies", %{})
-            |> Map.get("totalItems", 0)
-
-          replies = Map.get(option, "replies", %{})
-          updated_replies = Map.put(replies, "totalItems", current_count + 1)
-          Map.put(option, "replies", updated_replies)
-
-        option ->
-          option
-      end)
-
-    if updated_options == options do
-      :noop
-    else
-      existing_voters = Map.get(object.data, "voters") || []
-      voters = Enum.uniq([voter_ap_id | existing_voters])
-
-      updated_data =
-        object.data
-        |> Map.put(key, updated_options)
-        |> Map.put("voters", voters)
-
-      update_object(object, %{data: updated_data})
-    end
-  end
-
-  defp poll_is_multiple?(%Object{data: %{"anyOf" => any_of}})
-       when is_list(any_of) and any_of != [] do
-    true
-  end
-
-  defp poll_is_multiple?(_object), do: false
 
   defp maybe_where_max_id(query, max_id) when is_integer(max_id) and max_id > 0 do
     from(o in query, where: o.id < ^max_id)
