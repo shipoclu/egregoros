@@ -686,7 +686,7 @@ defmodule EgregorosWeb.SearchLive do
               </p>
             </.card>
 
-            <TimelineItem.timeline_item
+            <StatusCard.status_card
               :for={entry <- @post_results}
               id={post_dom_id(entry)}
               entry={entry}

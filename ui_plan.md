@@ -89,7 +89,7 @@ Add a first‑class attachment composer experience:
 ### 5) Timeline & post card UX
 Refactor timeline into smaller parts:
 - `TimelineHeader` (home/public toggle, filters later).
-- `TimelineItem` dispatcher with specialized card components:
+- `StatusCard` dispatcher with specialized card components:
   - `NoteCard` for standard posts
   - `PollCard` for Question/poll objects
   - `AnnounceCard` for boosts/reposts
@@ -144,7 +144,7 @@ Finish “real app” expectations:
 - Upload and post image attachment from web UI.
 
 ### UI‑3 — Timeline cards + quality
-- Extract `TimelineItem` dispatcher and specialized card components (NoteCard, PollCard, AnnounceCard).
+- Extract `StatusCard` dispatcher and specialized card components (NoteCard, PollCard, AnnounceCard).
 - Improve typography, spacing, and action row.
 - Add pagination/infinite scroll + loading skeletons.
 
