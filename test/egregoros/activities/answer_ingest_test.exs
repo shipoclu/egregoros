@@ -168,6 +168,157 @@ defmodule Egregoros.Activities.AnswerIngestTest do
     end
   end
 
+  describe "remote Answer inbox targeting" do
+    setup do
+      {:ok, alice} = Users.create_local_user("remote_alice")
+
+      # Create a public poll
+      public_question = %{
+        "id" => "https://remote.example/objects/" <> Ecto.UUID.generate(),
+        "type" => "Question",
+        "attributedTo" => "https://remote.example/users/pollcreator",
+        "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+        "cc" => [alice.ap_id <> "/followers"],
+        "content" => "Public poll",
+        "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
+        "oneOf" => [
+          %{"name" => "Yes", "replies" => %{"totalItems" => 0}},
+          %{"name" => "No", "replies" => %{"totalItems" => 0}}
+        ]
+      }
+
+      {:ok, public_poll} = Pipeline.ingest(public_question, local: false)
+
+      # Create a followers-only poll
+      followers_question = %{
+        "id" => "https://remote.example/objects/" <> Ecto.UUID.generate(),
+        "type" => "Question",
+        "attributedTo" => "https://remote.example/users/pollcreator",
+        "to" => ["https://remote.example/users/pollcreator/followers"],
+        "content" => "Followers-only poll",
+        "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
+        "oneOf" => [
+          %{"name" => "A", "replies" => %{"totalItems" => 0}},
+          %{"name" => "B", "replies" => %{"totalItems" => 0}}
+        ]
+      }
+
+      {:ok, followers_poll} = Pipeline.ingest(followers_question, local: false)
+
+      %{alice: alice, public_poll: public_poll, followers_poll: followers_poll}
+    end
+
+    test "accepts remote Answer for public poll", %{public_poll: poll} do
+      answer = %{
+        "id" => "https://remote.example/objects/" <> Ecto.UUID.generate(),
+        "type" => "Answer",
+        "actor" => "https://remote.example/users/voter",
+        "to" => ["https://remote.example/users/pollcreator"],
+        "name" => "Yes",
+        "inReplyTo" => poll.ap_id
+      }
+
+      assert {:ok, object} = Pipeline.ingest(answer, local: false)
+      assert object.type == "Answer"
+
+      # Verify vote was counted
+      updated_poll = Objects.get_by_ap_id(poll.ap_id)
+      yes_option = Enum.find(updated_poll.data["oneOf"], &(&1["name"] == "Yes"))
+      assert yes_option["replies"]["totalItems"] == 1
+    end
+
+    test "accepts remote Answer for followers-only poll when voter could be follower", %{
+      followers_poll: poll
+    } do
+      answer = %{
+        "id" => "https://remote.example/objects/" <> Ecto.UUID.generate(),
+        "type" => "Answer",
+        "actor" => "https://remote.example/users/follower",
+        "to" => ["https://remote.example/users/pollcreator"],
+        "name" => "A",
+        "inReplyTo" => poll.ap_id
+      }
+
+      # Should be accepted because the poll has a followers collection in audience
+      assert {:ok, object} = Pipeline.ingest(answer, local: false)
+      assert object.type == "Answer"
+    end
+
+    test "rejects remote Answer for unknown poll", %{} do
+      answer = %{
+        "id" => "https://remote.example/objects/" <> Ecto.UUID.generate(),
+        "type" => "Answer",
+        "actor" => "https://remote.example/users/voter",
+        "to" => ["https://remote.example/users/pollcreator"],
+        "name" => "Yes",
+        "inReplyTo" => "https://unknown.example/objects/nonexistent"
+      }
+
+      assert {:error, :question_not_found} = Pipeline.ingest(answer, local: false)
+    end
+
+    test "rejects remote Answer when voter not permitted", %{alice: alice} do
+      # Create a private poll addressed only to specific users
+      private_question = %{
+        "id" => "https://remote.example/objects/" <> Ecto.UUID.generate(),
+        "type" => "Question",
+        "attributedTo" => "https://remote.example/users/pollcreator",
+        "to" => [alice.ap_id],
+        "content" => "Private poll for alice only",
+        "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
+        "oneOf" => [
+          %{"name" => "X", "replies" => %{"totalItems" => 0}},
+          %{"name" => "Y", "replies" => %{"totalItems" => 0}}
+        ]
+      }
+
+      {:ok, private_poll} = Pipeline.ingest(private_question, local: false)
+
+      # Someone not in the audience tries to vote
+      answer = %{
+        "id" => "https://remote.example/objects/" <> Ecto.UUID.generate(),
+        "type" => "Answer",
+        "actor" => "https://remote.example/users/unauthorized",
+        "to" => ["https://remote.example/users/pollcreator"],
+        "name" => "X",
+        "inReplyTo" => private_poll.ap_id
+      }
+
+      assert {:error, :voter_not_permitted} = Pipeline.ingest(answer, local: false)
+    end
+
+    test "accepts remote Answer when voter is directly addressed in poll", %{alice: alice} do
+      # Create a poll addressed to alice
+      dm_question = %{
+        "id" => "https://remote.example/objects/" <> Ecto.UUID.generate(),
+        "type" => "Question",
+        "attributedTo" => "https://remote.example/users/pollcreator",
+        "to" => [alice.ap_id],
+        "content" => "Poll for alice",
+        "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
+        "oneOf" => [
+          %{"name" => "Option1", "replies" => %{"totalItems" => 0}},
+          %{"name" => "Option2", "replies" => %{"totalItems" => 0}}
+        ]
+      }
+
+      {:ok, dm_poll} = Pipeline.ingest(dm_question, local: false)
+
+      # Alice votes
+      answer = %{
+        "id" => "https://remote.example/objects/" <> Ecto.UUID.generate(),
+        "type" => "Answer",
+        "actor" => alice.ap_id,
+        "to" => ["https://remote.example/users/pollcreator"],
+        "name" => "Option1",
+        "inReplyTo" => dm_poll.ap_id
+      }
+
+      assert {:ok, object} = Pipeline.ingest(answer, local: false)
+      assert object.type == "Answer"
+    end
+  end
+
   describe "increase_vote_count/3" do
     test "increases vote count for matching option" do
       {:ok, alice} = Users.create_local_user("vote_alice")

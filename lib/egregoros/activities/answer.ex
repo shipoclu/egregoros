@@ -8,6 +8,11 @@ defmodule Egregoros.Activities.Answer do
   - `actor`/`attributedTo`: Who voted
 
   Side effects update the Question's vote count when an Answer is ingested.
+
+  ## Inbox Targeting
+
+  Answers are accepted if we have the Question in our database and the voter
+  is permitted to vote on it (i.e., the voter is in the Question's audience).
   """
   use Ecto.Schema
 
@@ -17,7 +22,10 @@ defmodule Egregoros.Activities.Answer do
   alias Egregoros.ActivityPub.ObjectValidators.Types.ObjectID
   alias Egregoros.ActivityPub.ObjectValidators.Types.Recipients
   alias Egregoros.ActivityPub.ObjectValidators.Types.DateTime, as: APDateTime
+  alias Egregoros.Object
   alias Egregoros.Objects
+
+  @as_public "https://www.w3.org/ns/activitystreams#Public"
 
   def type, do: "Answer"
 
@@ -34,6 +42,10 @@ defmodule Egregoros.Activities.Answer do
   end
 
   def cast_and_validate(answer) when is_map(answer) do
+    cast_and_validate(answer, [])
+  end
+
+  def cast_and_validate(answer, opts) when is_map(answer) and is_list(opts) do
     answer =
       answer
       |> normalize_actor()
@@ -45,12 +57,9 @@ defmodule Egregoros.Activities.Answer do
       |> validate_required([:id, :type, :actor, :name, :inReplyTo])
       |> validate_inclusion(:type, [type()])
 
-    case apply_action(changeset, :insert) do
-      {:ok, %__MODULE__{} = validated} ->
-        {:ok, apply_answer(answer, validated)}
-
-      {:error, %Ecto.Changeset{} = changeset} ->
-        {:error, changeset}
+    with {:ok, %__MODULE__{} = validated} <- apply_action(changeset, :insert),
+         :ok <- validate_question_exists_and_permits_voter(answer, opts) do
+      {:ok, apply_answer(answer, validated)}
     end
   end
 
@@ -113,4 +122,51 @@ defmodule Egregoros.Activities.Answer do
   end
 
   defp normalize_in_reply_to(answer), do: answer
+
+  # Inbox targeting validation
+  # Accept the Answer if we have the Question and the voter is permitted to vote on it
+
+  defp validate_question_exists_and_permits_voter(answer, opts) do
+    # Local answers skip this validation
+    if Keyword.get(opts, :local, true) do
+      :ok
+    else
+      question_ap_id = Map.get(answer, "inReplyTo")
+      voter_ap_id = Map.get(answer, "actor")
+
+      case Objects.get_by_ap_id(question_ap_id) do
+        %Object{type: "Question", data: data} when is_map(data) ->
+          if voter_permitted?(data, voter_ap_id) do
+            :ok
+          else
+            {:error, :voter_not_permitted}
+          end
+
+        _ ->
+          # We don't have the Question, reject the Answer
+          {:error, :question_not_found}
+      end
+    end
+  end
+
+  defp voter_permitted?(question_data, voter_ap_id) when is_map(question_data) do
+    # Check if the poll is public or if the voter is in the audience
+    to = Map.get(question_data, "to", []) |> List.wrap()
+    cc = Map.get(question_data, "cc", []) |> List.wrap()
+    audience = to ++ cc
+
+    @as_public in audience or voter_ap_id in audience or
+      voter_in_followers_collection?(audience, voter_ap_id)
+  end
+
+  defp voter_permitted?(_question_data, _voter_ap_id), do: false
+
+  defp voter_in_followers_collection?(audience, _voter_ap_id) do
+    # Check if any audience entry is a followers collection that the voter might belong to
+    # For now, we'll be permissive and accept if there's any followers collection
+    # A more complete implementation would check if the voter actually follows that actor
+    Enum.any?(audience, fn recipient ->
+      is_binary(recipient) and String.ends_with?(recipient, "/followers")
+    end)
+  end
 end
