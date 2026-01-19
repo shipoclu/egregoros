@@ -221,52 +221,43 @@ defmodule EgregorosWeb.Components.Shared.InteractionBar do
 
   defp reaction_picker(assigns) do
     ~H"""
-    <.popover
+    <div
       id={"reaction-picker-#{@id}"}
       data-role="reaction-picker"
+      phx-hook="ReactionPicker"
+      data-post-id={@entry.object.id}
+      data-feed-id={@feed_id}
       class="relative"
-      summary_class="cursor-pointer focus-visible:outline-none focus-brutal"
-      panel_class="absolute right-0 top-full z-40 mt-2 w-64 overflow-hidden p-4"
     >
-      <:trigger>
-        <span class="inline-flex h-9 w-9 items-center justify-center border border-[color:var(--border-muted)] bg-[color:var(--bg-base)] text-[color:var(--text-muted)] transition hover:border-[color:var(--border-default)] hover:text-[color:var(--text-primary)]">
-          <.icon name="hero-face-smile" class="size-5" />
-          <span class="sr-only">Add reaction</span>
-        </span>
-      </:trigger>
+      <button
+        type="button"
+        data-role="reaction-picker-toggle"
+        aria-label="Add reaction"
+        aria-haspopup="menu"
+        aria-expanded="false"
+        class="inline-flex h-9 w-9 items-center justify-center border border-[color:var(--border-muted)] bg-[color:var(--bg-base)] text-[color:var(--text-muted)] transition hover:border-[color:var(--border-default)] hover:text-[color:var(--text-primary)] focus-visible:outline-none focus-brutal"
+      >
+        <.icon name="hero-face-smile" class="size-5" />
+      </button>
 
-      <p class="text-xs font-bold uppercase tracking-wide text-[color:var(--text-muted)]">
-        React
-      </p>
+      <div
+        data-role="reaction-picker-menu"
+        data-state="closed"
+        aria-hidden="true"
+        class={[
+          "absolute right-0 top-full z-40 mt-2 w-64 overflow-hidden p-4",
+          "hidden border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)]",
+          "shadow-[4px_4px_0_var(--border-default)] motion-safe:animate-rise"
+        ]}
+      >
+        <p class="text-xs font-bold uppercase tracking-wide text-[color:var(--text-muted)]">
+          React
+        </p>
 
-      <div class="mt-3 grid grid-cols-8 gap-1">
-        <button
-          :for={emoji <- reaction_picker_emojis()}
-          type="button"
-          data-role="reaction-picker-option"
-          data-emoji={emoji}
-          phx-click={
-            JS.dispatch("egregoros:optimistic-toggle", detail: %{kind: "reaction"})
-            |> JS.push("toggle_reaction",
-              value: %{
-                "id" => @entry.object.id,
-                "feed_id" => @feed_id,
-                "emoji" => emoji
-              }
-            )
-            |> JS.remove_attribute("open", to: "#reaction-picker-#{@id}")
-          }
-          class="inline-flex cursor-pointer h-9 w-9 items-center justify-center text-xl transition hover:bg-[color:var(--bg-subtle)] focus-visible:outline-none focus-brutal"
-        >
-          {emoji}
-        </button>
+        <div data-role="reaction-picker-grid" class="mt-3 grid grid-cols-8 gap-1"></div>
       </div>
-    </.popover>
+    </div>
     """
-  end
-
-  defp reaction_picker_emojis do
-    ["😀", "😂", "😍", "😮", "😢", "😡", "🔥", "👍", "❤️", "🎉", "🙏", "🤔", "🥳", "😎", "💯", "✨"]
   end
 
   defp reaction_order(%{} = reactions) do

@@ -76,7 +76,7 @@ defmodule EgregorosWeb.StatusCardTest do
     assert html =~ ~s(data-emoji="😀")
   end
 
-  test "renders a reaction picker for adding more emoji reactions" do
+  test "renders a reaction picker hook for adding more emoji reactions" do
     html =
       render_component(&StatusCard.status_card/1, %{
         id: "post-1",
@@ -104,8 +104,13 @@ defmodule EgregorosWeb.StatusCardTest do
       })
 
     assert html =~ ~s(data-role="reaction-picker")
-    assert html =~ ~s(data-role="reaction-picker-option")
-    assert html =~ ~s(data-emoji="😀")
+    assert html =~ ~s(phx-hook="ReactionPicker")
+    assert html =~ ~s(data-post-id="1")
+    assert html =~ ~s(data-feed-id="1")
+    assert html =~ ~s(data-role="reaction-picker-toggle")
+    assert html =~ ~s(data-role="reaction-picker-menu")
+    assert html =~ ~s(data-role="reaction-picker-grid")
+    refute html =~ ~s(data-role="reaction-picker-option")
 
     assert html =~
              ~r/id="reaction-picker-post-1".*shadow-\[4px_4px_0_var\(--border-default\)\]/s

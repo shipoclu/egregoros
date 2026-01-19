@@ -794,6 +794,19 @@ defmodule EgregorosWeb.TimelineLiveTest do
     assert reply.data["inReplyTo"] == parent.ap_id
   end
 
+  test "timeline initial fetch renders up to 10 posts", %{conn: conn, user: user} do
+    for idx <- 1..25 do
+      assert {:ok, _} = Pipeline.ingest(Note.build(user, "Post #{idx}"), local: true)
+    end
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/?timeline=public")
+
+    html = render(view)
+
+    assert length(Regex.scan(~r/data-role=\"status-card\"/, html)) == 10
+  end
+
   test "timeline can load more posts", %{conn: conn, user: user} do
     for idx <- 1..25 do
       assert {:ok, _} = Pipeline.ingest(Note.build(user, "Post #{idx}"), local: true)
@@ -834,6 +847,17 @@ defmodule EgregorosWeb.TimelineLiveTest do
     render_hook(view, "load_more", %{})
 
     assert has_element?(view, "#post-#{oldest.id}")
+  end
+
+  test "reaction picker options are rendered client-side", %{conn: conn, user: user} do
+    assert {:ok, _} = Pipeline.ingest(Note.build(user, "Reactable"), local: true)
+    [note] = Objects.list_notes()
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/?timeline=public")
+
+    assert has_element?(view, "#post-#{note.id} [data-role='reaction-picker']")
+    refute has_element?(view, "#post-#{note.id} [data-role='reaction-picker-option']")
   end
 
   test "liking a post creates a Like activity", %{conn: conn, user: user} do

@@ -16,6 +16,7 @@ defmodule EgregorosWeb.TimelineLive do
   alias EgregorosWeb.Param
   alias EgregorosWeb.ViewModels.Status, as: StatusVM
 
+  @initial_page_size 10
   @page_size 20
   @impl true
   def mount(params, session, socket) do
@@ -36,7 +37,7 @@ defmodule EgregorosWeb.TimelineLive do
     form = Phoenix.Component.to_form(default_post_params(), as: :post)
     reply_form = Phoenix.Component.to_form(default_post_params(), as: :reply)
 
-    posts = list_timeline_posts(timeline, current_user, limit: @page_size)
+    posts = list_timeline_posts(timeline, current_user, limit: @initial_page_size)
 
     socket =
       socket
@@ -62,7 +63,7 @@ defmodule EgregorosWeb.TimelineLive do
         form: form,
         media_alt: %{},
         posts_cursor: posts_cursor(posts),
-        posts_end?: length(posts) < @page_size,
+        posts_end?: length(posts) < @initial_page_size,
         current_user: current_user
       )
       |> stream(:posts, StatusVM.decorate_many(posts, current_user), dom_id: &post_dom_id/1)
@@ -131,7 +132,8 @@ defmodule EgregorosWeb.TimelineLive do
           subscribe_topics(timeline_topics)
         end
 
-        posts = list_timeline_posts(timeline, socket.assigns.current_user, limit: @page_size)
+        posts =
+          list_timeline_posts(timeline, socket.assigns.current_user, limit: @initial_page_size)
 
         socket
         |> assign(
@@ -139,7 +141,7 @@ defmodule EgregorosWeb.TimelineLive do
           pending_posts: [],
           timeline_at_top?: true,
           posts_cursor: posts_cursor(posts),
-          posts_end?: length(posts) < @page_size,
+          posts_end?: length(posts) < @initial_page_size,
           timeline_topics: timeline_topics
         )
         |> stream(:posts, StatusVM.decorate_many(posts, socket.assigns.current_user),

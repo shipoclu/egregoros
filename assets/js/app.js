@@ -30,6 +30,7 @@ import ComposeCharCounter from "./hooks/compose_char_counter"
 import ComposeSettings from "./hooks/compose_settings"
 import ComposeMentions from "./hooks/compose_mentions"
 import EmojiPicker from "./hooks/emoji_picker"
+import ReactionPicker from "./hooks/reaction_picker"
 import MediaViewer from "./hooks/media_viewer"
 import ReplyModal from "./hooks/reply_modal"
 import ScrollRestore from "./hooks/scroll_restore"
@@ -1437,6 +1438,7 @@ const liveSocket = new LiveSocket("/live", Socket, {
     ComposeSettings,
     ComposeMentions,
     EmojiPicker,
+    ReactionPicker,
     MediaViewer,
     ReplyModal,
     ScrollRestore,
