@@ -62,7 +62,7 @@ defmodule EgregorosWeb.TimelineLive do
         timeline_topics: timeline_topics,
         form: form,
         media_alt: %{},
-        posts_cursor: posts_cursor(posts),
+        posts_cursor: posts_cursor(posts, timeline),
         posts_end?: length(posts) < @initial_page_size,
         current_user: current_user
       )
@@ -140,7 +140,7 @@ defmodule EgregorosWeb.TimelineLive do
           timeline: timeline,
           pending_posts: [],
           timeline_at_top?: true,
-          posts_cursor: posts_cursor(posts),
+          posts_cursor: posts_cursor(posts, timeline),
           posts_end?: length(posts) < @initial_page_size,
           timeline_topics: timeline_topics
         )
@@ -737,7 +737,7 @@ defmodule EgregorosWeb.TimelineLive do
           if posts == [] do
             assign(socket, posts_end?: true)
           else
-            new_cursor = posts_cursor(posts)
+            new_cursor = posts_cursor(posts, socket.assigns.timeline)
             posts_end? = length(posts) < @page_size
             current_user = socket.assigns.current_user
 
@@ -919,6 +919,19 @@ defmodule EgregorosWeb.TimelineLive do
             <div class="flex items-center gap-2">
               <%= if @current_user do %>
                 <.link
+                  patch={~p"/?timeline=for_you"}
+                  class={[
+                    "border-2 px-4 py-2 text-xs font-bold uppercase tracking-wide transition",
+                    @timeline == :for_you &&
+                      "border-[color:var(--border-default)] bg-[color:var(--text-primary)] text-[color:var(--bg-base)]",
+                    @timeline != :for_you &&
+                      "border-[color:var(--border-default)] bg-[color:var(--bg-base)] text-[color:var(--text-secondary)] hover:bg-[color:var(--text-primary)] hover:text-[color:var(--bg-base)]"
+                  ]}
+                >
+                  For you
+                </.link>
+
+                <.link
                   patch={~p"/?timeline=home"}
                   class={[
                     "border-2 px-4 py-2 text-xs font-bold uppercase tracking-wide transition",
@@ -1083,12 +1096,15 @@ defmodule EgregorosWeb.TimelineLive do
 
   defp timeline_from_params(%{"timeline" => "public"}, _user), do: :public
   defp timeline_from_params(%{"timeline" => "local"}, _user), do: :local
+  defp timeline_from_params(%{"timeline" => "for_you"}, %User{}), do: :for_you
+  defp timeline_from_params(%{"timeline" => "for_you"}, _user), do: :public
   defp timeline_from_params(%{"timeline" => "home"}, %User{}), do: :home
   defp timeline_from_params(_params, %User{}), do: :home
   defp timeline_from_params(_params, _user), do: :public
 
   defp timeline_topics(:public, _user), do: [Timeline.public_topic()]
   defp timeline_topics(:local, _user), do: [Timeline.public_topic()]
+  defp timeline_topics(:for_you, _user), do: []
   defp timeline_topics(:home, %User{} = user), do: [Timeline.user_topic(user.ap_id)]
   defp timeline_topics(_timeline, _user), do: [Timeline.public_topic()]
 
@@ -1124,6 +1140,10 @@ defmodule EgregorosWeb.TimelineLive do
     Objects.list_home_statuses(user.ap_id, opts)
   end
 
+  defp list_timeline_posts(:for_you, %User{} = user, opts) when is_list(opts) do
+    Objects.list_for_you_statuses(user.ap_id, opts)
+  end
+
   defp list_timeline_posts(:local, _user, opts) when is_list(opts) do
     Objects.list_public_statuses(Keyword.put(opts, :local, true))
   end
@@ -1132,9 +1152,26 @@ defmodule EgregorosWeb.TimelineLive do
     Objects.list_public_statuses(opts)
   end
 
-  defp posts_cursor([]), do: nil
+  defp posts_cursor([], _timeline), do: nil
 
-  defp posts_cursor(posts) when is_list(posts) do
+  defp posts_cursor(posts, :for_you) when is_list(posts) do
+    post = List.last(posts)
+
+    cond do
+      match?(%{internal: %{"for_you_like_id" => like_id}} when is_integer(like_id), post) ->
+        %{"for_you_like_id" => like_id} = post.internal
+        like_id
+
+      match?(%{internal: %{for_you_like_id: like_id}} when is_integer(like_id), post) ->
+        %{for_you_like_id: like_id} = post.internal
+        like_id
+
+      true ->
+        nil
+    end
+  end
+
+  defp posts_cursor(posts, _timeline) when is_list(posts) do
     case List.last(posts) do
       %{id: id} when is_integer(id) -> id
       _ -> nil
@@ -1180,6 +1217,8 @@ defmodule EgregorosWeb.TimelineLive do
   defp include_post?(%{type: type} = _post, :local, _user, _home_actor_ids)
        when type in @timeline_types,
        do: false
+
+  defp include_post?(_post, :for_you, _user, _home_actor_ids), do: false
 
   defp include_post?(_post, _timeline, _user, _home_actor_ids), do: false
 
@@ -1274,6 +1313,7 @@ defmodule EgregorosWeb.TimelineLive do
   defp new_posts_label(_count), do: "New posts"
 
   defp timeline_label(:home), do: "Home"
+  defp timeline_label(:for_you), do: "For you"
   defp timeline_label(:public), do: "Public"
   defp timeline_label(:local), do: "Local"
   defp timeline_label(_timeline), do: "Public"

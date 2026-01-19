@@ -5,6 +5,7 @@ defmodule EgregorosWeb.TimelineLiveTest do
 
   alias Egregoros.Activities.Announce
   alias Egregoros.Activities.Follow
+  alias Egregoros.Activities.Like
   alias Egregoros.Activities.Note
   alias Egregoros.Objects
   alias Egregoros.Pipeline
@@ -520,6 +521,32 @@ defmodule EgregorosWeb.TimelineLiveTest do
     {:ok, view, _html} = live(conn, "/?timeline=public")
 
     assert has_element?(view, "[data-role='timeline-current']", "public")
+  end
+
+  test "for you timeline recommends posts liked by similar accounts", %{conn: conn, user: user} do
+    {:ok, bob} = Users.create_local_user("bob")
+    {:ok, carol} = Users.create_local_user("carol")
+    {:ok, dave} = Users.create_local_user("dave")
+    {:ok, eve} = Users.create_local_user("eve")
+
+    assert {:ok, note_1} = Pipeline.ingest(Note.build(bob, "A"), local: true)
+    assert {:ok, note_2} = Pipeline.ingest(Note.build(carol, "B"), local: true)
+    assert {:ok, note_3} = Pipeline.ingest(Note.build(dave, "C"), local: true)
+
+    assert {:ok, _} = Pipeline.ingest(Like.build(user, note_1), local: true)
+    assert {:ok, _} = Pipeline.ingest(Like.build(user, note_2), local: true)
+
+    assert {:ok, _} = Pipeline.ingest(Like.build(eve, note_1), local: true)
+    assert {:ok, _} = Pipeline.ingest(Like.build(eve, note_2), local: true)
+    assert {:ok, _} = Pipeline.ingest(Like.build(eve, note_3), local: true)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/?timeline=for_you")
+
+    assert has_element?(view, "[data-role='timeline-current']", "for_you")
+    assert has_element?(view, "#post-#{note_3.id}")
+    refute has_element?(view, "#post-#{note_1.id}")
+    refute has_element?(view, "#post-#{note_2.id}")
   end
 
   test "local timeline shows only local public posts", %{conn: conn, user: user} do

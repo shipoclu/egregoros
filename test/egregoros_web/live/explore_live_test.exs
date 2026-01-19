@@ -40,4 +40,26 @@ defmodule EgregorosWeb.ExploreLiveTest do
     assert has_element?(view, "[data-role='explore-suggestions']")
     assert has_element?(view, "[data-role='explore-suggestion-handle']", "@bob")
   end
+
+  test "explore lets you follow suggested accounts from the list", %{conn: conn} do
+    {:ok, alice} = Users.create_local_user("alice")
+    {:ok, bob} = Users.create_local_user("bob")
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: alice.id})
+    {:ok, view, _html} = live(conn, "/explore")
+
+    refute Relationships.get_by_type_actor_object("Follow", alice.ap_id, bob.ap_id)
+
+    assert has_element?(
+             view,
+             "button[data-role='explore-suggestion-follow'][phx-value-ap_id='#{bob.ap_id}']"
+           )
+
+    view
+    |> element("button[data-role='explore-suggestion-follow'][phx-value-ap_id='#{bob.ap_id}']")
+    |> render_click()
+
+    assert Relationships.get_by_type_actor_object("Follow", alice.ap_id, bob.ap_id)
+    assert has_element?(view, "[data-role='explore-suggestions']", "No suggestions yet.")
+  end
 end

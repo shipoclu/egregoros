@@ -3,8 +3,10 @@ defmodule EgregorosWeb.ExploreLive do
 
   import Ecto.Query
 
+  alias Egregoros.Activities.Follow
   alias Egregoros.Notifications
   alias Egregoros.Objects
+  alias Egregoros.Pipeline
   alias Egregoros.Relationship
   alias Egregoros.Relationships
   alias Egregoros.Repo
@@ -60,6 +62,29 @@ defmodule EgregorosWeb.ExploreLive do
        suggestions: suggestions,
        followed_tags: followed_tags
      )}
+  end
+
+  @impl true
+  def handle_event("follow_suggestion", %{"ap_id" => ap_id}, socket) do
+    with %User{} = viewer <- socket.assigns.current_user,
+         ap_id when is_binary(ap_id) <- to_string(ap_id),
+         %User{} = target <- Users.get_by_ap_id(ap_id),
+         true <- viewer.ap_id != target.ap_id,
+         nil <- Relationships.get_by_type_actor_object("Follow", viewer.ap_id, target.ap_id),
+         {:ok, _follow} <- Pipeline.ingest(Follow.build(viewer, target), local: true) do
+      suggestions = suggestions(viewer, 8)
+
+      {:noreply,
+       socket
+       |> put_flash(:info, "Following #{ActorVM.handle(target, target.ap_id)}.")
+       |> assign(suggestions: suggestions)}
+    else
+      nil ->
+        {:noreply, put_flash(socket, :error, "Register to follow people.")}
+
+      _ ->
+        {:noreply, socket}
+    end
   end
 
   @impl true
@@ -129,28 +154,41 @@ defmodule EgregorosWeb.ExploreLive do
             </.card>
 
             <.card :for={user <- @suggestions} class="p-5">
-              <.link
-                navigate={ProfilePaths.profile_path(user)}
-                class="flex items-center gap-4 focus-visible:outline-none focus-brutal"
-              >
-                <.avatar
-                  name={user.name || user.nickname || user.ap_id}
-                  src={URL.absolute(user.avatar_url, user.ap_id)}
-                  size="lg"
-                />
+              <div class="flex items-center justify-between gap-4">
+                <.link
+                  navigate={ProfilePaths.profile_path(user)}
+                  class="flex min-w-0 flex-1 items-center gap-4 focus-visible:outline-none focus-brutal"
+                >
+                  <.avatar
+                    name={user.name || user.nickname || user.ap_id}
+                    src={URL.absolute(user.avatar_url, user.ap_id)}
+                    size="lg"
+                  />
 
-                <div class="min-w-0 flex-1">
-                  <p class="truncate text-sm font-bold text-[color:var(--text-primary)]">
-                    {user.name || user.nickname || user.ap_id}
-                  </p>
-                  <p
-                    data-role="explore-suggestion-handle"
-                    class="truncate font-mono text-xs text-[color:var(--text-muted)]"
-                  >
-                    {ActorVM.handle(user, user.ap_id)}
-                  </p>
-                </div>
-              </.link>
+                  <div class="min-w-0 flex-1">
+                    <p class="truncate text-sm font-bold text-[color:var(--text-primary)]">
+                      {user.name || user.nickname || user.ap_id}
+                    </p>
+                    <p
+                      data-role="explore-suggestion-handle"
+                      class="truncate font-mono text-xs text-[color:var(--text-muted)]"
+                    >
+                      {ActorVM.handle(user, user.ap_id)}
+                    </p>
+                  </div>
+                </.link>
+
+                <.button
+                  :if={show_follow_button?(@current_user, user)}
+                  data-role="explore-suggestion-follow"
+                  phx-click="follow_suggestion"
+                  phx-value-ap_id={user.ap_id}
+                  phx-disable-with="..."
+                  size="sm"
+                >
+                  Follow
+                </.button>
+              </div>
             </.card>
           </section>
 
@@ -247,6 +285,13 @@ defmodule EgregorosWeb.ExploreLive do
     </Layouts.app>
     """
   end
+
+  defp show_follow_button?(%User{} = current_user, %User{ap_id: ap_id})
+       when is_binary(ap_id) and ap_id != "" do
+    current_user.ap_id != ap_id
+  end
+
+  defp show_follow_button?(_current_user, _user), do: false
 
   defp notifications_count(nil), do: 0
 
