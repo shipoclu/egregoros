@@ -5,6 +5,8 @@ defmodule Egregoros.Federation.Delivery do
   alias Egregoros.User
   alias Egregoros.Workers.DeliverActivity
 
+  @activitystreams_context "https://www.w3.org/ns/activitystreams"
+
   def deliver(%User{} = user, inbox_url, activity)
       when is_binary(inbox_url) and is_map(activity) do
     with :ok <- SafeURL.validate_http_url(inbox_url) do
@@ -20,6 +22,7 @@ defmodule Egregoros.Federation.Delivery do
 
   def deliver_now(%User{} = user, inbox_url, activity)
       when is_binary(inbox_url) and is_map(activity) do
+    activity = Map.put_new(activity, "@context", @activitystreams_context)
     body = Jason.encode!(activity)
 
     with :ok <- SafeURL.validate_http_url(inbox_url),
