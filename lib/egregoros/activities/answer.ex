@@ -26,6 +26,7 @@ defmodule Egregoros.Activities.Answer do
   alias Egregoros.Object
   alias Egregoros.Objects
   alias Egregoros.Relationships
+  alias Egregoros.Timeline
 
   @as_public "https://www.w3.org/ns/activitystreams#Public"
 
@@ -91,7 +92,13 @@ defmodule Egregoros.Activities.Answer do
   def side_effects(object, _opts) do
     with %{data: %{"inReplyTo" => question_ap_id, "name" => name, "actor" => actor}}
          when is_binary(question_ap_id) and is_binary(name) and is_binary(actor) <- object do
-      Objects.increase_vote_count(question_ap_id, name, actor)
+      case Objects.increase_vote_count(question_ap_id, name, actor) do
+        {:ok, updated_poll} ->
+          Timeline.broadcast_post_updated(updated_poll)
+
+        _ ->
+          :ok
+      end
     end
 
     :ok
