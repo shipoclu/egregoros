@@ -6,7 +6,6 @@ defmodule EgregorosWeb.ReplyModal do
   attr :id, :string, default: "reply-modal"
   attr :form_id, :string, default: "reply-modal-form"
   attr :id_prefix, :string, default: "reply-modal"
-  attr :open, :boolean, default: false
 
   attr :form, :any, required: true
   attr :upload, :any, required: true
@@ -15,6 +14,7 @@ defmodule EgregorosWeb.ReplyModal do
   attr :reply_to_handle, :string, default: nil
   attr :current_user_handle, :string, default: nil
   attr :prefill_mention_handles, :list, default: []
+  attr :prefill_in_reply_to, :string, default: nil
 
   attr :mention_suggestions, :map, default: %{}
 
@@ -26,29 +26,26 @@ defmodule EgregorosWeb.ReplyModal do
   attr :submit_event, :string, default: "create_reply"
   attr :cancel_event, :string, default: "cancel_reply_media"
   attr :toggle_cw_event, :string, default: "toggle_reply_cw"
-  attr :close_event, :string, default: "close_reply_modal"
 
   def reply_modal(assigns) do
     ~H"""
     <div
       id={@id}
       data-role="reply-modal"
-      data-state={if @open, do: "open", else: "closed"}
+      data-state="closed"
       data-current-user-handle={@current_user_handle}
       data-prefill-actor-handle={@reply_to_handle}
       data-prefill-mention-handles={Enum.join(@prefill_mention_handles, " ")}
+      data-prefill-in-reply-to={@prefill_in_reply_to}
       role="dialog"
       aria-modal="true"
-      aria-hidden={if @open, do: "false", else: "true"}
+      aria-hidden="true"
       phx-hook="ReplyModal"
-      class={[
-        "fixed inset-0 z-50 flex items-center justify-center bg-[color:var(--text-primary)]/60 p-4",
-        !@open && "hidden"
-      ]}
+      class="fixed inset-0 z-50 hidden items-center justify-center bg-[color:var(--text-primary)]/60 p-4"
     >
       <.focus_wrap
         id={"#{@id}-dialog"}
-        phx-click-away={close_js(@id, @close_event)}
+        phx-click-away={close_js(@id)}
         class="relative w-full max-w-2xl overflow-visible border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] p-6"
       >
         <div class="flex items-start justify-between gap-4">
@@ -72,7 +69,7 @@ defmodule EgregorosWeb.ReplyModal do
 
           <.icon_button
             data-role="reply-modal-close"
-            phx-click={close_js(@id, @close_event)}
+            phx-click={close_js(@id)}
             label="Close reply composer"
             class="shrink-0"
           >
@@ -102,7 +99,10 @@ defmodule EgregorosWeb.ReplyModal do
             <input
               type="text"
               name="reply[in_reply_to]"
-              value={Map.get(@form.params || %{}, "in_reply_to", "")}
+              value={
+                @prefill_in_reply_to ||
+                  Map.get(@form.params || %{}, "in_reply_to", "")
+              }
               data-role="reply-in-reply-to"
               class="hidden"
               autocomplete="off"
@@ -114,8 +114,7 @@ defmodule EgregorosWeb.ReplyModal do
     """
   end
 
-  defp close_js(id, close_event) when is_binary(id) and is_binary(close_event) do
+  defp close_js(id) when is_binary(id) do
     JS.dispatch("egregoros:reply-close", to: "##{id}")
-    |> JS.push(close_event)
   end
 end

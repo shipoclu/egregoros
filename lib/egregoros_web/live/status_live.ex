@@ -15,7 +15,6 @@ defmodule EgregorosWeb.StatusLive do
   alias Egregoros.User
   alias Egregoros.Users
   alias EgregorosWeb.Endpoint
-  alias EgregorosWeb.Live.Uploads, as: LiveUploads
   alias EgregorosWeb.MentionAutocomplete
   alias EgregorosWeb.Param
   alias EgregorosWeb.ProfilePaths
@@ -53,7 +52,7 @@ defmodule EgregorosWeb.StatusLive do
           nil
       end
 
-    reply_modal_open? = Param.truthy?(Map.get(params, "reply")) and not is_nil(current_user)
+    prefill_reply? = Param.truthy?(Map.get(params, "reply")) and not is_nil(current_user)
 
     current_user_handle =
       case current_user do
@@ -132,28 +131,28 @@ defmodule EgregorosWeb.StatusLive do
     end
 
     reply_to_handle =
-      if reply_modal_open? and status_entry do
+      if prefill_reply? and status_entry do
         status_entry.actor.handle
       else
         nil
       end
 
     reply_to_ap_id =
-      if reply_modal_open? and status_entry do
+      if prefill_reply? and status_entry do
         status_entry.object.ap_id
       else
         nil
       end
 
     reply_prefill_mention_handles =
-      if reply_modal_open? and status_entry do
+      if prefill_reply? and status_entry do
         mention_handle_names(status_entry.object)
       else
         []
       end
 
     reply_params =
-      if reply_modal_open? and is_binary(reply_to_ap_id) do
+      if is_binary(reply_to_ap_id) do
         default_reply_params() |> Map.put("in_reply_to", reply_to_ap_id)
       else
         default_reply_params()
@@ -180,7 +179,6 @@ defmodule EgregorosWeb.StatusLive do
         thread_fetching_replies?: fetching_replies?,
         thread_context_retry_visible?: false,
         thread_replies_retry_visible?: false,
-        reply_modal_open?: reply_modal_open?,
         reply_to_ap_id: reply_to_ap_id,
         reply_to_handle: reply_to_handle,
         reply_prefill_mention_handles: reply_prefill_mention_handles,
@@ -323,42 +321,6 @@ defmodule EgregorosWeb.StatusLive do
     {:noreply, assign(socket, mention_suggestions: mention_suggestions)}
   end
 
-  def handle_event(
-        "open_reply_modal",
-        %{"in_reply_to" => in_reply_to, "actor_handle" => actor_handle},
-        socket
-      ) do
-    if socket.assigns.current_user do
-      in_reply_to = in_reply_to |> to_string() |> String.trim()
-      actor_handle = actor_handle |> to_string() |> String.trim()
-
-      if in_reply_to == "" do
-        {:noreply, socket}
-      else
-        reply_params =
-          default_reply_params()
-          |> Map.put("in_reply_to", in_reply_to)
-
-        socket =
-          socket
-          |> LiveUploads.cancel_all(:reply_media)
-          |> assign(
-            reply_modal_open?: true,
-            reply_to_ap_id: in_reply_to,
-            reply_to_handle: actor_handle,
-            reply_form: Phoenix.Component.to_form(reply_params, as: :reply),
-            reply_media_alt: %{},
-            reply_options_open?: false,
-            reply_cw_open?: false
-          )
-
-        {:noreply, socket}
-      end
-    else
-      {:noreply, put_flash(socket, :error, "Register to reply.")}
-    end
-  end
-
   def handle_event("cancel_reply_media", %{"ref" => ref}, socket) do
     {:noreply,
      socket
@@ -498,23 +460,6 @@ defmodule EgregorosWeb.StatusLive do
     end
   end
 
-  def handle_event("close_reply_modal", _params, socket) do
-    socket =
-      socket
-      |> LiveUploads.cancel_all(:reply_media)
-      |> assign(
-        reply_modal_open?: false,
-        reply_to_ap_id: nil,
-        reply_to_handle: nil,
-        reply_form: Phoenix.Component.to_form(default_reply_params(), as: :reply),
-        reply_media_alt: %{},
-        reply_options_open?: false,
-        reply_cw_open?: false
-      )
-
-    {:noreply, socket}
-  end
-
   def handle_event("toggle_reply_cw", _params, socket) do
     {:noreply, assign(socket, reply_cw_open?: !socket.assigns.reply_cw_open?)}
   end
@@ -553,11 +498,7 @@ defmodule EgregorosWeb.StatusLive do
       socket.assigns.reply_cw_open? ||
         reply_params |> Map.get("spoiler_text", "") |> to_string() |> String.trim() != ""
 
-    in_reply_to =
-      case socket.assigns.reply_to_ap_id do
-        ap_id when is_binary(ap_id) -> String.trim(ap_id)
-        _ -> reply_params |> Map.get("in_reply_to", "") |> to_string() |> String.trim()
-      end
+    in_reply_to = reply_params |> Map.get("in_reply_to", "") |> to_string() |> String.trim()
 
     with %User{} = user <- socket.assigns.current_user,
          true <- in_reply_to != "" do
@@ -569,7 +510,6 @@ defmodule EgregorosWeb.StatusLive do
            socket
            |> put_flash(:error, "Wait for attachments to finish uploading.")
            |> assign(
-             reply_modal_open?: true,
              reply_form: Phoenix.Component.to_form(reply_params, as: :reply),
              reply_media_alt: media_alt,
              reply_options_open?: reply_options_open?,
@@ -581,7 +521,6 @@ defmodule EgregorosWeb.StatusLive do
            socket
            |> put_flash(:error, "Remove invalid attachments before posting.")
            |> assign(
-             reply_modal_open?: true,
              reply_form: Phoenix.Component.to_form(reply_params, as: :reply),
              reply_media_alt: media_alt,
              reply_options_open?: reply_options_open?,
@@ -614,7 +553,6 @@ defmodule EgregorosWeb.StatusLive do
                socket
                |> put_flash(:error, "Could not upload attachment.")
                |> assign(
-                 reply_modal_open?: true,
                  reply_form: Phoenix.Component.to_form(reply_params, as: :reply),
                  reply_media_alt: media_alt,
                  reply_options_open?: reply_options_open?,
@@ -636,7 +574,6 @@ defmodule EgregorosWeb.StatusLive do
                    |> put_flash(:info, "Reply posted.")
                    |> refresh_thread()
                    |> assign(
-                     reply_modal_open?: false,
                      reply_to_ap_id: nil,
                      reply_to_handle: nil,
                      reply_form: Phoenix.Component.to_form(default_reply_params(), as: :reply),
@@ -651,7 +588,6 @@ defmodule EgregorosWeb.StatusLive do
                    socket
                    |> put_flash(:error, "Reply is too long.")
                    |> assign(
-                     reply_modal_open?: true,
                      reply_form: Phoenix.Component.to_form(reply_params, as: :reply),
                      reply_media_alt: media_alt,
                      reply_options_open?: reply_options_open?,
@@ -663,7 +599,6 @@ defmodule EgregorosWeb.StatusLive do
                    socket
                    |> put_flash(:error, "Reply can't be empty.")
                    |> assign(
-                     reply_modal_open?: true,
                      reply_form: Phoenix.Component.to_form(reply_params, as: :reply),
                      reply_media_alt: media_alt,
                      reply_options_open?: reply_options_open?,
@@ -675,7 +610,6 @@ defmodule EgregorosWeb.StatusLive do
                    socket
                    |> put_flash(:error, "Could not post reply.")
                    |> assign(
-                     reply_modal_open?: true,
                      reply_form: Phoenix.Component.to_form(reply_params, as: :reply),
                      reply_media_alt: media_alt,
                      reply_options_open?: reply_options_open?,
@@ -941,11 +875,11 @@ defmodule EgregorosWeb.StatusLive do
         reply_to_handle={@reply_to_handle}
         current_user_handle={@current_user_handle}
         prefill_mention_handles={@reply_prefill_mention_handles}
+        prefill_in_reply_to={@reply_to_ap_id}
         mention_suggestions={@mention_suggestions}
         max_chars={reply_max_chars()}
         options_open?={@reply_options_open?}
         cw_open?={@reply_cw_open?}
-        open={@reply_modal_open?}
       />
 
       <MediaViewer.media_viewer
@@ -1409,33 +1343,79 @@ defmodule EgregorosWeb.StatusLive do
   end
 
   defp mention_handle_names(%{data: %{} = data}) do
+    local_domains = local_domains()
+
     data
     |> Map.get("tag", [])
     |> List.wrap()
-    |> Enum.flat_map(&mention_handle_from_tag/1)
+    |> Enum.flat_map(&mention_handle_from_tag(&1, local_domains))
     |> Enum.uniq()
   end
 
   defp mention_handle_names(_object), do: []
 
-  defp mention_handle_from_tag(%{"type" => "Mention"} = tag) do
-    name = Map.get(tag, "name") || Map.get(tag, :name)
-    if valid_handle?(name), do: [String.trim(name)], else: []
+  defp mention_handle_from_tag(tag, local_domains) when is_list(local_domains) do
+    {name, href} =
+      case tag do
+        %{"type" => "Mention"} = tag ->
+          {Map.get(tag, "name") || Map.get(tag, :name),
+           Map.get(tag, "href") || Map.get(tag, :href) || Map.get(tag, "id") || Map.get(tag, :id)}
+
+        %{type: "Mention"} = tag ->
+          {Map.get(tag, :name) || Map.get(tag, "name"),
+           Map.get(tag, :href) || Map.get(tag, "href") || Map.get(tag, :id) || Map.get(tag, "id")}
+
+        _ ->
+          {nil, nil}
+      end
+
+    with handle when is_binary(handle) <- handle_for_prefill(name, href, local_domains) do
+      [handle]
+    else
+      _ -> []
+    end
   end
 
-  defp mention_handle_from_tag(%{type: "Mention"} = tag) do
-    name = Map.get(tag, :name) || Map.get(tag, "name")
-    if valid_handle?(name), do: [String.trim(name)], else: []
+  defp mention_handle_from_tag(_tag, _local_domains), do: []
+
+  defp handle_for_prefill(name, href, local_domains)
+       when is_binary(name) and is_list(local_domains) do
+    name = name |> String.trim() |> String.trim_leading("@")
+
+    case Mentions.parse(name) do
+      {:ok, nickname, host} ->
+        host = host || mention_host_from_href(href)
+
+        cond do
+          is_binary(host) and host != "" and host not in local_domains -> "@#{nickname}@#{host}"
+          true -> "@#{nickname}"
+        end
+
+      :error ->
+        nil
+    end
   end
 
-  defp mention_handle_from_tag(_tag), do: []
+  defp handle_for_prefill(_name, _href, _local_domains), do: nil
 
-  defp valid_handle?(handle) when is_binary(handle) do
-    handle = handle |> String.trim() |> String.trim_leading("@")
-    match?({:ok, _, _}, Mentions.parse(handle))
+  defp mention_host_from_href(href) when is_binary(href) do
+    href = String.trim(href)
+
+    if href == "" do
+      nil
+    else
+      href |> URI.parse() |> Domain.from_uri()
+    end
   end
 
-  defp valid_handle?(_handle), do: false
+  defp mention_host_from_href(_href), do: nil
+
+  defp local_domains do
+    case URI.parse(Endpoint.url()) do
+      %URI{} = uri -> Domain.aliases_from_uri(uri)
+      _ -> []
+    end
+  end
 
   defp back_timeline_from_params(params, current_user) when is_map(params) do
     timeline =

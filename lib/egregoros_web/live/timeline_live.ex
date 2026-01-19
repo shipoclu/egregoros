@@ -12,7 +12,6 @@ defmodule EgregorosWeb.TimelineLive do
   alias Egregoros.User
   alias Egregoros.UserEvents
   alias Egregoros.Users
-  alias EgregorosWeb.Live.Uploads, as: LiveUploads
   alias EgregorosWeb.MentionAutocomplete
   alias EgregorosWeb.Param
   alias EgregorosWeb.ViewModels.Actor, as: ActorVM
@@ -51,9 +50,6 @@ defmodule EgregorosWeb.TimelineLive do
         compose_open?: false,
         compose_options_open?: false,
         compose_cw_open?: false,
-        reply_modal_open?: false,
-        reply_to_ap_id: nil,
-        reply_to_handle: nil,
         reply_form: reply_form,
         reply_media_alt: %{},
         reply_options_open?: false,
@@ -363,59 +359,6 @@ defmodule EgregorosWeb.TimelineLive do
     end
   end
 
-  def handle_event(
-        "open_reply_modal",
-        %{"in_reply_to" => in_reply_to, "actor_handle" => actor_handle},
-        socket
-      ) do
-    if socket.assigns.current_user do
-      in_reply_to = in_reply_to |> to_string() |> String.trim()
-      actor_handle = actor_handle |> to_string() |> String.trim()
-
-      if in_reply_to == "" do
-        {:noreply, socket}
-      else
-        reply_params =
-          default_post_params()
-          |> Map.put("in_reply_to", in_reply_to)
-
-        socket =
-          socket
-          |> LiveUploads.cancel_all(:reply_media)
-          |> assign(
-            reply_modal_open?: true,
-            reply_to_ap_id: in_reply_to,
-            reply_to_handle: actor_handle,
-            reply_form: Phoenix.Component.to_form(reply_params, as: :reply),
-            reply_media_alt: %{},
-            reply_options_open?: false,
-            reply_cw_open?: false
-          )
-
-        {:noreply, socket}
-      end
-    else
-      {:noreply, put_flash(socket, :error, "Register to reply.")}
-    end
-  end
-
-  def handle_event("close_reply_modal", _params, socket) do
-    socket =
-      socket
-      |> LiveUploads.cancel_all(:reply_media)
-      |> assign(
-        reply_modal_open?: false,
-        reply_to_ap_id: nil,
-        reply_to_handle: nil,
-        reply_form: Phoenix.Component.to_form(default_post_params(), as: :reply),
-        reply_media_alt: %{},
-        reply_options_open?: false,
-        reply_cw_open?: false
-      )
-
-    {:noreply, socket}
-  end
-
   def handle_event("toggle_reply_cw", _params, socket) do
     {:noreply, assign(socket, reply_cw_open?: !socket.assigns.reply_cw_open?)}
   end
@@ -452,11 +395,7 @@ defmodule EgregorosWeb.TimelineLive do
         {:noreply, put_flash(socket, :error, "Register to reply.")}
 
       user ->
-        in_reply_to =
-          case socket.assigns.reply_to_ap_id do
-            ap_id when is_binary(ap_id) -> String.trim(ap_id)
-            _ -> reply_params |> Map.get("in_reply_to", "") |> to_string() |> String.trim()
-          end
+        in_reply_to = reply_params |> Map.get("in_reply_to", "") |> to_string() |> String.trim()
 
         if in_reply_to != "" do
           reply_params = Map.merge(default_post_params(), reply_params)
@@ -547,9 +486,6 @@ defmodule EgregorosWeb.TimelineLive do
                        socket
                        |> put_flash(:info, "Reply posted.")
                        |> assign(
-                         reply_modal_open?: false,
-                         reply_to_ap_id: nil,
-                         reply_to_handle: nil,
                          reply_form: Phoenix.Component.to_form(default_post_params(), as: :reply),
                          reply_media_alt: %{},
                          reply_options_open?: false,
@@ -1095,12 +1031,10 @@ defmodule EgregorosWeb.TimelineLive do
         form={@reply_form}
         upload={@uploads.reply_media}
         media_alt={@reply_media_alt}
-        reply_to_handle={@reply_to_handle}
         current_user_handle={ActorVM.handle(@current_user, @current_user.ap_id)}
         mention_suggestions={@mention_suggestions}
         options_open?={@reply_options_open?}
         cw_open?={@reply_cw_open?}
-        open={@reply_modal_open?}
       />
 
       <MediaViewer.media_viewer

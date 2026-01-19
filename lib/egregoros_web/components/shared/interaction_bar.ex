@@ -5,6 +5,7 @@ defmodule EgregorosWeb.Components.Shared.InteractionBar do
   """
   use EgregorosWeb, :html
 
+  alias Egregoros.Domain
   alias Egregoros.Mentions
 
   @default_reactions ["🔥", "👍", "❤️"]
@@ -60,12 +61,6 @@ defmodule EgregorosWeb.Components.Shared.InteractionBar do
               in_reply_to: @entry.object.ap_id,
               actor_handle: @entry.actor.handle,
               mention_handles: @mention_handles
-            }
-          )
-          |> JS.push("open_reply_modal",
-            value: %{
-              "in_reply_to" => @entry.object.ap_id,
-              "actor_handle" => @entry.actor.handle
             }
           )
         }
@@ -287,9 +282,11 @@ defmodule EgregorosWeb.Components.Shared.InteractionBar do
   defp feed_id_for_entry(_entry), do: nil
 
   defp mention_handles_for_entry(%{object: object}) do
+    local_domains = local_domains()
+
     object
     |> mention_tags()
-    |> Enum.flat_map(&mention_handle_from_tag/1)
+    |> Enum.flat_map(&mention_handle_from_tag(&1, local_domains))
     |> Enum.uniq()
   end
 
@@ -305,24 +302,68 @@ defmodule EgregorosWeb.Components.Shared.InteractionBar do
 
   defp mention_tags(_object), do: []
 
-  defp mention_handle_from_tag(%{"type" => "Mention"} = tag) do
-    name = Map.get(tag, "name") || Map.get(tag, :name)
-    if valid_handle?(name), do: [String.trim(name)], else: []
+  defp mention_handle_from_tag(tag, local_domains) when is_list(local_domains) do
+    {name, href} =
+      case tag do
+        %{"type" => "Mention"} = tag ->
+          {Map.get(tag, "name") || Map.get(tag, :name),
+           Map.get(tag, "href") || Map.get(tag, :href) || Map.get(tag, "id") || Map.get(tag, :id)}
+
+        %{type: "Mention"} = tag ->
+          {Map.get(tag, :name) || Map.get(tag, "name"),
+           Map.get(tag, :href) || Map.get(tag, "href") || Map.get(tag, :id) || Map.get(tag, "id")}
+
+        _ ->
+          {nil, nil}
+      end
+
+    with handle when is_binary(handle) <- handle_for_prefill(name, href, local_domains) do
+      [handle]
+    else
+      _ -> []
+    end
   end
 
-  defp mention_handle_from_tag(%{type: "Mention"} = tag) do
-    name = Map.get(tag, :name) || Map.get(tag, "name")
-    if valid_handle?(name), do: [String.trim(name)], else: []
+  defp mention_handle_from_tag(_tag, _local_domains), do: []
+
+  defp handle_for_prefill(name, href, local_domains)
+       when is_binary(name) and is_list(local_domains) do
+    name = name |> String.trim() |> String.trim_leading("@")
+
+    case Mentions.parse(name) do
+      {:ok, nickname, host} ->
+        host = host || mention_host_from_href(href)
+
+        cond do
+          is_binary(host) and host != "" and host not in local_domains -> "@#{nickname}@#{host}"
+          true -> "@#{nickname}"
+        end
+
+      :error ->
+        nil
+    end
   end
 
-  defp mention_handle_from_tag(_tag), do: []
+  defp handle_for_prefill(_name, _href, _local_domains), do: nil
 
-  defp valid_handle?(handle) when is_binary(handle) do
-    handle = handle |> String.trim() |> String.trim_leading("@")
-    match?({:ok, _, _}, Mentions.parse(handle))
+  defp mention_host_from_href(href) when is_binary(href) do
+    href = String.trim(href)
+
+    if href == "" do
+      nil
+    else
+      href |> URI.parse() |> Domain.from_uri()
+    end
   end
 
-  defp valid_handle?(_handle), do: false
+  defp mention_host_from_href(_href), do: nil
+
+  defp local_domains do
+    case URI.parse(EgregorosWeb.Endpoint.url()) do
+      %URI{} = uri -> Domain.aliases_from_uri(uri)
+      _ -> []
+    end
+  end
 
   defp status_reply_path(entry) do
     case status_permalink_path(entry) do

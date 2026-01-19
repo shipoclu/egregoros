@@ -543,16 +543,20 @@ defmodule EgregorosWeb.ProfileLiveTest do
     {:ok, view, _html} = live(conn, "/@#{viewer.nickname}")
 
     assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='closed']")
+    assert has_element?(view, "#post-#{parent.id} button[data-role='reply']")
+
+    reply_html =
+      view
+      |> element("#post-#{parent.id} button[data-role='reply']")
+      |> render()
 
     view
-    |> element("#post-#{parent.id} button[data-role='reply']")
-    |> render_click()
-
-    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='open']")
-
-    view
-    |> form("#reply-modal-form", reply: %{content: "A reply"})
+    |> form("#reply-modal-form", reply: %{in_reply_to: parent.ap_id, content: "A reply"})
     |> render_submit()
+
+    assert reply_html =~ "egregoros:reply-open"
+    assert reply_html =~ parent.ap_id
+    refute reply_html =~ "open_reply_modal"
 
     assert render(view) =~ "Reply posted."
 
@@ -560,35 +564,36 @@ defmodule EgregorosWeb.ProfileLiveTest do
     assert reply.data["inReplyTo"] == parent.ap_id
   end
 
-  test "profile reply modal can be closed and resets reply state", %{conn: conn, viewer: viewer} do
+  test "profile reply modal close button dispatches client-side close events", %{
+    conn: conn,
+    viewer: viewer
+  } do
     assert {:ok, parent} = Pipeline.ingest(Note.build(viewer, "Parent post"), local: true)
-
     conn = Plug.Test.init_test_session(conn, %{user_id: viewer.id})
     {:ok, view, _html} = live(conn, "/@#{viewer.nickname}")
 
-    view
-    |> element("#post-#{parent.id} button[data-role='reply']")
-    |> render_click()
+    reply_html =
+      view
+      |> element("#post-#{parent.id} button[data-role='reply']")
+      |> render()
 
-    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='open']")
+    assert reply_html =~ "egregoros:reply-open"
+    refute reply_html =~ "open_reply_modal"
 
-    view
-    |> element("#reply-modal button[data-role='reply-modal-close']")
-    |> render_click()
+    close_html =
+      view
+      |> element("#reply-modal button[data-role='reply-modal-close']")
+      |> render()
 
-    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='closed']")
-    assert has_element?(view, "#reply-modal input[data-role='reply-in-reply-to'][value='']")
+    assert close_html =~ "egregoros:reply-close"
+    refute close_html =~ "close_reply_modal"
   end
 
   test "profile reply composer supports content warning toggles", %{conn: conn, viewer: viewer} do
-    assert {:ok, parent} = Pipeline.ingest(Note.build(viewer, "Parent post"), local: true)
+    assert {:ok, _parent} = Pipeline.ingest(Note.build(viewer, "Parent post"), local: true)
 
     conn = Plug.Test.init_test_session(conn, %{user_id: viewer.id})
     {:ok, view, _html} = live(conn, "/@#{viewer.nickname}")
-
-    view
-    |> element("#post-#{parent.id} button[data-role='reply']")
-    |> render_click()
 
     assert has_element?(view, "#reply-modal [data-role='compose-cw'][data-state='closed']")
 
@@ -603,14 +608,10 @@ defmodule EgregorosWeb.ProfileLiveTest do
     conn: conn,
     viewer: viewer
   } do
-    assert {:ok, parent} = Pipeline.ingest(Note.build(viewer, "Parent post"), local: true)
+    assert {:ok, _parent} = Pipeline.ingest(Note.build(viewer, "Parent post"), local: true)
 
     conn = Plug.Test.init_test_session(conn, %{user_id: viewer.id})
     {:ok, view, _html} = live(conn, "/@#{viewer.nickname}")
-
-    view
-    |> element("#post-#{parent.id} button[data-role='reply']")
-    |> render_click()
 
     render_hook(view, "reply_change", %{
       "reply" => %{"content" => "hello", "spoiler_text" => "CW", "ui_options_open" => "true"}
@@ -625,14 +626,10 @@ defmodule EgregorosWeb.ProfileLiveTest do
     viewer: viewer,
     profile_user: profile_user
   } do
-    assert {:ok, parent} = Pipeline.ingest(Note.build(profile_user, "Parent post"), local: true)
+    assert {:ok, _parent} = Pipeline.ingest(Note.build(profile_user, "Parent post"), local: true)
 
     conn = Plug.Test.init_test_session(conn, %{user_id: viewer.id})
     {:ok, view, _html} = live(conn, "/@#{profile_user.nickname}")
-
-    view
-    |> element("#post-#{parent.id} button[data-role='reply']")
-    |> render_click()
 
     fixture_path = Fixtures.path!("DSCN0010.png")
     content = File.read!(fixture_path)
@@ -667,10 +664,6 @@ defmodule EgregorosWeb.ProfileLiveTest do
 
     conn = Plug.Test.init_test_session(conn, %{user_id: viewer.id})
     {:ok, view, _html} = live(conn, "/@#{profile_user.nickname}")
-
-    view
-    |> element("#post-#{parent.id} button[data-role='reply']")
-    |> render_click()
 
     fixture_path = Fixtures.path!("DSCN0010.png")
     content = File.read!(fixture_path)
@@ -715,10 +708,6 @@ defmodule EgregorosWeb.ProfileLiveTest do
     conn = Plug.Test.init_test_session(conn, %{user_id: viewer.id})
     {:ok, view, _html} = live(conn, "/@#{profile_user.nickname}")
 
-    view
-    |> element("#post-#{parent.id} button[data-role='reply']")
-    |> render_click()
-
     upload =
       file_input(view, "#reply-modal-form", :reply_media, [
         %{
@@ -753,21 +742,17 @@ defmodule EgregorosWeb.ProfileLiveTest do
     conn = Plug.Test.init_test_session(conn, %{user_id: viewer.id})
     {:ok, view, _html} = live(conn, "/@#{viewer.nickname}")
 
-    view
-    |> element("#post-#{parent.id} button[data-role='reply']")
-    |> render_click()
-
     too_long = String.duplicate("a", 5001)
 
     view
-    |> form("#reply-modal-form", reply: %{content: too_long})
+    |> form("#reply-modal-form", reply: %{in_reply_to: parent.ap_id, content: too_long})
     |> render_submit()
 
     assert render(view) =~ "Reply is too long."
     assert Objects.list_replies_to(parent.ap_id, limit: 10) == []
 
     view
-    |> form("#reply-modal-form", reply: %{content: "   \n"})
+    |> form("#reply-modal-form", reply: %{in_reply_to: parent.ap_id, content: "   \n"})
     |> render_submit()
 
     assert render(view) =~ "Reply can&#39;t be empty."
@@ -778,15 +763,11 @@ defmodule EgregorosWeb.ProfileLiveTest do
     conn: conn,
     viewer: viewer
   } do
-    assert {:ok, parent} = Pipeline.ingest(Note.build(viewer, "Parent post"), local: true)
+    assert {:ok, _parent} = Pipeline.ingest(Note.build(viewer, "Parent post"), local: true)
     {:ok, _} = Users.create_local_user("bob2")
 
     conn = Plug.Test.init_test_session(conn, %{user_id: viewer.id})
     {:ok, view, _html} = live(conn, "/@#{viewer.nickname}")
-
-    view
-    |> element("#post-#{parent.id} button[data-role='reply']")
-    |> render_click()
 
     _html = render_hook(view, "mention_search", %{"q" => "bo", "scope" => "reply-modal"})
     assert has_element?(view, "[data-role='mention-suggestion']", "@bob2")

@@ -150,9 +150,11 @@ defmodule EgregorosWeb.TimelineLiveTest do
     assert render(view) =~ "Register to bookmark posts."
 
     _html =
-      render_click(view, "open_reply_modal", %{
-        "in_reply_to" => note.ap_id,
-        "actor_handle" => "@alice"
+      render_click(view, "create_reply", %{
+        "reply" => %{
+          "in_reply_to" => note.ap_id,
+          "content" => "Hello"
+        }
       })
 
     assert render(view) =~ "Register to reply."
@@ -684,6 +686,7 @@ defmodule EgregorosWeb.TimelineLiveTest do
 
     assert html =~ "egregoros:reply-open"
     assert html =~ note.ap_id
+    refute html =~ "open_reply_modal"
     refute html =~ "?reply=true"
   end
 
@@ -704,6 +707,45 @@ defmodule EgregorosWeb.TimelineLiveTest do
 
     assert html =~ "mention_handles"
     assert html =~ "@carol"
+  end
+
+  test "reply button mention handles include remote domains", %{conn: conn, user: user} do
+    assert {:ok, note} =
+             Pipeline.ingest(
+               %{
+                 "id" => "https://shitposter.world/objects/mention-domain",
+                 "type" => "Note",
+                 "attributedTo" => "https://shitposter.world/users/mrsaturday",
+                 "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+                 "cc" => [],
+                 "content" => "<p>Hi</p>",
+                 "tag" => [
+                   %{
+                     "type" => "Mention",
+                     "href" => "https://shitposter.world/users/nerthos",
+                     "name" => "@nerthos"
+                   },
+                   %{
+                     "type" => "Mention",
+                     "href" => "https://shitposter.world/users/noyoushutthefuckupdad",
+                     "name" => "@noyoushutthefuckupdad"
+                   }
+                 ]
+               },
+               local: false
+             )
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/?timeline=public")
+
+    html =
+      view
+      |> element("#post-#{note.id} button[data-role='reply']")
+      |> render()
+
+    assert html =~ "mention_handles"
+    assert html =~ "@nerthos@shitposter.world"
+    assert html =~ "@noyoushutthefuckupdad@shitposter.world"
   end
 
   test "reply buttons ignore invalid mention tags in frontend prefill data", %{
@@ -741,34 +783,35 @@ defmodule EgregorosWeb.TimelineLiveTest do
     refute html =~ "@-bad"
   end
 
-  test "reply modal can be opened from a post card", %{conn: conn, user: user} do
+  test "reply modal controls are client-side and carry reply target data", %{
+    conn: conn,
+    user: user
+  } do
     assert {:ok, parent} = Pipeline.ingest(Note.build(user, "Reply target"), local: true)
 
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     {:ok, view, _html} = live(conn, "/")
 
     assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='closed']")
-
-    view
-    |> element("#post-#{parent.id} button[data-role='reply']")
-    |> render_click()
-
-    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='open']")
-
-    assert has_element?(
-             view,
-             "input[data-role='reply-in-reply-to'][value='#{parent.ap_id}']"
-           )
-
-    assert has_element?(view, "[data-role='reply-modal-target']", "Replying to @alice")
-
-    view
-    |> element("#reply-modal [data-role='reply-modal-close']")
-    |> render_click()
-
-    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='closed']")
-
     assert has_element?(view, "input[data-role='reply-in-reply-to'][value='']")
+
+    reply_html =
+      view
+      |> element("#post-#{parent.id} button[data-role='reply']")
+      |> render()
+
+    assert reply_html =~ "egregoros:reply-open"
+    assert reply_html =~ parent.ap_id
+    assert reply_html =~ "@alice"
+    refute reply_html =~ "open_reply_modal"
+
+    close_html =
+      view
+      |> element("#reply-modal [data-role='reply-modal-close']")
+      |> render()
+
+    assert close_html =~ "egregoros:reply-close"
+    refute close_html =~ "close_reply_modal"
   end
 
   test "reply_change opens the content warning area when spoiler_text is present", %{
@@ -903,11 +946,7 @@ defmodule EgregorosWeb.TimelineLiveTest do
     {:ok, view, _html} = live(conn, "/")
 
     view
-    |> element("#post-#{parent.id} button[data-role='reply']")
-    |> render_click()
-
-    view
-    |> form("#reply-modal-form", reply: %{content: "A reply"})
+    |> form("#reply-modal-form", reply: %{in_reply_to: parent.ap_id, content: "A reply"})
     |> render_submit()
 
     [reply] = Objects.list_replies_to(parent.ap_id, limit: 1)
@@ -1942,16 +1981,12 @@ defmodule EgregorosWeb.TimelineLiveTest do
     conn: conn,
     user: user
   } do
-    assert {:ok, parent} = Pipeline.ingest(Note.build(user, "Reply target"), local: true)
+    assert {:ok, _parent} = Pipeline.ingest(Note.build(user, "Reply target"), local: true)
 
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     {:ok, view, _html} = live(conn, "/")
 
-    view
-    |> element("#post-#{parent.id} button[data-role='reply']")
-    |> render_click()
-
-    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='open']")
+    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='closed']")
     assert has_element?(view, "#reply-modal-cw[data-role='compose-cw'][data-state='closed']")
 
     _html = render_click(view, "toggle_reply_cw", %{})
@@ -1977,10 +2012,6 @@ defmodule EgregorosWeb.TimelineLiveTest do
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     {:ok, view, _html} = live(conn, "/")
 
-    view
-    |> element("#post-#{parent.id} button[data-role='reply']")
-    |> render_click()
-
     fixture_path = Fixtures.path!("DSCN0010.png")
     content = File.read!(fixture_path)
 
@@ -2002,7 +2033,9 @@ defmodule EgregorosWeb.TimelineLiveTest do
     assert render_upload(upload, "photo.png") =~ "100%"
 
     view
-    |> form("#reply-modal-form", reply: %{content: "Reply with failing media"})
+    |> form("#reply-modal-form",
+      reply: %{in_reply_to: parent.ap_id, content: "Reply with failing media"}
+    )
     |> render_submit()
 
     assert render(view) =~ "Could not upload attachment."

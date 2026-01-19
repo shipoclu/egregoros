@@ -62,74 +62,38 @@ defmodule EgregorosWeb.BookmarksLiveTest do
     {:ok, view, _html} = live(conn, "/bookmarks")
 
     assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='closed']")
+    assert has_element?(view, "#post-#{parent.id} button[data-role='reply']")
+
+    html =
+      view
+      |> element("#post-#{parent.id} button[data-role='reply']")
+      |> render()
 
     view
-    |> element("#post-#{parent.id} button[data-role='reply']")
-    |> render_click()
-
-    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='open']")
-
-    view
-    |> form("#reply-modal-form", reply: %{content: "A reply"})
+    |> form("#reply-modal-form", reply: %{in_reply_to: parent.ap_id, content: "A reply"})
     |> render_submit()
 
+    assert html =~ "egregoros:reply-open"
+    assert html =~ parent.ap_id
+    refute html =~ "open_reply_modal"
     assert render(view) =~ "Reply posted."
 
     [reply] = Objects.list_replies_to(parent.ap_id, limit: 1)
     assert reply.data["inReplyTo"] == parent.ap_id
   end
 
-  test "bookmarks reply modal requires authentication", %{conn: conn} do
+  test "bookmarks create_reply requires authentication", %{conn: conn} do
     {:ok, view, _html} = live(conn, "/bookmarks")
 
     _html =
-      render_click(view, "open_reply_modal", %{
-        "in_reply_to" => "https://example.com/objects/1",
-        "actor_handle" => "@someone"
+      render_click(view, "create_reply", %{
+        "reply" => %{
+          "in_reply_to" => "https://example.com/objects/1",
+          "content" => "Hello"
+        }
       })
 
     assert render(view) =~ "Register to reply."
-  end
-
-  test "bookmarks reply modal ignores blank targets", %{conn: conn, user: user} do
-    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
-    {:ok, view, _html} = live(conn, "/bookmarks")
-
-    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='closed']")
-
-    _html =
-      render_click(view, "open_reply_modal", %{
-        "in_reply_to" => "   ",
-        "actor_handle" => "@someone"
-      })
-
-    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='closed']")
-  end
-
-  test "bookmarks reply modal can be closed and resets state", %{conn: conn, user: user} do
-    assert {:ok, parent} = Pipeline.ingest(Note.build(user, "Parent post"), local: true)
-    assert {:ok, :bookmarked} = Interactions.toggle_bookmark(user, parent.id)
-
-    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
-    {:ok, view, _html} = live(conn, "/bookmarks")
-
-    _html =
-      render_click(view, "open_reply_modal", %{
-        "in_reply_to" => parent.ap_id,
-        "actor_handle" => "@#{user.nickname}"
-      })
-
-    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='open']")
-
-    assert has_element?(
-             view,
-             "#reply-modal [data-role='reply-in-reply-to'][value='#{parent.ap_id}']"
-           )
-
-    _html = render_click(view, "close_reply_modal", %{})
-
-    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='closed']")
-    assert has_element?(view, "#reply-modal [data-role='reply-in-reply-to'][value='']")
   end
 
   test "bookmarks reply modal supports mention_search and mention_clear", %{
@@ -181,20 +145,13 @@ defmodule EgregorosWeb.BookmarksLiveTest do
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     {:ok, view, _html} = live(conn, "/bookmarks")
 
-    _html =
-      render_click(view, "open_reply_modal", %{
-        "in_reply_to" => parent.ap_id,
-        "actor_handle" => "@#{user.nickname}"
-      })
-
     too_long = String.duplicate("a", 6000)
 
     view
-    |> form("#reply-modal-form", reply: %{content: too_long})
+    |> form("#reply-modal-form", reply: %{in_reply_to: parent.ap_id, content: too_long})
     |> render_submit()
 
     assert render(view) =~ "Reply is too long."
-    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='open']")
   end
 
   test "favourites page lists liked posts and allows unliking", %{conn: conn, user: user} do
