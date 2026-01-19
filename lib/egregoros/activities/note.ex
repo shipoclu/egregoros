@@ -19,6 +19,7 @@ defmodule Egregoros.Activities.Note do
   def type, do: "Note"
 
   @as_public "https://www.w3.org/ns/activitystreams#Public"
+  @max_inbound_note_chars 20_000
 
   @primary_key false
   embedded_schema do
@@ -48,6 +49,10 @@ defmodule Egregoros.Activities.Note do
   end
 
   def cast_and_validate(note) when is_map(note) do
+    cast_and_validate(note, [])
+  end
+
+  def cast_and_validate(note, opts) when is_map(note) and is_list(opts) do
     note =
       note
       |> normalize_actor()
@@ -62,21 +67,43 @@ defmodule Egregoros.Activities.Note do
       |> List.wrap()
       |> Enum.any?(&is_map/1)
 
-    changeset =
-      %__MODULE__{}
-      |> cast(note, __schema__(:fields))
-      |> validate_required([:id, :type, :actor])
-      |> validate_inclusion(:type, [type()])
-      |> validate_content(has_attachments?)
+    with :ok <- validate_inbound_note_length(note, opts) do
+      changeset =
+        %__MODULE__{}
+        |> cast(note, __schema__(:fields))
+        |> validate_required([:id, :type, :actor])
+        |> validate_inclusion(:type, [type()])
+        |> validate_content(has_attachments?)
 
-    case apply_action(changeset, :insert) do
-      {:ok, %__MODULE__{} = validated_note} ->
-        {:ok, apply_note(note, validated_note)}
+      case apply_action(changeset, :insert) do
+        {:ok, %__MODULE__{} = validated_note} ->
+          {:ok, apply_note(note, validated_note)}
 
-      {:error, %Ecto.Changeset{} = changeset} ->
-        {:error, changeset}
+        {:error, %Ecto.Changeset{} = changeset} ->
+          {:error, changeset}
+      end
     end
   end
+
+  defp validate_inbound_note_length(%{} = note, opts) when is_list(opts) do
+    if Keyword.get(opts, :local, true) do
+      :ok
+    else
+      content =
+        case Map.get(note, "content") do
+          content when is_binary(content) -> content
+          _ -> ""
+        end
+
+      if String.length(content) > @max_inbound_note_chars do
+        {:error, :too_long}
+      else
+        :ok
+      end
+    end
+  end
+
+  defp validate_inbound_note_length(_note, _opts), do: :ok
 
   def to_object_attrs(note, opts) do
     %{
