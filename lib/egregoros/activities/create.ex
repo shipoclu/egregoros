@@ -209,10 +209,43 @@ defmodule Egregoros.Activities.Create do
   defp normalize_actor(activity), do: activity
 
   defp normalize_poll_answer(%{"object" => %{} = object} = activity) do
-    Map.put(activity, "object", maybe_convert_poll_answer(object))
+    object =
+      object
+      |> inherit_object_recipients_from_create(activity)
+      |> maybe_convert_poll_answer()
+
+    Map.put(activity, "object", object)
   end
 
   defp normalize_poll_answer(activity), do: activity
+
+  defp inherit_object_recipients_from_create(%{} = object, %{} = activity) do
+    object_to = object |> Map.get("to", []) |> List.wrap()
+    object_cc = object |> Map.get("cc", []) |> List.wrap()
+
+    if object_to == [] and object_cc == [] do
+      object
+      |> maybe_copy_recipients_from_create(activity, "to")
+      |> maybe_copy_recipients_from_create(activity, "cc")
+    else
+      object
+    end
+  end
+
+  defp inherit_object_recipients_from_create(object, _activity), do: object
+
+  defp maybe_copy_recipients_from_create(%{} = object, %{} = activity, field)
+       when field in ["to", "cc"] do
+    case Map.get(activity, field) do
+      recipients when is_list(recipients) and recipients != [] ->
+        Map.put(object, field, recipients)
+
+      _ ->
+        object
+    end
+  end
+
+  defp maybe_copy_recipients_from_create(object, _activity, _field), do: object
 
   defp maybe_convert_poll_answer(%{"type" => "Note", "name" => name} = object)
        when is_binary(name) do
