@@ -19,12 +19,16 @@ defmodule Egregoros.Federation.DeliveryTest do
       "object" => "https://remote.example/users/bob"
     }
 
-    body = Jason.encode!(activity)
+    body =
+      activity
+      |> Map.put_new("@context", "https://www.w3.org/ns/activitystreams")
+      |> Jason.encode!()
 
     expected_digest = "SHA-256=" <> (:crypto.hash(:sha256, body) |> Base.encode64())
 
     Egregoros.HTTP.Mock
     |> expect(:post, fn ^inbox, ^body, headers ->
+      assert %{"@context" => "https://www.w3.org/ns/activitystreams"} = Jason.decode!(body)
       assert {"content-type", "application/activity+json"} in headers
       assert {"accept", "application/activity+json"} in headers
       assert {"digest", expected_digest} in headers

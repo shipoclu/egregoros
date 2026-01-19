@@ -124,6 +124,23 @@ end
 defp normalize_actor(activity), do: activity
 ```
 
+**Storing private, server-only state (do not leak via federation):**
+
+Use the `objects.internal` column for state that must never be repeated to clients or remote servers
+(e.g., poll voter tracking). Never store private state in `data`.
+
+```elixir
+updated_internal =
+  object
+  |> Map.get(:internal)
+  |> Kernel.||(%{})
+  |> Map.put("my_type", %{"private" => "value"})
+
+object
+|> Object.changeset(%{internal: updated_internal})
+|> Repo.update()
+```
+
 **Inbox targeting validation (for federated objects):**
 
 ```elixir
@@ -141,6 +158,16 @@ defp validate_inbox_target(activity, opts) do
   end)
 end
 ```
+
+**Normalize Create-wrapped objects when remote servers embed a different type:**
+
+Some servers send objects inside a `Create` that need type normalization before validation.
+For example, poll votes arrive as `Create` with an embedded `Note` containing `name` and `inReplyTo`,
+which must be converted into an `Answer` before validation and ingestion.
+
+Add a normalization step in `Egregoros.Activities.Create` to coerce the embedded object type when needed,
+and ensure inbox targeting accepts cases where the embedded object is addressed to the inbox user
+even if the Create itself has empty `to`/`cc`.
 
 ## Step 2: Add to Status Types (if timeline-displayable)
 
@@ -378,6 +405,13 @@ Key principles:
 - Always return `:ok` even if the side effect doesn't apply
 - Use `with` to safely extract required data
 - Don't crash on missing data - gracefully skip
+- If you update a timeline-visible object, broadcast it so LiveView clients refresh:
+
+```elixir
+with {:ok, updated} <- Objects.update_something(...) do
+  Timeline.broadcast_post_updated(updated)
+end
+```
 
 ## Step 9: Type-Specific Publish Operations (Optional)
 
@@ -629,6 +663,16 @@ post "/my_types/:id/action", MyTypesController, :action
 - `PollsController` - Poll (Question) operations:
   - `GET /api/v1/polls/:id` - View poll details (optional auth)
   - `POST /api/v1/polls/:id/votes` - Vote on poll (requires `write:statuses` scope)
+
+## Poll-Specific Notes (Question/Answer)
+
+When adding or extending poll support, match these patterns:
+
+- **Question choices** live in `oneOf` (single choice) or `anyOf` (multiple choice), and vote counts are stored in each option’s `replies.totalItems`.
+- **Answers as votes**: remote servers often send votes as `Create` with an embedded `Note` that has `name` and `inReplyTo`. Normalize this to an `Answer` before validation/ingest (in `Egregoros.Activities.Create`), and make inbox targeting accept cases where the embedded object is addressed to the inbox user even if the `Create` itself is not.
+- **Private vote tracking** belongs in `objects.internal` (e.g., per-voter tracking and per-option voter lists) so it never leaks via federation.
+- **Live updates**: when vote side-effects update a `Question`, broadcast the updated object via `Timeline.broadcast_post_updated/1` so connected LiveViews refresh without a full page reload.
+- **Tests to include**: Answer ingest + vote count side-effects; Create-with-Note normalization; and a PubSub assertion that a vote triggers `{:post_updated, question}`.
 
 ## Summary Checklist
 
