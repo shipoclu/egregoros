@@ -14,7 +14,7 @@ defmodule Egregoros.Pipeline do
   @doc false
   def ingest_with(module, activity, opts \\ [])
       when is_atom(module) and is_map(activity) and is_list(opts) do
-    with {:ok, validated} <- cast_and_validate(module, activity),
+    with {:ok, validated} <- cast_and_validate(module, activity, opts),
          :ok <- discover_actors(validated, opts),
          {:ok, object} <- module.ingest(validated, opts),
          :ok <- module.side_effects(object, opts) do
@@ -30,16 +30,26 @@ defmodule Egregoros.Pipeline do
     :ok
   end
 
-  defp cast_and_validate(module, activity) do
-    if function_exported?(module, :cast_and_validate, 1) do
-      case module.cast_and_validate(activity) do
-        {:ok, validated} when is_map(validated) -> {:ok, validated}
-        {:error, %Ecto.Changeset{}} -> {:error, :invalid}
-        {:error, _} = error -> error
-        _ -> {:error, :invalid}
+  defp cast_and_validate(module, activity, opts) do
+    # Prefer cast_and_validate/2 if available (allows passing opts for inbox targeting)
+    # Fall back to cast_and_validate/1 for backwards compatibility
+    result =
+      cond do
+        function_exported?(module, :cast_and_validate, 2) ->
+          module.cast_and_validate(activity, opts)
+
+        function_exported?(module, :cast_and_validate, 1) ->
+          module.cast_and_validate(activity)
+
+        true ->
+          {:error, :invalid}
       end
-    else
-      {:error, :invalid}
+
+    case result do
+      {:ok, validated} when is_map(validated) -> {:ok, validated}
+      {:error, %Ecto.Changeset{}} -> {:error, :invalid}
+      {:error, _} = error -> error
+      _ -> {:error, :invalid}
     end
   end
 

@@ -44,3 +44,6 @@ npm-debug.log
 # Local env files
 .env*
 !.env.example
+
+# Ignore AI reference projects
+/reference/

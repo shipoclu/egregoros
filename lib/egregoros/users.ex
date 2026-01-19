@@ -291,7 +291,8 @@ defmodule Egregoros.Users do
       when is_binary(nickname) and is_binary(password) do
     nickname = String.trim(nickname)
 
-    with %User{local: true, password_hash: hash} when is_binary(hash) <- get_by_nickname(nickname),
+    with %User{local: true, password_hash: hash} when is_binary(hash) <-
+           get_by_nickname(nickname),
          true <- Password.verify(password, hash) do
       {:ok, get_by_nickname(nickname)}
     else

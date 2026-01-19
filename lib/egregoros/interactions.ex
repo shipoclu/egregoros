@@ -15,7 +15,7 @@ defmodule Egregoros.Interactions do
 
   def toggle_like(%User{} = user, post_id) when is_integer(post_id) do
     with %{} = post <- Objects.get(post_id),
-         true <- post.type == "Note",
+         true <- post.type in ["Note", "Question"],
          true <- Objects.visible_to?(post, user) do
       case Relationships.get_by_type_actor_object("Like", user.ap_id, post.ap_id) do
         %Relationship{} = relationship ->
@@ -31,7 +31,7 @@ defmodule Egregoros.Interactions do
 
   def toggle_repost(%User{} = user, post_id) when is_integer(post_id) do
     with %{} = post <- Objects.get(post_id),
-         true <- post.type == "Note",
+         true <- post.type in ["Note", "Question"],
          true <- Objects.visible_to?(post, user) do
       case Relationships.get_by_type_actor_object("Announce", user.ap_id, post.ap_id) do
         %Relationship{} = relationship ->
@@ -48,7 +48,7 @@ defmodule Egregoros.Interactions do
   def toggle_reaction(%User{} = user, post_id, emoji)
       when is_integer(post_id) and is_binary(emoji) do
     with %{} = post <- Objects.get(post_id),
-         true <- post.type == "Note",
+         true <- post.type in ["Note", "Question"],
          true <- Objects.visible_to?(post, user) do
       relationship_type = "EmojiReact:" <> emoji
 
@@ -66,7 +66,7 @@ defmodule Egregoros.Interactions do
 
   def toggle_bookmark(%User{} = user, post_id) when is_integer(post_id) do
     with %{} = post <- Objects.get(post_id),
-         true <- post.type == "Note",
+         true <- post.type in ["Note", "Question"],
          true <- Objects.visible_to?(post, user) do
       case Relationships.get_by_type_actor_object("Bookmark", user.ap_id, post.ap_id) do
         %Relationship{} ->
@@ -92,7 +92,7 @@ defmodule Egregoros.Interactions do
 
   def delete_post(%User{} = user, post_id) when is_integer(post_id) do
     with %{} = post <- Objects.get(post_id),
-         true <- post.type == "Note",
+         true <- post.type in ["Note", "Question"],
          true <- post.local,
          true <- post.actor == user.ap_id do
       Pipeline.ingest(Delete.build(user, post), local: true)

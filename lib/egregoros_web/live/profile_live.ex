@@ -476,7 +476,8 @@ defmodule EgregorosWeb.ProfileLive do
          %User{} = profile_user <- socket.assigns.profile_user,
          true <- viewer.id != profile_user.id,
          nil <- socket.assigns.block_relationship,
-         nil <- Relationships.get_by_type_actor_object("Follow", viewer.ap_id, profile_user.ap_id),
+         nil <-
+           Relationships.get_by_type_actor_object("Follow", viewer.ap_id, profile_user.ap_id),
          {:ok, _follow} <- Pipeline.ingest(Follow.build(viewer, profile_user), local: true) do
       relationship = follow_relationship(viewer, profile_user)
       follow_request = follow_request_relationship(viewer, profile_user)
@@ -1163,7 +1164,7 @@ defmodule EgregorosWeb.ProfileLive do
     current_user = socket.assigns.current_user
 
     case Objects.get(post_id) do
-      %{type: "Note"} = object ->
+      %{type: type} = object when type in ["Note", "Question"] ->
         if Objects.visible_to?(object, current_user) do
           if feed_id == post_id do
             stream_insert(socket, :posts, StatusVM.decorate(object, current_user))

@@ -157,6 +157,58 @@ defmodule EgregorosWeb.TimelineLiveTest do
     assert render(view) =~ "Register to reply."
   end
 
+  test "voting on a boosted poll refreshes the boosted timeline entry", %{conn: conn} do
+    {:ok, poll_owner} = Users.create_local_user("poll_owner")
+    {:ok, booster} = Users.create_local_user("poll_booster")
+    {:ok, voter} = Users.create_local_user("poll_voter")
+
+    assert {:ok, _follow} =
+             Relationships.upsert_relationship(%{
+               type: "Follow",
+               actor: voter.ap_id,
+               object: booster.ap_id
+             })
+
+    question = %{
+      "id" => EgregorosWeb.Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
+      "type" => "Question",
+      "attributedTo" => poll_owner.ap_id,
+      "context" => EgregorosWeb.Endpoint.url() <> "/contexts/" <> Ecto.UUID.generate(),
+      "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+      "content" => "Boosted poll",
+      "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
+      "oneOf" => [
+        %{
+          "name" => "Option A",
+          "type" => "Note",
+          "replies" => %{"type" => "Collection", "totalItems" => 0}
+        },
+        %{
+          "name" => "Option B",
+          "type" => "Note",
+          "replies" => %{"type" => "Collection", "totalItems" => 0}
+        }
+      ],
+      "closed" => "2030-12-31T23:59:59Z"
+    }
+
+    assert {:ok, poll} = Pipeline.ingest(question, local: true)
+    assert {:ok, announce} = Pipeline.ingest(Announce.build(booster, poll), local: true)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: voter.id})
+    {:ok, view, _html} = live(conn, "/")
+
+    assert has_element?(view, "#post-#{announce.id} form#poll-form-post-#{announce.id}")
+
+    view
+    |> form("#poll-form-post-#{announce.id}", %{"choices" => ["0"]})
+    |> render_submit()
+
+    assert has_element?(view, "#post-#{announce.id} [data-role='poll-results']")
+    refute has_element?(view, "#post-#{announce.id} form#poll-form-post-#{announce.id}")
+    refute has_element?(view, "#post-#{poll.id}")
+  end
+
   test "home timeline includes direct messages addressed to the signed-in user", %{
     conn: conn,
     user: user

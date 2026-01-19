@@ -13,6 +13,7 @@ defmodule EgregorosWeb.StatusCardTest do
         entry: %{
           object: %{
             id: 1,
+            type: "Note",
             inserted_at: ~U[2025-01-01 00:00:00Z],
             local: true,
             data: %{"content" => "Hello world"}
@@ -49,6 +50,7 @@ defmodule EgregorosWeb.StatusCardTest do
         entry: %{
           object: %{
             id: 1,
+            type: "Note",
             inserted_at: ~U[2025-01-01 00:00:00Z],
             local: true,
             data: %{"content" => "Hello world"}
@@ -82,6 +84,7 @@ defmodule EgregorosWeb.StatusCardTest do
         entry: %{
           object: %{
             id: 1,
+            type: "Note",
             inserted_at: ~U[2025-01-01 00:00:00Z],
             local: true,
             data: %{"content" => "Hello world"}
@@ -116,6 +119,7 @@ defmodule EgregorosWeb.StatusCardTest do
         entry: %{
           object: %{
             id: 1,
+            type: "Note",
             inserted_at: ~U[2025-01-01 00:00:00Z],
             local: false,
             data: %{
@@ -155,6 +159,7 @@ defmodule EgregorosWeb.StatusCardTest do
         entry: %{
           object: %{
             id: 1,
+            type: "Note",
             inserted_at: ~U[2025-01-01 00:00:00Z],
             local: true,
             data: %{"content" => "Check this out https://example.com"}
@@ -186,6 +191,7 @@ defmodule EgregorosWeb.StatusCardTest do
         entry: %{
           object: %{
             id: 1,
+            type: "Note",
             inserted_at: ~U[2025-01-01 00:00:00Z],
             local: false,
             data: %{"content" => "<p>Hello</p>"}
@@ -219,6 +225,7 @@ defmodule EgregorosWeb.StatusCardTest do
         entry: %{
           object: %{
             id: 1,
+            type: "Note",
             inserted_at: ~U[2025-01-01 00:00:00Z],
             local: false,
             data: %{"content" => "<p>Hello</p>"}
@@ -251,6 +258,7 @@ defmodule EgregorosWeb.StatusCardTest do
         entry: %{
           object: %{
             id: 1,
+            type: "Note",
             inserted_at: ~U[2025-01-01 00:00:00Z],
             local: false,
             data: %{"content" => "<p>Hello</p>"}
@@ -285,6 +293,7 @@ defmodule EgregorosWeb.StatusCardTest do
         entry: %{
           object: %{
             id: 1,
+            type: "Note",
             inserted_at: ~U[2025-01-01 00:00:00Z],
             local: false,
             data: %{"content" => "<p>Hello</p>"}
@@ -322,6 +331,7 @@ defmodule EgregorosWeb.StatusCardTest do
         entry: %{
           object: %{
             id: 1,
+            type: "Note",
             inserted_at: ~U[2025-01-01 00:00:00Z],
             local: false,
             data: %{"content" => "<p>Hello</p>"}
@@ -358,6 +368,7 @@ defmodule EgregorosWeb.StatusCardTest do
         entry: %{
           object: %{
             id: 1,
+            type: "Note",
             inserted_at: ~U[2025-01-01 00:00:00Z],
             local: true,
             data: %{"content" => "Hello world"}
@@ -389,6 +400,7 @@ defmodule EgregorosWeb.StatusCardTest do
         entry: %{
           object: %{
             id: 1,
+            type: "Note",
             inserted_at: ~U[2025-01-01 00:00:00Z],
             local: false,
             data: %{"content" => "<p>Hello world</p>"}
@@ -420,6 +432,7 @@ defmodule EgregorosWeb.StatusCardTest do
         entry: %{
           object: %{
             id: 1,
+            type: "Note",
             inserted_at: ~U[2025-01-01 00:00:00Z],
             local: true,
             data: %{"content" => "Hello world"}
@@ -449,6 +462,7 @@ defmodule EgregorosWeb.StatusCardTest do
         entry: %{
           object: %{
             id: 1,
+            type: "Note",
             inserted_at: ~U[2025-01-01 00:00:00Z],
             local: true,
             data: %{"content" => "Hello world"}
@@ -483,6 +497,7 @@ defmodule EgregorosWeb.StatusCardTest do
         entry: %{
           object: %{
             id: 1,
+            type: "Note",
             ap_id: ap_id,
             inserted_at: ~U[2025-01-01 00:00:00Z],
             local: true,
@@ -518,6 +533,7 @@ defmodule EgregorosWeb.StatusCardTest do
         entry: %{
           object: %{
             id: 1,
+            type: "Note",
             inserted_at: now,
             published: published,
             local: false,
@@ -554,6 +570,7 @@ defmodule EgregorosWeb.StatusCardTest do
         entry: %{
           object: %{
             id: 1,
+            type: "Note",
             ap_id: ap_id,
             inserted_at: ~U[2025-01-01 00:00:00Z],
             local: true,
@@ -596,6 +613,7 @@ defmodule EgregorosWeb.StatusCardTest do
         entry: %{
           object: %{
             id: 1,
+            type: "Note",
             ap_id: ap_id,
             inserted_at: ~U[2025-01-01 00:00:00Z],
             local: true,
@@ -628,6 +646,7 @@ defmodule EgregorosWeb.StatusCardTest do
         entry: %{
           object: %{
             id: 123,
+            type: "Note",
             ap_id: "https://remote.example/objects/123",
             inserted_at: ~U[2025-01-01 00:00:00Z],
             local: false,
@@ -660,6 +679,7 @@ defmodule EgregorosWeb.StatusCardTest do
         entry: %{
           object: %{
             id: 1,
+            type: "Note",
             inserted_at: ~U[2025-01-01 00:00:00Z],
             local: true,
             data: %{"summary" => "Spoilers", "content" => "Hello world"}
@@ -691,6 +711,7 @@ defmodule EgregorosWeb.StatusCardTest do
         entry: %{
           object: %{
             id: 1,
+            type: "Note",
             inserted_at: ~U[2025-01-01 00:00:00Z],
             local: true,
             data: %{"content" => "Hello world", "sensitive" => true}
@@ -727,6 +748,7 @@ defmodule EgregorosWeb.StatusCardTest do
         entry: %{
           object: %{
             id: 1,
+            type: "Note",
             inserted_at: ~U[2025-01-01 00:00:00Z],
             local: true,
             data: %{"content" => long_content}
@@ -758,6 +780,7 @@ defmodule EgregorosWeb.StatusCardTest do
         entry: %{
           object: %{
             id: 1,
+            type: "Note",
             ap_id: "javascript:alert(1)",
             inserted_at: ~U[2025-01-01 00:00:00Z],
             local: false,

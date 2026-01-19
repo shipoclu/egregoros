@@ -337,6 +337,53 @@ defmodule EgregorosWeb.MastodonAPI.StatusesControllerTest do
     assert response["content"] == "<p>Hello show</p>"
   end
 
+  test "GET /api/v1/statuses/:id includes poll entity for Question statuses", %{conn: conn} do
+    {:ok, alice} = Users.create_local_user("poll_status_alice")
+
+    question = %{
+      "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
+      "type" => "Question",
+      "attributedTo" => alice.ap_id,
+      "context" => Endpoint.url() <> "/contexts/" <> Ecto.UUID.generate(),
+      "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+      "content" => "Is Tenshi eating a corndog cute?",
+      "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
+      "oneOf" => [
+        %{
+          "name" => "Absolutely!",
+          "type" => "Note",
+          "replies" => %{"type" => "Collection", "totalItems" => 0}
+        },
+        %{
+          "name" => "Sure",
+          "type" => "Note",
+          "replies" => %{"type" => "Collection", "totalItems" => 0}
+        }
+      ],
+      "closed" => "2030-12-31T23:59:59Z"
+    }
+
+    {:ok, poll} = Pipeline.ingest(question, local: true)
+
+    conn = get(conn, "/api/v1/statuses/#{poll.id}")
+    response = json_response(conn, 200)
+
+    assert response["id"] == Integer.to_string(poll.id)
+    assert is_map(response["poll"])
+
+    poll_entity = response["poll"]
+    assert poll_entity["id"] == Integer.to_string(poll.id)
+    assert poll_entity["multiple"] == false
+
+    assert poll_entity["options"] == [
+             %{"title" => "Absolutely!", "votes_count" => 0},
+             %{"title" => "Sure", "votes_count" => 0}
+           ]
+
+    refute Map.has_key?(poll_entity, "voted")
+    refute Map.has_key?(poll_entity, "own_votes")
+  end
+
   test "GET /api/v1/statuses/:id does not expose direct statuses", %{conn: conn} do
     {:ok, user} = Users.create_local_user("local")
 

@@ -3,6 +3,7 @@ defmodule EgregorosWeb.StatusLive do
 
   alias Egregoros.Domain
   alias Egregoros.Federation.ThreadDiscovery
+  alias Egregoros.Workers.RefreshPoll
   alias Egregoros.Interactions
   alias Egregoros.Media
   alias Egregoros.MediaStorage
@@ -12,10 +13,10 @@ defmodule EgregorosWeb.StatusLive do
   alias Egregoros.Timeline
   alias Egregoros.User
   alias Egregoros.Users
+  alias EgregorosWeb.Endpoint
   alias EgregorosWeb.Live.Uploads, as: LiveUploads
   alias EgregorosWeb.MentionAutocomplete
   alias EgregorosWeb.Param
-  alias EgregorosWeb.Endpoint
   alias EgregorosWeb.ProfilePaths
   alias EgregorosWeb.ViewModels.Status, as: StatusVM
 
@@ -76,6 +77,11 @@ defmodule EgregorosWeb.StatusLive do
 
           {status_entry, ancestors, descendants, note, missing_parent?}
 
+        %{type: "Question"} = question ->
+          # Questions (polls) don't have thread context in the same way Notes do
+          status_entry = StatusVM.decorate(question, current_user)
+          {status_entry, [], [], question, false}
+
         _ ->
           {nil, [], [], nil, false}
       end
@@ -109,6 +115,12 @@ defmodule EgregorosWeb.StatusLive do
 
     if connected?(socket) and fetching_replies? do
       _ = schedule_thread_retry(:replies)
+    end
+
+    # Schedule poll refresh for remote Questions
+    if connected?(socket) and
+         match?(%Egregoros.Object{type: "Question", local: false}, thread_note) do
+      _ = RefreshPoll.maybe_enqueue(thread_note)
     end
 
     reply_to_handle =
@@ -395,6 +407,50 @@ defmodule EgregorosWeb.StatusLive do
 
       _ ->
         {:noreply, socket}
+    end
+  end
+
+  def handle_event("vote_on_poll", %{"poll-id" => poll_id, "choices" => choices}, socket) do
+    with %User{} = user <- socket.assigns.current_user,
+         {poll_id, ""} <- Integer.parse(to_string(poll_id)),
+         %{type: "Question"} = question <- Objects.get(poll_id),
+         choices <- parse_choices(choices),
+         {:ok, _updated} <- Publish.vote_on_poll(user, question, choices) do
+      {:noreply,
+       socket
+       |> put_flash(:info, "Vote submitted!")
+       |> refresh_thread()}
+    else
+      nil ->
+        {:noreply, put_flash(socket, :error, "Register to vote on polls.")}
+
+      {:error, :already_voted} ->
+        {:noreply, put_flash(socket, :error, "You have already voted on this poll.")}
+
+      {:error, :poll_expired} ->
+        {:noreply, put_flash(socket, :error, "This poll has ended.")}
+
+      {:error, :own_poll} ->
+        {:noreply, put_flash(socket, :error, "You cannot vote on your own poll.")}
+
+      {:error, :multiple_choices_not_allowed} ->
+        {:noreply, put_flash(socket, :error, "This poll only allows a single choice.")}
+
+      {:error, :invalid_choice} ->
+        {:noreply, put_flash(socket, :error, "Invalid poll option selected.")}
+
+      _ ->
+        {:noreply, put_flash(socket, :error, "Could not submit vote.")}
+    end
+  end
+
+  def handle_event("vote_on_poll", %{"poll-id" => _poll_id}, socket) do
+    case socket.assigns.current_user do
+      nil ->
+        {:noreply, put_flash(socket, :error, "Register to vote on polls.")}
+
+      _ ->
+        {:noreply, put_flash(socket, :error, "Please select at least one option.")}
     end
   end
 
@@ -1055,6 +1111,32 @@ defmodule EgregorosWeb.StatusLive do
           thread_fetching_replies?: fetching_replies?
         )
 
+      %{object: %{type: "Question"} = question} ->
+        question =
+          case question.ap_id do
+            ap_id when is_binary(ap_id) and ap_id != "" ->
+              case Objects.get_by_ap_id(ap_id) do
+                %Egregoros.Object{} = latest -> latest
+                _ -> question
+              end
+
+            _ ->
+              question
+          end
+
+        status_entry = StatusVM.decorate(question, current_user)
+        thread_index = build_thread_index(status_entry, [], [])
+
+        socket
+        |> assign(
+          status: status_entry,
+          ancestors: [],
+          descendants: [],
+          thread_index: thread_index,
+          thread_missing_context?: false,
+          thread_fetching_replies?: false
+        )
+
       _ ->
         socket
     end
@@ -1328,4 +1410,31 @@ defmodule EgregorosWeb.StatusLive do
   defp timeline_href(%{id: _}, :public), do: ~p"/?timeline=public" <> "&restore_scroll=1"
   defp timeline_href(%{id: _}, _timeline), do: ~p"/?timeline=home" <> "&restore_scroll=1"
   defp timeline_href(_user, _timeline), do: ~p"/?timeline=public" <> "&restore_scroll=1"
+
+  defp parse_choices(choices) when is_list(choices) do
+    choices
+    |> Enum.map(fn
+      choice when is_integer(choice) ->
+        choice
+
+      choice when is_binary(choice) ->
+        case Integer.parse(choice) do
+          {int, ""} -> int
+          _ -> nil
+        end
+
+      _ ->
+        nil
+    end)
+    |> Enum.filter(&is_integer/1)
+  end
+
+  defp parse_choices(choice) when is_binary(choice) do
+    case Integer.parse(choice) do
+      {int, ""} -> [int]
+      _ -> []
+    end
+  end
+
+  defp parse_choices(_choices), do: []
 end

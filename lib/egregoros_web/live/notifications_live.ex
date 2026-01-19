@@ -13,6 +13,8 @@ defmodule EgregorosWeb.NotificationsLive do
   alias Egregoros.Relationships
   alias Egregoros.User
   alias Egregoros.Users
+  alias EgregorosWeb.Components.NotificationItems.FollowRequestNotification
+  alias EgregorosWeb.Components.NotificationItems.NotificationItem
   alias EgregorosWeb.ProfilePaths
   alias EgregorosWeb.URL
   alias EgregorosWeb.ViewModels.Actor, as: ActorVM
@@ -247,7 +249,7 @@ defmodule EgregorosWeb.NotificationsLive do
                   No follow requests yet.
                 </div>
 
-                <.follow_request_item
+                <FollowRequestNotification.follow_request_notification
                   :for={entry <- @follow_requests}
                   id={"follow-request-#{entry.relationship.id}"}
                   entry={entry}
@@ -267,7 +269,7 @@ defmodule EgregorosWeb.NotificationsLive do
                   No notifications yet.
                 </div>
 
-                <.notification_item
+                <NotificationItem.notification_item
                   :for={{id, entry} <- @streams.notifications}
                   id={id}
                   entry={entry}
@@ -346,213 +348,6 @@ defmodule EgregorosWeb.NotificationsLive do
     </button>
     """
   end
-
-  attr :id, :string, required: true
-  attr :entry, :map, required: true
-
-  defp follow_request_item(assigns) do
-    ~H"""
-    <article
-      id={@id}
-      data-role="follow-request"
-      class="border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] p-6 transition hover:bg-[color:var(--bg-subtle)]"
-    >
-      <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div class="flex items-start gap-4">
-          <.avatar size="sm" name={@entry.actor.display_name} src={@entry.actor.avatar_url} />
-
-          <div class="min-w-0">
-            <p class="text-sm font-bold text-[color:var(--text-primary)]">
-              {@entry.actor.display_name}
-            </p>
-            <p class="mt-1 font-mono text-xs text-[color:var(--text-muted)]">
-              {@entry.actor.handle}
-            </p>
-          </div>
-        </div>
-
-        <div class="flex flex-wrap items-center justify-end gap-2">
-          <.button
-            type="button"
-            size="sm"
-            data-role="follow-request-accept"
-            phx-click="follow_request_accept"
-            phx-value-id={@entry.relationship.id}
-            phx-disable-with="Accepting..."
-          >
-            Accept
-          </.button>
-
-          <.button
-            type="button"
-            size="sm"
-            variant="secondary"
-            data-role="follow-request-reject"
-            phx-click="follow_request_reject"
-            phx-value-id={@entry.relationship.id}
-            phx-disable-with="Rejecting..."
-          >
-            Reject
-          </.button>
-        </div>
-      </div>
-    </article>
-    """
-  end
-
-  defp notification_item(assigns) do
-    importance = notification_importance(assigns.entry.type)
-    assigns = assign(assigns, :importance, importance)
-
-    ~H"""
-    <article
-      id={@id}
-      data-role="notification"
-      data-type={@entry.type}
-      data-importance={@importance}
-      class={[
-        "relative bg-[color:var(--bg-base)] transition",
-        @importance == "high" && "border-2 border-[color:var(--border-default)] p-6",
-        @importance == "medium" && "border border-[color:var(--border-muted)] p-5",
-        @importance == "low" && "p-0",
-        @importance != "low" && "hover:bg-[color:var(--bg-subtle)]"
-      ]}
-    >
-      <%= if @importance == "low" do %>
-        <%!-- Compact inline layout for low importance --%>
-        <div class="flex items-center gap-2.5 pl-2">
-          <.avatar
-            size="xs"
-            name={@entry.actor.display_name}
-            src={@entry.actor.avatar_url}
-            class="shrink-0 !h-6 !w-6 !border"
-          />
-          <%= case @entry.reaction_emoji do %>
-            <% %{type: :unicode, emoji: emoji} -> %>
-              <span class="shrink-0 text-base">{emoji}</span>
-            <% %{type: :custom, url: url, shortcode: shortcode} -> %>
-              <img
-                src={url}
-                alt={shortcode}
-                class="size-4 shrink-0 object-contain"
-                loading="lazy"
-              />
-            <% _ -> %>
-              <.icon name={@entry.icon} class="size-3.5 shrink-0 text-[color:var(--text-muted)]" />
-          <% end %>
-          <span class="min-w-0 flex-1 truncate text-sm text-[color:var(--text-secondary)]">
-            <%= if is_binary(@entry.target_path) and @entry.target_path != "" do %>
-              <.link
-                navigate={@entry.target_path}
-                data-role="notification-target"
-                class="block truncate hover:underline underline-offset-2"
-                aria-label="Open post"
-              >
-                {emoji_inline(@entry.message, @entry.message_emojis)}
-              </.link>
-            <% else %>
-              {emoji_inline(@entry.message, @entry.message_emojis)}
-            <% end %>
-          </span>
-          <span class="shrink-0 text-xs text-[color:var(--text-muted)]">
-            <.time_ago at={@entry.notification.inserted_at} />
-          </span>
-        </div>
-      <% else %>
-        <%!-- Full layout for high/medium importance --%>
-        <span :if={@importance == "high"} data-role="notification-badge">
-          {notification_badge_label(@entry.type)}
-        </span>
-
-        <div class={[
-          "flex items-start",
-          @importance == "high" && "gap-4 pl-2",
-          @importance == "medium" && "gap-3 pl-2"
-        ]}>
-          <div data-role="notification-avatar">
-            <.avatar
-              size="sm"
-              name={@entry.actor.display_name}
-              src={@entry.actor.avatar_url}
-            />
-          </div>
-
-          <div class="min-w-0 flex-1 space-y-3">
-            <div class="flex items-start justify-between gap-3">
-              <div class="min-w-0">
-                <p class={[
-                  "flex flex-wrap items-center gap-2 text-sm",
-                  @importance == "high" && "font-bold text-[color:var(--text-primary)]",
-                  @importance == "medium" && "font-semibold text-[color:var(--text-primary)]"
-                ]}>
-                  <.icon
-                    name={@entry.icon}
-                    class={[
-                      "size-4",
-                      @importance == "high" && "text-[color:var(--text-primary)]",
-                      @importance == "medium" && "text-[color:var(--text-muted)]"
-                    ]}
-                  />
-                  <span data-role="notification-message" class="truncate">
-                    {emoji_inline(@entry.message, @entry.message_emojis)}
-                  </span>
-                </p>
-                <p class="mt-1 font-mono text-xs text-[color:var(--text-muted)]">
-                  {@entry.actor.handle}
-                </p>
-              </div>
-
-              <span class="shrink-0">
-                <.time_ago at={@entry.notification.inserted_at} />
-              </span>
-            </div>
-
-            <div
-              :if={@entry.preview_html}
-              data-role="notification-preview"
-              class={[
-                "border border-[color:var(--border-muted)] bg-[color:var(--bg-subtle)] p-4 text-sm text-[color:var(--text-secondary)]",
-                @importance == "high" && "border-2"
-              ]}
-            >
-              {@entry.preview_html}
-            </div>
-
-            <div
-              :if={is_binary(@entry.target_path) and @entry.target_path != ""}
-              class="flex justify-end"
-            >
-              <.link
-                navigate={@entry.target_path}
-                data-role="notification-target"
-                class={[
-                  "inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wide transition focus-visible:outline-none focus-brutal",
-                  @importance == "high" &&
-                    "bg-[color:var(--bg-subtle)] border border-[color:var(--border-muted)] px-3 py-1.5 text-[color:var(--text-primary)] hover:bg-[color:var(--text-primary)] hover:text-[color:var(--bg-base)] hover:border-[color:var(--border-default)]",
-                  @importance != "high" &&
-                    "text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] hover:underline underline-offset-2"
-                ]}
-                aria-label="Open post"
-              >
-                Open post <.icon name="hero-arrow-right" class="size-4" />
-              </.link>
-            </div>
-          </div>
-        </div>
-      <% end %>
-    </article>
-    """
-  end
-
-  defp notification_importance("Note"), do: "high"
-  defp notification_importance("Follow"), do: "medium"
-  defp notification_importance("Announce"), do: "medium"
-  defp notification_importance("Like"), do: "low"
-  defp notification_importance("EmojiReact"), do: "low"
-  defp notification_importance(_type), do: "medium"
-
-  defp notification_badge_label("Note"), do: "Mention"
-  defp notification_badge_label(_type), do: nil
 
   defp set_filter_js(filter) when is_binary(filter) do
     JS.set_attribute({"data-filter", filter}, to: "#notifications-list")

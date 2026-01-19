@@ -12,6 +12,7 @@ This is a web application written using the Phoenix web framework.
 - Use `mix precommit` alias when you are done with all changes and fix any pending issues
 - Run `mix format` before `mix precommit` (the precommit check uses `mix format --check-formatted`)
 - Use the already included and available `:req` (`Req`) library for HTTP requests, **avoid** `:httpoison`, `:tesla`, and `:httpc`. Req is included by default and is the preferred HTTP client for Phoenix apps
+- Treat `Egregoros.Object.data` as canonical external ActivityPub JSON: **never** persist internal/derived state into it (risk of future exposure/federation); use `Egregoros.Object.internal` for internal caching/metadata instead.
 
 ### Phoenix v1.8 guidelines
 
@@ -103,6 +104,10 @@ custom classes must fully style the input
 
 ## Test guidelines
 
+- **Running tests**: Tests require PostgreSQL credentials. Run with:
+  ```bash
+  POSTGRES_USER=your_user POSTGRES_PASSWORD=your_password MIX_ENV=test mix test
+  ```
 - **Always use `start_supervised!/1`** to start processes in tests as it guarantees cleanup between tests
 - Keep the coverage gate in mind: `mix test --cover` must stay **≥ 85%**; add tests for new branches and run cover locally when touching core modules.
 - Coverage is enforced in `mix precommit` via `mix test --cover`; keep total **≥ 85%**.
