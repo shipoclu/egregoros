@@ -41,7 +41,7 @@ defmodule EgregorosWeb.ReplyModal do
       aria-modal="true"
       aria-hidden="true"
       phx-hook="ReplyModal"
-      class="fixed inset-0 z-50 hidden items-center justify-center bg-[color:var(--text-primary)]/60 p-4"
+      class="fixed inset-0 z-50 flex hidden items-center justify-center bg-[color:var(--text-primary)]/60 p-4"
     >
       <.focus_wrap
         id={"#{@id}-dialog"}
