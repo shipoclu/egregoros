@@ -36,6 +36,41 @@ const ReplyModal = {
     }
 
     window.addEventListener("keydown", this.onKeydown)
+
+    this.handleEvent("reply_modal_prefill", payload => {
+      if (!this.el.isConnected) return
+
+      const detail = payload || {}
+      const content = String(detail.content || "")
+      if (!content) return
+
+      const expectedInReplyTo = detail.in_reply_to || detail.inReplyTo
+
+      if (expectedInReplyTo) {
+        const input = this.el.querySelector("input[data-role='reply-in-reply-to']")
+        if (input && String(input.value || "") !== String(expectedInReplyTo)) return
+      }
+
+      const textarea = this.el.querySelector("textarea[data-role='compose-content']")
+      if (!textarea) return
+
+      const current = String(textarea.value || "")
+
+      if (current.trim() === "") {
+        textarea.value = content
+      } else if (!current.startsWith(content)) {
+        textarea.value = `${content}${current}`
+      } else {
+        return
+      }
+
+      textarea.dispatchEvent(new Event("input", {bubbles: true}))
+
+      try {
+        textarea.setSelectionRange(textarea.value.length, textarea.value.length)
+      } catch (_e) {}
+    })
+
     this.handleEvent("reply_modal_close", () => this.close())
   },
 
@@ -63,6 +98,7 @@ const ReplyModal = {
     this.el.dataset.state = "closed"
     this.el.setAttribute("aria-hidden", "true")
     this.clearReplyTarget()
+    this.clearTextarea()
     this.restoreFocus()
   },
 
@@ -107,6 +143,15 @@ const ReplyModal = {
   focusTextarea() {
     const textarea = this.el.querySelector("textarea[data-role='compose-content']")
     if (textarea) textarea.focus({preventScroll: true})
+  },
+
+  clearTextarea() {
+    const textarea = this.el.querySelector("textarea[data-role='compose-content']")
+    if (!textarea) return
+    if (textarea.value === "") return
+
+    textarea.value = ""
+    textarea.dispatchEvent(new Event("input", {bubbles: true}))
   },
 }
 

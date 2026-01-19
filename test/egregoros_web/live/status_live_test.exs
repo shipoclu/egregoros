@@ -6,6 +6,7 @@ defmodule EgregorosWeb.StatusLiveTest do
   alias Egregoros.Activities.Note
   alias Egregoros.Objects
   alias Egregoros.Pipeline
+  alias Egregoros.Publish
   alias Egregoros.Relationships
   alias Egregoros.TestSupport.Fixtures
   alias Egregoros.Users
@@ -83,6 +84,25 @@ defmodule EgregorosWeb.StatusLiveTest do
 
     _html = render_hook(view, "mention_clear", %{"scope" => "reply-modal"})
     refute has_element?(view, "[data-role='mention-suggestion']")
+  end
+
+  test "reply composer pre-fills mentioned handles when opened via reply param", %{
+    conn: conn,
+    user: user
+  } do
+    {:ok, bob} = Users.create_local_user("bob")
+    {:ok, _carol} = Users.create_local_user("carol")
+
+    assert {:ok, _create} = Publish.post_note(user, "Hi @carol")
+    [note] = Objects.list_notes_by_actor(user.ap_id, limit: 1)
+
+    uuid = uuid_from_ap_id(note.ap_id)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: bob.id})
+    {:ok, view, _html} = live(conn, "/@alice/#{uuid}?reply=true")
+
+    assert has_element?(view, "#reply-modal-content", "@alice")
+    assert has_element?(view, "#reply-modal-content", "@carol")
   end
 
   test "redirects to the canonical nickname for local status permalinks", %{
