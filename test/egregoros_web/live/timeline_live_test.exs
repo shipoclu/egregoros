@@ -360,6 +360,45 @@ defmodule EgregorosWeb.TimelineLiveTest do
     assert has_element?(view, "[data-role='post-actor-name'] img.emoji[alt=':linux:']")
   end
 
+  test "timeline replaces placeholder actor cards when remote user data arrives", %{conn: conn} do
+    actor_ap_id = "https://remote.example/users/bob"
+
+    assert {:ok, note} =
+             Pipeline.ingest(
+               %{
+                 "id" => "https://remote.example/objects/placeholder-actor",
+                 "type" => "Note",
+                 "actor" => actor_ap_id,
+                 "content" => "Hello from bob",
+                 "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+                 "cc" => []
+               },
+               local: false
+             )
+
+    {:ok, view, _html} = live(conn, "/")
+
+    assert has_element?(view, "#post-#{note.id} [data-role='post-actor-name']", "bob")
+
+    assert {:ok, _user} =
+             Users.create_user(%{
+               nickname: "bob",
+               ap_id: actor_ap_id,
+               inbox: actor_ap_id <> "/inbox",
+               outbox: actor_ap_id <> "/outbox",
+               public_key: "remote-key",
+               private_key: nil,
+               local: false,
+               name: "Bobby",
+               avatar_url: "https://remote.example/media/avatar.png"
+             })
+
+    assert :ok = Egregoros.UserEvents.broadcast_update(actor_ap_id)
+    _ = :sys.get_state(view.pid)
+
+    assert has_element?(view, "#post-#{note.id} [data-role='post-actor-name']", "Bobby")
+  end
+
   test "compose options panel can be persisted via ui_options_open param", %{
     conn: conn,
     user: user

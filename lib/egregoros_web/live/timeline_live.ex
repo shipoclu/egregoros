@@ -10,10 +10,12 @@ defmodule EgregorosWeb.TimelineLive do
   alias Egregoros.Relationships
   alias Egregoros.Timeline
   alias Egregoros.User
+  alias Egregoros.UserEvents
   alias Egregoros.Users
   alias EgregorosWeb.Live.Uploads, as: LiveUploads
   alias EgregorosWeb.MentionAutocomplete
   alias EgregorosWeb.Param
+  alias EgregorosWeb.ViewModels.Actor, as: ActorVM
   alias EgregorosWeb.ViewModels.Status, as: StatusVM
 
   @initial_page_size 10
@@ -38,6 +40,7 @@ defmodule EgregorosWeb.TimelineLive do
     reply_form = Phoenix.Component.to_form(default_post_params(), as: :reply)
 
     posts = list_timeline_posts(timeline, current_user, limit: @initial_page_size)
+    entries = StatusVM.decorate_many(posts, current_user)
 
     socket =
       socket
@@ -64,9 +67,13 @@ defmodule EgregorosWeb.TimelineLive do
         media_alt: %{},
         posts_cursor: posts_cursor(posts, timeline),
         posts_end?: length(posts) < @initial_page_size,
+        posts_by_feed_id: %{},
+        feed_actor_ap_ids: %{},
+        actor_feed_ids: %{},
         current_user: current_user
       )
-      |> stream(:posts, StatusVM.decorate_many(posts, current_user), dom_id: &post_dom_id/1)
+      |> stream(:posts, entries, dom_id: &post_dom_id/1)
+      |> track_posts(entries)
       |> allow_upload(:media,
         accept: ~w(
           .png
@@ -135,7 +142,10 @@ defmodule EgregorosWeb.TimelineLive do
         posts =
           list_timeline_posts(timeline, socket.assigns.current_user, limit: @initial_page_size)
 
+        entries = StatusVM.decorate_many(posts, socket.assigns.current_user)
+
         socket
+        |> reset_tracked_posts()
         |> assign(
           timeline: timeline,
           pending_posts: [],
@@ -144,10 +154,11 @@ defmodule EgregorosWeb.TimelineLive do
           posts_end?: length(posts) < @initial_page_size,
           timeline_topics: timeline_topics
         )
-        |> stream(:posts, StatusVM.decorate_many(posts, socket.assigns.current_user),
+        |> stream(:posts, entries,
           reset: true,
           dom_id: &post_dom_id/1
         )
+        |> track_posts(entries)
       end
 
     {:noreply, socket}
@@ -706,7 +717,7 @@ defmodule EgregorosWeb.TimelineLive do
       {:noreply,
        socket
        |> put_flash(:info, "Post deleted.")
-       |> stream_delete(:posts, %{object: %{id: post_id}})}
+       |> delete_post(post_id)}
     else
       nil ->
         {:noreply, put_flash(socket, :error, "Register to delete posts.")}
@@ -742,7 +753,7 @@ defmodule EgregorosWeb.TimelineLive do
             current_user = socket.assigns.current_user
 
             Enum.reduce(StatusVM.decorate_many(posts, current_user), socket, fn entry, socket ->
-              stream_insert(socket, :posts, entry, at: -1)
+              insert_post(socket, entry, at: -1)
             end)
             |> assign(posts_cursor: new_cursor, posts_end?: posts_end?)
           end
@@ -768,7 +779,7 @@ defmodule EgregorosWeb.TimelineLive do
 
         {:noreply,
          socket
-         |> stream_insert(:posts, StatusVM.decorate(post, socket.assigns.current_user), at: 0)
+         |> insert_post(StatusVM.decorate(post, socket.assigns.current_user), at: 0)
          |> assign(:posts_cursor, cursor)}
       else
         pending_posts =
@@ -792,7 +803,7 @@ defmodule EgregorosWeb.TimelineLive do
          socket.assigns.home_actor_ids
        ) do
       {:noreply,
-       stream_insert(socket, :posts, StatusVM.decorate(post, socket.assigns.current_user),
+       insert_post(socket, StatusVM.decorate(post, socket.assigns.current_user),
          update_only: true
        )}
     else
@@ -809,7 +820,12 @@ defmodule EgregorosWeb.TimelineLive do
     {:noreply,
      socket
      |> assign(pending_posts: pending_posts)
-     |> stream_delete(:posts, %{feed_id: id})}
+     |> delete_post(id)}
+  end
+
+  @impl true
+  def handle_info({:user_updated, %{ap_id: ap_id}}, socket) do
+    {:noreply, refresh_actor_posts(socket, ap_id)}
   end
 
   @impl true
@@ -1120,6 +1136,212 @@ defmodule EgregorosWeb.TimelineLive do
 
   defp unsubscribe_topics(_topics), do: :ok
 
+  defp track_posts(socket, entries) when is_list(entries) do
+    Enum.reduce(entries, socket, fn entry, socket ->
+      track_post(socket, entry)
+    end)
+  end
+
+  defp track_posts(socket, _entries), do: socket
+
+  defp insert_post(socket, entry, opts \\ [])
+
+  defp insert_post(socket, entry, opts) when is_map(entry) and is_list(opts) do
+    socket
+    |> stream_insert(:posts, entry, opts)
+    |> track_post(entry)
+  end
+
+  defp insert_post(socket, _entry, _opts), do: socket
+
+  defp delete_post(socket, feed_id) do
+    socket
+    |> stream_delete(:posts, %{feed_id: feed_id})
+    |> untrack_post(feed_id)
+  end
+
+  defp reset_tracked_posts(socket) do
+    actor_feed_ids = socket.assigns.actor_feed_ids || %{}
+
+    if connected?(socket) do
+      actor_feed_ids
+      |> Map.keys()
+      |> Enum.each(&UserEvents.unsubscribe/1)
+    end
+
+    assign(socket,
+      posts_by_feed_id: %{},
+      feed_actor_ap_ids: %{},
+      actor_feed_ids: %{}
+    )
+  end
+
+  defp track_post(socket, %{} = entry) do
+    feed_id = Map.get(entry, :feed_id) || get_in(entry, [:object, :id])
+
+    if is_nil(feed_id) do
+      socket
+    else
+      new_actor_ap_ids = actor_ap_ids_for_entry(entry)
+
+      old_actor_ap_ids =
+        socket.assigns.feed_actor_ap_ids
+        |> Map.get(feed_id, MapSet.new())
+
+      actor_feed_ids =
+        socket.assigns.actor_feed_ids
+        |> remove_feed_id_from_actors(feed_id, old_actor_ap_ids, new_actor_ap_ids)
+        |> add_feed_id_to_actors(feed_id, old_actor_ap_ids, new_actor_ap_ids, connected?(socket))
+
+      posts_by_feed_id =
+        socket.assigns.posts_by_feed_id
+        |> Map.put(feed_id, entry)
+
+      feed_actor_ap_ids =
+        socket.assigns.feed_actor_ap_ids
+        |> Map.put(feed_id, new_actor_ap_ids)
+
+      assign(socket,
+        posts_by_feed_id: posts_by_feed_id,
+        feed_actor_ap_ids: feed_actor_ap_ids,
+        actor_feed_ids: actor_feed_ids
+      )
+    end
+  end
+
+  defp track_post(socket, _entry), do: socket
+
+  defp untrack_post(socket, feed_id) do
+    old_actor_ap_ids =
+      socket.assigns.feed_actor_ap_ids
+      |> Map.get(feed_id, MapSet.new())
+
+    actor_feed_ids =
+      socket.assigns.actor_feed_ids
+      |> remove_feed_id_from_actors(feed_id, old_actor_ap_ids, MapSet.new())
+
+    assign(socket,
+      posts_by_feed_id: Map.delete(socket.assigns.posts_by_feed_id, feed_id),
+      feed_actor_ap_ids: Map.delete(socket.assigns.feed_actor_ap_ids, feed_id),
+      actor_feed_ids: actor_feed_ids
+    )
+  end
+
+  defp actor_ap_ids_for_entry(%{} = entry) do
+    [
+      get_in(entry, [:actor, :ap_id]),
+      get_in(entry, [:reposted_by, :ap_id])
+    ]
+    |> Enum.filter(&is_binary/1)
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
+    |> MapSet.new()
+  end
+
+  defp actor_ap_ids_for_entry(_entry), do: MapSet.new()
+
+  defp remove_feed_id_from_actors(
+         actor_feed_ids,
+         feed_id,
+         old_actor_ap_ids,
+         new_actor_ap_ids
+       )
+       when is_map(actor_feed_ids) do
+    removed_actor_ap_ids = MapSet.difference(old_actor_ap_ids, new_actor_ap_ids)
+
+    Enum.reduce(removed_actor_ap_ids, actor_feed_ids, fn actor_ap_id, actor_feed_ids ->
+      feed_ids =
+        actor_feed_ids
+        |> Map.get(actor_ap_id, MapSet.new())
+        |> MapSet.delete(feed_id)
+
+      if MapSet.size(feed_ids) == 0 do
+        _ = UserEvents.unsubscribe(actor_ap_id)
+        Map.delete(actor_feed_ids, actor_ap_id)
+      else
+        Map.put(actor_feed_ids, actor_ap_id, feed_ids)
+      end
+    end)
+  end
+
+  defp remove_feed_id_from_actors(actor_feed_ids, _feed_id, _old_actor_ap_ids, _new_actor_ap_ids),
+    do: actor_feed_ids
+
+  defp add_feed_id_to_actors(
+         actor_feed_ids,
+         feed_id,
+         old_actor_ap_ids,
+         new_actor_ap_ids,
+         subscribe?
+       )
+       when is_map(actor_feed_ids) and is_boolean(subscribe?) do
+    added_actor_ap_ids = MapSet.difference(new_actor_ap_ids, old_actor_ap_ids)
+
+    Enum.reduce(added_actor_ap_ids, actor_feed_ids, fn actor_ap_id, actor_feed_ids ->
+      feed_ids =
+        actor_feed_ids
+        |> Map.get(actor_ap_id, MapSet.new())
+        |> MapSet.put(feed_id)
+
+      if subscribe? do
+        _ = UserEvents.subscribe(actor_ap_id)
+      end
+
+      Map.put(actor_feed_ids, actor_ap_id, feed_ids)
+    end)
+  end
+
+  defp add_feed_id_to_actors(actor_feed_ids, _feed_id, _old_actor_ap_ids, _new_actor_ap_ids, _),
+    do: actor_feed_ids
+
+  defp refresh_actor_posts(socket, ap_id) when is_binary(ap_id) do
+    ap_id = String.trim(ap_id)
+
+    if ap_id == "" do
+      socket
+    else
+      feed_ids = Map.get(socket.assigns.actor_feed_ids, ap_id, MapSet.new())
+
+      if MapSet.size(feed_ids) == 0 do
+        socket
+      else
+        updated_card = ActorVM.card(ap_id)
+
+        Enum.reduce(feed_ids, socket, fn feed_id, socket ->
+          case Map.get(socket.assigns.posts_by_feed_id, feed_id) do
+            %{} = entry ->
+              entry = replace_actor_card(entry, ap_id, updated_card)
+
+              insert_post(socket, entry, update_only: true)
+
+            _ ->
+              socket
+          end
+        end)
+      end
+    end
+  end
+
+  defp refresh_actor_posts(socket, _ap_id), do: socket
+
+  defp replace_actor_card(%{} = entry, ap_id, updated_card)
+       when is_binary(ap_id) and is_map(updated_card) do
+    entry =
+      if get_in(entry, [:actor, :ap_id]) == ap_id do
+        Map.put(entry, :actor, updated_card)
+      else
+        entry
+      end
+
+    if get_in(entry, [:reposted_by, :ap_id]) == ap_id do
+      Map.put(entry, :reposted_by, updated_card)
+    else
+      entry
+    end
+  end
+
+  defp replace_actor_card(entry, _ap_id, _updated_card), do: entry
+
   defp open_compose_js(js \\ %JS{}) do
     js
     |> JS.remove_class("hidden", to: "#compose-panel")
@@ -1290,7 +1512,7 @@ defmodule EgregorosWeb.TimelineLive do
         Enum.reduce(Enum.reverse(pending_posts), {socket, socket.assigns.posts_cursor}, fn post,
                                                                                            {socket,
                                                                                             cursor} ->
-          socket = stream_insert(socket, :posts, StatusVM.decorate(post, current_user), at: 0)
+          socket = insert_post(socket, StatusVM.decorate(post, current_user), at: 0)
 
           cursor =
             case cursor do
@@ -1326,14 +1548,14 @@ defmodule EgregorosWeb.TimelineLive do
       %{type: type} = object when type in ["Note", "Question"] ->
         if Objects.visible_to?(object, current_user) do
           if feed_id == post_id do
-            stream_insert(socket, :posts, StatusVM.decorate(object, current_user))
+            insert_post(socket, StatusVM.decorate(object, current_user))
           else
             socket
-            |> stream_insert(:posts, StatusVM.decorate(object, current_user), update_only: true)
+            |> insert_post(StatusVM.decorate(object, current_user), update_only: true)
             |> refresh_announce_post(feed_id, current_user)
           end
         else
-          stream_delete(socket, :posts, %{feed_id: feed_id})
+          delete_post(socket, feed_id)
         end
 
       _ ->
@@ -1345,12 +1567,12 @@ defmodule EgregorosWeb.TimelineLive do
        when is_integer(feed_id) do
     case Objects.get(feed_id) do
       nil ->
-        stream_delete(socket, :posts, %{feed_id: feed_id})
+        delete_post(socket, feed_id)
 
       %{type: "Announce"} = announce ->
         case StatusVM.decorate(announce, current_user) do
-          nil -> stream_delete(socket, :posts, %{feed_id: feed_id})
-          entry -> stream_insert(socket, :posts, entry)
+          nil -> delete_post(socket, feed_id)
+          entry -> insert_post(socket, entry)
         end
 
       _ ->

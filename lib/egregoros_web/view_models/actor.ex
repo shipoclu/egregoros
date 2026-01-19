@@ -89,11 +89,13 @@ defmodule EgregorosWeb.ViewModels.Actor do
   end
 
   defp fallback_card(ap_id) when is_binary(ap_id) do
+    {nickname, domain} = derive_handle_parts(ap_id)
+
     %{
       ap_id: ap_id,
-      display_name: ap_id,
-      nickname: nil,
-      handle: ap_id,
+      display_name: nickname || ap_id,
+      nickname: nickname,
+      handle: derive_handle(nickname, domain, ap_id),
       avatar_url: nil,
       emojis: [],
       local?: false
@@ -110,5 +112,74 @@ defmodule EgregorosWeb.ViewModels.Actor do
       emojis: [],
       local?: false
     }
+  end
+
+  defp derive_handle_parts(ap_id) when is_binary(ap_id) do
+    ap_id = String.trim(ap_id)
+
+    with %URI{} = uri <- URI.parse(ap_id),
+         host when is_binary(host) <- uri.host,
+         host when host != "" <- String.trim(host) do
+      domain = Domain.from_uri(uri)
+
+      nickname =
+        uri.path
+        |> Kernel.||("")
+        |> String.split("/", trim: true)
+        |> List.last()
+        |> candidate_nickname()
+
+      nickname =
+        case nickname do
+          value when is_binary(value) ->
+            value = String.trim(value)
+            if value == "", do: nil, else: value
+
+          _ ->
+            nil
+        end
+
+      {nickname, domain}
+    else
+      _ -> {nil, nil}
+    end
+  end
+
+  @fallback_nickname_blocklist ~w(users user actor objects object inbox outbox followers following)
+
+  defp candidate_nickname("@" <> nick), do: candidate_nickname(nick)
+
+  defp candidate_nickname(nick) when is_binary(nick) do
+    nick = String.trim(nick)
+
+    cond do
+      nick == "" ->
+        nil
+
+      nick in @fallback_nickname_blocklist ->
+        nil
+
+      Regex.match?(~r/^[\p{L}\p{N}_][\p{L}\p{N}_.-]{0,63}$/u, nick) ->
+        nick
+
+      true ->
+        nil
+    end
+  end
+
+  defp candidate_nickname(_), do: nil
+
+  defp derive_handle(nickname, domain, fallback_ap_id)
+       when is_binary(fallback_ap_id) do
+    cond do
+      is_binary(nickname) and nickname != "" and is_binary(domain) and domain != "" ->
+        "@#{nickname}@#{domain}"
+
+      is_binary(nickname) and nickname != "" ->
+        "@#{nickname}"
+
+      true ->
+        fallback_ap_id
+    end
   end
 end
