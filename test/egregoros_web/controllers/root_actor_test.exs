@@ -15,7 +15,7 @@ defmodule EgregorosWeb.RootActorTest do
     body = Jason.decode!(response(conn, 200))
 
     assert body["id"] == Endpoint.url()
-    assert body["type"] == "Service"
+    assert body["type"] == "Application"
     assert body["inbox"] == Endpoint.url() <> "/inbox"
 
     assert body["publicKey"]["id"] == Endpoint.url() <> "#main-key"
