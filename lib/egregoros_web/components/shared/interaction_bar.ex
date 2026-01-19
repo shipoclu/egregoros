@@ -5,6 +5,8 @@ defmodule EgregorosWeb.Components.Shared.InteractionBar do
   """
   use EgregorosWeb, :html
 
+  alias Egregoros.Mentions
+
   @default_reactions ["🔥", "👍", "❤️"]
 
   attr :id, :string, required: true
@@ -41,6 +43,11 @@ defmodule EgregorosWeb.Components.Shared.InteractionBar do
   attr :reply_mode, :atom, default: :navigate
 
   defp reply_button(assigns) do
+    assigns =
+      assign_new(assigns, :mention_handles, fn ->
+        mention_handles_for_entry(assigns.entry)
+      end)
+
     ~H"""
     <%= if @reply_mode == :modal do %>
       <button
@@ -51,7 +58,8 @@ defmodule EgregorosWeb.Components.Shared.InteractionBar do
             to: "#reply-modal",
             detail: %{
               in_reply_to: @entry.object.ap_id,
-              actor_handle: @entry.actor.handle
+              actor_handle: @entry.actor.handle,
+              mention_handles: @mention_handles
             }
           )
           |> JS.push("open_reply_modal",
@@ -277,6 +285,44 @@ defmodule EgregorosWeb.Components.Shared.InteractionBar do
   defp feed_id_for_entry(%{object: %{id: id}}) when is_integer(id), do: id
   defp feed_id_for_entry(%{object: %{"id" => id}}) when is_integer(id), do: id
   defp feed_id_for_entry(_entry), do: nil
+
+  defp mention_handles_for_entry(%{object: object}) do
+    object
+    |> mention_tags()
+    |> Enum.flat_map(&mention_handle_from_tag/1)
+    |> Enum.uniq()
+  end
+
+  defp mention_handles_for_entry(_entry), do: []
+
+  defp mention_tags(object) when is_map(object) do
+    data = Map.get(object, :data) || Map.get(object, "data") || %{}
+
+    data
+    |> Map.get("tag", Map.get(data, :tag, []))
+    |> List.wrap()
+  end
+
+  defp mention_tags(_object), do: []
+
+  defp mention_handle_from_tag(%{"type" => "Mention"} = tag) do
+    name = Map.get(tag, "name") || Map.get(tag, :name)
+    if valid_handle?(name), do: [String.trim(name)], else: []
+  end
+
+  defp mention_handle_from_tag(%{type: "Mention"} = tag) do
+    name = Map.get(tag, :name) || Map.get(tag, "name")
+    if valid_handle?(name), do: [String.trim(name)], else: []
+  end
+
+  defp mention_handle_from_tag(_tag), do: []
+
+  defp valid_handle?(handle) when is_binary(handle) do
+    handle = handle |> String.trim() |> String.trim_leading("@")
+    match?({:ok, _, _}, Mentions.parse(handle))
+  end
+
+  defp valid_handle?(_handle), do: false
 
   defp status_reply_path(entry) do
     case status_permalink_path(entry) do

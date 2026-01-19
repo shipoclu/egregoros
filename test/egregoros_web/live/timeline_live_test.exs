@@ -687,6 +687,60 @@ defmodule EgregorosWeb.TimelineLiveTest do
     refute html =~ "?reply=true"
   end
 
+  test "reply buttons embed mention handles for frontend prefill", %{conn: conn, user: user} do
+    {:ok, bob} = Users.create_local_user("bob")
+    {:ok, _carol} = Users.create_local_user("carol")
+
+    assert {:ok, _create} = Publish.post_note(bob, "Hi @carol")
+    [note] = Objects.list_notes_by_actor(bob.ap_id, limit: 1)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/?timeline=public")
+
+    html =
+      view
+      |> element("#post-#{note.id} button[data-role='reply']")
+      |> render()
+
+    assert html =~ "mention_handles"
+    assert html =~ "@carol"
+  end
+
+  test "reply buttons ignore invalid mention tags in frontend prefill data", %{
+    conn: conn,
+    user: user
+  } do
+    assert {:ok, note} =
+             Pipeline.ingest(
+               %{
+                 "id" => "https://remote.example/objects/bad-mention",
+                 "type" => "Note",
+                 "attributedTo" => "https://remote.example/users/bob",
+                 "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+                 "cc" => [],
+                 "content" => "<p>hi</p>",
+                 "tag" => [
+                   %{
+                     "type" => "Mention",
+                     "href" => "https://remote.example/users/-bad",
+                     "name" => "@-bad"
+                   }
+                 ]
+               },
+               local: false
+             )
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/?timeline=public")
+
+    html =
+      view
+      |> element("#post-#{note.id} button[data-role='reply']")
+      |> render()
+
+    refute html =~ "@-bad"
+  end
+
   test "reply modal can be opened from a post card", %{conn: conn, user: user} do
     assert {:ok, parent} = Pipeline.ingest(Note.build(user, "Reply target"), local: true)
 

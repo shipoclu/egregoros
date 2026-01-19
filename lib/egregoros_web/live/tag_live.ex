@@ -12,6 +12,7 @@ defmodule EgregorosWeb.TagLive do
   alias EgregorosWeb.Live.Uploads, as: LiveUploads
   alias EgregorosWeb.MentionAutocomplete
   alias EgregorosWeb.Param
+  alias EgregorosWeb.ViewModels.Actor, as: ActorVM
   alias EgregorosWeb.ViewModels.Status, as: StatusVM
 
   @page_size 20
@@ -551,6 +552,7 @@ defmodule EgregorosWeb.TagLive do
         upload={@uploads.reply_media}
         media_alt={@reply_media_alt}
         reply_to_handle={@reply_to_handle}
+        current_user_handle={ActorVM.handle(@current_user, @current_user.ap_id)}
         mention_suggestions={@mention_suggestions}
         options_open?={@reply_options_open?}
         cw_open?={@reply_cw_open?}

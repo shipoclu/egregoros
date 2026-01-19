@@ -6,6 +6,7 @@ defmodule EgregorosWeb.StatusLiveTest do
   alias Egregoros.Activities.Note
   alias Egregoros.Objects
   alias Egregoros.Pipeline
+  alias Egregoros.Publish
   alias Egregoros.Relationships
   alias Egregoros.TestSupport.Fixtures
   alias Egregoros.Users
@@ -83,6 +84,55 @@ defmodule EgregorosWeb.StatusLiveTest do
 
     _html = render_hook(view, "mention_clear", %{"scope" => "reply-modal"})
     refute has_element?(view, "[data-role='mention-suggestion']")
+  end
+
+  test "reply modal includes mention handles data for frontend prefill when opened via reply param",
+       %{
+         conn: conn,
+         user: user
+       } do
+    {:ok, bob} = Users.create_local_user("bob")
+    {:ok, _carol} = Users.create_local_user("carol")
+
+    assert {:ok, _create} = Publish.post_note(user, "Hi @carol")
+    [note] = Objects.list_notes_by_actor(user.ap_id, limit: 1)
+
+    uuid = uuid_from_ap_id(note.ap_id)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: bob.id})
+    {:ok, view, _html} = live(conn, "/@alice/#{uuid}?reply=true")
+
+    assert has_element?(view, "#reply-modal[data-prefill-mention-handles*='@carol']")
+  end
+
+  test "reply modal ignores invalid mention tags in frontend prefill data", %{
+    conn: conn,
+    user: user
+  } do
+    assert {:ok, note} =
+             Pipeline.ingest(
+               %{
+                 "id" => "https://remote.example/objects/bad-mention",
+                 "type" => "Note",
+                 "attributedTo" => "https://remote.example/users/bob",
+                 "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+                 "cc" => [],
+                 "content" => "<p>bad mention</p>",
+                 "tag" => [
+                   %{
+                     "type" => "Mention",
+                     "href" => "https://remote.example/users/-bad",
+                     "name" => "@-bad"
+                   }
+                 ]
+               },
+               local: false
+             )
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/@bob@remote.example/#{note.id}?reply=true")
+
+    refute has_element?(view, "#reply-modal[data-prefill-mention-handles*='@-bad']")
   end
 
   test "redirects to the canonical nickname for local status permalinks", %{

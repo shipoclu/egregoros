@@ -13,6 +13,8 @@ defmodule EgregorosWeb.ReplyModal do
   attr :media_alt, :map, default: %{}
 
   attr :reply_to_handle, :string, default: nil
+  attr :current_user_handle, :string, default: nil
+  attr :prefill_mention_handles, :list, default: []
 
   attr :mention_suggestions, :map, default: %{}
 
@@ -32,6 +34,9 @@ defmodule EgregorosWeb.ReplyModal do
       id={@id}
       data-role="reply-modal"
       data-state={if @open, do: "open", else: "closed"}
+      data-current-user-handle={@current_user_handle}
+      data-prefill-actor-handle={@reply_to_handle}
+      data-prefill-mention-handles={Enum.join(@prefill_mention_handles, " ")}
       role="dialog"
       aria-modal="true"
       aria-hidden={if @open, do: "false", else: "true"}

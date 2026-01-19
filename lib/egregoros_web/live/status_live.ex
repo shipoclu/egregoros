@@ -1,6 +1,7 @@
 defmodule EgregorosWeb.StatusLive do
   use EgregorosWeb, :live_view
 
+  alias Egregoros.Mentions
   alias Egregoros.Domain
   alias Egregoros.Federation.ThreadDiscovery
   alias Egregoros.Workers.RefreshPoll
@@ -18,6 +19,7 @@ defmodule EgregorosWeb.StatusLive do
   alias EgregorosWeb.MentionAutocomplete
   alias EgregorosWeb.Param
   alias EgregorosWeb.ProfilePaths
+  alias EgregorosWeb.ViewModels.Actor, as: ActorVM
   alias EgregorosWeb.ViewModels.Status, as: StatusVM
 
   @reply_max_chars 5000
@@ -52,6 +54,12 @@ defmodule EgregorosWeb.StatusLive do
       end
 
     reply_modal_open? = Param.truthy?(Map.get(params, "reply")) and not is_nil(current_user)
+
+    current_user_handle =
+      case current_user do
+        %User{} = user -> ActorVM.handle(user, user.ap_id)
+        _ -> nil
+      end
 
     {status_entry, ancestor_entries, descendant_entries, thread_note, missing_parent?} =
       case object do
@@ -137,6 +145,13 @@ defmodule EgregorosWeb.StatusLive do
         nil
       end
 
+    reply_prefill_mention_handles =
+      if reply_modal_open? and status_entry do
+        mention_handle_names(status_entry.object)
+      else
+        []
+      end
+
     reply_params =
       if reply_modal_open? and is_binary(reply_to_ap_id) do
         default_reply_params() |> Map.put("in_reply_to", reply_to_ap_id)
@@ -152,6 +167,7 @@ defmodule EgregorosWeb.StatusLive do
       socket
       |> assign(
         current_user: current_user,
+        current_user_handle: current_user_handle,
         notifications_count: notifications_count(current_user),
         nickname: nickname,
         uuid: uuid,
@@ -167,6 +183,7 @@ defmodule EgregorosWeb.StatusLive do
         reply_modal_open?: reply_modal_open?,
         reply_to_ap_id: reply_to_ap_id,
         reply_to_handle: reply_to_handle,
+        reply_prefill_mention_handles: reply_prefill_mention_handles,
         reply_form: reply_form,
         reply_media_alt: %{},
         reply_options_open?: false,
@@ -922,6 +939,8 @@ defmodule EgregorosWeb.StatusLive do
         upload={@uploads.reply_media}
         media_alt={@reply_media_alt}
         reply_to_handle={@reply_to_handle}
+        current_user_handle={@current_user_handle}
+        prefill_mention_handles={@reply_prefill_mention_handles}
         mention_suggestions={@mention_suggestions}
         max_chars={reply_max_chars()}
         options_open?={@reply_options_open?}
@@ -1388,6 +1407,35 @@ defmodule EgregorosWeb.StatusLive do
       "media_alt" => %{}
     }
   end
+
+  defp mention_handle_names(%{data: %{} = data}) do
+    data
+    |> Map.get("tag", [])
+    |> List.wrap()
+    |> Enum.flat_map(&mention_handle_from_tag/1)
+    |> Enum.uniq()
+  end
+
+  defp mention_handle_names(_object), do: []
+
+  defp mention_handle_from_tag(%{"type" => "Mention"} = tag) do
+    name = Map.get(tag, "name") || Map.get(tag, :name)
+    if valid_handle?(name), do: [String.trim(name)], else: []
+  end
+
+  defp mention_handle_from_tag(%{type: "Mention"} = tag) do
+    name = Map.get(tag, :name) || Map.get(tag, "name")
+    if valid_handle?(name), do: [String.trim(name)], else: []
+  end
+
+  defp mention_handle_from_tag(_tag), do: []
+
+  defp valid_handle?(handle) when is_binary(handle) do
+    handle = handle |> String.trim() |> String.trim_leading("@")
+    match?({:ok, _, _}, Mentions.parse(handle))
+  end
+
+  defp valid_handle?(_handle), do: false
 
   defp back_timeline_from_params(params, current_user) when is_map(params) do
     timeline =
