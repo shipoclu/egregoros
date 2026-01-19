@@ -9,6 +9,7 @@ defmodule Egregoros.Activities.Create do
   alias Egregoros.ActivityPub.ObjectValidators.Types.DateTime, as: APDateTime
   alias Egregoros.Federation.Delivery
   alias Egregoros.InboxTargeting
+  alias Egregoros.Object
   alias Egregoros.Objects
   alias Egregoros.Pipeline
   alias Egregoros.Relationships
@@ -51,7 +52,10 @@ defmodule Egregoros.Activities.Create do
   end
 
   def cast_and_validate(activity) when is_map(activity) do
-    activity = normalize_actor(activity)
+    activity =
+      activity
+      |> normalize_actor()
+      |> normalize_poll_answer()
 
     changeset =
       %__MODULE__{}
@@ -101,9 +105,13 @@ defmodule Egregoros.Activities.Create do
   defp validate_inbox_target(%{} = activity, opts) when is_list(opts) do
     InboxTargeting.validate(opts, fn inbox_user_ap_id ->
       actor_ap_id = Map.get(activity, "actor")
+      object = Map.get(activity, "object")
 
       cond do
         InboxTargeting.addressed_to?(activity, inbox_user_ap_id) ->
+          :ok
+
+        InboxTargeting.addressed_to?(object, inbox_user_ap_id) ->
           :ok
 
         InboxTargeting.follows?(inbox_user_ap_id, actor_ap_id) ->
@@ -199,6 +207,43 @@ defmodule Egregoros.Activities.Create do
   end
 
   defp normalize_actor(activity), do: activity
+
+  defp normalize_poll_answer(%{"object" => %{} = object} = activity) do
+    Map.put(activity, "object", maybe_convert_poll_answer(object))
+  end
+
+  defp normalize_poll_answer(activity), do: activity
+
+  defp maybe_convert_poll_answer(%{"type" => "Note", "name" => name} = object)
+       when is_binary(name) do
+    case extract_in_reply_to_id(object) do
+      reply_id when is_binary(reply_id) and reply_id != "" ->
+        case Objects.get_by_ap_id(reply_id) do
+          %Object{type: "Question"} -> Map.put(object, "type", "Answer")
+          _ -> object
+        end
+
+      _ ->
+        object
+    end
+  end
+
+  defp maybe_convert_poll_answer(object), do: object
+
+  defp extract_in_reply_to_id(%{"inReplyTo" => reply_to}) do
+    extract_reply_to_id(reply_to)
+  end
+
+  defp extract_in_reply_to_id(%{inReplyTo: reply_to}) do
+    extract_reply_to_id(reply_to)
+  end
+
+  defp extract_in_reply_to_id(_object), do: nil
+
+  defp extract_reply_to_id(%{"id" => id}) when is_binary(id), do: id
+  defp extract_reply_to_id(%{id: id}) when is_binary(id), do: id
+  defp extract_reply_to_id(id) when is_binary(id), do: id
+  defp extract_reply_to_id(_reply_to), do: nil
 
   defp validate_object(changeset) do
     create_actor = get_field(changeset, :actor)
