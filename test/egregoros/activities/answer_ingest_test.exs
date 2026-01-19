@@ -293,6 +293,54 @@ defmodule Egregoros.Activities.AnswerIngestTest do
 
       assert Objects.get_by_type_actor_object("Answer", voter_ap_id, poll.ap_id)
     end
+
+    test "rejects remote Create vote for followers-only poll when voter is not a follower" do
+      {:ok, owner} = Users.create_local_user("poll_owner_create_followers_only")
+
+      question = %{
+        "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
+        "type" => "Question",
+        "attributedTo" => owner.ap_id,
+        "context" => Endpoint.url() <> "/contexts/" <> Ecto.UUID.generate(),
+        "to" => [owner.ap_id <> "/followers"],
+        "cc" => [],
+        "content" => "Followers-only vote poll",
+        "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
+        "oneOf" => [
+          %{"name" => "yes", "replies" => %{"type" => "Collection", "totalItems" => 0}},
+          %{"name" => "no", "replies" => %{"type" => "Collection", "totalItems" => 0}}
+        ]
+      }
+
+      {:ok, poll} = Pipeline.ingest(question, local: true)
+
+      voter_ap_id = "https://remote.example/users/voter"
+
+      activity = %{
+        "id" => "https://remote.example/activities/" <> Ecto.UUID.generate(),
+        "type" => "Create",
+        "actor" => voter_ap_id,
+        "to" => [owner.ap_id],
+        "cc" => [],
+        "object" => %{
+          "id" => "https://remote.example/objects/" <> Ecto.UUID.generate(),
+          "type" => "Note",
+          "actor" => voter_ap_id,
+          "attributedTo" => voter_ap_id,
+          "name" => "no",
+          "inReplyTo" => poll.ap_id
+        }
+      }
+
+      assert {:error, :voter_not_permitted} =
+               Pipeline.ingest(activity, local: false, inbox_user_ap_id: owner.ap_id)
+
+      updated_poll = Objects.get_by_ap_id(poll.ap_id)
+      option = Enum.find(updated_poll.data["oneOf"], &(&1["name"] == "no"))
+      assert option["replies"]["totalItems"] == 0
+
+      refute Objects.get_by_type_actor_object("Answer", voter_ap_id, poll.ap_id)
+    end
   end
 
   describe "remote Answer inbox targeting" do
