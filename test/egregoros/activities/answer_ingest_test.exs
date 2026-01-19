@@ -171,6 +171,57 @@ defmodule Egregoros.Activities.AnswerIngestTest do
     end
   end
 
+  describe "Create activities with poll answers" do
+    test "ingests remote Create with Note answer and updates poll counts" do
+      {:ok, owner} = Users.create_local_user("poll_owner_create")
+
+      question = %{
+        "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
+        "type" => "Question",
+        "attributedTo" => owner.ap_id,
+        "context" => Endpoint.url() <> "/contexts/" <> Ecto.UUID.generate(),
+        "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+        "content" => "Remote vote poll",
+        "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
+        "oneOf" => [
+          %{"name" => "yes", "replies" => %{"type" => "Collection", "totalItems" => 0}},
+          %{"name" => "no", "replies" => %{"type" => "Collection", "totalItems" => 0}}
+        ]
+      }
+
+      {:ok, poll} = Pipeline.ingest(question, local: true)
+
+      voter_ap_id = "https://remote.example/users/voter"
+
+      activity = %{
+        "id" => "https://remote.example/activities/" <> Ecto.UUID.generate(),
+        "type" => "Create",
+        "actor" => voter_ap_id,
+        "to" => [],
+        "cc" => [],
+        "object" => %{
+          "id" => "https://remote.example/objects/" <> Ecto.UUID.generate(),
+          "type" => "Note",
+          "actor" => voter_ap_id,
+          "attributedTo" => voter_ap_id,
+          "name" => "no",
+          "inReplyTo" => poll.ap_id,
+          "cc" => [owner.ap_id],
+          "to" => []
+        }
+      }
+
+      assert {:ok, _create} =
+               Pipeline.ingest(activity, local: false, inbox_user_ap_id: owner.ap_id)
+
+      updated_poll = Objects.get_by_ap_id(poll.ap_id)
+      option = Enum.find(updated_poll.data["oneOf"], &(&1["name"] == "no"))
+      assert option["replies"]["totalItems"] == 1
+
+      assert Objects.get_by_type_actor_object("Answer", voter_ap_id, poll.ap_id)
+    end
+  end
+
   describe "remote Answer inbox targeting" do
     setup do
       {:ok, alice} = Users.create_local_user("remote_alice")
