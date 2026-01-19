@@ -108,6 +108,82 @@ defmodule Egregoros.Activities.AnswerIngestTest do
       assert green_option["replies"]["totalItems"] == 1
     end
 
+    test "does not broadcast post_updated when vote is a noop (invalid option)", %{
+      poll: poll,
+      bob: bob
+    } do
+      Timeline.subscribe_public()
+
+      answer = %{
+        "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
+        "type" => "Answer",
+        "attributedTo" => bob.ap_id,
+        "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+        "name" => "Purple",
+        "inReplyTo" => poll.ap_id
+      }
+
+      assert {:ok, _answer_object} = Pipeline.ingest(answer, local: true)
+
+      updated_poll = Objects.get_by_ap_id(poll.ap_id)
+
+      for option <- updated_poll.data["oneOf"] do
+        assert option["replies"]["totalItems"] == 0
+      end
+
+      refute_receive {:post_updated, _}, 50
+    end
+
+    test "does not broadcast post_updated to public for followers-only polls" do
+      {:ok, owner} = Users.create_local_user("poll_broadcast_followers_owner")
+
+      question = %{
+        "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
+        "type" => "Question",
+        "attributedTo" => owner.ap_id,
+        "context" => Endpoint.url() <> "/contexts/" <> Ecto.UUID.generate(),
+        "to" => [owner.ap_id <> "/followers"],
+        "cc" => [],
+        "content" => "Followers-only poll",
+        "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
+        "oneOf" => [
+          %{"name" => "Red", "replies" => %{"totalItems" => 0}},
+          %{"name" => "Blue", "replies" => %{"totalItems" => 0}}
+        ]
+      }
+
+      {:ok, poll} = Pipeline.ingest(question, local: true)
+
+      Timeline.subscribe_public()
+
+      voter_ap_id = "https://remote.example/users/follower"
+
+      assert {:ok, _relationship} =
+               Relationships.upsert_relationship(%{
+                 type: "Follow",
+                 actor: voter_ap_id,
+                 object: owner.ap_id
+               })
+
+      answer = %{
+        "id" => "https://remote.example/objects/" <> Ecto.UUID.generate(),
+        "type" => "Answer",
+        "actor" => voter_ap_id,
+        "attributedTo" => voter_ap_id,
+        "to" => [owner.ap_id],
+        "name" => "Blue",
+        "inReplyTo" => poll.ap_id
+      }
+
+      assert {:ok, _answer_object} = Pipeline.ingest(answer, local: false)
+
+      updated_poll = Objects.get_by_ap_id(poll.ap_id)
+      blue_option = Enum.find(updated_poll.data["oneOf"], &(&1["name"] == "Blue"))
+      assert blue_option["replies"]["totalItems"] == 1
+
+      refute_receive {:post_updated, _}, 50
+    end
+
     test "side_effects records voter metadata in internal state", %{poll: poll, bob: bob} do
       answer = %{
         "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
