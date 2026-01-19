@@ -18,7 +18,6 @@ defmodule EgregorosWeb.StatusLive do
   alias EgregorosWeb.MentionAutocomplete
   alias EgregorosWeb.Param
   alias EgregorosWeb.ProfilePaths
-  alias EgregorosWeb.ReplyPrefill
   alias EgregorosWeb.ViewModels.Status, as: StatusVM
 
   @reply_max_chars 5000
@@ -139,12 +138,8 @@ defmodule EgregorosWeb.StatusLive do
       end
 
     reply_params =
-      if reply_modal_open? and is_binary(reply_to_ap_id) and is_binary(reply_to_handle) do
-        reply_content = ReplyPrefill.reply_content(reply_to_ap_id, reply_to_handle, current_user)
-
-        default_reply_params()
-        |> Map.put("in_reply_to", reply_to_ap_id)
-        |> Map.put("content", reply_content)
+      if reply_modal_open? and is_binary(reply_to_ap_id) do
+        default_reply_params() |> Map.put("in_reply_to", reply_to_ap_id)
       else
         default_reply_params()
       end
@@ -323,13 +318,9 @@ defmodule EgregorosWeb.StatusLive do
       if in_reply_to == "" do
         {:noreply, socket}
       else
-        reply_content =
-          ReplyPrefill.reply_content(in_reply_to, actor_handle, socket.assigns.current_user)
-
         reply_params =
           default_reply_params()
           |> Map.put("in_reply_to", in_reply_to)
-          |> Map.put("content", reply_content)
 
         socket =
           socket
@@ -343,7 +334,6 @@ defmodule EgregorosWeb.StatusLive do
             reply_options_open?: false,
             reply_cw_open?: false
           )
-          |> push_event("reply_modal_prefill", %{in_reply_to: in_reply_to, content: reply_content})
 
         {:noreply, socket}
       end

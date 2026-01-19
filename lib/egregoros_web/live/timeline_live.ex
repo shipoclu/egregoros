@@ -15,7 +15,6 @@ defmodule EgregorosWeb.TimelineLive do
   alias EgregorosWeb.Live.Uploads, as: LiveUploads
   alias EgregorosWeb.MentionAutocomplete
   alias EgregorosWeb.Param
-  alias EgregorosWeb.ReplyPrefill
   alias EgregorosWeb.ViewModels.Actor, as: ActorVM
   alias EgregorosWeb.ViewModels.Status, as: StatusVM
 
@@ -376,13 +375,9 @@ defmodule EgregorosWeb.TimelineLive do
       if in_reply_to == "" do
         {:noreply, socket}
       else
-        reply_content =
-          ReplyPrefill.reply_content(in_reply_to, actor_handle, socket.assigns.current_user)
-
         reply_params =
           default_post_params()
           |> Map.put("in_reply_to", in_reply_to)
-          |> Map.put("content", reply_content)
 
         socket =
           socket
@@ -396,7 +391,6 @@ defmodule EgregorosWeb.TimelineLive do
             reply_options_open?: false,
             reply_cw_open?: false
           )
-          |> push_event("reply_modal_prefill", %{in_reply_to: in_reply_to, content: reply_content})
 
         {:noreply, socket}
       end

@@ -717,31 +717,6 @@ defmodule EgregorosWeb.TimelineLiveTest do
     assert has_element?(view, "input[data-role='reply-in-reply-to'][value='']")
   end
 
-  test "reply modal pre-fills mentioned handles when replying", %{conn: conn, user: user} do
-    {:ok, bob} = Users.create_local_user("bob")
-    {:ok, _carol} = Users.create_local_user("carol")
-
-    assert {:ok, _create} = Publish.post_note(bob, "Hi @carol")
-    [parent] = Objects.list_notes_by_actor(bob.ap_id, limit: 1)
-
-    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
-    {:ok, view, _html} = live(conn, "/?timeline=public")
-
-    assert has_element?(view, "#post-#{parent.id}")
-
-    view
-    |> element("#post-#{parent.id} button[data-role='reply']")
-    |> render_click()
-
-    assert_push_event(view, "reply_modal_prefill", %{content: content})
-    assert content =~ "@bob"
-    assert content =~ "@carol"
-
-    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='open']")
-    assert has_element?(view, "#reply-modal-content", "@bob")
-    assert has_element?(view, "#reply-modal-content", "@carol")
-  end
-
   test "reply_change opens the content warning area when spoiler_text is present", %{
     conn: conn,
     user: user
