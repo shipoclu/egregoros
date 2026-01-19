@@ -42,7 +42,7 @@ defmodule EgregorosWeb.Components.Shared.AttachmentGrid do
               JS.show(to: "#sensitive-media-#{@id}")
               |> JS.add_class("hidden", to: "#attachments-#{@id}")
             }
-            class="inline-flex items-center gap-2 border border-[color:var(--border-muted)] bg-[color:var(--bg-subtle)] px-3 py-2 text-xs font-bold uppercase text-[color:var(--text-secondary)] transition hover:border-[color:var(--border-default)] hover:text-[color:var(--text-primary)] focus-visible:outline-none focus-brutal"
+            class="inline-flex cursor-pointer items-center gap-2 border border-[color:var(--border-muted)] bg-[color:var(--bg-subtle)] px-3 py-2 text-xs font-bold uppercase text-[color:var(--text-secondary)] transition hover:border-[color:var(--border-default)] hover:text-[color:var(--text-primary)] focus-visible:outline-none focus-brutal"
           >
             <.icon name="hero-eye-slash" class="size-4" /> Hide media
           </button>
@@ -91,7 +91,7 @@ defmodule EgregorosWeb.Components.Shared.AttachmentGrid do
           JS.hide(to: "#sensitive-media-#{@id}")
           |> JS.remove_class("hidden", to: "#attachments-#{@id}")
         }
-        class="inline-flex items-center gap-2 border-2 border-[color:var(--border-default)] bg-[color:var(--text-primary)] px-4 py-2 text-sm font-bold uppercase text-[color:var(--bg-base)] transition hover:bg-[color:var(--accent-primary-hover)] focus-visible:outline-none focus-brutal"
+        class="inline-flex cursor-pointer items-center gap-2 border-2 border-[color:var(--border-default)] bg-[color:var(--text-primary)] px-4 py-2 text-sm font-bold uppercase text-[color:var(--bg-base)] transition hover:bg-[color:var(--accent-primary-hover)] focus-visible:outline-none focus-brutal"
       >
         <.icon name="hero-eye" class="size-4" /> Reveal
       </button>
@@ -121,7 +121,7 @@ defmodule EgregorosWeb.Components.Shared.AttachmentGrid do
           data-role="attachment-open"
           data-index={@index}
           phx-click={JS.dispatch("egregoros:media-open", to: "#media-viewer")}
-          class="relative block w-full overflow-hidden text-left focus-visible:outline-none focus-brutal"
+          class="relative block w-full cursor-pointer overflow-hidden text-left focus-visible:outline-none focus-brutal"
           aria-label={attachment_label(@attachment, "Open image")}
         >
           <img

@@ -30,7 +30,7 @@ defmodule EgregorosWeb.Components.Shared.StatusMenu do
       panel_class="absolute right-0 top-9 z-40 w-48 overflow-hidden"
     >
       <:trigger>
-        <span class="inline-flex h-8 w-8 items-center justify-center text-[color:var(--text-muted)] transition hover:bg-[color:var(--bg-subtle)] hover:text-[color:var(--text-primary)] focus-visible:outline-none focus-brutal">
+        <span class="inline-flex h-8 w-8 cursor-pointer items-center justify-center text-[color:var(--text-muted)] transition hover:bg-[color:var(--bg-subtle)] hover:text-[color:var(--text-primary)] focus-visible:outline-none focus-brutal">
           <.icon name="hero-ellipsis-horizontal" class="size-5" />
         </span>
       </:trigger>
@@ -45,7 +45,7 @@ defmodule EgregorosWeb.Components.Shared.StatusMenu do
           |> JS.push("copied_link")
           |> JS.remove_attribute("open", to: "##{@menu_id}")
         }
-        class="flex w-full items-center gap-3 px-4 py-2.5 text-sm font-medium text-[color:var(--text-primary)] transition hover:bg-[color:var(--bg-subtle)]"
+        class="flex w-full cursor-pointer items-center gap-3 px-4 py-2.5 text-sm font-medium text-[color:var(--text-primary)] transition hover:bg-[color:var(--bg-subtle)]"
       >
         <.icon name="hero-clipboard-document" class="size-5 text-[color:var(--text-muted)]" />
         Copy link
@@ -57,7 +57,7 @@ defmodule EgregorosWeb.Components.Shared.StatusMenu do
         href={@share_url}
         target="_blank"
         rel="nofollow noopener noreferrer"
-        class="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-[color:var(--text-primary)] transition hover:bg-[color:var(--bg-subtle)]"
+        class="flex cursor-pointer items-center gap-3 px-4 py-2.5 text-sm font-medium text-[color:var(--text-primary)] transition hover:bg-[color:var(--bg-subtle)]"
       >
         <.icon
           name="hero-arrow-top-right-on-square"
@@ -74,7 +74,7 @@ defmodule EgregorosWeb.Components.Shared.StatusMenu do
         phx-value-feed-id={@feed_id}
         phx-disable-with="..."
         class={[
-          "flex w-full items-center gap-3 px-4 py-2.5 text-sm font-medium transition hover:bg-[color:var(--bg-subtle)]",
+          "flex w-full cursor-pointer items-center gap-3 px-4 py-2.5 text-sm font-medium transition hover:bg-[color:var(--bg-subtle)]",
           @bookmarked? && "text-[color:var(--text-primary)]",
           !@bookmarked? && "text-[color:var(--text-primary)]"
         ]}
@@ -96,7 +96,7 @@ defmodule EgregorosWeb.Components.Shared.StatusMenu do
             type="button"
             data-role="delete-post"
             phx-click={JS.toggle(to: "#delete-post-confirm-#{@card_id}")}
-            class="flex w-full items-center gap-3 px-4 py-2.5 text-sm font-medium text-[color:var(--danger)] transition hover:bg-[color:var(--danger-subtle)]"
+            class="flex w-full cursor-pointer items-center gap-3 px-4 py-2.5 text-sm font-medium text-[color:var(--danger)] transition hover:bg-[color:var(--danger-subtle)]"
           >
             <.icon name="hero-trash" class="size-5" /> Delete post
           </button>
@@ -114,7 +114,7 @@ defmodule EgregorosWeb.Components.Shared.StatusMenu do
                 type="button"
                 data-role="delete-post-cancel"
                 phx-click={JS.hide(to: "#delete-post-confirm-#{@card_id}")}
-                class="inline-flex items-center justify-center border border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-3 py-1.5 text-xs font-bold uppercase text-[color:var(--text-primary)] transition hover:bg-[color:var(--bg-subtle)] focus-visible:outline-none focus-brutal"
+                class="inline-flex cursor-pointer items-center justify-center border border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-3 py-1.5 text-xs font-bold uppercase text-[color:var(--text-primary)] transition hover:bg-[color:var(--bg-subtle)] focus-visible:outline-none focus-brutal"
               >
                 Cancel
               </button>
@@ -125,7 +125,7 @@ defmodule EgregorosWeb.Components.Shared.StatusMenu do
                 phx-click="delete_post"
                 phx-value-id={@entry.object.id}
                 phx-disable-with="Deleting..."
-                class="inline-flex items-center justify-center border-2 border-[color:var(--danger)] bg-[color:var(--danger)] px-3 py-1.5 text-xs font-bold uppercase text-[color:var(--bg-base)] transition hover:bg-[color:var(--danger-subtle)] hover:text-[color:var(--danger)] focus-visible:outline-none focus-brutal"
+                class="inline-flex cursor-pointer items-center justify-center border-2 border-[color:var(--danger)] bg-[color:var(--danger)] px-3 py-1.5 text-xs font-bold uppercase text-[color:var(--bg-base)] transition hover:bg-[color:var(--danger-subtle)] hover:text-[color:var(--danger)] focus-visible:outline-none focus-brutal"
               >
                 Delete
               </button>

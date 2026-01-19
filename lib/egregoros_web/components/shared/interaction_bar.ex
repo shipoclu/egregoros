@@ -235,7 +235,7 @@ defmodule EgregorosWeb.Components.Shared.InteractionBar do
         aria-label="Add reaction"
         aria-haspopup="menu"
         aria-expanded="false"
-        class="inline-flex h-9 w-9 items-center justify-center border border-[color:var(--border-muted)] bg-[color:var(--bg-base)] text-[color:var(--text-muted)] transition hover:border-[color:var(--border-default)] hover:text-[color:var(--text-primary)] focus-visible:outline-none focus-brutal"
+        class="inline-flex h-9 w-9 cursor-pointer items-center justify-center border border-[color:var(--border-muted)] bg-[color:var(--bg-base)] text-[color:var(--text-muted)] transition hover:border-[color:var(--border-default)] hover:text-[color:var(--text-primary)] focus-visible:outline-none focus-brutal"
       >
         <.icon name="hero-face-smile" class="size-5" />
       </button>

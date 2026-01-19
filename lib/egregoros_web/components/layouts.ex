@@ -151,7 +151,7 @@ defmodule EgregorosWeb.Layouts do
                     <button
                       type="submit"
                       data-role="user-menu-logout"
-                      class="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm font-medium uppercase text-[color:var(--danger)] transition hover:bg-[color:var(--bg-muted)] focus-visible:bg-[color:var(--bg-muted)] focus-visible:outline-none"
+                      class="flex w-full cursor-pointer items-center gap-3 px-3 py-2.5 text-left text-sm font-medium uppercase text-[color:var(--danger)] transition hover:bg-[color:var(--bg-muted)] focus-visible:bg-[color:var(--bg-muted)] focus-visible:outline-none"
                     >
                       <.icon name="hero-arrow-right-on-rectangle" class="size-4" /> Logout
                     </button>
@@ -245,7 +245,7 @@ defmodule EgregorosWeb.Layouts do
     <div class="flex items-center gap-0 border border-[color:var(--border-default)] bg-[color:var(--bg-subtle)]">
       <button
         type="button"
-        class="flex h-8 w-8 items-center justify-center text-[color:var(--text-muted)] transition hover:bg-[color:var(--bg-base)] hover:text-[color:var(--text-primary)] [[data-theme-mode=system]_&]:bg-[color:var(--text-primary)] [[data-theme-mode=system]_&]:text-[color:var(--bg-base)]"
+        class="flex h-8 w-8 cursor-pointer items-center justify-center text-[color:var(--text-muted)] transition hover:bg-[color:var(--bg-base)] hover:text-[color:var(--text-primary)] [[data-theme-mode=system]_&]:bg-[color:var(--text-primary)] [[data-theme-mode=system]_&]:text-[color:var(--bg-base)]"
         phx-click={JS.dispatch("phx:set-theme")}
         data-phx-theme="system"
         aria-label="Use system theme"
@@ -255,7 +255,7 @@ defmodule EgregorosWeb.Layouts do
 
       <button
         type="button"
-        class="flex h-8 w-8 items-center justify-center text-[color:var(--text-muted)] transition hover:bg-[color:var(--bg-base)] hover:text-[color:var(--text-primary)] [[data-theme-mode=light]_&]:bg-[color:var(--text-primary)] [[data-theme-mode=light]_&]:text-[color:var(--bg-base)]"
+        class="flex h-8 w-8 cursor-pointer items-center justify-center text-[color:var(--text-muted)] transition hover:bg-[color:var(--bg-base)] hover:text-[color:var(--text-primary)] [[data-theme-mode=light]_&]:bg-[color:var(--text-primary)] [[data-theme-mode=light]_&]:text-[color:var(--bg-base)]"
         phx-click={JS.dispatch("phx:set-theme")}
         data-phx-theme="light"
         aria-label="Use light theme"
@@ -265,7 +265,7 @@ defmodule EgregorosWeb.Layouts do
 
       <button
         type="button"
-        class="flex h-8 w-8 items-center justify-center text-[color:var(--text-muted)] transition hover:bg-[color:var(--bg-base)] hover:text-[color:var(--text-primary)] [[data-theme-mode=dark]_&]:bg-[color:var(--text-primary)] [[data-theme-mode=dark]_&]:text-[color:var(--bg-base)]"
+        class="flex h-8 w-8 cursor-pointer items-center justify-center text-[color:var(--text-muted)] transition hover:bg-[color:var(--bg-base)] hover:text-[color:var(--text-primary)] [[data-theme-mode=dark]_&]:bg-[color:var(--text-primary)] [[data-theme-mode=dark]_&]:text-[color:var(--bg-base)]"
         phx-click={JS.dispatch("phx:set-theme")}
         data-phx-theme="dark"
         aria-label="Use dark theme"

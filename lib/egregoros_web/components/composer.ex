@@ -75,7 +75,7 @@ defmodule EgregorosWeb.Composer do
               type="button"
               data-role="compose-visibility-pill"
               phx-click={toggle_menu_js(@visibility_menu_id)}
-              class="inline-flex items-center gap-2 border border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-3 py-2 text-xs font-bold uppercase text-[color:var(--text-primary)] transition hover:bg-[color:var(--bg-subtle)] focus-visible:outline-none focus-brutal"
+              class="inline-flex cursor-pointer items-center gap-2 border border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-3 py-2 text-xs font-bold uppercase text-[color:var(--text-primary)] transition hover:bg-[color:var(--bg-subtle)] focus-visible:outline-none focus-brutal"
               aria-label="Post visibility"
               aria-expanded="false"
             >
@@ -125,7 +125,7 @@ defmodule EgregorosWeb.Composer do
               type="button"
               data-role="compose-language-pill"
               phx-click={toggle_menu_js(@language_menu_id)}
-              class="inline-flex items-center gap-2 border border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-3 py-2 text-xs font-bold uppercase text-[color:var(--text-primary)] transition hover:bg-[color:var(--bg-subtle)] focus-visible:outline-none focus-brutal"
+              class="inline-flex cursor-pointer items-center gap-2 border border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-3 py-2 text-xs font-bold uppercase text-[color:var(--text-primary)] transition hover:bg-[color:var(--bg-subtle)] focus-visible:outline-none focus-brutal"
               aria-label="Post language"
               aria-expanded="false"
             >
@@ -217,7 +217,7 @@ defmodule EgregorosWeb.Composer do
                         }
                       )
                     }
-                    class="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-[color:var(--bg-subtle)] focus-visible:outline-none focus-brutal"
+                    class="flex w-full cursor-pointer items-center gap-3 px-4 py-3 text-left transition hover:bg-[color:var(--bg-subtle)] focus-visible:outline-none focus-brutal"
                   >
                     <div class="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden border border-[color:var(--border-default)] bg-[color:var(--bg-subtle)] text-sm font-bold text-[color:var(--text-secondary)]">
                       <img
@@ -310,7 +310,7 @@ defmodule EgregorosWeb.Composer do
                     type="button"
                     phx-click={@cancel_event}
                     phx-value-ref={entry.ref}
-                    class="absolute right-2 top-2 inline-flex h-9 w-9 items-center justify-center border border-[color:var(--border-default)] bg-[color:var(--bg-base)] text-[color:var(--text-muted)] shadow-sm transition hover:bg-[color:var(--bg-subtle)] hover:text-[color:var(--text-primary)] focus-visible:outline-none focus-brutal"
+                    class="absolute right-2 top-2 inline-flex h-9 w-9 cursor-pointer items-center justify-center border border-[color:var(--border-default)] bg-[color:var(--bg-base)] text-[color:var(--text-muted)] shadow-sm transition hover:bg-[color:var(--bg-subtle)] hover:text-[color:var(--text-primary)] focus-visible:outline-none focus-brutal"
                     aria-label="Remove attachment"
                   >
                     <.icon name="hero-x-mark" class="size-4" />
@@ -398,7 +398,7 @@ defmodule EgregorosWeb.Composer do
               phx-click={toggle_cw_js(@cw_id) |> JS.push(@toggle_cw_event)}
               aria-label="Content warning"
               class={[
-                "inline-flex h-10 w-10 items-center justify-center transition focus-visible:outline-none focus-brutal",
+                "inline-flex h-10 w-10 cursor-pointer items-center justify-center transition focus-visible:outline-none focus-brutal",
                 @cw_open? &&
                   "bg-[color:var(--warning-subtle)] text-[color:var(--warning)]",
                 !@cw_open? &&
@@ -414,7 +414,7 @@ defmodule EgregorosWeb.Composer do
               phx-click={toggle_options_js(@options_id, @options_state_id)}
               aria-label="Post options"
               class={[
-                "inline-flex h-10 w-10 items-center justify-center transition focus-visible:outline-none focus-brutal",
+                "inline-flex h-10 w-10 cursor-pointer items-center justify-center transition focus-visible:outline-none focus-brutal",
                 @options_open? &&
                   "bg-[color:var(--bg-muted)] text-[color:var(--text-primary)]",
                 !@options_open? &&
