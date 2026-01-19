@@ -4,6 +4,7 @@ defmodule Egregoros.Activities.AnswerIngestTest do
   alias Egregoros.Objects
   alias Egregoros.Pipeline
   alias Egregoros.Relationships
+  alias Egregoros.Timeline
   alias Egregoros.Users
   alias EgregorosWeb.Endpoint
 
@@ -80,6 +81,31 @@ defmodule Egregoros.Activities.AnswerIngestTest do
 
       red_option = Enum.find(updated_poll.data["oneOf"], &(&1["name"] == "Red"))
       assert red_option["replies"]["totalItems"] == 1
+    end
+
+    test "broadcasts post_updated when a vote is counted", %{poll: poll} do
+      Timeline.subscribe_public()
+
+      voter_ap_id = "https://remote.example/users/voter"
+
+      answer = %{
+        "id" => "https://remote.example/objects/" <> Ecto.UUID.generate(),
+        "type" => "Answer",
+        "actor" => voter_ap_id,
+        "attributedTo" => voter_ap_id,
+        "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+        "name" => "Green",
+        "inReplyTo" => poll.ap_id
+      }
+
+      assert {:ok, _answer_object} = Pipeline.ingest(answer, local: false)
+
+      poll_ap_id = poll.ap_id
+
+      assert_receive {:post_updated, %Egregoros.Object{ap_id: ^poll_ap_id} = updated_poll}
+
+      green_option = Enum.find(updated_poll.data["oneOf"], &(&1["name"] == "Green"))
+      assert green_option["replies"]["totalItems"] == 1
     end
 
     test "side_effects records voter metadata in internal state", %{poll: poll, bob: bob} do
