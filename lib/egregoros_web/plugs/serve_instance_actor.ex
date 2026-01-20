@@ -40,7 +40,7 @@ defmodule EgregorosWeb.Plugs.ServeInstanceActor do
         "https://w3id.org/security/v1"
       ],
       "id" => base_url,
-      "type" => "Service",
+      "type" => "Application",
       "preferredUsername" => actor.nickname,
       "name" => "Egregoros",
       "summary" => "Egregoros instance actor.",

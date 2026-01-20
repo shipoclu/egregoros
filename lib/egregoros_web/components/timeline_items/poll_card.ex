@@ -149,7 +149,7 @@ defmodule EgregorosWeb.Components.TimelineItems.PollCard do
       <div class="mt-4">
         <button
           type="submit"
-          class="inline-flex items-center gap-2 border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-4 py-2 text-sm font-medium text-[color:var(--text-primary)] transition hover:bg-[color:var(--bg-subtle)] focus-visible:outline-none focus-brutal"
+          class="inline-flex cursor-pointer items-center gap-2 border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-4 py-2 text-sm font-medium text-[color:var(--text-primary)] transition hover:bg-[color:var(--bg-subtle)] focus-visible:outline-none focus-brutal"
         >
           <.icon name="hero-check" class="size-4" /> Vote
         </button>

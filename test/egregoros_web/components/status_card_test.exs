@@ -76,7 +76,7 @@ defmodule EgregorosWeb.StatusCardTest do
     assert html =~ ~s(data-emoji="😀")
   end
 
-  test "renders a reaction picker for adding more emoji reactions" do
+  test "renders a reaction picker hook for adding more emoji reactions" do
     html =
       render_component(&StatusCard.status_card/1, %{
         id: "post-1",
@@ -104,11 +104,49 @@ defmodule EgregorosWeb.StatusCardTest do
       })
 
     assert html =~ ~s(data-role="reaction-picker")
-    assert html =~ ~s(data-role="reaction-picker-option")
-    assert html =~ ~s(data-emoji="😀")
+    assert html =~ ~s(phx-hook="ReactionPicker")
+    assert html =~ ~s(data-post-id="1")
+    assert html =~ ~s(data-feed-id="1")
+    assert html =~ ~s(data-role="reaction-picker-toggle")
+    assert html =~ ~s(data-role="reaction-picker-menu")
+    assert html =~ ~s(data-role="reaction-picker-grid")
+    refute html =~ ~s(data-role="reaction-picker-option")
 
     assert html =~
              ~r/id="reaction-picker-post-1".*shadow-\[4px_4px_0_var\(--border-default\)\]/s
+  end
+
+  test "renders a reply link when permalinks are available" do
+    html =
+      render_component(&StatusCard.status_card/1, %{
+        id: "post-1",
+        current_user: %{id: 1},
+        reply_mode: :navigate,
+        entry: %{
+          object: %{
+            id: 1,
+            ap_id: "http://localhost:4000/objects/uuid-1",
+            type: "Note",
+            inserted_at: ~U[2025-01-01 00:00:00Z],
+            local: true,
+            data: %{"content" => "Hello world"}
+          },
+          actor: %{
+            display_name: "Alice",
+            nickname: "alice",
+            handle: "@alice",
+            avatar_url: nil
+          },
+          attachments: [],
+          liked?: false,
+          likes_count: 0,
+          reposted?: false,
+          reposts_count: 0,
+          reactions: %{"🔥" => %{count: 0, reacted?: false}}
+        }
+      })
+
+    assert html =~ ~s(href="/@alice/uuid-1?reply=true#reply-form")
   end
 
   test "renders custom emojis in post content when ActivityPub emoji tags are present" do

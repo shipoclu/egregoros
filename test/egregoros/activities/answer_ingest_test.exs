@@ -108,6 +108,84 @@ defmodule Egregoros.Activities.AnswerIngestTest do
       assert green_option["replies"]["totalItems"] == 1
     end
 
+    test "does not broadcast post_updated when vote is a noop (invalid option)", %{
+      poll: poll,
+      bob: bob
+    } do
+      poll_ap_id = poll.ap_id
+      Timeline.subscribe_public()
+
+      answer = %{
+        "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
+        "type" => "Answer",
+        "attributedTo" => bob.ap_id,
+        "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+        "name" => "Purple",
+        "inReplyTo" => poll.ap_id
+      }
+
+      assert {:ok, _answer_object} = Pipeline.ingest(answer, local: true)
+
+      updated_poll = Objects.get_by_ap_id(poll.ap_id)
+
+      for option <- updated_poll.data["oneOf"] do
+        assert option["replies"]["totalItems"] == 0
+      end
+
+      refute_receive {:post_updated, %Egregoros.Object{ap_id: ^poll_ap_id}}, 50
+    end
+
+    test "does not broadcast post_updated to public for followers-only polls" do
+      {:ok, owner} = Users.create_local_user("poll_broadcast_followers_owner")
+
+      question = %{
+        "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
+        "type" => "Question",
+        "attributedTo" => owner.ap_id,
+        "context" => Endpoint.url() <> "/contexts/" <> Ecto.UUID.generate(),
+        "to" => [owner.ap_id <> "/followers"],
+        "cc" => [],
+        "content" => "Followers-only poll",
+        "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
+        "oneOf" => [
+          %{"name" => "Red", "replies" => %{"totalItems" => 0}},
+          %{"name" => "Blue", "replies" => %{"totalItems" => 0}}
+        ]
+      }
+
+      {:ok, poll} = Pipeline.ingest(question, local: true)
+
+      poll_ap_id = poll.ap_id
+      Timeline.subscribe_public()
+
+      voter_ap_id = "https://remote.example/users/follower"
+
+      assert {:ok, _relationship} =
+               Relationships.upsert_relationship(%{
+                 type: "Follow",
+                 actor: voter_ap_id,
+                 object: owner.ap_id
+               })
+
+      answer = %{
+        "id" => "https://remote.example/objects/" <> Ecto.UUID.generate(),
+        "type" => "Answer",
+        "actor" => voter_ap_id,
+        "attributedTo" => voter_ap_id,
+        "to" => [owner.ap_id],
+        "name" => "Blue",
+        "inReplyTo" => poll.ap_id
+      }
+
+      assert {:ok, _answer_object} = Pipeline.ingest(answer, local: false)
+
+      updated_poll = Objects.get_by_ap_id(poll.ap_id)
+      blue_option = Enum.find(updated_poll.data["oneOf"], &(&1["name"] == "Blue"))
+      assert blue_option["replies"]["totalItems"] == 1
+
+      refute_receive {:post_updated, %Egregoros.Object{ap_id: ^poll_ap_id}}, 50
+    end
+
     test "side_effects records voter metadata in internal state", %{poll: poll, bob: bob} do
       answer = %{
         "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
@@ -245,6 +323,308 @@ defmodule Egregoros.Activities.AnswerIngestTest do
       assert option["replies"]["totalItems"] == 1
 
       assert Objects.get_by_type_actor_object("Answer", voter_ap_id, poll.ap_id)
+    end
+
+    test "ingests remote Create where only the Create has recipients (embedded vote has no to/cc)" do
+      {:ok, owner} = Users.create_local_user("poll_owner_create_recipients")
+
+      question = %{
+        "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
+        "type" => "Question",
+        "attributedTo" => owner.ap_id,
+        "context" => Endpoint.url() <> "/contexts/" <> Ecto.UUID.generate(),
+        "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+        "content" => "Remote vote poll",
+        "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
+        "oneOf" => [
+          %{"name" => "yes", "replies" => %{"type" => "Collection", "totalItems" => 0}},
+          %{"name" => "no", "replies" => %{"type" => "Collection", "totalItems" => 0}}
+        ]
+      }
+
+      {:ok, poll} = Pipeline.ingest(question, local: true)
+
+      voter_ap_id = "https://remote.example/users/voter"
+
+      activity = %{
+        "id" => "https://remote.example/activities/" <> Ecto.UUID.generate(),
+        "type" => "Create",
+        "actor" => voter_ap_id,
+        "to" => [owner.ap_id],
+        "cc" => [],
+        "object" => %{
+          "id" => "https://remote.example/objects/" <> Ecto.UUID.generate(),
+          "type" => "Note",
+          "actor" => voter_ap_id,
+          "attributedTo" => voter_ap_id,
+          "name" => "no",
+          "inReplyTo" => poll.ap_id
+        }
+      }
+
+      assert {:ok, _create} =
+               Pipeline.ingest(activity, local: false, inbox_user_ap_id: owner.ap_id)
+
+      updated_poll = Objects.get_by_ap_id(poll.ap_id)
+      option = Enum.find(updated_poll.data["oneOf"], &(&1["name"] == "no"))
+      assert option["replies"]["totalItems"] == 1
+
+      assert Objects.get_by_type_actor_object("Answer", voter_ap_id, poll.ap_id)
+    end
+
+    test "rejects remote Create vote for followers-only poll when voter is not a follower" do
+      {:ok, owner} = Users.create_local_user("poll_owner_create_followers_only")
+
+      question = %{
+        "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
+        "type" => "Question",
+        "attributedTo" => owner.ap_id,
+        "context" => Endpoint.url() <> "/contexts/" <> Ecto.UUID.generate(),
+        "to" => [owner.ap_id <> "/followers"],
+        "cc" => [],
+        "content" => "Followers-only vote poll",
+        "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
+        "oneOf" => [
+          %{"name" => "yes", "replies" => %{"type" => "Collection", "totalItems" => 0}},
+          %{"name" => "no", "replies" => %{"type" => "Collection", "totalItems" => 0}}
+        ]
+      }
+
+      {:ok, poll} = Pipeline.ingest(question, local: true)
+
+      voter_ap_id = "https://remote.example/users/voter"
+
+      activity = %{
+        "id" => "https://remote.example/activities/" <> Ecto.UUID.generate(),
+        "type" => "Create",
+        "actor" => voter_ap_id,
+        "to" => [owner.ap_id],
+        "cc" => [],
+        "object" => %{
+          "id" => "https://remote.example/objects/" <> Ecto.UUID.generate(),
+          "type" => "Note",
+          "actor" => voter_ap_id,
+          "attributedTo" => voter_ap_id,
+          "name" => "no",
+          "inReplyTo" => poll.ap_id
+        }
+      }
+
+      assert {:error, :voter_not_permitted} =
+               Pipeline.ingest(activity, local: false, inbox_user_ap_id: owner.ap_id)
+
+      updated_poll = Objects.get_by_ap_id(poll.ap_id)
+      option = Enum.find(updated_poll.data["oneOf"], &(&1["name"] == "no"))
+      assert option["replies"]["totalItems"] == 0
+
+      refute Objects.get_by_type_actor_object("Answer", voter_ap_id, poll.ap_id)
+    end
+
+    test "does not double-count or rebroadcast on repeated Create votes for oneOf polls" do
+      {:ok, owner} = Users.create_local_user("poll_owner_create_idempotent_oneof")
+
+      question = %{
+        "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
+        "type" => "Question",
+        "attributedTo" => owner.ap_id,
+        "context" => Endpoint.url() <> "/contexts/" <> Ecto.UUID.generate(),
+        "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+        "cc" => [owner.ap_id <> "/followers"],
+        "content" => "Idempotent vote poll",
+        "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
+        "oneOf" => [
+          %{"name" => "yes", "replies" => %{"type" => "Collection", "totalItems" => 0}},
+          %{"name" => "no", "replies" => %{"type" => "Collection", "totalItems" => 0}}
+        ]
+      }
+
+      {:ok, poll} = Pipeline.ingest(question, local: true)
+
+      Timeline.subscribe_public()
+
+      poll_ap_id = poll.ap_id
+      voter_ap_id = "https://remote.example/users/voter"
+
+      create1 = %{
+        "id" => "https://remote.example/activities/" <> Ecto.UUID.generate(),
+        "type" => "Create",
+        "actor" => voter_ap_id,
+        "to" => [owner.ap_id],
+        "cc" => [],
+        "object" => %{
+          "id" => "https://remote.example/objects/" <> Ecto.UUID.generate(),
+          "type" => "Note",
+          "actor" => voter_ap_id,
+          "attributedTo" => voter_ap_id,
+          "name" => "yes",
+          "inReplyTo" => poll_ap_id
+        }
+      }
+
+      assert {:ok, _create} =
+               Pipeline.ingest(create1, local: false, inbox_user_ap_id: owner.ap_id)
+
+      assert_receive {:post_updated, %Egregoros.Object{ap_id: ^poll_ap_id}}
+
+      create2 = %{
+        "id" => "https://remote.example/activities/" <> Ecto.UUID.generate(),
+        "type" => "Create",
+        "actor" => voter_ap_id,
+        "to" => [owner.ap_id],
+        "cc" => [],
+        "object" => %{
+          "id" => "https://remote.example/objects/" <> Ecto.UUID.generate(),
+          "type" => "Note",
+          "actor" => voter_ap_id,
+          "attributedTo" => voter_ap_id,
+          "name" => "yes",
+          "inReplyTo" => poll_ap_id
+        }
+      }
+
+      assert {:ok, _create} =
+               Pipeline.ingest(create2, local: false, inbox_user_ap_id: owner.ap_id)
+
+      refute_receive {:post_updated, %Egregoros.Object{ap_id: ^poll_ap_id}}, 50
+
+      updated_poll = Objects.get_by_ap_id(poll_ap_id)
+      yes_option = Enum.find(updated_poll.data["oneOf"], &(&1["name"] == "yes"))
+      assert yes_option["replies"]["totalItems"] == 1
+    end
+
+    test "prevents double-counting an anyOf option on repeated Create votes but allows other options" do
+      {:ok, owner} = Users.create_local_user("poll_owner_create_idempotent_anyof")
+
+      question = %{
+        "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
+        "type" => "Question",
+        "attributedTo" => owner.ap_id,
+        "context" => Endpoint.url() <> "/contexts/" <> Ecto.UUID.generate(),
+        "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+        "cc" => [owner.ap_id <> "/followers"],
+        "content" => "Idempotent multi vote poll",
+        "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
+        "anyOf" => [
+          %{"name" => "Option A", "replies" => %{"type" => "Collection", "totalItems" => 0}},
+          %{"name" => "Option B", "replies" => %{"type" => "Collection", "totalItems" => 0}}
+        ]
+      }
+
+      {:ok, poll} = Pipeline.ingest(question, local: true)
+
+      Timeline.subscribe_public()
+
+      poll_ap_id = poll.ap_id
+      voter_ap_id = "https://remote.example/users/voter"
+
+      vote_a_1 = %{
+        "id" => "https://remote.example/activities/" <> Ecto.UUID.generate(),
+        "type" => "Create",
+        "actor" => voter_ap_id,
+        "to" => [owner.ap_id],
+        "cc" => [],
+        "object" => %{
+          "id" => "https://remote.example/objects/" <> Ecto.UUID.generate(),
+          "type" => "Note",
+          "actor" => voter_ap_id,
+          "attributedTo" => voter_ap_id,
+          "name" => "Option A",
+          "inReplyTo" => poll_ap_id
+        }
+      }
+
+      assert {:ok, _create} =
+               Pipeline.ingest(vote_a_1, local: false, inbox_user_ap_id: owner.ap_id)
+
+      assert_receive {:post_updated, %Egregoros.Object{ap_id: ^poll_ap_id}}
+
+      vote_a_2 = %{
+        "id" => "https://remote.example/activities/" <> Ecto.UUID.generate(),
+        "type" => "Create",
+        "actor" => voter_ap_id,
+        "to" => [owner.ap_id],
+        "cc" => [],
+        "object" => %{
+          "id" => "https://remote.example/objects/" <> Ecto.UUID.generate(),
+          "type" => "Note",
+          "actor" => voter_ap_id,
+          "attributedTo" => voter_ap_id,
+          "name" => "Option A",
+          "inReplyTo" => poll_ap_id
+        }
+      }
+
+      assert {:ok, _create} =
+               Pipeline.ingest(vote_a_2, local: false, inbox_user_ap_id: owner.ap_id)
+
+      refute_receive {:post_updated, %Egregoros.Object{ap_id: ^poll_ap_id}}, 50
+
+      vote_b = %{
+        "id" => "https://remote.example/activities/" <> Ecto.UUID.generate(),
+        "type" => "Create",
+        "actor" => voter_ap_id,
+        "to" => [owner.ap_id],
+        "cc" => [],
+        "object" => %{
+          "id" => "https://remote.example/objects/" <> Ecto.UUID.generate(),
+          "type" => "Note",
+          "actor" => voter_ap_id,
+          "attributedTo" => voter_ap_id,
+          "name" => "Option B",
+          "inReplyTo" => poll_ap_id
+        }
+      }
+
+      assert {:ok, _create} = Pipeline.ingest(vote_b, local: false, inbox_user_ap_id: owner.ap_id)
+
+      assert_receive {:post_updated, %Egregoros.Object{ap_id: ^poll_ap_id}}
+
+      updated_poll = Objects.get_by_ap_id(poll_ap_id)
+      opt_a = Enum.find(updated_poll.data["anyOf"], &(&1["name"] == "Option A"))
+      opt_b = Enum.find(updated_poll.data["anyOf"], &(&1["name"] == "Option B"))
+      assert opt_a["replies"]["totalItems"] == 1
+      assert opt_b["replies"]["totalItems"] == 1
+    end
+
+    test "does not misclassify Create + Note as a poll vote when inReplyTo is not a Question" do
+      {:ok, inbox_user} = Users.create_local_user("create_vote_conversion_inbox_user")
+
+      parent_note = %{
+        "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
+        "type" => "Note",
+        "attributedTo" => inbox_user.ap_id,
+        "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+        "cc" => [inbox_user.ap_id <> "/followers"],
+        "content" => "Not a poll",
+        "published" => DateTime.utc_now() |> DateTime.to_iso8601()
+      }
+
+      {:ok, parent} = Pipeline.ingest(parent_note, local: true)
+
+      actor = "https://remote.example/users/alice"
+      object_id = "https://remote.example/objects/" <> Ecto.UUID.generate()
+
+      activity = %{
+        "id" => "https://remote.example/activities/" <> Ecto.UUID.generate(),
+        "type" => "Create",
+        "actor" => actor,
+        "to" => [inbox_user.ap_id],
+        "cc" => [],
+        "object" => %{
+          "id" => object_id,
+          "type" => "Note",
+          "actor" => actor,
+          "attributedTo" => actor,
+          "name" => "Not a vote",
+          "inReplyTo" => parent.ap_id,
+          "content" => "This is a reply, not a poll vote"
+        }
+      }
+
+      assert {:ok, _create} =
+               Pipeline.ingest(activity, local: false, inbox_user_ap_id: inbox_user.ap_id)
+
+      assert %{type: "Note"} = Objects.get_by_ap_id(object_id)
     end
   end
 

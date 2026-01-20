@@ -140,31 +140,34 @@ defmodule EgregorosWeb.TagLiveTest do
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     assert {:ok, view, _html} = live(conn, "/tags/elixir")
 
-    refute has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='open']")
+    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='closed']")
+
+    reply_html =
+      view
+      |> element("#post-#{note.id} button[data-role='reply']")
+      |> render()
 
     view
-    |> element("#post-#{note.id} button[data-role='reply']")
-    |> render_click()
-
-    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='open']")
-
-    view
-    |> form("#reply-modal-form", reply: %{content: "A reply"})
+    |> form("#reply-modal-form", reply: %{in_reply_to: note.ap_id, content: "A reply"})
     |> render_submit()
+
+    assert reply_html =~ "egregoros:reply-open"
+    assert reply_html =~ note.ap_id
+    refute reply_html =~ "open_reply_modal"
 
     [reply] = Objects.list_replies_to(note.ap_id, limit: 1)
     assert reply.data["inReplyTo"] == note.ap_id
   end
 
-  test "reply composer mention autocomplete suggests users", %{conn: conn, user: user, note: note} do
+  test "reply composer mention autocomplete suggests users", %{
+    conn: conn,
+    user: user,
+    note: _note
+  } do
     {:ok, _} = Users.create_local_user("bob")
 
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     assert {:ok, view, _html} = live(conn, "/tags/elixir")
-
-    view
-    |> element("#post-#{note.id} button[data-role='reply']")
-    |> render_click()
 
     _html = render_hook(view, "mention_search", %{"q" => "bo", "scope" => "reply-modal"})
     assert has_element?(view, "[data-role='mention-suggestion']", "@bob")
@@ -223,14 +226,10 @@ defmodule EgregorosWeb.TagLiveTest do
   test "reply composer supports attachments and can cancel them", %{
     conn: conn,
     user: user,
-    note: note
+    note: _note
   } do
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     assert {:ok, view, _html} = live(conn, "/tags/elixir")
-
-    view
-    |> element("#post-#{note.id} button[data-role='reply']")
-    |> render_click()
 
     fixture_path = Fixtures.path!("DSCN0010.png")
     content = File.read!(fixture_path)
@@ -257,19 +256,15 @@ defmodule EgregorosWeb.TagLiveTest do
     refute has_element?(view, "[data-role='media-entry']")
   end
 
-  test "reply modal can be closed and local state toggles render without navigation", %{
+  test "reply composer state reacts to cw toggles and reply_change events", %{
     conn: conn,
     user: user,
-    note: note
+    note: _note
   } do
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     assert {:ok, view, _html} = live(conn, "/tags/elixir")
 
-    view
-    |> element("#post-#{note.id} button[data-role='reply']")
-    |> render_click()
-
-    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='open']")
+    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='closed']")
 
     _html =
       render_change(view, "reply_change", %{
@@ -281,10 +276,6 @@ defmodule EgregorosWeb.TagLiveTest do
     _html = render_click(view, "toggle_reply_cw", %{})
 
     assert has_element?(view, "[data-role='compose-cw'][data-state='closed']")
-
-    _html = render_click(view, "close_reply_modal", %{})
-
-    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='closed']")
   end
 
   test "signed-out users cannot interact with tag timelines", %{conn: conn, note: note} do
@@ -328,40 +319,5 @@ defmodule EgregorosWeb.TagLiveTest do
     |> render_click()
 
     refute has_element?(view, "button[data-role='tag-load-more']")
-  end
-
-  test "closing the reply modal clears queued uploads", %{conn: conn, user: user, note: note} do
-    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
-    assert {:ok, view, _html} = live(conn, "/tags/elixir")
-
-    view
-    |> element("#post-#{note.id} button[data-role='reply']")
-    |> render_click()
-
-    fixture_path = Fixtures.path!("DSCN0010.png")
-    content = File.read!(fixture_path)
-
-    upload =
-      file_input(view, "#reply-modal-form", :reply_media, [
-        %{
-          last_modified: 1_694_171_879_000,
-          name: "photo.png",
-          content: content,
-          size: byte_size(content),
-          type: "image/png"
-        }
-      ])
-
-    assert render_upload(upload, "photo.png") =~ "100%"
-    assert has_element?(view, "[data-role='media-entry']")
-
-    _html = render_click(view, "close_reply_modal", %{})
-    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='closed']")
-
-    view
-    |> element("#post-#{note.id} button[data-role='reply']")
-    |> render_click()
-
-    refute has_element?(view, "[data-role='media-entry']")
   end
 end

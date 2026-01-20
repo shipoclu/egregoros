@@ -4,6 +4,7 @@ defmodule Egregoros.Federation.Actor do
   alias Egregoros.HTTP
   alias Egregoros.Federation.SignedFetch
   alias Egregoros.SafeURL
+  alias Egregoros.UserEvents
   alias Egregoros.Users
 
   def fetch_and_store(actor_url) when is_binary(actor_url) do
@@ -11,6 +12,7 @@ defmodule Egregoros.Federation.Actor do
          {:ok, actor} <- fetch_actor(actor_url),
          {:ok, attrs} <- to_user_attrs(actor, actor_url),
          {:ok, user} <- Users.upsert_user(attrs) do
+      _ = UserEvents.broadcast_update(user.ap_id)
       {:ok, user}
     else
       {:error, _} = error -> error
@@ -47,6 +49,7 @@ defmodule Egregoros.Federation.Actor do
          :ok <- SafeURL.validate_http_url(actor_url),
          {:ok, attrs} <- to_user_attrs(actor, actor_url),
          {:ok, user} <- Users.upsert_user(attrs) do
+      _ = UserEvents.broadcast_update(user.ap_id)
       {:ok, user}
     else
       {:error, _} = error -> error

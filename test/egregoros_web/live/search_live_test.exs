@@ -191,11 +191,7 @@ defmodule EgregorosWeb.SearchLiveTest do
     {:ok, view, _html} = live(conn, "/search?q=parent")
 
     view
-    |> element("#search-post-#{parent.id} button[data-role='reply']")
-    |> render_click()
-
-    view
-    |> form("#reply-modal-form", reply: %{content: "A reply"})
+    |> form("#reply-modal-form", reply: %{in_reply_to: parent.ap_id, content: "A reply"})
     |> render_submit()
 
     [reply] = Objects.list_replies_to(parent.ap_id, limit: 1)
@@ -295,20 +291,10 @@ defmodule EgregorosWeb.SearchLiveTest do
     {:ok, user} = Users.create_local_user("alice")
     {:ok, _} = Users.create_local_user("bob")
 
-    assert {:ok, parent} = Pipeline.ingest(Note.build(user, "Reply target"), local: true)
-
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     {:ok, view, _html} = live(conn, "/search?q=reply")
 
     assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='closed']")
-
-    _html =
-      render_click(view, "open_reply_modal", %{
-        "in_reply_to" => parent.ap_id,
-        "actor_handle" => "@alice"
-      })
-
-    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='open']")
 
     _html = render_hook(view, "mention_search", %{"q" => "bo", "scope" => "reply-modal"})
     assert has_element?(view, "[data-role='mention-suggestion']", "@bob")
@@ -317,19 +303,13 @@ defmodule EgregorosWeb.SearchLiveTest do
     refute has_element?(view, "[data-role='mention-suggestion']")
   end
 
-  test "search reply modal can be opened, updated, and closed without navigation", %{conn: conn} do
+  test "reply composer state reacts to cw toggles and reply_change events", %{conn: conn} do
     {:ok, user} = Users.create_local_user("alice")
-
-    assert {:ok, parent} = Pipeline.ingest(Note.build(user, "Reply target"), local: true)
 
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     {:ok, view, _html} = live(conn, "/search?q=reply")
 
-    _html =
-      render_click(view, "open_reply_modal", %{
-        "in_reply_to" => parent.ap_id,
-        "actor_handle" => "@alice"
-      })
+    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='closed']")
 
     assert has_element?(view, "[data-role='compose-options'][data-state='closed']")
 
@@ -343,10 +323,6 @@ defmodule EgregorosWeb.SearchLiveTest do
 
     _html = render_click(view, "toggle_reply_cw", %{})
     assert has_element?(view, "[data-role='compose-cw'][data-state='closed']")
-
-    _html = render_click(view, "close_reply_modal", %{})
-
-    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='closed']")
   end
 
   test "signed-out users cannot post replies from search results", %{conn: conn} do
@@ -381,16 +357,10 @@ defmodule EgregorosWeb.SearchLiveTest do
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     {:ok, view, _html} = live(conn, "/search?q=reply")
 
-    _html =
-      render_click(view, "open_reply_modal", %{
-        "in_reply_to" => parent.ap_id,
-        "actor_handle" => "@alice"
-      })
-
     too_long = String.duplicate("a", 5001)
 
     view
-    |> form("#reply-modal-form", reply: %{content: too_long})
+    |> form("#reply-modal-form", reply: %{in_reply_to: parent.ap_id, content: too_long})
     |> render_submit()
 
     assert render(view) =~ "Reply is too long."
@@ -405,14 +375,8 @@ defmodule EgregorosWeb.SearchLiveTest do
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     {:ok, view, _html} = live(conn, "/search?q=reply")
 
-    _html =
-      render_click(view, "open_reply_modal", %{
-        "in_reply_to" => parent.ap_id,
-        "actor_handle" => "@alice"
-      })
-
     view
-    |> form("#reply-modal-form", reply: %{content: ""})
+    |> form("#reply-modal-form", reply: %{in_reply_to: parent.ap_id, content: ""})
     |> render_submit()
 
     assert render(view) =~ "Reply can&#39;t be empty."
@@ -426,12 +390,6 @@ defmodule EgregorosWeb.SearchLiveTest do
 
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     {:ok, view, _html} = live(conn, "/search?q=reply")
-
-    _html =
-      render_click(view, "open_reply_modal", %{
-        "in_reply_to" => parent.ap_id,
-        "actor_handle" => "@alice"
-      })
 
     fixture_path = Fixtures.path!("DSCN0010.png")
     content = File.read!(fixture_path)
@@ -456,7 +414,7 @@ defmodule EgregorosWeb.SearchLiveTest do
     assert render_upload(upload, "photo.png") =~ "100%"
 
     view
-    |> form("#reply-modal-form", reply: %{content: "Reply with media"})
+    |> form("#reply-modal-form", reply: %{in_reply_to: parent.ap_id, content: "Reply with media"})
     |> render_submit()
 
     assert render(view) =~ "Could not upload attachment."

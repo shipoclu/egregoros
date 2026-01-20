@@ -6,6 +6,7 @@ defmodule EgregorosWeb.StatusLiveTest do
   alias Egregoros.Activities.Note
   alias Egregoros.Objects
   alias Egregoros.Pipeline
+  alias Egregoros.Publish
   alias Egregoros.Relationships
   alias Egregoros.TestSupport.Fixtures
   alias Egregoros.Users
@@ -83,6 +84,55 @@ defmodule EgregorosWeb.StatusLiveTest do
 
     _html = render_hook(view, "mention_clear", %{"scope" => "reply-modal"})
     refute has_element?(view, "[data-role='mention-suggestion']")
+  end
+
+  test "reply modal includes mention handles data for frontend prefill when opened via reply param",
+       %{
+         conn: conn,
+         user: user
+       } do
+    {:ok, bob} = Users.create_local_user("bob")
+    {:ok, _carol} = Users.create_local_user("carol")
+
+    assert {:ok, _create} = Publish.post_note(user, "Hi @carol")
+    [note] = Objects.list_notes_by_actor(user.ap_id, limit: 1)
+
+    uuid = uuid_from_ap_id(note.ap_id)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: bob.id})
+    {:ok, view, _html} = live(conn, "/@alice/#{uuid}?reply=true")
+
+    assert has_element?(view, "#reply-modal[data-prefill-mention-handles*='@carol']")
+  end
+
+  test "reply modal ignores invalid mention tags in frontend prefill data", %{
+    conn: conn,
+    user: user
+  } do
+    assert {:ok, note} =
+             Pipeline.ingest(
+               %{
+                 "id" => "https://remote.example/objects/bad-mention",
+                 "type" => "Note",
+                 "attributedTo" => "https://remote.example/users/bob",
+                 "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+                 "cc" => [],
+                 "content" => "<p>bad mention</p>",
+                 "tag" => [
+                   %{
+                     "type" => "Mention",
+                     "href" => "https://remote.example/users/-bad",
+                     "name" => "@-bad"
+                   }
+                 ]
+               },
+               local: false
+             )
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/@bob@remote.example/#{note.id}?reply=true")
+
+    refute has_element?(view, "#reply-modal[data-prefill-mention-handles*='@-bad']")
   end
 
   test "redirects to the canonical nickname for local status permalinks", %{
@@ -758,54 +808,120 @@ defmodule EgregorosWeb.StatusLiveTest do
     assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='closed']")
   end
 
-  test "status view ignores open_reply_modal when signed out or missing a target", %{
-    conn: conn,
-    user: user
-  } do
+  test "status view does not render reply composer when signed out", %{conn: conn, user: user} do
     assert {:ok, note} = Pipeline.ingest(Note.build(user, "Replyable"), local: true)
     uuid = uuid_from_ap_id(note.ap_id)
 
-    assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}")
+    assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}?reply=true")
     refute has_element?(view, "#reply-modal")
 
     _html =
-      render_click(view, "open_reply_modal", %{
-        "in_reply_to" => note.ap_id,
-        "actor_handle" => "@alice"
+      render_click(view, "create_reply", %{
+        "reply" => %{
+          "in_reply_to" => note.ap_id,
+          "content" => "Hello"
+        }
       })
 
     assert render(view) =~ "Register to reply."
     refute has_element?(view, "#reply-modal")
-
-    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
-    assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}")
-
-    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='closed']")
-
-    _html =
-      render_click(view, "open_reply_modal", %{"in_reply_to" => "", "actor_handle" => "@alice"})
-
-    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='closed']")
   end
 
-  test "status view can open the reply modal via open_reply_modal event", %{
-    conn: conn,
-    user: user
-  } do
+  test "status view exposes reply prefill data when reply=true", %{conn: conn, user: user} do
     assert {:ok, note} = Pipeline.ingest(Note.build(user, "Replyable"), local: true)
     uuid = uuid_from_ap_id(note.ap_id)
 
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
-    assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}")
+    assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}?reply=true")
 
-    _html =
-      render_click(view, "open_reply_modal", %{
-        "in_reply_to" => note.ap_id,
-        "actor_handle" => "@alice"
-      })
-
-    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='open']")
+    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='closed']")
+    assert has_element?(view, "#reply-modal[data-prefill-in-reply-to='#{note.ap_id}']")
+    assert has_element?(view, "#reply-modal[data-prefill-actor-handle='@alice']")
     assert has_element?(view, "input[data-role='reply-in-reply-to'][value='#{note.ap_id}']")
+  end
+
+  test "status view reply prefill mention handles include remote domains", %{
+    conn: conn,
+    user: user
+  } do
+    assert {:ok, note} =
+             Pipeline.ingest(
+               %{
+                 "id" => "https://shitposter.world/objects/mention-domain-status",
+                 "type" => "Note",
+                 "attributedTo" => "https://shitposter.world/users/mrsaturday",
+                 "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+                 "cc" => [],
+                 "content" => "<p>Hi</p>",
+                 "tag" => [
+                   %{
+                     "type" => "Mention",
+                     "href" => "https://shitposter.world/users/nerthos",
+                     "name" => "@nerthos"
+                   },
+                   %{
+                     "type" => "Mention",
+                     "href" => "https://shitposter.world/users/noyoushutthefuckupdad",
+                     "name" => "@noyoushutthefuckupdad"
+                   }
+                 ]
+               },
+               local: false
+             )
+
+    actor_ap_id = "https://shitposter.world/users/mrsaturday"
+
+    %URI{path: path} = URI.parse(actor_ap_id)
+    nickname = Path.basename(path)
+    handle = nickname <> "@shitposter.world"
+
+    status_path = "/@" <> handle <> "/" <> Integer.to_string(note.id)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    assert {:ok, view, _html} = live(conn, status_path <> "?reply=true")
+
+    assert has_element?(
+             view,
+             "#reply-modal[data-prefill-mention-handles*='@nerthos@shitposter.world']"
+           )
+
+    assert has_element?(
+             view,
+             "#reply-modal[data-prefill-mention-handles*='@noyoushutthefuckupdad@shitposter.world']"
+           )
+  end
+
+  test "question status pages can be rendered and refreshed", %{conn: conn, user: user} do
+    poll = %{
+      "id" => "https://remote.example/objects/poll-1",
+      "type" => "Question",
+      "attributedTo" => "https://remote.example/users/bob",
+      "context" => "https://remote.example/contexts/poll-1",
+      "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+      "cc" => [],
+      "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
+      "content" => "<p>Poll?</p>",
+      "oneOf" => [
+        %{"type" => "Note", "name" => "Option A", "replies" => %{"totalItems" => 0}},
+        %{"type" => "Note", "name" => "Option B", "replies" => %{"totalItems" => 0}}
+      ]
+    }
+
+    assert {:ok, question} = Pipeline.ingest(poll, local: false)
+
+    handle = "bob@remote.example"
+    path = "/@" <> handle <> "/" <> Integer.to_string(question.id)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    assert {:ok, view, _html} = live(conn, path)
+
+    assert has_element?(view, "article[data-role='status-card']")
+
+    _html = render_click(view, "fetch_thread_context", %{})
+    _html = render_click(view, "fetch_thread_replies", %{})
+
+    _html = render_click(view, "toggle_like", %{"id" => question.id})
+    assert has_element?(view, "article[data-role='status-card']")
   end
 
   test "signed-in users can bookmark posts from the status page", %{conn: conn, user: user} do
@@ -1284,30 +1400,6 @@ defmodule EgregorosWeb.StatusLiveTest do
 
     assert close_html =~ "egregoros:media-close"
     refute close_html =~ "close_media"
-  end
-
-  test "signed-in users can open and close the reply modal and changes reset", %{
-    conn: conn,
-    user: user
-  } do
-    assert {:ok, note} = Pipeline.ingest(Note.build(user, "Parent post"), local: true)
-    uuid = uuid_from_ap_id(note.ap_id)
-
-    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
-    assert {:ok, view, _html} = live(conn, "/@alice/#{uuid}?reply=true")
-
-    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='open']")
-
-    view
-    |> form("#reply-modal-form", reply: %{content: "Typing..."})
-    |> render_change()
-
-    assert render(view) =~ "Typing..."
-
-    _html = render_hook(view, "close_reply_modal", %{})
-
-    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='closed']")
-    refute render(view) =~ "Typing..."
   end
 
   test "signed-in users can remove reply uploads before posting", %{conn: conn, user: user} do

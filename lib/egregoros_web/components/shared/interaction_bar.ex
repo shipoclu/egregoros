@@ -5,6 +5,9 @@ defmodule EgregorosWeb.Components.Shared.InteractionBar do
   """
   use EgregorosWeb, :html
 
+  alias Egregoros.Domain
+  alias Egregoros.Mentions
+
   @default_reactions ["🔥", "👍", "❤️"]
 
   attr :id, :string, required: true
@@ -41,6 +44,11 @@ defmodule EgregorosWeb.Components.Shared.InteractionBar do
   attr :reply_mode, :atom, default: :navigate
 
   defp reply_button(assigns) do
+    assigns =
+      assign_new(assigns, :mention_handles, fn ->
+        mention_handles_for_entry(assigns.entry)
+      end)
+
     ~H"""
     <%= if @reply_mode == :modal do %>
       <button
@@ -51,13 +59,8 @@ defmodule EgregorosWeb.Components.Shared.InteractionBar do
             to: "#reply-modal",
             detail: %{
               in_reply_to: @entry.object.ap_id,
-              actor_handle: @entry.actor.handle
-            }
-          )
-          |> JS.push("open_reply_modal",
-            value: %{
-              "in_reply_to" => @entry.object.ap_id,
-              "actor_handle" => @entry.actor.handle
+              actor_handle: @entry.actor.handle,
+              mention_handles: @mention_handles
             }
           )
         }
@@ -221,52 +224,43 @@ defmodule EgregorosWeb.Components.Shared.InteractionBar do
 
   defp reaction_picker(assigns) do
     ~H"""
-    <.popover
+    <div
       id={"reaction-picker-#{@id}"}
       data-role="reaction-picker"
+      phx-hook="ReactionPicker"
+      data-post-id={@entry.object.id}
+      data-feed-id={@feed_id}
       class="relative"
-      summary_class="cursor-pointer focus-visible:outline-none focus-brutal"
-      panel_class="absolute right-0 top-full z-40 mt-2 w-64 overflow-hidden p-4"
     >
-      <:trigger>
-        <span class="inline-flex h-9 w-9 items-center justify-center border border-[color:var(--border-muted)] bg-[color:var(--bg-base)] text-[color:var(--text-muted)] transition hover:border-[color:var(--border-default)] hover:text-[color:var(--text-primary)]">
-          <.icon name="hero-face-smile" class="size-5" />
-          <span class="sr-only">Add reaction</span>
-        </span>
-      </:trigger>
+      <button
+        type="button"
+        data-role="reaction-picker-toggle"
+        aria-label="Add reaction"
+        aria-haspopup="menu"
+        aria-expanded="false"
+        class="inline-flex h-9 w-9 cursor-pointer items-center justify-center border border-[color:var(--border-muted)] bg-[color:var(--bg-base)] text-[color:var(--text-muted)] transition hover:border-[color:var(--border-default)] hover:text-[color:var(--text-primary)] focus-visible:outline-none focus-brutal"
+      >
+        <.icon name="hero-face-smile" class="size-5" />
+      </button>
 
-      <p class="text-xs font-bold uppercase tracking-wide text-[color:var(--text-muted)]">
-        React
-      </p>
+      <div
+        data-role="reaction-picker-menu"
+        data-state="closed"
+        aria-hidden="true"
+        class={[
+          "absolute right-0 top-full z-40 mt-2 w-64 overflow-hidden p-4",
+          "hidden border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)]",
+          "shadow-[4px_4px_0_var(--border-default)] motion-safe:animate-rise"
+        ]}
+      >
+        <p class="text-xs font-bold uppercase tracking-wide text-[color:var(--text-muted)]">
+          React
+        </p>
 
-      <div class="mt-3 grid grid-cols-8 gap-1">
-        <button
-          :for={emoji <- reaction_picker_emojis()}
-          type="button"
-          data-role="reaction-picker-option"
-          data-emoji={emoji}
-          phx-click={
-            JS.dispatch("egregoros:optimistic-toggle", detail: %{kind: "reaction"})
-            |> JS.push("toggle_reaction",
-              value: %{
-                "id" => @entry.object.id,
-                "feed_id" => @feed_id,
-                "emoji" => emoji
-              }
-            )
-            |> JS.remove_attribute("open", to: "#reaction-picker-#{@id}")
-          }
-          class="inline-flex cursor-pointer h-9 w-9 items-center justify-center text-xl transition hover:bg-[color:var(--bg-subtle)] focus-visible:outline-none focus-brutal"
-        >
-          {emoji}
-        </button>
+        <div data-role="reaction-picker-grid" class="mt-3 grid grid-cols-8 gap-1"></div>
       </div>
-    </.popover>
+    </div>
     """
-  end
-
-  defp reaction_picker_emojis do
-    ["😀", "😂", "😍", "😮", "😢", "😡", "🔥", "👍", "❤️", "🎉", "🙏", "🤔", "🥳", "😎", "💯", "✨"]
   end
 
   defp reaction_order(%{} = reactions) do
@@ -286,6 +280,90 @@ defmodule EgregorosWeb.Components.Shared.InteractionBar do
   defp feed_id_for_entry(%{object: %{id: id}}) when is_integer(id), do: id
   defp feed_id_for_entry(%{object: %{"id" => id}}) when is_integer(id), do: id
   defp feed_id_for_entry(_entry), do: nil
+
+  defp mention_handles_for_entry(%{object: object}) do
+    local_domains = local_domains()
+
+    object
+    |> mention_tags()
+    |> Enum.flat_map(&mention_handle_from_tag(&1, local_domains))
+    |> Enum.uniq()
+  end
+
+  defp mention_handles_for_entry(_entry), do: []
+
+  defp mention_tags(object) when is_map(object) do
+    data = Map.get(object, :data) || Map.get(object, "data") || %{}
+
+    data
+    |> Map.get("tag", Map.get(data, :tag, []))
+    |> List.wrap()
+  end
+
+  defp mention_tags(_object), do: []
+
+  defp mention_handle_from_tag(tag, local_domains) when is_list(local_domains) do
+    {name, href} =
+      case tag do
+        %{"type" => "Mention"} = tag ->
+          {Map.get(tag, "name") || Map.get(tag, :name),
+           Map.get(tag, "href") || Map.get(tag, :href) || Map.get(tag, "id") || Map.get(tag, :id)}
+
+        %{type: "Mention"} = tag ->
+          {Map.get(tag, :name) || Map.get(tag, "name"),
+           Map.get(tag, :href) || Map.get(tag, "href") || Map.get(tag, :id) || Map.get(tag, "id")}
+
+        _ ->
+          {nil, nil}
+      end
+
+    with handle when is_binary(handle) <- handle_for_prefill(name, href, local_domains) do
+      [handle]
+    else
+      _ -> []
+    end
+  end
+
+  defp mention_handle_from_tag(_tag, _local_domains), do: []
+
+  defp handle_for_prefill(name, href, local_domains)
+       when is_binary(name) and is_list(local_domains) do
+    name = name |> String.trim() |> String.trim_leading("@")
+
+    case Mentions.parse(name) do
+      {:ok, nickname, host} ->
+        host = host || mention_host_from_href(href)
+
+        cond do
+          is_binary(host) and host != "" and host not in local_domains -> "@#{nickname}@#{host}"
+          true -> "@#{nickname}"
+        end
+
+      :error ->
+        nil
+    end
+  end
+
+  defp handle_for_prefill(_name, _href, _local_domains), do: nil
+
+  defp mention_host_from_href(href) when is_binary(href) do
+    href = String.trim(href)
+
+    if href == "" do
+      nil
+    else
+      href |> URI.parse() |> Domain.from_uri()
+    end
+  end
+
+  defp mention_host_from_href(_href), do: nil
+
+  defp local_domains do
+    case URI.parse(EgregorosWeb.Endpoint.url()) do
+      %URI{} = uri -> Domain.aliases_from_uri(uri)
+      _ -> []
+    end
+  end
 
   defp status_reply_path(entry) do
     case status_permalink_path(entry) do

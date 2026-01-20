@@ -67,7 +67,7 @@ defmodule EgregorosWeb.CoreComponents do
 
         <button
           type="button"
-          class="group -m-1 inline-flex items-center justify-center p-1 text-[color:var(--text-muted)] transition hover:text-[color:var(--text-primary)] hover:underline focus-visible:outline-none"
+          class="group -m-1 inline-flex cursor-pointer items-center justify-center p-1 text-[color:var(--text-muted)] transition hover:text-[color:var(--text-primary)] hover:underline focus-visible:outline-none"
           aria-label={gettext("close")}
         >
           <span class="font-mono text-xs">[X]</span>
@@ -296,7 +296,7 @@ defmodule EgregorosWeb.CoreComponents do
         data-role="compose-emoji"
         aria-label="Emoji picker"
         aria-expanded="false"
-        class="inline-flex h-10 w-10 items-center justify-center text-[color:var(--text-muted)] transition hover:bg-[color:var(--bg-muted)] hover:text-[color:var(--text-primary)] focus-visible:outline-none"
+        class="inline-flex h-10 w-10 cursor-pointer items-center justify-center text-[color:var(--text-muted)] transition hover:bg-[color:var(--bg-muted)] hover:text-[color:var(--text-primary)] focus-visible:outline-none"
       >
         <.icon name="hero-face-smile" class="size-5" />
       </button>
@@ -319,7 +319,7 @@ defmodule EgregorosWeb.CoreComponents do
             type="button"
             data-role="compose-emoji-option"
             data-emoji={emoji}
-            class="inline-flex h-9 w-9 items-center justify-center text-xl transition hover:bg-[color:var(--bg-muted)] focus-visible:outline-none"
+            class="inline-flex h-9 w-9 cursor-pointer items-center justify-center text-xl transition hover:bg-[color:var(--bg-muted)] focus-visible:outline-none"
           >
             {emoji}
           </button>

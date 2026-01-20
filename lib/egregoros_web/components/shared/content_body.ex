@@ -97,7 +97,7 @@ defmodule EgregorosWeb.Components.Shared.ContentBody do
         |> JS.toggle_class("rotate-180", to: "##{@toggle_icon_id}")
         |> JS.toggle_attribute({"aria-expanded", "true", "false"})
       }
-      class="mt-3 inline-flex items-center gap-2 border border-[color:var(--border-muted)] bg-[color:var(--bg-subtle)] px-3 py-1.5 text-xs font-bold uppercase text-[color:var(--text-secondary)] transition hover:border-[color:var(--border-default)] hover:text-[color:var(--text-primary)] focus-visible:outline-none focus-brutal"
+      class="mt-3 inline-flex cursor-pointer items-center gap-2 border border-[color:var(--border-muted)] bg-[color:var(--bg-subtle)] px-3 py-1.5 text-xs font-bold uppercase text-[color:var(--text-secondary)] transition hover:border-[color:var(--border-default)] hover:text-[color:var(--text-primary)] focus-visible:outline-none focus-brutal"
     >
       <span id={@toggle_more_id}>Show more</span>
       <span id={@toggle_less_id} class="hidden">Show less</span>

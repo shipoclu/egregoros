@@ -5,6 +5,7 @@ defmodule EgregorosWeb.TimelineLiveTest do
 
   alias Egregoros.Activities.Announce
   alias Egregoros.Activities.Follow
+  alias Egregoros.Activities.Like
   alias Egregoros.Activities.Note
   alias Egregoros.Objects
   alias Egregoros.Pipeline
@@ -170,9 +171,11 @@ defmodule EgregorosWeb.TimelineLiveTest do
     assert render(view) =~ "Register to bookmark posts."
 
     _html =
-      render_click(view, "open_reply_modal", %{
-        "in_reply_to" => note.ap_id,
-        "actor_handle" => "@alice"
+      render_click(view, "create_reply", %{
+        "reply" => %{
+          "in_reply_to" => note.ap_id,
+          "content" => "Hello"
+        }
       })
 
     assert render(view) =~ "Register to reply."
@@ -380,6 +383,45 @@ defmodule EgregorosWeb.TimelineLiveTest do
     assert has_element?(view, "[data-role='post-actor-name'] img.emoji[alt=':linux:']")
   end
 
+  test "timeline replaces placeholder actor cards when remote user data arrives", %{conn: conn} do
+    actor_ap_id = "https://remote.example/users/bob"
+
+    assert {:ok, note} =
+             Pipeline.ingest(
+               %{
+                 "id" => "https://remote.example/objects/placeholder-actor",
+                 "type" => "Note",
+                 "actor" => actor_ap_id,
+                 "content" => "Hello from bob",
+                 "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+                 "cc" => []
+               },
+               local: false
+             )
+
+    {:ok, view, _html} = live(conn, "/")
+
+    assert has_element?(view, "#post-#{note.id} [data-role='post-actor-name']", "bob")
+
+    assert {:ok, _user} =
+             Users.create_user(%{
+               nickname: "bob",
+               ap_id: actor_ap_id,
+               inbox: actor_ap_id <> "/inbox",
+               outbox: actor_ap_id <> "/outbox",
+               public_key: "remote-key",
+               private_key: nil,
+               local: false,
+               name: "Bobby",
+               avatar_url: "https://remote.example/media/avatar.png"
+             })
+
+    assert :ok = Egregoros.UserEvents.broadcast_update(actor_ap_id)
+    _ = :sys.get_state(view.pid)
+
+    assert has_element?(view, "#post-#{note.id} [data-role='post-actor-name']", "Bobby")
+  end
+
   test "compose options panel can be persisted via ui_options_open param", %{
     conn: conn,
     user: user
@@ -543,6 +585,32 @@ defmodule EgregorosWeb.TimelineLiveTest do
     assert has_element?(view, "[data-role='timeline-current']", "public")
   end
 
+  test "for you timeline recommends posts liked by similar accounts", %{conn: conn, user: user} do
+    {:ok, bob} = Users.create_local_user("bob")
+    {:ok, carol} = Users.create_local_user("carol")
+    {:ok, dave} = Users.create_local_user("dave")
+    {:ok, eve} = Users.create_local_user("eve")
+
+    assert {:ok, note_1} = Pipeline.ingest(Note.build(bob, "A"), local: true)
+    assert {:ok, note_2} = Pipeline.ingest(Note.build(carol, "B"), local: true)
+    assert {:ok, note_3} = Pipeline.ingest(Note.build(dave, "C"), local: true)
+
+    assert {:ok, _} = Pipeline.ingest(Like.build(user, note_1), local: true)
+    assert {:ok, _} = Pipeline.ingest(Like.build(user, note_2), local: true)
+
+    assert {:ok, _} = Pipeline.ingest(Like.build(eve, note_1), local: true)
+    assert {:ok, _} = Pipeline.ingest(Like.build(eve, note_2), local: true)
+    assert {:ok, _} = Pipeline.ingest(Like.build(eve, note_3), local: true)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/?timeline=for_you")
+
+    assert has_element?(view, "[data-role='timeline-current']", "for_you")
+    assert has_element?(view, "#post-#{note_3.id}")
+    refute has_element?(view, "#post-#{note_1.id}")
+    refute has_element?(view, "#post-#{note_2.id}")
+  end
+
   test "local timeline shows only local public posts", %{conn: conn, user: user} do
     assert {:ok, _local_note} = Pipeline.ingest(Note.build(user, "Local note"), local: true)
 
@@ -639,37 +707,132 @@ defmodule EgregorosWeb.TimelineLiveTest do
 
     assert html =~ "egregoros:reply-open"
     assert html =~ note.ap_id
+    refute html =~ "open_reply_modal"
     refute html =~ "?reply=true"
   end
 
-  test "reply modal can be opened from a post card", %{conn: conn, user: user} do
+  test "reply buttons embed mention handles for frontend prefill", %{conn: conn, user: user} do
+    {:ok, bob} = Users.create_local_user("bob")
+    {:ok, _carol} = Users.create_local_user("carol")
+
+    assert {:ok, _create} = Publish.post_note(bob, "Hi @carol")
+    [note] = Objects.list_notes_by_actor(bob.ap_id, limit: 1)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/?timeline=public")
+
+    html =
+      view
+      |> element("#post-#{note.id} button[data-role='reply']")
+      |> render()
+
+    assert html =~ "mention_handles"
+    assert html =~ "@carol"
+  end
+
+  test "reply button mention handles include remote domains", %{conn: conn, user: user} do
+    assert {:ok, note} =
+             Pipeline.ingest(
+               %{
+                 "id" => "https://shitposter.world/objects/mention-domain",
+                 "type" => "Note",
+                 "attributedTo" => "https://shitposter.world/users/mrsaturday",
+                 "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+                 "cc" => [],
+                 "content" => "<p>Hi</p>",
+                 "tag" => [
+                   %{
+                     "type" => "Mention",
+                     "href" => "https://shitposter.world/users/nerthos",
+                     "name" => "@nerthos"
+                   },
+                   %{
+                     "type" => "Mention",
+                     "href" => "https://shitposter.world/users/noyoushutthefuckupdad",
+                     "name" => "@noyoushutthefuckupdad"
+                   }
+                 ]
+               },
+               local: false
+             )
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/?timeline=public")
+
+    html =
+      view
+      |> element("#post-#{note.id} button[data-role='reply']")
+      |> render()
+
+    assert html =~ "mention_handles"
+    assert html =~ "@nerthos@shitposter.world"
+    assert html =~ "@noyoushutthefuckupdad@shitposter.world"
+  end
+
+  test "reply buttons ignore invalid mention tags in frontend prefill data", %{
+    conn: conn,
+    user: user
+  } do
+    assert {:ok, note} =
+             Pipeline.ingest(
+               %{
+                 "id" => "https://remote.example/objects/bad-mention",
+                 "type" => "Note",
+                 "attributedTo" => "https://remote.example/users/bob",
+                 "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+                 "cc" => [],
+                 "content" => "<p>hi</p>",
+                 "tag" => [
+                   %{
+                     "type" => "Mention",
+                     "href" => "https://remote.example/users/-bad",
+                     "name" => "@-bad"
+                   }
+                 ]
+               },
+               local: false
+             )
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/?timeline=public")
+
+    html =
+      view
+      |> element("#post-#{note.id} button[data-role='reply']")
+      |> render()
+
+    refute html =~ "@-bad"
+  end
+
+  test "reply modal controls are client-side and carry reply target data", %{
+    conn: conn,
+    user: user
+  } do
     assert {:ok, parent} = Pipeline.ingest(Note.build(user, "Reply target"), local: true)
 
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     {:ok, view, _html} = live(conn, "/")
 
     assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='closed']")
-
-    view
-    |> element("#post-#{parent.id} button[data-role='reply']")
-    |> render_click()
-
-    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='open']")
-
-    assert has_element?(
-             view,
-             "input[data-role='reply-in-reply-to'][value='#{parent.ap_id}']"
-           )
-
-    assert has_element?(view, "[data-role='reply-modal-target']", "Replying to @alice")
-
-    view
-    |> element("#reply-modal [data-role='reply-modal-close']")
-    |> render_click()
-
-    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='closed']")
-
     assert has_element?(view, "input[data-role='reply-in-reply-to'][value='']")
+
+    reply_html =
+      view
+      |> element("#post-#{parent.id} button[data-role='reply']")
+      |> render()
+
+    assert reply_html =~ "egregoros:reply-open"
+    assert reply_html =~ parent.ap_id
+    assert reply_html =~ "@alice"
+    refute reply_html =~ "open_reply_modal"
+
+    close_html =
+      view
+      |> element("#reply-modal [data-role='reply-modal-close']")
+      |> render()
+
+    assert close_html =~ "egregoros:reply-close"
+    refute close_html =~ "close_reply_modal"
   end
 
   test "reply_change opens the content warning area when spoiler_text is present", %{
@@ -804,15 +967,24 @@ defmodule EgregorosWeb.TimelineLiveTest do
     {:ok, view, _html} = live(conn, "/")
 
     view
-    |> element("#post-#{parent.id} button[data-role='reply']")
-    |> render_click()
-
-    view
-    |> form("#reply-modal-form", reply: %{content: "A reply"})
+    |> form("#reply-modal-form", reply: %{in_reply_to: parent.ap_id, content: "A reply"})
     |> render_submit()
 
     [reply] = Objects.list_replies_to(parent.ap_id, limit: 1)
     assert reply.data["inReplyTo"] == parent.ap_id
+  end
+
+  test "timeline initial fetch renders up to 10 posts", %{conn: conn, user: user} do
+    for idx <- 1..25 do
+      assert {:ok, _} = Pipeline.ingest(Note.build(user, "Post #{idx}"), local: true)
+    end
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/?timeline=public")
+
+    html = render(view)
+
+    assert length(Regex.scan(~r/data-role=\"status-card\"/, html)) == 10
   end
 
   test "timeline can load more posts", %{conn: conn, user: user} do
@@ -855,6 +1027,17 @@ defmodule EgregorosWeb.TimelineLiveTest do
     render_hook(view, "load_more", %{})
 
     assert has_element?(view, "#post-#{oldest.id}")
+  end
+
+  test "reaction picker options are rendered client-side", %{conn: conn, user: user} do
+    assert {:ok, _} = Pipeline.ingest(Note.build(user, "Reactable"), local: true)
+    [note] = Objects.list_notes()
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/?timeline=public")
+
+    assert has_element?(view, "#post-#{note.id} [data-role='reaction-picker']")
+    refute has_element?(view, "#post-#{note.id} [data-role='reaction-picker-option']")
   end
 
   test "liking a post creates a Like activity", %{conn: conn, user: user} do
@@ -1819,16 +2002,12 @@ defmodule EgregorosWeb.TimelineLiveTest do
     conn: conn,
     user: user
   } do
-    assert {:ok, parent} = Pipeline.ingest(Note.build(user, "Reply target"), local: true)
+    assert {:ok, _parent} = Pipeline.ingest(Note.build(user, "Reply target"), local: true)
 
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     {:ok, view, _html} = live(conn, "/")
 
-    view
-    |> element("#post-#{parent.id} button[data-role='reply']")
-    |> render_click()
-
-    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='open']")
+    assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='closed']")
     assert has_element?(view, "#reply-modal-cw[data-role='compose-cw'][data-state='closed']")
 
     _html = render_click(view, "toggle_reply_cw", %{})
@@ -1854,10 +2033,6 @@ defmodule EgregorosWeb.TimelineLiveTest do
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     {:ok, view, _html} = live(conn, "/")
 
-    view
-    |> element("#post-#{parent.id} button[data-role='reply']")
-    |> render_click()
-
     fixture_path = Fixtures.path!("DSCN0010.png")
     content = File.read!(fixture_path)
 
@@ -1879,7 +2054,9 @@ defmodule EgregorosWeb.TimelineLiveTest do
     assert render_upload(upload, "photo.png") =~ "100%"
 
     view
-    |> form("#reply-modal-form", reply: %{content: "Reply with failing media"})
+    |> form("#reply-modal-form",
+      reply: %{in_reply_to: parent.ap_id, content: "Reply with failing media"}
+    )
     |> render_submit()
 
     assert render(view) =~ "Could not upload attachment."

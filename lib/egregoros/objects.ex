@@ -717,6 +717,116 @@ defmodule Egregoros.Objects do
     )
   end
 
+  @for_you_neighbor_limit 50
+  @for_you_like_scan_limit 500
+
+  def list_for_you_statuses(actor_ap_id, opts \\ [])
+
+  def list_for_you_statuses(actor_ap_id, opts)
+      when is_binary(actor_ap_id) and is_list(opts) do
+    actor_ap_id = String.trim(actor_ap_id)
+
+    if actor_ap_id == "" do
+      []
+    else
+      limit = opts |> Keyword.get(:limit, 20) |> normalize_limit()
+      max_like_id = Keyword.get(opts, :max_id)
+      since_like_id = Keyword.get(opts, :since_id)
+
+      :telemetry.span(
+        [:egregoros, :timeline, :read],
+        %{name: :list_for_you_statuses, limit: limit},
+        fn ->
+          ignored_actor_subquery =
+            from(r in Relationship,
+              where: r.actor == ^actor_ap_id and r.type in ["Block", "Mute"],
+              select: r.object
+            )
+
+          viewer_liked_objects =
+            from(l in Object,
+              where:
+                l.type == "Like" and l.actor == ^actor_ap_id and not is_nil(l.object) and
+                  l.object != "",
+              distinct: l.object,
+              select: l.object
+            )
+
+          similar_actors =
+            from(l in Object,
+              where:
+                l.type == "Like" and l.object in subquery(viewer_liked_objects) and
+                  l.actor != ^actor_ap_id,
+              group_by: l.actor,
+              order_by: [desc: count(l.id)],
+              select: l.actor,
+              limit: ^@for_you_neighbor_limit
+            )
+
+          latest_like_ids_by_object =
+            from(l in Object,
+              where:
+                l.type == "Like" and l.actor in subquery(similar_actors) and
+                  l.object not in subquery(viewer_liked_objects) and not is_nil(l.object) and
+                  l.object != "",
+              group_by: l.object,
+              select: %{object_ap_id: l.object, like_id: max(l.id)},
+              order_by: [desc: max(l.id)],
+              limit: ^@for_you_like_scan_limit
+            )
+
+          like_rows =
+            from(l in Object,
+              join: latest in subquery(latest_like_ids_by_object),
+              on: l.id == latest.like_id,
+              select: %{object_ap_id: latest.object_ap_id, like_id: l.id}
+            )
+
+          query =
+            from(o in Object,
+              join: lr in subquery(like_rows),
+              on: o.ap_id == lr.object_ap_id,
+              where: o.type in ^@status_types,
+              where: o.actor not in subquery(ignored_actor_subquery),
+              order_by: [desc: lr.like_id],
+              limit: ^limit,
+              select: {o, lr.like_id}
+            )
+            |> where_announces_have_object()
+            |> where_publicly_visible()
+            |> maybe_where_for_you_max_like_id(max_like_id)
+            |> maybe_where_for_you_since_like_id(since_like_id)
+
+          objects_with_like_ids =
+            Repo.all(query,
+              telemetry_options: [feature: :timeline, name: :list_for_you_statuses]
+            )
+
+          objects =
+            Enum.map(objects_with_like_ids, fn {object, like_id} ->
+              %{object | internal: Map.put(object.internal || %{}, "for_you_like_id", like_id)}
+            end)
+
+          {objects, %{count: length(objects), name: :list_for_you_statuses}}
+        end
+      )
+    end
+  end
+
+  def list_for_you_statuses(_actor_ap_id, _opts), do: []
+
+  defp maybe_where_for_you_max_like_id(query, max_like_id) when is_integer(max_like_id) do
+    from([_o, lr] in query, where: lr.like_id < ^max_like_id)
+  end
+
+  defp maybe_where_for_you_max_like_id(query, _max_like_id), do: query
+
+  defp maybe_where_for_you_since_like_id(query, since_like_id) when is_integer(since_like_id) do
+    from([_o, lr] in query, where: lr.like_id > ^since_like_id)
+  end
+
+  defp maybe_where_for_you_since_like_id(query, _since_like_id), do: query
+
   defp where_visible_to_home(query, user_ap_id) when is_binary(user_ap_id) do
     base =
       dynamic(

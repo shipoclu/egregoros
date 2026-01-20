@@ -54,6 +54,37 @@ defmodule Egregoros.Federation.ActorTest do
     assert Users.get_by_ap_id(actor_url)
   end
 
+  test "fetch_and_store broadcasts user updates for newly stored actors" do
+    actor_url = "https://remote.example/users/alice"
+    {public_key, _private_key} = Keys.generate_rsa_keypair()
+
+    Egregoros.UserEvents.subscribe(actor_url)
+
+    expect(Egregoros.HTTP.Mock, :get, fn _url, _headers ->
+      {:ok,
+       %{
+         status: 200,
+         body: %{
+           "id" => actor_url,
+           "type" => "Person",
+           "preferredUsername" => "alice",
+           "name" => "Alice",
+           "inbox" => actor_url <> "/inbox",
+           "outbox" => actor_url <> "/outbox",
+           "publicKey" => %{
+             "id" => actor_url <> "#main-key",
+             "owner" => actor_url,
+             "publicKeyPem" => public_key
+           }
+         },
+         headers: []
+       }}
+    end)
+
+    assert {:ok, _user} = Actor.fetch_and_store(actor_url)
+    assert_receive {:user_updated, %{ap_id: ^actor_url}}
+  end
+
   test "fetch_and_store stores custom emoji tags for display names" do
     actor_url = "https://remote.example/users/alice"
     {public_key, _private_key} = Keys.generate_rsa_keypair()
