@@ -4,12 +4,36 @@ services:
     restart: unless-stopped
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_fed_data:/data/caddy
     networks:
       federation:
         aliases:
           - egregoros.test
           - pleroma.test
           - mastodon.test
+
+  gateway_certs:
+    image: caddy:2.8
+    restart: "no"
+    depends_on:
+      gateway:
+        condition: service_started
+    volumes:
+      - caddy_fed_data:/data/caddy
+    command:
+      - sh
+      - -lc
+      - |
+        set -eu
+
+        while [ ! -f /data/caddy/pki/authorities/local/root.crt ]; do
+          sleep 1
+        done
+
+        chmod 755 /data/caddy/pki /data/caddy/pki/authorities /data/caddy/pki/authorities/local
+        chmod 644 /data/caddy/pki/authorities/local/root.crt
+    networks:
+      - federation
 
   egregoros_db:
     image: postgres:16
@@ -120,6 +144,7 @@ services:
     depends_on:
       pleroma_web:
         condition: service_healthy
+    entrypoint: []
     environment:
       DOMAIN: pleroma.test
       DB_HOST: pleroma_db
@@ -133,7 +158,36 @@ services:
     command:
       - sh
       - -lc
-      - /opt/pleroma/bin/pleroma_ctl user new bob bob@pleroma.test --password password --admin --assume-yes || true
+      - |
+        set -euo pipefail
+
+        if wget -qO- "http://pleroma_web:4000/.well-known/webfinger?resource=acct:bob@pleroma.test" >/dev/null; then
+          echo "[fedbox] pleroma: bob already exists"
+          exit 0
+        fi
+
+        app=$$(
+          wget -qO- \
+            --post-data "client_name=fedbox&redirect_uris=urn:ietf:wg:oauth:2.0:oob&scopes=read+write+follow&website=" \
+            "http://pleroma_web:4000/api/v1/apps"
+        )
+        client_id=$$(echo "$$app" | sed -n 's/.*"client_id":"\([^"]*\)".*/\1/p')
+        client_secret=$$(echo "$$app" | sed -n 's/.*"client_secret":"\([^"]*\)".*/\1/p')
+
+        token=$$(
+          wget -qO- \
+            --post-data "client_id=$$client_id&client_secret=$$client_secret&grant_type=client_credentials&scope=read+write+follow" \
+            "http://pleroma_web:4000/oauth/token"
+        )
+        access_token=$$(echo "$$token" | sed -n 's/.*"access_token":"\([^"]*\)".*/\1/p')
+
+        wget -qO- \
+          --header "Authorization: Bearer $$access_token" \
+          --header "Content-Type: application/json" \
+          --post-data '{"username":"bob","email":"bob@pleroma.test","password":"password","agreement":true,"locale":"en"}' \
+          "http://pleroma_web:4000/api/v1/accounts" >/dev/null || true
+
+        wget -qO- "http://pleroma_web:4000/.well-known/webfinger?resource=acct:bob@pleroma.test" >/dev/null
     networks:
       - federation
 
@@ -181,6 +235,7 @@ services:
       PORT: 3000
       LOCAL_DOMAIN: mastodon.test
       WEB_DOMAIN: mastodon.test
+      ANNOTATERB_SKIP_ON_DB_TASKS: "true"
       REDIS_HOST: mastodon_redis
       REDIS_PORT: 6379
       DB_HOST: mastodon_db
@@ -188,6 +243,8 @@ services:
       DB_NAME: mastodon
       DB_USER: mastodon
       DB_PASS: mastodon
+      SSL_CERT_FILE: /caddy/pki/authorities/local/root.crt
+      OTP_SECRET: "fedbox_otp_secret_mastodon"
       SECRET_KEY_BASE: "fca7fa5fe8ca9b7bbcaa442535b973e772e6392f46aab7fb3ec227ef5eb8d8c6605b921f7af4c2cc41f19a20633334e11c6012d6de958d0b14c4c2aa24a294ab"
       ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY: "ZVdBBUYdAX9il2dZ3mwVRv1h7bDnRlH9oybCdHautQUNIhSBoV7wdpKm+ByScMaeEChmrmxIhIMBujlnikHUqA=="
       ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY: "82yPOOdC5iAbaCU7ck0hsWP1kJqMH8g7v/vtzS+AlWBFsVvcuzGYBg888Oa+vBkhXY8Xr1jE03WbSwVwHDR3Aw=="
@@ -195,9 +252,12 @@ services:
     command:
       - sh
       - -lc
-      - bundle exec rails db:prepare && bin/tootctl accounts create carol --email carol@mastodon.test --confirmed --approve --role Owner || true
+      - bundle exec rails db:prepare && (bin/tootctl accounts create carol --email carol@mastodon.test --confirmed --approve --role Owner || true)
     volumes:
       - mastodon_fed_system:/mastodon/public/system
+      - ./mastodon/initializers/00_letter_opener_web_stub.rb:/opt/mastodon/config/initializers/00_letter_opener_web_stub.rb:ro
+      - ./mastodon/initializers/01_fedbox_settings.rb:/opt/mastodon/config/initializers/01_fedbox_settings.rb:ro
+      - caddy_fed_data:/caddy:ro
     networks:
       - federation
 
@@ -213,6 +273,9 @@ services:
       - "3000"
     volumes:
       - mastodon_fed_system:/mastodon/public/system
+      - ./mastodon/initializers/00_letter_opener_web_stub.rb:/opt/mastodon/config/initializers/00_letter_opener_web_stub.rb:ro
+      - ./mastodon/initializers/01_fedbox_settings.rb:/opt/mastodon/config/initializers/01_fedbox_settings.rb:ro
+      - caddy_fed_data:/caddy:ro
     healthcheck:
       test: ["CMD-SHELL", "curl -s --noproxy localhost localhost:3000/health | grep -q 'OK' || exit 1"]
       interval: 15s
@@ -232,6 +295,9 @@ services:
     command: bundle exec sidekiq
     volumes:
       - mastodon_fed_system:/mastodon/public/system
+      - ./mastodon/initializers/00_letter_opener_web_stub.rb:/opt/mastodon/config/initializers/00_letter_opener_web_stub.rb:ro
+      - ./mastodon/initializers/01_fedbox_settings.rb:/opt/mastodon/config/initializers/01_fedbox_settings.rb:ro
+      - caddy_fed_data:/caddy:ro
     networks:
       - federation
 
@@ -239,8 +305,12 @@ services:
     profiles: ["fedtest"]
     image: egregoros-fedbox
     depends_on:
+      gateway_certs:
+        condition: service_completed_successfully
       egregoros_web:
         condition: service_healthy
+      pleroma_seed:
+        condition: service_completed_successfully
       pleroma_web:
         condition: service_healthy
       mastodon_web:
@@ -258,11 +328,12 @@ services:
     command:
       - sh
       - -lc
-      - bin/egregoros eval "Code.require_file('/app/fedtest/federation_box_test.exs'); FederationBoxTest.run()"
+      - bin/egregoros eval "Application.load(:egregoros); {:ok, _} = Application.ensure_all_started(:egregoros); Code.require_file(\"/app/fedtest/federation_box_test.exs\"); FederationBoxTest.run()"
     networks:
       - federation
 
 volumes:
+  caddy_fed_data:
   egregoros_fed_db:
   egregoros_fed_uploads:
   pleroma_fed_db:

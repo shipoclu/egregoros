@@ -7,3 +7,6 @@ config :pleroma, Pleroma.Web.Endpoint,
 # Keep it permissive for local testing.
 config :pleroma, :instance,
   registrations_open: true
+
+# Disable CAPTCHA for fedbox user seeding / smoke tests.
+config :pleroma, Pleroma.Captcha, enabled: false
