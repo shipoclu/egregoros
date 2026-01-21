@@ -17,5 +17,4 @@ RUN mix deps.compile
 
 COPY test test
 
-CMD ["mix", "test", "--color"]
-
+CMD ["mix", "test", "--color", "--trace"]

@@ -103,20 +103,20 @@ defmodule FederationBoxTest do
 
     {:ok,
      %{
-        egregoros_base_url: egregoros_base_url,
-        access_token: access_token,
-        alice_handle: alice_handle,
-        alice_actor_id: alice_actor_id,
-        alice_actor_id_variants: alice_actor_id_variants,
-        bob_handle: bob_handle,
-        bob_access_token: bob_access_token,
-        bob_actor_id_variants: bob_actor_id_variants,
-        pleroma_base_url: pleroma_base_url,
-        carol_handle: carol_handle,
-        carol_access_token: carol_access_token,
-        carol_actor_id_variants: carol_actor_id_variants,
-        mastodon_base_url: mastodon_base_url
-      }}
+       egregoros_base_url: egregoros_base_url,
+       access_token: access_token,
+       alice_handle: alice_handle,
+       alice_actor_id: alice_actor_id,
+       alice_actor_id_variants: alice_actor_id_variants,
+       bob_handle: bob_handle,
+       bob_access_token: bob_access_token,
+       bob_actor_id_variants: bob_actor_id_variants,
+       pleroma_base_url: pleroma_base_url,
+       carol_handle: carol_handle,
+       carol_access_token: carol_access_token,
+       carol_actor_id_variants: carol_actor_id_variants,
+       mastodon_base_url: mastodon_base_url
+     }}
   end
 
   test "outgoing follow is accepted by pleroma", ctx do
@@ -242,7 +242,8 @@ defmodule FederationBoxTest do
          local_actor_id,
          remote_actor_id_variants
        )
-       when is_binary(remote_base_url) and is_binary(remote_access_token) and is_binary(local_handle) and
+       when is_binary(remote_base_url) and is_binary(remote_access_token) and
+              is_binary(local_handle) and
               is_binary(local_actor_id) and is_list(remote_actor_id_variants) do
     _ = follow_remote!(remote_base_url, remote_access_token, local_handle)
 
@@ -320,11 +321,75 @@ defmodule FederationBoxTest do
         end
       end)
 
-    if is_map(status) do
-      {:ok, status}
-    else
-      nil
+    cond do
+      is_map(status) ->
+        {:ok, status}
+
+      true ->
+        find_status_by_uri_variant_via_search(base_url, access_token, uri_variants)
     end
+  end
+
+  defp find_status_by_uri_variant_via_search(base_url, access_token, uri_variants)
+       when is_binary(base_url) and is_binary(access_token) and is_list(uri_variants) do
+    find_status_by_uri_variant_via_search_endpoint(base_url, access_token, uri_variants, :v2) ||
+      find_status_by_uri_variant_via_search_endpoint(base_url, access_token, uri_variants, :v1)
+  end
+
+  defp find_status_by_uri_variant_via_search_endpoint(
+         base_url,
+         access_token,
+         uri_variants,
+         version
+       )
+       when is_binary(base_url) and is_binary(access_token) and is_list(uri_variants) and
+              version in [:v1, :v2] do
+    endpoint =
+      case version do
+        :v2 -> "/api/v2/search"
+        :v1 -> "/api/v1/search"
+      end
+
+    Enum.find_value(uri_variants, fn query ->
+      params =
+        case version do
+          :v2 ->
+            [{"q", query}, {"type", "statuses"}, {"resolve", "true"}, {"limit", 10}]
+
+          :v1 ->
+            [{"q", query}, {"resolve", "true"}, {"limit", 10}]
+        end
+
+      resp =
+        req_get!(
+          base_url <> endpoint,
+          headers: [{"authorization", "Bearer " <> access_token}],
+          params: params
+        )
+
+      cond do
+        resp.status in 200..299 ->
+          body = ensure_json!(resp.body)
+          statuses = Map.get(body, "statuses", [])
+
+          Enum.find_value(statuses, fn status ->
+            case status_uri(status) do
+              uri when is_binary(uri) ->
+                if Enum.member?(uri_variants, uri) do
+                  {:ok, status}
+                else
+                  nil
+                end
+
+              _ ->
+                nil
+            end
+          end)
+
+        true ->
+          nil
+      end
+    end)
   end
 
   defp fetch_home_timeline!(base_url, access_token, opts)
@@ -881,14 +946,14 @@ defmodule FederationBoxTest do
 
   defp extract_oauth_code!(html) when is_binary(html) do
     with [_, code] <-
-           (Regex.run(
-              ~r/<input[^>]*class=[\"'][^\"']*oauth-code[^\"']*[\"'][^>]*value=[\"']([^\"']+)[\"']/i,
-              html
-            ) ||
-              Regex.run(
-                ~r/<input[^>]*value=[\"']([^\"']+)[\"'][^>]*class=[\"'][^\"']*oauth-code[^\"']*[\"']/i,
-                html
-              )) do
+           Regex.run(
+             ~r/<input[^>]*class=[\"'][^\"']*oauth-code[^\"']*[\"'][^>]*value=[\"']([^\"']+)[\"']/i,
+             html
+           ) ||
+             Regex.run(
+               ~r/<input[^>]*value=[\"']([^\"']+)[\"'][^>]*class=[\"'][^\"']*oauth-code[^\"']*[\"']/i,
+               html
+             ) do
       String.trim(code)
     else
       _ ->
@@ -965,11 +1030,11 @@ defmodule FederationBoxTest do
     end
   end
 
-  defp req_get!(url, opts \\ []) when is_binary(url) and is_list(opts) do
+  defp req_get!(url, opts) when is_binary(url) and is_list(opts) do
     Req.get!(url, req_default_opts(url) ++ opts)
   end
 
-  defp req_post!(url, opts \\ []) when is_binary(url) and is_list(opts) do
+  defp req_post!(url, opts) when is_binary(url) and is_list(opts) do
     Req.post!(url, req_default_opts(url) ++ opts)
   end
 
