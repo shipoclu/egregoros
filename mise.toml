@@ -4,3 +4,22 @@ erlang = "28.3"
 
 [env]
 _.file = ".env"
+
+[tasks."fed:up"]
+description = "Start federation-in-a-box (Egregoros + Pleroma + Mastodon)"
+run = "docker compose -f docker/federation/compose.yml up -d --build"
+
+[tasks."fed:test"]
+description = "Run federation-in-a-box smoke test (outgoing follow + accept)"
+run = [
+  "docker compose -f docker/federation/compose.yml up -d --build",
+  "docker compose -f docker/federation/compose.yml --profile fedtest run --rm fedtest",
+]
+
+[tasks."fed:logs"]
+description = "Tail federation-in-a-box logs"
+run = "docker compose -f docker/federation/compose.yml logs -f --no-color"
+
+[tasks."fed:down"]
+description = "Stop federation-in-a-box and delete volumes"
+run = "docker compose -f docker/federation/compose.yml down -v --remove-orphans"
