@@ -253,7 +253,16 @@ services:
     command:
       - sh
       - -lc
-      - bundle exec rails db:prepare && (bin/tootctl accounts create carol --email carol@mastodon.test --confirmed --approve --role Owner || true)
+      - |
+        set -euo pipefail
+
+        bundle exec rails db:prepare
+
+        # Create an initial user for API-driven smoke tests.
+        bin/tootctl accounts create carol --email carol@mastodon.test --confirmed --approve --role Owner || true
+
+        # Ensure a stable password for the OAuth authorization code flow.
+        bundle exec rails runner 'u = User.find_by(email: "carol@mastodon.test"); raise "carol missing" unless u; u.mark_email_as_confirmed! unless u.confirmed?; u.approve! unless u.approved?; u.change_password!("password");'
     volumes:
       - mastodon_fed_system:/mastodon/public/system
       - ./mastodon/initializers/00_letter_opener_web_stub.rb:/opt/mastodon/config/initializers/00_letter_opener_web_stub.rb:ro
