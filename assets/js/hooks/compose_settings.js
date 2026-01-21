@@ -48,6 +48,11 @@ const ComposeSettings = {
       if (languageToggle && this.el.contains(languageToggle)) {
         this.updateMenuPlacement(languageToggle, "[data-role='compose-language-menu']")
       }
+
+      const cwToggle = target.closest?.("[data-role='compose-toggle-cw']")
+      if (cwToggle && this.el.contains(cwToggle)) {
+        this.toggleContentWarning(cwToggle)
+      }
     }
 
     this.onKeyDown = e => {
@@ -122,6 +127,47 @@ const ComposeSettings = {
     const text = this.languageText(normalized)
 
     if (this.languageLabel.textContent !== text) this.languageLabel.textContent = text
+  },
+
+  toggleContentWarning(toggleButton) {
+    const stateInput = this.el.querySelector("[data-role='compose-cw-state']")
+    const cwPanel = this.el.querySelector("[data-role='compose-cw']")
+    if (!stateInput || !cwPanel) return
+
+    const currentlyOpen = this.truthyValue(stateInput.value || "")
+    const nextOpen = !currentlyOpen
+
+    this.setContentWarningOpen(toggleButton, stateInput, cwPanel, nextOpen)
+  },
+
+  setContentWarningOpen(toggleButton, stateInput, cwPanel, open) {
+    stateInput.value = open ? "true" : "false"
+    stateInput.setAttribute("value", stateInput.value)
+
+    toggleButton.dataset.state = open ? "open" : "closed"
+
+    cwPanel.dataset.state = open ? "open" : "closed"
+    cwPanel.classList.toggle("hidden", !open)
+
+    if (!open) {
+      const spoilerInput = this.el.querySelector("input[name$='[spoiler_text]']")
+      if (spoilerInput && spoilerInput.value !== "") {
+        spoilerInput.value = ""
+        spoilerInput.dispatchEvent(new Event("input", {bubbles: true}))
+        spoilerInput.dispatchEvent(new Event("change", {bubbles: true}))
+      }
+    } else {
+      const spoilerInput = this.el.querySelector("input[name$='[spoiler_text]']")
+      spoilerInput?.focus?.({preventScroll: true})
+    }
+
+    stateInput.dispatchEvent(new Event("input", {bubbles: true}))
+    stateInput.dispatchEvent(new Event("change", {bubbles: true}))
+  },
+
+  truthyValue(value) {
+    const normalized = String(value || "").trim().toLowerCase()
+    return normalized === "true" || normalized === "1" || normalized === "yes" || normalized === "on"
   },
 
   visibilityText: value => {

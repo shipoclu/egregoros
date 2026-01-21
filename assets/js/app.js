@@ -26,6 +26,7 @@ import {hooks as colocatedHooks} from "phoenix-colocated/egregoros"
 import topbar from "../vendor/topbar"
 import TimelineTopSentinel from "./hooks/timeline_top_sentinel"
 import TimelineBottomSentinel from "./hooks/timeline_bottom_sentinel"
+import ComposePanel from "./hooks/compose_panel"
 import ComposeCharCounter from "./hooks/compose_char_counter"
 import ComposeSettings from "./hooks/compose_settings"
 import ComposeMentions from "./hooks/compose_mentions"
@@ -1187,7 +1188,73 @@ const E2EEDMComposer = {
   mounted() {
     this.encrypting = false
     this.skipNextSubmit = false
+    this.encryptEnabled = null
+    this.lastPeerApId = (this.el.dataset.peerApId || "").trim()
     restoreE2EEIdentityFromStorage()
+
+    this.readEncryptEnabled = () => {
+      const encryptInput = this.el.querySelector("[data-role='dm-encrypt-enabled']")
+      return ((encryptInput?.value || "true") + "").trim() !== "false"
+    }
+
+    this.syncEncryptUI = () => {
+      const encryptInput = this.el.querySelector("[data-role='dm-encrypt-enabled']")
+      const toggleButton = this.el.querySelector("[data-role='dm-encrypt-toggle']")
+      const contentInput = this.el.querySelector("textarea[name='dm[content]']")
+      const lockIcon = this.el.querySelector("[data-role='dm-composer-lock']")
+
+      if (this.encryptEnabled === null) this.encryptEnabled = this.readEncryptEnabled()
+
+      if (encryptInput) {
+        encryptInput.value = this.encryptEnabled ? "true" : "false"
+      }
+
+      if (contentInput) {
+        contentInput.placeholder = this.encryptEnabled
+          ? "Type an encrypted message..."
+          : "Type a message..."
+      }
+
+      if (lockIcon) lockIcon.classList.toggle("hidden", !this.encryptEnabled)
+
+      if (toggleButton) {
+        toggleButton.dataset.state = this.encryptEnabled ? "encrypted" : "plain"
+
+        toggleButton
+          .querySelector("[data-role='dm-encrypt-icon-encrypted']")
+          ?.classList?.toggle("hidden", !this.encryptEnabled)
+        toggleButton
+          .querySelector("[data-role='dm-encrypt-icon-plain']")
+          ?.classList?.toggle("hidden", this.encryptEnabled)
+
+        toggleButton
+          .querySelector("[data-role='dm-encrypt-label-encrypted']")
+          ?.classList?.toggle("hidden", !this.encryptEnabled)
+        toggleButton
+          .querySelector("[data-role='dm-encrypt-label-plain']")
+          ?.classList?.toggle("hidden", this.encryptEnabled)
+      } else {
+        this.encryptEnabled = false
+        if (encryptInput) encryptInput.value = "false"
+        if (lockIcon) lockIcon.classList.add("hidden")
+      }
+    }
+
+    this.toggleEncryptEnabled = () => {
+      this.encryptEnabled = !this.readEncryptEnabled()
+      this.syncEncryptUI()
+    }
+
+    this.onClick = e => {
+      const target = e?.target
+      if (!(target instanceof HTMLElement)) return
+
+      const toggle = target.closest?.("[data-role='dm-encrypt-toggle']")
+      if (!toggle || !this.el.contains(toggle)) return
+
+      e.preventDefault()
+      this.toggleEncryptEnabled()
+    }
 
     this.onSubmit = async e => {
       if (this.skipNextSubmit) {
@@ -1204,6 +1271,7 @@ const E2EEDMComposer = {
 
       clearDmE2EEFeedback(this.el)
 
+      this.syncEncryptUI()
       const encryptEnabled = ((encryptInput?.value || "true") + "").trim() !== "false"
       const recipientRaw = (recipientInput.value || "").trim()
       const plaintext = (contentInput.value || "").trim()
@@ -1303,10 +1371,25 @@ const E2EEDMComposer = {
       }
     }
 
+    this.encryptEnabled = this.readEncryptEnabled()
+    this.syncEncryptUI()
+
+    this.el.addEventListener("click", this.onClick)
     this.el.addEventListener("submit", this.onSubmit)
   },
 
+  updated() {
+    const peerApId = (this.el.dataset.peerApId || "").trim()
+    if (peerApId !== this.lastPeerApId) {
+      this.lastPeerApId = peerApId
+      this.encryptEnabled = this.readEncryptEnabled()
+    }
+
+    this.syncEncryptUI()
+  },
+
   destroyed() {
+    this.el.removeEventListener("click", this.onClick)
     this.el.removeEventListener("submit", this.onSubmit)
   },
 }
@@ -1434,6 +1517,7 @@ const liveSocket = new LiveSocket("/live", Socket, {
     ...colocatedHooks,
     TimelineTopSentinel,
     TimelineBottomSentinel,
+    ComposePanel,
     ComposeCharCounter,
     ComposeSettings,
     ComposeMentions,

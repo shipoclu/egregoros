@@ -597,9 +597,10 @@ defmodule EgregorosWeb.ProfileLiveTest do
 
     assert has_element?(view, "#reply-modal [data-role='compose-cw'][data-state='closed']")
 
-    view
-    |> element("#reply-modal button[data-role='compose-toggle-cw']")
-    |> render_click()
+    _html =
+      render_change(view, "reply_change", %{
+        "reply" => %{"ui_cw_open" => "true"}
+      })
 
     assert has_element?(view, "#reply-modal [data-role='compose-cw'][data-state='open']")
   end

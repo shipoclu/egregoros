@@ -273,7 +273,10 @@ defmodule EgregorosWeb.TagLiveTest do
 
     assert has_element?(view, "[data-role='compose-cw'][data-state='open']")
 
-    _html = render_click(view, "toggle_reply_cw", %{})
+    _html =
+      render_change(view, "reply_change", %{
+        "reply" => %{"ui_cw_open" => "false", "spoiler_text" => ""}
+      })
 
     assert has_element?(view, "[data-role='compose-cw'][data-state='closed']")
   end

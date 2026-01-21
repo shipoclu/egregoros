@@ -15,7 +15,6 @@ defmodule EgregorosWeb.Composer do
   attr :change_event, :string, required: true
   attr :submit_event, :string, required: true
   attr :cancel_event, :string, required: true
-  attr :toggle_cw_event, :string, required: true
 
   attr :max_chars, :integer, default: 5000
   attr :options_open?, :boolean, default: false
@@ -30,6 +29,7 @@ defmodule EgregorosWeb.Composer do
     assigns =
       assigns
       |> assign_new(:options_state_id, fn -> "#{assigns.id_prefix}-options-state" end)
+      |> assign_new(:cw_state_id, fn -> "#{assigns.id_prefix}-cw-state" end)
       |> assign_new(:cw_id, fn -> "#{assigns.id_prefix}-cw" end)
       |> assign_new(:options_id, fn -> "#{assigns.id_prefix}-options" end)
       |> assign_new(:visibility_menu_id, fn -> "#{assigns.id_prefix}-visibility-menu" end)
@@ -57,6 +57,14 @@ defmodule EgregorosWeb.Composer do
         name={"#{@param_prefix}[ui_options_open]"}
         value={Map.get(@form.params || %{}, "ui_options_open", "false")}
         data-role="compose-options-state"
+      />
+
+      <.input
+        type="hidden"
+        id={@cw_state_id}
+        name={"#{@param_prefix}[ui_cw_open]"}
+        value={if @cw_open?, do: "true", else: "false"}
+        data-role="compose-cw-state"
       />
 
       {render_slot(@extra_fields)}
@@ -395,14 +403,12 @@ defmodule EgregorosWeb.Composer do
             <button
               type="button"
               data-role="compose-toggle-cw"
-              phx-click={toggle_cw_js(@cw_id) |> JS.push(@toggle_cw_event)}
+              data-state={if @cw_open?, do: "open", else: "closed"}
               aria-label="Content warning"
               class={[
                 "inline-flex h-10 w-10 cursor-pointer items-center justify-center transition focus-visible:outline-none focus-brutal",
-                @cw_open? &&
-                  "bg-[color:var(--warning-subtle)] text-[color:var(--warning)]",
-                !@cw_open? &&
-                  "text-[color:var(--text-muted)] hover:bg-[color:var(--bg-muted)] hover:text-[color:var(--text-primary)]"
+                "data-[state=open]:bg-[color:var(--warning-subtle)] data-[state=open]:text-[color:var(--warning)]",
+                "data-[state=closed]:text-[color:var(--text-muted)] data-[state=closed]:hover:bg-[color:var(--bg-muted)] data-[state=closed]:hover:text-[color:var(--text-primary)]"
               ]}
             >
               <.icon name="hero-exclamation-triangle" class="size-5" />
@@ -485,10 +491,6 @@ defmodule EgregorosWeb.Composer do
   defp close_menu_js(menu_id) when is_binary(menu_id) do
     JS.add_class("hidden", to: "##{menu_id}")
     |> JS.set_attribute({"data-state", "closed"}, to: "##{menu_id}")
-  end
-
-  defp toggle_cw_js(cw_id) when is_binary(cw_id) do
-    JS.toggle_class("hidden", to: "##{cw_id}")
   end
 
   defp remaining_chars(%Phoenix.HTML.Form{} = form, max_chars) when is_integer(max_chars) do
