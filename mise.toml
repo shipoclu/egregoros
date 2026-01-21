@@ -11,10 +11,23 @@ run = "docker compose -f docker/federation/compose.yml up -d --build"
 
 [tasks."fed:test"]
 description = "Run federation-in-a-box smoke test (outgoing follow + accept)"
-run = [
-  "docker compose -f docker/federation/compose.yml up -d --build",
-  "docker compose -f docker/federation/compose.yml --profile fedtest run --rm fedtest",
-]
+run = '''
+set -eu
+
+compose() {
+  docker compose -f docker/federation/compose.yml "$@"
+}
+
+cleanup() {
+  compose down -v --remove-orphans || true
+}
+
+trap cleanup EXIT
+
+compose down -v --remove-orphans || true
+compose up -d --build
+compose --profile fedtest run --rm --build fedtest
+'''
 
 [tasks."fed:logs"]
 description = "Tail federation-in-a-box logs"
