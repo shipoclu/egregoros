@@ -1,13 +1,16 @@
 defmodule Egregoros.Federation.WebFinger do
+  alias Egregoros.Config
   alias Egregoros.HTTP
   alias Egregoros.SafeURL
 
   def lookup(handle) when is_binary(handle) do
     with {:ok, username, domain} <- parse_handle(handle),
+         scheme <- lookup_scheme(),
          url <-
-           "https://" <>
+           scheme <>
+             "://" <>
              domain <> "/.well-known/webfinger?resource=acct:" <> username <> "@" <> domain,
-         :ok <- SafeURL.validate_http_url(url),
+         :ok <- SafeURL.validate_http_url_federation(url),
          {:ok, %{status: status, body: body}} when status in 200..299 <- HTTP.get(url, headers()),
          {:ok, jrd} <- decode_json(body),
          {:ok, actor_url} <- find_actor_url(jrd) do
@@ -61,6 +64,18 @@ defmodule Egregoros.Federation.WebFinger do
 
       _ ->
         {:error, :invalid_handle}
+    end
+  end
+
+  defp lookup_scheme do
+    Config.get(:federation_webfinger_scheme, "https")
+    |> to_string()
+    |> String.trim()
+    |> String.downcase()
+    |> case do
+      "http" -> "http"
+      "https" -> "https"
+      _ -> "https"
     end
   end
 end

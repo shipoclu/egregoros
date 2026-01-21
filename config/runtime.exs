@@ -23,6 +23,24 @@ end
 config :egregoros, EgregorosWeb.Endpoint,
   http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 
+allow_private_federation =
+  System.get_env("EGREGOROS_ALLOW_PRIVATE_FEDERATION", "")
+  |> String.trim()
+  |> String.downcase()
+
+if allow_private_federation in ~w(true 1) do
+  config :egregoros, :allow_private_federation, true
+end
+
+webfinger_scheme =
+  System.get_env("EGREGOROS_FEDERATION_WEBFINGER_SCHEME", "")
+  |> String.trim()
+  |> String.downcase()
+
+if webfinger_scheme in ~w(http https) do
+  config :egregoros, :federation_webfinger_scheme, webfinger_scheme
+end
+
 bootstrap_admin_nickname = System.get_env("EGREGOROS_BOOTSTRAP_ADMIN")
 
 if is_binary(bootstrap_admin_nickname) and bootstrap_admin_nickname != "" do

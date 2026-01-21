@@ -416,6 +416,46 @@ defmodule Egregoros.Federation.ActorTest do
     assert {:error, :unsafe_url} = Actor.fetch_and_store(actor_url)
   end
 
+  test "fetch_and_store can be configured to allow federation-box hostnames" do
+    actor_url = "https://private.example/users/alice"
+    {public_key, _private_key} = Keys.generate_rsa_keypair()
+
+    stub(Egregoros.Config.Mock, :get, fn
+      :allow_private_federation, _default -> true
+      key, default -> Egregoros.Config.Stub.get(key, default)
+    end)
+
+    Egregoros.DNS.Mock
+    |> expect(:lookup_ips, 0, fn _host ->
+      flunk("unexpected DNS lookup for federation-box actor fetch")
+    end)
+
+    expect(Egregoros.HTTP.Mock, :get, fn url, _headers ->
+      assert url == actor_url
+
+      {:ok,
+       %{
+         status: 200,
+         body: %{
+           "id" => actor_url,
+           "type" => "Person",
+           "preferredUsername" => "alice",
+           "inbox" => actor_url <> "/inbox",
+           "outbox" => actor_url <> "/outbox",
+           "publicKey" => %{
+             "id" => actor_url <> "#main-key",
+             "owner" => actor_url,
+             "publicKeyPem" => public_key
+           }
+         },
+         headers: []
+       }}
+    end)
+
+    assert {:ok, user} = Actor.fetch_and_store(actor_url)
+    assert user.ap_id == actor_url
+  end
+
   test "fetch_and_store returns :invalid_json for non-json bodies" do
     actor_url = "https://remote.example/users/alice"
 

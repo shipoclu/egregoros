@@ -165,4 +165,36 @@ defmodule Egregoros.SafeURLTest do
     assert {:error, :unsafe_url} ==
              SafeURL.validate_http_url_no_dns("http://8.8.65536/users/alice")
   end
+
+  test "validate_http_url_federation allows private federation hostnames when configured" do
+    Egregoros.DNS.Mock
+    |> expect(:lookup_ips, 0, fn _host ->
+      flunk("unexpected DNS lookup for federation-safe URL validation")
+    end)
+
+    stub(Egregoros.Config.Mock, :get, fn
+      :allow_private_federation, _default -> true
+      key, default -> Egregoros.Config.Stub.get(key, default)
+    end)
+
+    Egregoros.Config.with_impl(Egregoros.Config.Mock, fn ->
+      assert :ok == SafeURL.validate_http_url_federation("https://private.example/users/alice")
+    end)
+  end
+
+  test "validate_http_url_federation treats allow_private_federation=1 as enabled" do
+    Egregoros.DNS.Mock
+    |> expect(:lookup_ips, 0, fn _host ->
+      flunk("unexpected DNS lookup for federation-safe URL validation")
+    end)
+
+    stub(Egregoros.Config.Mock, :get, fn
+      :allow_private_federation, _default -> "1"
+      key, default -> Egregoros.Config.Stub.get(key, default)
+    end)
+
+    Egregoros.Config.with_impl(Egregoros.Config.Mock, fn ->
+      assert :ok == SafeURL.validate_http_url_federation("https://private.example/users/alice")
+    end)
+  end
 end

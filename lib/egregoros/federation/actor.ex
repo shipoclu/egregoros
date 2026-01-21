@@ -8,7 +8,7 @@ defmodule Egregoros.Federation.Actor do
   alias Egregoros.Users
 
   def fetch_and_store(actor_url) when is_binary(actor_url) do
-    with :ok <- SafeURL.validate_http_url(actor_url),
+    with :ok <- SafeURL.validate_http_url_federation(actor_url),
          {:ok, actor} <- fetch_actor(actor_url),
          {:ok, attrs} <- to_user_attrs(actor, actor_url),
          {:ok, user} <- Users.upsert_user(attrs) do
@@ -23,7 +23,7 @@ defmodule Egregoros.Federation.Actor do
   def fetch_and_store_with_counts(actor_url) when is_binary(actor_url) do
     checked_at = DateTime.utc_now() |> DateTime.truncate(:microsecond)
 
-    with :ok <- SafeURL.validate_http_url(actor_url),
+    with :ok <- SafeURL.validate_http_url_federation(actor_url),
          {:ok, actor} <- fetch_actor(actor_url),
          {:ok, attrs} <- to_user_attrs(actor, actor_url) do
       count_attrs =
@@ -46,7 +46,7 @@ defmodule Egregoros.Federation.Actor do
     actor_url = actor |> extract_id() |> normalize_id()
 
     with actor_url when is_binary(actor_url) and actor_url != "" <- actor_url,
-         :ok <- SafeURL.validate_http_url(actor_url),
+         :ok <- SafeURL.validate_http_url_federation(actor_url),
          {:ok, attrs} <- to_user_attrs(actor, actor_url),
          {:ok, user} <- Users.upsert_user(attrs) do
       _ = UserEvents.broadcast_update(user.ap_id)
@@ -186,7 +186,7 @@ defmodule Egregoros.Federation.Actor do
     url = String.trim(url)
 
     with true <- url != "",
-         :ok <- SafeURL.validate_http_url(url) do
+         :ok <- SafeURL.validate_http_url_federation(url) do
       case HTTP.get(url, headers()) do
         {:ok, %{status: status, body: body}} when status in 200..299 ->
           with {:ok, %{} = collection} <- decode_json(body) do
@@ -271,8 +271,8 @@ defmodule Egregoros.Federation.Actor do
     else
       with {:ok, inbox} <- required_string_field(actor, "inbox", :missing_inbox),
            {:ok, outbox} <- required_string_field(actor, "outbox", :missing_outbox),
-           :ok <- SafeURL.validate_http_url(inbox),
-           :ok <- SafeURL.validate_http_url(outbox) do
+           :ok <- SafeURL.validate_http_url_federation(inbox),
+           :ok <- SafeURL.validate_http_url_federation(outbox) do
         domain =
           case URI.parse(id) do
             %URI{} = uri -> Domain.from_uri(uri)
@@ -475,7 +475,7 @@ defmodule Egregoros.Federation.Actor do
     |> resolve_url(actor_id)
     |> case do
       url when is_binary(url) ->
-        case SafeURL.validate_http_url(url) do
+        case SafeURL.validate_http_url_federation(url) do
           :ok -> url
           _ -> nil
         end
@@ -494,7 +494,7 @@ defmodule Egregoros.Federation.Actor do
     |> resolve_url(actor_id)
     |> case do
       url when is_binary(url) ->
-        case SafeURL.validate_http_url(url) do
+        case SafeURL.validate_http_url_federation(url) do
           :ok -> url
           _ -> nil
         end

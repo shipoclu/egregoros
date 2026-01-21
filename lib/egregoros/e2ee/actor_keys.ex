@@ -51,7 +51,7 @@ defmodule Egregoros.E2EE.ActorKeys do
           {:ok, keys}
 
         _ ->
-          with :ok <- SafeURL.validate_http_url(actor_ap_id) do
+          with :ok <- SafeURL.validate_http_url_federation(actor_ap_id) do
             keys = cached_actor_keys(actor_ap_id)
 
             cond do
@@ -84,7 +84,7 @@ defmodule Egregoros.E2EE.ActorKeys do
           local_actor_key(user, kid)
 
         _ ->
-          with :ok <- SafeURL.validate_http_url(actor_ap_id) do
+          with :ok <- SafeURL.validate_http_url_federation(actor_ap_id) do
             remote_actor_key(actor_ap_id, kid)
           else
             _ -> {:error, :invalid_payload}
@@ -106,7 +106,7 @@ defmodule Egregoros.E2EE.ActorKeys do
           {:ok, actor_ap_id}
 
         _ ->
-          with :ok <- SafeURL.validate_http_url(actor_ap_id) do
+          with :ok <- SafeURL.validate_http_url_federation(actor_ap_id) do
             {:ok, actor_ap_id}
           else
             _ -> {:error, :invalid_payload}

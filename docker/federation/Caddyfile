@@ -1,0 +1,15 @@
+{
+  auto_https off
+}
+
+egregoros.test {
+  reverse_proxy egregoros_web:4000
+}
+
+pleroma.test {
+  reverse_proxy pleroma_web:4000
+}
+
+mastodon.test {
+  reverse_proxy mastodon_web:3000
+}
