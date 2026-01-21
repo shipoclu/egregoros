@@ -336,6 +336,8 @@ services:
         condition: service_healthy
       mastodon_web:
         condition: service_healthy
+      mastodon_sidekiq:
+        condition: service_started
     environment:
       FEDTEST_EGREGOROS_DOMAIN: egregoros.test
       FEDTEST_PLEROMA_HANDLE: "@bob@pleroma.test"
