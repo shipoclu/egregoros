@@ -75,13 +75,16 @@ services:
       # Must be at least 64 bytes for Plug.Session cookie store.
       SECRET_KEY_BASE: "fedbox_secret_key_base_egregoros_0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
       PHX_HOST: egregoros.test
-      PHX_SCHEME: http
-      PHX_PORT: 80
+      PHX_SCHEME: https
+      PHX_PORT: 443
       EGREGOROS_ALLOW_PRIVATE_FEDERATION: "true"
-      EGREGOROS_FEDERATION_WEBFINGER_SCHEME: http
+      EGREGOROS_FEDERATION_WEBFINGER_SCHEME: https
       EGREGOROS_UPLOADS_DIR: /data/uploads
+      EGREGOROS_REQ_CACERTFILE: /caddy/pki/authorities/local/root.crt
+      SSL_CERT_FILE: /caddy/pki/authorities/local/root.crt
     volumes:
       - egregoros_fed_uploads:/data/uploads
+      - caddy_fed_data:/caddy:ro
     expose:
       - "4000"
     command: >
@@ -127,6 +130,7 @@ services:
     volumes:
       - pleroma_fed_data:/var/lib/pleroma
       - ./pleroma/config.exs:/var/lib/pleroma/config.exs:ro
+      - caddy_fed_data:/caddy:ro
     expose:
       - "4000"
     healthcheck:
@@ -226,12 +230,14 @@ services:
     image: ${MASTODON_IMAGE:-ghcr.io/mastodon/mastodon:v4.5.3}
     restart: "no"
     depends_on:
+      gateway_certs:
+        condition: service_completed_successfully
       mastodon_db:
         condition: service_healthy
       mastodon_redis:
         condition: service_healthy
     environment: &mastodon_env
-      RAILS_ENV: development
+      RAILS_ENV: production
       NODE_ENV: production
       PORT: 3000
       LOCAL_DOMAIN: mastodon.test
@@ -244,6 +250,9 @@ services:
       DB_NAME: mastodon
       DB_USER: mastodon
       DB_PASS: mastodon
+      # Production Mastodon blocks private-network federation by default.
+      # Allow common Docker/private ranges for federation-in-a-box.
+      ALLOWED_PRIVATE_ADDRESSES: "10.0.0.0/8 172.16.0.0/12 192.168.0.0/16"
       SSL_CERT_FILE: /caddy/pki/authorities/local/root.crt
       OTP_SECRET: "fedbox_otp_secret_mastodon"
       SECRET_KEY_BASE: "fca7fa5fe8ca9b7bbcaa442535b973e772e6392f46aab7fb3ec227ef5eb8d8c6605b921f7af4c2cc41f19a20633334e11c6012d6de958d0b14c4c2aa24a294ab"
@@ -332,8 +341,12 @@ services:
       FEDTEST_PLEROMA_HANDLE: "@bob@pleroma.test"
       FEDTEST_MASTODON_HANDLE: "@carol@mastodon.test"
       FEDTEST_PASSWORD: "password"
+      FEDTEST_SCHEME: https
+      FEDTEST_CACERTFILE: /caddy/pki/authorities/local/root.crt
     networks:
       - federation
+    volumes:
+      - caddy_fed_data:/caddy:ro
 
 volumes:
   caddy_fed_data:
