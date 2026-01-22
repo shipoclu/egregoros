@@ -214,6 +214,366 @@ defmodule FederationBoxTest do
     )
   end
 
+  test "receives boosts from mastodon on our posts", ctx do
+    unique = unique_token()
+
+    follow_and_assert_local_accept!(
+      ctx.mastodon_base_url,
+      ctx.carol_access_token,
+      ctx.alice_handle,
+      ctx.alice_actor_id,
+      ctx.carol_actor_id_variants
+    )
+
+    alice_text = "fedbox: boost me #{unique}"
+    alice_status = create_status!(ctx.egregoros_base_url, ctx.access_token, alice_text)
+    alice_status_id = alice_status["id"]
+
+    alice_uri_variants =
+      alice_status
+      |> status_uri()
+      |> actor_id_variants()
+
+    mastodon_status =
+      wait_until!(
+        fn ->
+          find_status_by_uri_variant(
+            ctx.mastodon_base_url,
+            ctx.carol_access_token,
+            alice_uri_variants
+          )
+        end,
+        "mastodon received alice post"
+      )
+
+    reblog_status!(ctx.mastodon_base_url, ctx.carol_access_token, mastodon_status["id"])
+
+    wait_until!(
+      fn ->
+        status = fetch_status!(ctx.egregoros_base_url, ctx.access_token, alice_status_id)
+        reblogs_count = Map.get(status, "reblogs_count", 0)
+        is_integer(reblogs_count) and reblogs_count > 0
+      end,
+      "egregoros received mastodon boost"
+    )
+  end
+
+  test "remote receives our boosts", ctx do
+    unique = unique_token()
+
+    follow_and_assert_remote_accept!(
+      ctx.egregoros_base_url,
+      ctx.access_token,
+      ctx.bob_handle,
+      ctx.alice_actor_id_variants
+    )
+
+    bob_text = "fedbox: boost this #{unique}"
+    bob_status = create_status!(ctx.pleroma_base_url, ctx.bob_access_token, bob_text)
+    bob_status_id = bob_status["id"]
+
+    bob_uri_variants =
+      bob_status
+      |> status_uri()
+      |> actor_id_variants()
+
+    egregoros_bob_status =
+      wait_until!(
+        fn ->
+          find_status_by_uri_variant(ctx.egregoros_base_url, ctx.access_token, bob_uri_variants)
+        end,
+        "egregoros received bob post"
+      )
+
+    _reblog = reblog_status!(ctx.egregoros_base_url, ctx.access_token, egregoros_bob_status["id"])
+
+    wait_until!(
+      fn ->
+        status = fetch_status!(ctx.pleroma_base_url, ctx.bob_access_token, bob_status_id)
+        reblogs_count = Map.get(status, "reblogs_count", 0)
+        is_integer(reblogs_count) and reblogs_count > 0
+      end,
+      "pleroma received alice boost"
+    )
+  end
+
+  test "deletes: receives deletes from mastodon", ctx do
+    unique = unique_token()
+
+    follow_and_assert_remote_accept!(
+      ctx.egregoros_base_url,
+      ctx.access_token,
+      ctx.carol_handle,
+      ctx.alice_actor_id_variants
+    )
+
+    carol_text = "fedbox: delete me (mastodon) #{unique}"
+    carol_status = create_status!(ctx.mastodon_base_url, ctx.carol_access_token, carol_text)
+    carol_status_id = carol_status["id"]
+
+    carol_uri_variants =
+      carol_status
+      |> status_uri()
+      |> actor_id_variants()
+
+    egregoros_status =
+      wait_until!(
+        fn ->
+          find_status_by_uri_variant(ctx.egregoros_base_url, ctx.access_token, carol_uri_variants)
+        end,
+        "egregoros received mastodon post"
+      )
+
+    _ = delete_status!(ctx.mastodon_base_url, ctx.carol_access_token, carol_status_id)
+
+    wait_until!(
+      fn -> status_gone?(ctx.egregoros_base_url, ctx.access_token, egregoros_status["id"]) end,
+      "egregoros removed deleted mastodon post"
+    )
+  end
+
+  test "deletes: receives deletes from pleroma", ctx do
+    unique = unique_token()
+
+    follow_and_assert_remote_accept!(
+      ctx.egregoros_base_url,
+      ctx.access_token,
+      ctx.bob_handle,
+      ctx.alice_actor_id_variants
+    )
+
+    bob_text = "fedbox: delete me (pleroma) #{unique}"
+    bob_status = create_status!(ctx.pleroma_base_url, ctx.bob_access_token, bob_text)
+    bob_status_id = bob_status["id"]
+
+    bob_uri_variants =
+      bob_status
+      |> status_uri()
+      |> actor_id_variants()
+
+    egregoros_status =
+      wait_until!(
+        fn ->
+          find_status_by_uri_variant(ctx.egregoros_base_url, ctx.access_token, bob_uri_variants)
+        end,
+        "egregoros received pleroma post"
+      )
+
+    _ = delete_status!(ctx.pleroma_base_url, ctx.bob_access_token, bob_status_id)
+
+    wait_until!(
+      fn -> status_gone?(ctx.egregoros_base_url, ctx.access_token, egregoros_status["id"]) end,
+      "egregoros removed deleted pleroma post"
+    )
+  end
+
+  test "deletes: remote receives our deletes (mastodon)", ctx do
+    unique = unique_token()
+
+    follow_and_assert_local_accept!(
+      ctx.mastodon_base_url,
+      ctx.carol_access_token,
+      ctx.alice_handle,
+      ctx.alice_actor_id,
+      ctx.carol_actor_id_variants
+    )
+
+    alice_text = "fedbox: delete me (to mastodon) #{unique}"
+    alice_status = create_status!(ctx.egregoros_base_url, ctx.access_token, alice_text)
+    alice_status_id = alice_status["id"]
+
+    alice_uri_variants =
+      alice_status
+      |> status_uri()
+      |> actor_id_variants()
+
+    mastodon_status =
+      wait_until!(
+        fn ->
+          find_status_by_uri_variant(
+            ctx.mastodon_base_url,
+            ctx.carol_access_token,
+            alice_uri_variants
+          )
+        end,
+        "mastodon received alice post"
+      )
+
+    _ = delete_status!(ctx.egregoros_base_url, ctx.access_token, alice_status_id)
+
+    wait_until!(
+      fn ->
+        status_gone?(ctx.mastodon_base_url, ctx.carol_access_token, mastodon_status["id"])
+      end,
+      "mastodon removed deleted alice post"
+    )
+  end
+
+  test "deletes: remote receives our deletes (pleroma)", ctx do
+    unique = unique_token()
+
+    follow_and_assert_local_accept!(
+      ctx.pleroma_base_url,
+      ctx.bob_access_token,
+      ctx.alice_handle,
+      ctx.alice_actor_id,
+      ctx.bob_actor_id_variants
+    )
+
+    alice_text = "fedbox: delete me (to pleroma) #{unique}"
+    alice_status = create_status!(ctx.egregoros_base_url, ctx.access_token, alice_text)
+    alice_status_id = alice_status["id"]
+
+    alice_uri_variants =
+      alice_status
+      |> status_uri()
+      |> actor_id_variants()
+
+    pleroma_status =
+      wait_until!(
+        fn ->
+          find_status_by_uri_variant(
+            ctx.pleroma_base_url,
+            ctx.bob_access_token,
+            alice_uri_variants
+          )
+        end,
+        "pleroma received alice post"
+      )
+
+    _ = delete_status!(ctx.egregoros_base_url, ctx.access_token, alice_status_id)
+
+    wait_until!(
+      fn -> status_gone?(ctx.pleroma_base_url, ctx.bob_access_token, pleroma_status["id"]) end,
+      "pleroma removed deleted alice post"
+    )
+  end
+
+  test "threads: receives replies from mastodon on our posts", ctx do
+    unique = unique_token()
+
+    follow_and_assert_local_accept!(
+      ctx.mastodon_base_url,
+      ctx.carol_access_token,
+      ctx.alice_handle,
+      ctx.alice_actor_id,
+      ctx.carol_actor_id_variants
+    )
+
+    alice_text = "fedbox: thread root #{unique}"
+    alice_status = create_status!(ctx.egregoros_base_url, ctx.access_token, alice_text)
+    alice_status_id = alice_status["id"]
+
+    alice_uri_variants =
+      alice_status
+      |> status_uri()
+      |> actor_id_variants()
+
+    mastodon_root =
+      wait_until!(
+        fn ->
+          find_status_by_uri_variant(
+            ctx.mastodon_base_url,
+            ctx.carol_access_token,
+            alice_uri_variants
+          )
+        end,
+        "mastodon received alice root"
+      )
+
+    reply_text = "#{ctx.alice_handle} fedbox: reply from carol #{unique}"
+
+    reply_status =
+      create_reply!(
+        ctx.mastodon_base_url,
+        ctx.carol_access_token,
+        reply_text,
+        mastodon_root["id"]
+      )
+
+    reply_uri_variants =
+      reply_status
+      |> status_uri()
+      |> actor_id_variants()
+
+    wait_until!(
+      fn ->
+        context = fetch_context!(ctx.egregoros_base_url, ctx.access_token, alice_status_id)
+        descendants = Map.get(context, "descendants", [])
+
+        Enum.any?(descendants, fn status ->
+          status
+          |> status_uri()
+          |> case do
+            uri when is_binary(uri) -> uri in reply_uri_variants
+            _ -> false
+          end
+        end)
+      end,
+      "egregoros received mastodon reply in context"
+    )
+  end
+
+  test "threads: remote receives our replies", ctx do
+    unique = unique_token()
+
+    follow_and_assert_remote_accept!(
+      ctx.egregoros_base_url,
+      ctx.access_token,
+      ctx.bob_handle,
+      ctx.alice_actor_id_variants
+    )
+
+    bob_text = "fedbox: bob thread root #{unique}"
+    bob_status = create_status!(ctx.pleroma_base_url, ctx.bob_access_token, bob_text)
+    bob_status_id = bob_status["id"]
+
+    bob_uri_variants =
+      bob_status
+      |> status_uri()
+      |> actor_id_variants()
+
+    egregoros_bob_status =
+      wait_until!(
+        fn ->
+          find_status_by_uri_variant(ctx.egregoros_base_url, ctx.access_token, bob_uri_variants)
+        end,
+        "egregoros received bob root"
+      )
+
+    reply_text = "fedbox: reply from alice #{unique}"
+
+    reply_status =
+      create_reply!(
+        ctx.egregoros_base_url,
+        ctx.access_token,
+        reply_text,
+        egregoros_bob_status["id"]
+      )
+
+    reply_uri_variants =
+      reply_status
+      |> status_uri()
+      |> actor_id_variants()
+
+    wait_until!(
+      fn ->
+        context = fetch_context!(ctx.pleroma_base_url, ctx.bob_access_token, bob_status_id)
+        descendants = Map.get(context, "descendants", [])
+
+        Enum.any?(descendants, fn status ->
+          status
+          |> status_uri()
+          |> case do
+            uri when is_binary(uri) -> uri in reply_uri_variants
+            _ -> false
+          end
+        end)
+      end,
+      "pleroma received alice reply in context"
+    )
+  end
+
   defp follow_and_assert_remote_accept!(base_url, access_token, handle, alice_actor_id_variants)
        when is_binary(base_url) and is_binary(access_token) and is_binary(handle) and
               is_list(alice_actor_id_variants) do
@@ -275,11 +635,39 @@ defmodule FederationBoxTest do
     ensure_json!(resp.body)
   end
 
+  defp create_reply!(base_url, access_token, text, in_reply_to_id)
+       when is_binary(base_url) and is_binary(access_token) and is_binary(text) and
+              is_binary(in_reply_to_id) do
+    resp =
+      req_post!(
+        base_url <> "/api/v1/statuses",
+        headers: [{"authorization", "Bearer " <> access_token}],
+        form: [
+          {"status", text},
+          {"in_reply_to_id", in_reply_to_id},
+          {"visibility", "public"}
+        ]
+      )
+
+    ensure_json!(resp.body)
+  end
+
   defp fetch_status!(base_url, access_token, status_id)
        when is_binary(base_url) and is_binary(access_token) and is_binary(status_id) do
     resp =
       req_get!(
         base_url <> "/api/v1/statuses/" <> status_id,
+        headers: [{"authorization", "Bearer " <> access_token}]
+      )
+
+    ensure_json!(resp.body)
+  end
+
+  defp fetch_context!(base_url, access_token, status_id)
+       when is_binary(base_url) and is_binary(access_token) and is_binary(status_id) do
+    resp =
+      req_get!(
+        base_url <> "/api/v1/statuses/" <> status_id <> "/context",
         headers: [{"authorization", "Bearer " <> access_token}]
       )
 
@@ -295,6 +683,43 @@ defmodule FederationBoxTest do
       )
 
     :ok
+  end
+
+  defp reblog_status!(base_url, access_token, status_id)
+       when is_binary(base_url) and is_binary(access_token) and is_binary(status_id) do
+    resp =
+      req_post!(
+        base_url <> "/api/v1/statuses/" <> status_id <> "/reblog",
+        headers: [{"authorization", "Bearer " <> access_token}]
+      )
+
+    ensure_json!(resp.body)
+  end
+
+  defp delete_status!(base_url, access_token, status_id)
+       when is_binary(base_url) and is_binary(access_token) and is_binary(status_id) do
+    resp =
+      req_delete!(
+        base_url <> "/api/v1/statuses/" <> status_id,
+        headers: [{"authorization", "Bearer " <> access_token}]
+      )
+
+    if resp.status in 200..299 do
+      :ok
+    else
+      raise("unexpected status when deleting #{status_id}: #{resp.status}")
+    end
+  end
+
+  defp status_gone?(base_url, access_token, status_id)
+       when is_binary(base_url) and is_binary(access_token) and is_binary(status_id) do
+    resp =
+      req_get!(
+        base_url <> "/api/v1/statuses/" <> status_id,
+        headers: [{"authorization", "Bearer " <> access_token}]
+      )
+
+    resp.status in [404, 410]
   end
 
   defp home_timeline_contains?(base_url, access_token, needle)
@@ -1036,6 +1461,10 @@ defmodule FederationBoxTest do
 
   defp req_post!(url, opts) when is_binary(url) and is_list(opts) do
     Req.post!(url, req_default_opts(url) ++ opts)
+  end
+
+  defp req_delete!(url, opts) when is_binary(url) and is_list(opts) do
+    Req.delete!(url, req_default_opts(url) ++ opts)
   end
 
   defp wait_until!(check_fun, label, timeout_ms \\ 120_000)
