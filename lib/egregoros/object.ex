@@ -13,6 +13,7 @@ defmodule Egregoros.Object do
     field :object, :string
     field :in_reply_to_ap_id, :string
     field :has_media, :boolean, default: false
+    field :context, :string
     field :data, :map
     field :internal, :map, default: %{}
     field :published, :utc_datetime_usec

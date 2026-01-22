@@ -1204,7 +1204,7 @@ defmodule Egregoros.Objects do
 
     if is_binary(context) do
       from(o in Object,
-        where: o.type in ^@status_types and fragment("?->>'context' = ?", o.data, ^context),
+        where: o.type in ^@status_types and o.context == ^context,
         where: o.ap_id != ^ap_id,
         order_by: [asc: o.published, asc: o.id],
         limit: ^limit,
