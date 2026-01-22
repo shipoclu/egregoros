@@ -166,8 +166,18 @@ services:
       - |
         set -euo pipefail
 
-        if wget -qO- "http://pleroma_web:4000/.well-known/webfinger?resource=acct:bob@pleroma.test" >/dev/null; then
-          echo "[fedbox] pleroma: bob already exists"
+        needs_seed=0
+
+        for username in bob dave; do
+          if wget -qO- "http://pleroma_web:4000/.well-known/webfinger?resource=acct:$$username@pleroma.test" >/dev/null; then
+            echo "[fedbox] pleroma: $$username already exists"
+          else
+            needs_seed=1
+          fi
+        done
+
+        if [ "$$needs_seed" -eq 0 ]; then
+          echo "[fedbox] pleroma: users already exist"
           exit 0
         fi
 
@@ -186,13 +196,30 @@ services:
         )
         access_token=$$(echo "$$token" | sed -n 's/.*"access_token":"\([^"]*\)".*/\1/p')
 
-        wget -qO- \
-          --header "Authorization: Bearer $$access_token" \
-          --header "Content-Type: application/json" \
-          --post-data '{"username":"bob","email":"bob@pleroma.test","password":"password","agreement":true,"locale":"en"}' \
-          "http://pleroma_web:4000/api/v1/accounts" >/dev/null || true
+        for username in bob dave; do
+          if wget -qO- "http://pleroma_web:4000/.well-known/webfinger?resource=acct:$$username@pleroma.test" >/dev/null; then
+            echo "[fedbox] pleroma: $$username already exists"
+            continue
+          fi
 
-        wget -qO- "http://pleroma_web:4000/.well-known/webfinger?resource=acct:bob@pleroma.test" >/dev/null
+          wget -qO- \
+            --header "Authorization: Bearer $$access_token" \
+            --header "Content-Type: application/json" \
+            --post-data "{\"username\":\"$$username\",\"email\":\"$$username@pleroma.test\",\"password\":\"password\",\"agreement\":true,\"locale\":\"en\"}" \
+            "http://pleroma_web:4000/api/v1/accounts" >/dev/null || true
+
+          tries=0
+          until wget -qO- "http://pleroma_web:4000/.well-known/webfinger?resource=acct:$$username@pleroma.test" >/dev/null; do
+            tries=$$((tries + 1))
+
+            if [ "$$tries" -ge 30 ]; then
+              echo "[fedbox] pleroma: timeout waiting for webfinger $$username" >&2
+              exit 1
+            fi
+
+            sleep 1
+          done
+        done
     networks:
       - federation
 

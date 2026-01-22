@@ -1164,6 +1164,49 @@ defmodule Egregoros.ObjectsTest do
     assert Objects.thread_descendants(nil, 10) == []
   end
 
+  test "thread_descendants groups partial threads by context when replies are missing" do
+    context = "https://remote.example/contexts/thread-1"
+    root_ap_id = "https://remote.example/objects/thread-root-context-1"
+
+    assert {:ok, %Object{} = root} =
+             Objects.create_object(%{
+               ap_id: root_ap_id,
+               type: "Note",
+               actor: "https://remote.example/users/alice",
+               local: false,
+               data: %{
+                 "id" => root_ap_id,
+                 "type" => "Note",
+                 "actor" => "https://remote.example/users/alice",
+                 "context" => context,
+                 "content" => "Root"
+               }
+             })
+
+    missing_ap_id = "https://remote.example/objects/thread-missing-1"
+    reply_ap_id = "https://remote.example/objects/thread-reply-context-1"
+
+    assert {:ok, %Object{} = reply} =
+             Objects.create_object(%{
+               ap_id: reply_ap_id,
+               type: "Note",
+               actor: "https://remote.example/users/bob",
+               local: false,
+               data: %{
+                 "id" => reply_ap_id,
+                 "type" => "Note",
+                 "actor" => "https://remote.example/users/bob",
+                 "context" => context,
+                 "inReplyTo" => missing_ap_id,
+                 "content" => "Reply to missing"
+               }
+             })
+
+    descendants = Objects.thread_descendants(root, 10)
+    assert Enum.any?(descendants, &(&1.ap_id == reply.ap_id))
+    assert Objects.thread_descendants(reply, 10) == []
+  end
+
   test "creates and counts create activities by actor" do
     actor = "https://example.com/users/alice"
 

@@ -1087,9 +1087,12 @@ defmodule Egregoros.Objects do
 
   def thread_descendants(object, limit \\ 50)
 
-  def thread_descendants(%Object{ap_id: ap_id}, limit)
+  def thread_descendants(%Object{ap_id: ap_id} = object, limit)
       when is_binary(ap_id) and is_integer(limit) and limit > 0 do
-    list_thread_descendants_by_ap_id(ap_id, limit)
+    case list_thread_descendants_by_context(object, limit) do
+      [] -> list_thread_descendants_by_ap_id(ap_id, limit)
+      descendants -> descendants
+    end
   end
 
   def thread_descendants(_object, _limit), do: []
@@ -1181,6 +1184,39 @@ defmodule Egregoros.Objects do
   end
 
   defp list_thread_descendants_by_ap_id(_object_ap_id, _limit), do: []
+
+  defp list_thread_descendants_by_context(%Object{in_reply_to_ap_id: in_reply_to_ap_id}, _limit)
+       when is_binary(in_reply_to_ap_id) and in_reply_to_ap_id != "" do
+    []
+  end
+
+  defp list_thread_descendants_by_context(%Object{ap_id: ap_id, data: %{} = data}, limit)
+       when is_binary(ap_id) and is_integer(limit) and limit > 0 do
+    context =
+      case Map.get(data, "context") do
+        context when is_binary(context) ->
+          context = String.trim(context)
+          if context == "", do: nil, else: context
+
+        _ ->
+          nil
+      end
+
+    if is_binary(context) do
+      from(o in Object,
+        where: o.type in ^@status_types and fragment("?->>'context' = ?", o.data, ^context),
+        where: o.ap_id != ^ap_id,
+        order_by: [asc: o.published, asc: o.id],
+        limit: ^limit,
+        select: o
+      )
+      |> Repo.all()
+    else
+      []
+    end
+  end
+
+  defp list_thread_descendants_by_context(_object, _limit), do: []
 
   def list_replies_to(object_ap_id, opts \\ [])
       when is_binary(object_ap_id) and is_list(opts) do

@@ -18,9 +18,11 @@ defmodule FederationBoxTest do
     alice_nickname = System.get_env("FEDTEST_ALICE_NICKNAME", "alice")
 
     bob_handle = System.get_env("FEDTEST_PLEROMA_HANDLE", "@bob@pleroma.test")
+    dave_handle = System.get_env("FEDTEST_PLEROMA_SECOND_HANDLE", "@dave@pleroma.test")
     carol_handle = System.get_env("FEDTEST_MASTODON_HANDLE", "@carol@mastodon.test")
 
     %{username: bob_username, domain: bob_domain} = parse_handle!(bob_handle)
+    %{username: dave_username, domain: dave_domain} = parse_handle!(dave_handle)
     %{username: carol_username, domain: carol_domain} = parse_handle!(carol_handle)
 
     pleroma_base_url = "#{scheme}://#{bob_domain}"
@@ -55,6 +57,12 @@ defmodule FederationBoxTest do
         "webfinger ready #{bob_handle}"
       )
 
+    dave_actor_id =
+      wait_until!(
+        fn -> webfinger_self_href(dave_username, dave_domain) end,
+        "webfinger ready #{dave_handle}"
+      )
+
     carol_actor_id =
       wait_until!(
         fn -> webfinger_self_href(carol_username, carol_domain) end,
@@ -62,6 +70,7 @@ defmodule FederationBoxTest do
       )
 
     bob_actor_id_variants = actor_id_variants(bob_actor_id)
+    dave_actor_id_variants = actor_id_variants(dave_actor_id)
     carol_actor_id_variants = actor_id_variants(carol_actor_id)
 
     %{client_id: bob_client_id, client_secret: bob_client_secret} =
@@ -73,6 +82,16 @@ defmodule FederationBoxTest do
         bob_client_id,
         bob_client_secret,
         [bob_username, "#{bob_username}@#{bob_domain}"],
+        password,
+        scopes
+      )
+
+    dave_access_token =
+      password_grant_token!(
+        pleroma_base_url,
+        bob_client_id,
+        bob_client_secret,
+        [dave_username, "#{dave_username}@#{dave_domain}"],
         password,
         scopes
       )
@@ -110,7 +129,12 @@ defmodule FederationBoxTest do
        alice_actor_id_variants: alice_actor_id_variants,
        bob_handle: bob_handle,
        bob_access_token: bob_access_token,
+       bob_actor_id: bob_actor_id,
        bob_actor_id_variants: bob_actor_id_variants,
+       dave_handle: dave_handle,
+       dave_access_token: dave_access_token,
+       dave_actor_id: dave_actor_id,
+       dave_actor_id_variants: dave_actor_id_variants,
        pleroma_base_url: pleroma_base_url,
        carol_handle: carol_handle,
        carol_access_token: carol_access_token,
@@ -449,6 +473,110 @@ defmodule FederationBoxTest do
     )
   end
 
+  test "threads: partial threads stay together when intermediate replies are missing", ctx do
+    unique = unique_token()
+
+    _ = follow_remote!(ctx.pleroma_base_url, ctx.dave_access_token, ctx.bob_handle)
+
+    wait_until!(
+      fn ->
+        followers = fetch_follower_ids(ctx.bob_actor_id)
+        Enum.any?(followers, &(&1 in ctx.dave_actor_id_variants))
+      end,
+      "pleroma accepted follow dave -> bob"
+    )
+
+    _ = follow_remote!(ctx.pleroma_base_url, ctx.bob_access_token, ctx.dave_handle)
+
+    wait_until!(
+      fn ->
+        followers = fetch_follower_ids(ctx.dave_actor_id)
+        Enum.any?(followers, &(&1 in ctx.bob_actor_id_variants))
+      end,
+      "pleroma accepted follow bob -> dave"
+    )
+
+    follow_and_assert_remote_accept!(
+      ctx.egregoros_base_url,
+      ctx.access_token,
+      ctx.bob_handle,
+      ctx.alice_actor_id_variants
+    )
+
+    root_text = "fedbox: private thread root #{unique}"
+    bob_root = create_status!(ctx.pleroma_base_url, ctx.bob_access_token, root_text, "private")
+
+    bob_root_uri_variants =
+      bob_root
+      |> status_uri()
+      |> actor_id_variants()
+
+    egregoros_root =
+      wait_until!(
+        fn ->
+          find_status_by_uri_variant(
+            ctx.egregoros_base_url,
+            ctx.access_token,
+            bob_root_uri_variants
+          )
+        end,
+        "egregoros received private pleroma root"
+      )
+
+    hidden_reply_text = "fedbox: private hidden reply #{unique}"
+
+    hidden_reply =
+      create_reply!(
+        ctx.pleroma_base_url,
+        ctx.dave_access_token,
+        hidden_reply_text,
+        bob_root["id"],
+        "private"
+      )
+
+    visible_reply_text = "fedbox: private visible reply #{unique}"
+
+    visible_reply =
+      create_reply!(
+        ctx.pleroma_base_url,
+        ctx.bob_access_token,
+        visible_reply_text,
+        Map.fetch!(hidden_reply, "id"),
+        "private"
+      )
+
+    visible_reply_uri_variants =
+      visible_reply
+      |> status_uri()
+      |> actor_id_variants()
+
+    wait_until!(
+      fn ->
+        home_timeline_contains?(ctx.egregoros_base_url, ctx.access_token, visible_reply_text)
+      end,
+      "egregoros received bob private reply"
+    )
+
+    refute home_timeline_contains?(ctx.egregoros_base_url, ctx.access_token, hidden_reply_text)
+
+    wait_until!(
+      fn ->
+        context = fetch_context!(ctx.egregoros_base_url, ctx.access_token, egregoros_root["id"])
+        descendants = Map.get(context, "descendants", [])
+
+        Enum.any?(descendants, fn status ->
+          status
+          |> status_uri()
+          |> case do
+            uri when is_binary(uri) -> uri in visible_reply_uri_variants
+            _ -> false
+          end
+        end)
+      end,
+      "egregoros groups partial thread by conversation context"
+    )
+  end
+
   test "threads: receives replies from mastodon on our posts", ctx do
     unique = unique_token()
 
@@ -625,11 +753,17 @@ defmodule FederationBoxTest do
 
   defp create_status!(base_url, access_token, text)
        when is_binary(base_url) and is_binary(access_token) and is_binary(text) do
+    create_status!(base_url, access_token, text, "public")
+  end
+
+  defp create_status!(base_url, access_token, text, visibility)
+       when is_binary(base_url) and is_binary(access_token) and is_binary(text) and
+              is_binary(visibility) do
     resp =
       req_post!(
         base_url <> "/api/v1/statuses",
         headers: [{"authorization", "Bearer " <> access_token}],
-        form: [{"status", text}, {"visibility", "public"}]
+        form: [{"status", text}, {"visibility", visibility}]
       )
 
     ensure_json!(resp.body)
@@ -638,6 +772,12 @@ defmodule FederationBoxTest do
   defp create_reply!(base_url, access_token, text, in_reply_to_id)
        when is_binary(base_url) and is_binary(access_token) and is_binary(text) and
               is_binary(in_reply_to_id) do
+    create_reply!(base_url, access_token, text, in_reply_to_id, "public")
+  end
+
+  defp create_reply!(base_url, access_token, text, in_reply_to_id, visibility)
+       when is_binary(base_url) and is_binary(access_token) and is_binary(text) and
+              is_binary(in_reply_to_id) and is_binary(visibility) do
     resp =
       req_post!(
         base_url <> "/api/v1/statuses",
@@ -645,7 +785,7 @@ defmodule FederationBoxTest do
         form: [
           {"status", text},
           {"in_reply_to_id", in_reply_to_id},
-          {"visibility", "public"}
+          {"visibility", visibility}
         ]
       )
 
