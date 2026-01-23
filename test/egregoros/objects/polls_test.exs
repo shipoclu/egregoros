@@ -171,6 +171,26 @@ defmodule Egregoros.Objects.PollsTest do
       assert get_in(updated.internal, ["poll", "voters"]) == [poll.actor]
     end
 
+    test "updates votersCount when provided by remote poll", %{poll: poll} do
+      incoming = %{
+        "id" => poll.ap_id,
+        "type" => "Question",
+        "actor" => poll.actor,
+        "attributedTo" => poll.actor,
+        "context" => poll.data["context"],
+        "to" => poll.data["to"],
+        "votersCount" => 12,
+        "oneOf" => [
+          %{"name" => "A", "type" => "Note", "replies" => %{"totalItems" => 3}},
+          %{"name" => "B", "type" => "Note", "replies" => %{"totalItems" => 4}}
+        ]
+      }
+
+      assert {:ok, updated} = Polls.update_from_remote(poll, incoming)
+
+      assert updated.data["votersCount"] == 12
+    end
+
     test "returns :noop when options change", %{poll: poll} do
       incoming = %{
         "id" => poll.ap_id,
