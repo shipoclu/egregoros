@@ -469,6 +469,7 @@ defmodule Egregoros.PerformanceRegressionsTest do
           "objects_object_index",
           "objects_type_object_id_index",
           "objects_in_reply_to_ap_id_id_index",
+          "objects_status_context_published_id_index",
           "objects_note_has_media_id_index",
           "relationships_object_type_index",
           "users_nickname_trgm_index",
@@ -477,5 +478,15 @@ defmodule Egregoros.PerformanceRegressionsTest do
         ] do
       assert MapSet.member?(index_names, name)
     end
+  end
+
+  test "objects.context is a generated column" do
+    result =
+      Repo.query!(
+        "SELECT attgenerated FROM pg_attribute WHERE attrelid = 'objects'::regclass AND attname = 'context'",
+        []
+      )
+
+    assert result.rows == [["s"]] or result.rows == [["v"]]
   end
 end

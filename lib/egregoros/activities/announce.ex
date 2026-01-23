@@ -17,6 +17,7 @@ defmodule Egregoros.Activities.Announce do
   alias Egregoros.Timeline
   alias Egregoros.User
   alias Egregoros.Users
+  alias Egregoros.Workers.DeliverToActor
   alias Egregoros.Workers.FetchThreadAncestors
   alias EgregorosWeb.Endpoint
 
@@ -120,7 +121,7 @@ defmodule Egregoros.Activities.Announce do
     end
 
     if Keyword.get(opts, :local, true) do
-      deliver_to_followers(object)
+      deliver_announce(object)
     end
 
     :ok
@@ -198,6 +199,40 @@ defmodule Egregoros.Activities.Announce do
       Notifications.broadcast(target.ap_id, object)
     else
       _ -> :ok
+    end
+  end
+
+  defp deliver_announce(%Object{} = announce_object) do
+    deliver_to_followers(announce_object)
+    deliver_to_object_actor(announce_object)
+    :ok
+  end
+
+  defp deliver_to_object_actor(%Object{} = announce_object) do
+    with %{} = actor <- Users.get_by_ap_id(announce_object.actor),
+         %{} = announced_object <- Objects.get_by_ap_id(announce_object.object),
+         target_actor_ap_id when is_binary(target_actor_ap_id) <- announced_object.actor do
+      case Users.get_by_ap_id(target_actor_ap_id) do
+        %User{local: false, inbox: inbox} when is_binary(inbox) and inbox != "" ->
+          _ = Delivery.deliver(actor, inbox, announce_object.data)
+          :ok
+
+        %User{local: true} ->
+          :ok
+
+        _ ->
+          _ =
+            Oban.insert(
+              DeliverToActor.new(%{
+                "user_id" => actor.id,
+                "target_actor_ap_id" => target_actor_ap_id,
+                "activity_id" => announce_object.ap_id,
+                "activity" => announce_object.data
+              })
+            )
+
+          :ok
+      end
     end
   end
 

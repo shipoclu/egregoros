@@ -113,10 +113,6 @@ defmodule EgregorosWeb.BookmarksLive do
     {:noreply, assign(socket, mention_suggestions: mention_suggestions)}
   end
 
-  def handle_event("toggle_reply_cw", _params, socket) do
-    {:noreply, assign(socket, reply_cw_open?: !socket.assigns.reply_cw_open?)}
-  end
-
   def handle_event("reply_change", %{"reply" => %{} = reply_params}, socket) do
     reply_params = Map.merge(default_reply_params(), reply_params)
     media_alt = Map.get(reply_params, "media_alt", %{})
@@ -124,7 +120,7 @@ defmodule EgregorosWeb.BookmarksLive do
     reply_options_open? = Param.truthy?(Map.get(reply_params, "ui_options_open"))
 
     reply_cw_open? =
-      socket.assigns.reply_cw_open? ||
+      Param.truthy?(Map.get(reply_params, "ui_cw_open")) ||
         reply_params |> Map.get("spoiler_text", "") |> to_string() |> String.trim() != ""
 
     {:noreply,
@@ -163,7 +159,7 @@ defmodule EgregorosWeb.BookmarksLive do
           reply_options_open? = Param.truthy?(Map.get(reply_params, "ui_options_open"))
 
           reply_cw_open? =
-            socket.assigns.reply_cw_open? ||
+            Param.truthy?(Map.get(reply_params, "ui_cw_open")) ||
               reply_params |> Map.get("spoiler_text", "") |> to_string() |> String.trim() != ""
 
           upload = socket.assigns.uploads.reply_media
@@ -707,6 +703,7 @@ defmodule EgregorosWeb.BookmarksLive do
       "visibility" => "public",
       "sensitive" => "false",
       "language" => "",
+      "ui_cw_open" => "false",
       "ui_options_open" => "false",
       "media_alt" => %{}
     }

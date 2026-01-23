@@ -10,7 +10,7 @@ defmodule Egregoros.Federation.ObjectFetcher do
   def fetch_and_ingest(ap_id) when is_binary(ap_id) do
     ap_id = String.trim(ap_id)
 
-    with :ok <- SafeURL.validate_http_url(ap_id),
+    with :ok <- SafeURL.validate_http_url_federation(ap_id),
          {:ok, %{status: status, body: body}} <- SignedFetch.get(ap_id, accept: @accept),
          status when status in 200..299 <- status,
          {:ok, map} <- decode_json(body),

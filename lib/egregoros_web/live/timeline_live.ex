@@ -50,7 +50,6 @@ defmodule EgregorosWeb.TimelineLive do
         timeline: timeline,
         home_actor_ids: home_actor_ids(current_user),
         notifications_count: notifications_count(current_user),
-        compose_open?: false,
         compose_options_open?: false,
         compose_cw_open?: false,
         compose_poll_open?: false,
@@ -177,7 +176,7 @@ defmodule EgregorosWeb.TimelineLive do
     compose_options_open? = Param.truthy?(Map.get(post_params, "ui_options_open"))
 
     compose_cw_open? =
-      socket.assigns.compose_cw_open? ||
+      Param.truthy?(Map.get(post_params, "ui_cw_open")) ||
         post_params |> Map.get("spoiler_text", "") |> to_string() |> String.trim() != ""
 
     {:noreply,
@@ -215,14 +214,6 @@ defmodule EgregorosWeb.TimelineLive do
       |> Map.delete(scope)
 
     {:noreply, assign(socket, mention_suggestions: mention_suggestions)}
-  end
-
-  def handle_event("open_compose", _params, socket) do
-    {:noreply, assign(socket, compose_open?: true)}
-  end
-
-  def handle_event("close_compose", _params, socket) do
-    {:noreply, assign(socket, compose_open?: false)}
   end
 
   def handle_event("toggle_compose_cw", _params, socket) do
@@ -417,9 +408,9 @@ defmodule EgregorosWeb.TimelineLive do
                     {:noreply,
                      socket
                      |> put_flash(:info, "Posted.")
+                     |> push_event("compose_panel_close", %{})
                      |> assign(
                        form: Phoenix.Component.to_form(default_post_params(), as: :post),
-                       compose_open?: false,
                        compose_options_open?: false,
                        compose_cw_open?: false,
                        compose_poll_open?: false,
@@ -464,10 +455,6 @@ defmodule EgregorosWeb.TimelineLive do
     end
   end
 
-  def handle_event("toggle_reply_cw", _params, socket) do
-    {:noreply, assign(socket, reply_cw_open?: !socket.assigns.reply_cw_open?)}
-  end
-
   def handle_event("reply_change", %{"reply" => %{} = reply_params}, socket) do
     reply_params = Map.merge(default_post_params(), reply_params)
     media_alt = Map.get(reply_params, "media_alt", %{})
@@ -475,7 +462,7 @@ defmodule EgregorosWeb.TimelineLive do
     reply_options_open? = Param.truthy?(Map.get(reply_params, "ui_options_open"))
 
     reply_cw_open? =
-      socket.assigns.reply_cw_open? ||
+      Param.truthy?(Map.get(reply_params, "ui_cw_open")) ||
         reply_params |> Map.get("spoiler_text", "") |> to_string() |> String.trim() != ""
 
     {:noreply,
@@ -514,7 +501,7 @@ defmodule EgregorosWeb.TimelineLive do
           reply_options_open? = Param.truthy?(Map.get(reply_params, "ui_options_open"))
 
           reply_cw_open? =
-            socket.assigns.reply_cw_open? ||
+            Param.truthy?(Map.get(reply_params, "ui_cw_open")) ||
               reply_params |> Map.get("spoiler_text", "") |> to_string() |> String.trim() != ""
 
           upload = socket.assigns.uploads.reply_media
@@ -885,21 +872,22 @@ defmodule EgregorosWeb.TimelineLive do
           <section
             id="compose-panel"
             data-role="compose-panel"
-            data-state={if @compose_open?, do: "open", else: "closed"}
+            data-state="closed"
+            phx-hook="ComposePanel"
             class={[
               "bg-[color:var(--bg-base)]",
               "fixed inset-x-4 bottom-24 z-50 max-h-[78vh] overflow-y-auto border-2 border-[color:var(--border-default)] p-4",
               "lg:static lg:inset-auto lg:bottom-auto lg:z-auto lg:max-h-none lg:overflow-visible lg:border-0 lg:p-0",
-              !@compose_open? && "hidden lg:block"
+              "hidden lg:block"
             ]}
           >
             <div
               id="compose-mobile-header"
               data-role="compose-mobile-header"
-              data-state={if @compose_open?, do: "open", else: "closed"}
+              data-state="closed"
               class={[
                 "mb-4 flex items-center justify-between lg:hidden",
-                !@compose_open? && "hidden"
+                "hidden"
               ]}
             >
               <p class="text-xs font-bold uppercase tracking-wide text-[color:var(--text-muted)]">
@@ -908,7 +896,7 @@ defmodule EgregorosWeb.TimelineLive do
               <button
                 type="button"
                 data-role="compose-close"
-                phx-click={close_compose_js() |> JS.push("close_compose")}
+                phx-click={JS.dispatch("egregoros:compose-close", to: "#compose-panel")}
                 class="inline-flex h-9 w-9 items-center justify-center border-2 border-[color:var(--border-default)] text-[color:var(--text-muted)] transition hover:bg-[color:var(--text-primary)] hover:text-[color:var(--bg-base)] focus-visible:outline-none focus-brutal"
                 aria-label="Close composer"
               >
@@ -931,7 +919,6 @@ defmodule EgregorosWeb.TimelineLive do
                 change_event="compose_change"
                 submit_event="create_post"
                 cancel_event="cancel_media"
-                toggle_cw_event="toggle_compose_cw"
                 options_open?={@compose_options_open?}
                 cw_open?={@compose_cw_open?}
                 submit_label="Post"
@@ -1126,13 +1113,13 @@ defmodule EgregorosWeb.TimelineLive do
         <div
           id="compose-overlay"
           data-role="compose-overlay"
-          data-state={if @compose_open?, do: "open", else: "closed"}
+          data-state="closed"
           class={[
             "fixed inset-0 z-40 bg-[color:var(--text-primary)]/50 lg:hidden",
-            !@compose_open? && "hidden"
+            "hidden"
           ]}
-          phx-click={close_compose_js() |> JS.push("close_compose")}
-          aria-hidden={!@compose_open?}
+          phx-click={JS.dispatch("egregoros:compose-close", to: "#compose-panel")}
+          aria-hidden="true"
         >
         </div>
 
@@ -1141,11 +1128,10 @@ defmodule EgregorosWeb.TimelineLive do
           type="button"
           id="compose-open-button"
           data-role="compose-open"
-          data-state={if @compose_open?, do: "hidden", else: "visible"}
-          phx-click={open_compose_js() |> JS.push("open_compose")}
+          data-state="visible"
+          phx-click={JS.dispatch("egregoros:compose-open", to: "#compose-panel")}
           class={[
-            "fixed bottom-24 right-6 z-40 inline-flex h-14 w-14 items-center justify-center border-2 border-[color:var(--border-default)] bg-[color:var(--text-primary)] text-[color:var(--bg-base)] shadow-[4px_4px_0_var(--border-default)] transition hover:shadow-none hover:translate-x-1 hover:translate-y-1 focus-visible:outline-none lg:hidden",
-            @compose_open? && "hidden"
+            "fixed bottom-24 right-6 z-40 inline-flex h-14 w-14 items-center justify-center border-2 border-[color:var(--border-default)] bg-[color:var(--text-primary)] text-[color:var(--bg-base)] shadow-[4px_4px_0_var(--border-default)] transition hover:shadow-none hover:translate-x-1 hover:translate-y-1 focus-visible:outline-none lg:hidden"
           ]}
           aria-label="Compose a new post"
         >
@@ -1404,22 +1390,6 @@ defmodule EgregorosWeb.TimelineLive do
 
   defp replace_actor_card(entry, _ap_id, _updated_card), do: entry
 
-  defp open_compose_js(js \\ %JS{}) do
-    js
-    |> JS.remove_class("hidden", to: "#compose-panel")
-    |> JS.remove_class("hidden", to: "#compose-overlay")
-    |> JS.remove_class("hidden", to: "#compose-mobile-header")
-    |> JS.add_class("hidden", to: "#compose-open-button")
-  end
-
-  defp close_compose_js(js \\ %JS{}) do
-    js
-    |> JS.add_class("hidden lg:block", to: "#compose-panel")
-    |> JS.add_class("hidden", to: "#compose-overlay")
-    |> JS.add_class("hidden", to: "#compose-mobile-header")
-    |> JS.remove_class("hidden", to: "#compose-open-button")
-  end
-
   defp list_timeline_posts(:home, %User{} = user, opts) when is_list(opts) do
     Objects.list_home_statuses(user.ap_id, opts)
   end
@@ -1590,6 +1560,7 @@ defmodule EgregorosWeb.TimelineLive do
       "visibility" => "public",
       "sensitive" => "false",
       "language" => "",
+      "ui_cw_open" => "false",
       "ui_options_open" => "false",
       "media_alt" => %{}
     }

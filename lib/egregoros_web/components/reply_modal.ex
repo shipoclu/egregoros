@@ -25,7 +25,6 @@ defmodule EgregorosWeb.ReplyModal do
   attr :change_event, :string, default: "reply_change"
   attr :submit_event, :string, default: "create_reply"
   attr :cancel_event, :string, default: "cancel_reply_media"
-  attr :toggle_cw_event, :string, default: "toggle_reply_cw"
 
   def reply_modal(assigns) do
     ~H"""
@@ -41,7 +40,7 @@ defmodule EgregorosWeb.ReplyModal do
       aria-modal="true"
       aria-hidden="true"
       phx-hook="ReplyModal"
-      class="fixed inset-0 z-50 hidden items-center justify-center bg-[color:var(--text-primary)]/60 p-4"
+      class="fixed inset-0 z-50 flex hidden items-center justify-center bg-[color:var(--text-primary)]/60 p-4"
     >
       <.focus_wrap
         id={"#{@id}-dialog"}
@@ -91,7 +90,6 @@ defmodule EgregorosWeb.ReplyModal do
           change_event={@change_event}
           submit_event={@submit_event}
           cancel_event={@cancel_event}
-          toggle_cw_event={@toggle_cw_event}
           submit_label="Reply"
           class="mt-0"
         >

@@ -117,6 +117,23 @@ defmodule EgregorosWeb.TimelineLiveTest do
     refute has_element?(view, "#timeline-aside")
   end
 
+  test "timeline compose panel uses client-side state (no backend open/close events)", %{
+    conn: conn,
+    user: user
+  } do
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/")
+
+    assert has_element?(view, "#compose-panel[phx-hook='ComposePanel']")
+
+    html = render(view)
+
+    refute html =~ "open_compose"
+    refute html =~ "close_compose"
+    refute html =~ "toggle_compose_cw"
+    refute html =~ "toggle_reply_cw"
+  end
+
   test "timeline includes a scroll restore hook for returning from threads", %{
     conn: conn,
     user: user
@@ -634,23 +651,13 @@ defmodule EgregorosWeb.TimelineLiveTest do
     refute has_element?(view, "article[data-role='status-card']", "Remote note")
   end
 
-  test "compose sheet can be opened and closed", %{conn: conn, user: user} do
+  test "compose sheet is controlled by client-side events", %{conn: conn, user: user} do
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     {:ok, view, _html} = live(conn, "/")
 
     assert has_element?(view, "#compose-overlay[data-state='closed']")
-
-    view
-    |> element("button[data-role='compose-open']")
-    |> render_click()
-
-    assert has_element?(view, "#compose-overlay[data-state='open']")
-
-    view
-    |> element("button[data-role='compose-close']")
-    |> render_click()
-
-    assert has_element?(view, "#compose-overlay[data-state='closed']")
+    assert render(view) =~ "egregoros:compose-open"
+    assert render(view) =~ "egregoros:compose-close"
   end
 
   test "public timeline sanitizes remote html content", %{conn: conn} do
@@ -1846,17 +1853,29 @@ defmodule EgregorosWeb.TimelineLiveTest do
 
     assert has_element?(view, "#compose-cw[data-role='compose-cw'][data-state='closed']")
 
-    _html = render_click(view, "toggle_compose_cw", %{})
+    _html =
+      render_change(view, "compose_change", %{
+        "post" => %{"ui_cw_open" => "true"}
+      })
+
     assert has_element?(view, "#compose-cw[data-role='compose-cw'][data-state='open']")
 
     _html =
       render_change(view, "compose_change", %{
-        "post" => %{"spoiler_text" => "CW", "content" => "hello"}
+        "post" => %{"ui_cw_open" => "true", "spoiler_text" => "CW", "content" => "hello"}
       })
 
     assert has_element?(view, "input[name='post[spoiler_text]'][value='CW']")
 
-    _html = render_click(view, "toggle_compose_cw", %{})
+    _html =
+      render_change(view, "compose_change", %{
+        "post" => %{
+          "ui_cw_open" => "false",
+          "spoiler_text" => "",
+          "content" => "hello"
+        }
+      })
+
     assert has_element?(view, "#compose-cw[data-role='compose-cw'][data-state='closed']")
     assert has_element?(view, "input[name='post[spoiler_text]'][value='']")
   end
@@ -2010,7 +2029,11 @@ defmodule EgregorosWeb.TimelineLiveTest do
     assert has_element?(view, "#reply-modal[data-role='reply-modal'][data-state='closed']")
     assert has_element?(view, "#reply-modal-cw[data-role='compose-cw'][data-state='closed']")
 
-    _html = render_click(view, "toggle_reply_cw", %{})
+    _html =
+      render_change(view, "reply_change", %{
+        "reply" => %{"ui_cw_open" => "true"}
+      })
+
     assert has_element?(view, "#reply-modal-cw[data-role='compose-cw'][data-state='open']")
 
     _html =

@@ -84,8 +84,6 @@ defmodule EgregorosWeb.MessagesLive do
 
     dm_peer_supports_e2ee? = dm_peer_e2ee_keys != []
 
-    dm_encrypt? = dm_peer_supports_e2ee?
-
     chat_messages_oldest_id =
       case List.first(messages) do
         %{id: id} when is_integer(id) -> id
@@ -123,7 +121,6 @@ defmodule EgregorosWeb.MessagesLive do
        dm_markers: dm_markers,
        dm_peer_e2ee_keys: dm_peer_e2ee_keys,
        dm_peer_supports_e2ee?: dm_peer_supports_e2ee?,
-       dm_encrypt?: dm_encrypt?,
        chat_messages_has_more?: chat_messages_has_more?,
        chat_messages_oldest_id: chat_messages_oldest_id,
        conversations_has_more?: conversations_has_more?,
@@ -227,7 +224,6 @@ defmodule EgregorosWeb.MessagesLive do
           end
 
         dm_peer_supports_e2ee? = dm_peer_e2ee_keys != []
-        dm_encrypt? = dm_peer_supports_e2ee?
 
         dm_markers =
           case List.last(messages) do
@@ -246,7 +242,6 @@ defmodule EgregorosWeb.MessagesLive do
            conversation_e2ee?: conversation_e2ee?,
            dm_peer_e2ee_keys: dm_peer_e2ee_keys,
            dm_peer_supports_e2ee?: dm_peer_supports_e2ee?,
-           dm_encrypt?: dm_encrypt?,
            chat_messages_has_more?: chat_messages_has_more?,
            chat_messages_oldest_id: chat_messages_oldest_id,
            dm_markers: dm_markers,
@@ -291,7 +286,6 @@ defmodule EgregorosWeb.MessagesLive do
            conversation_e2ee?: false,
            dm_peer_e2ee_keys: [],
            dm_peer_supports_e2ee?: false,
-           dm_encrypt?: false,
            chat_messages_has_more?: false,
            chat_messages_oldest_id: nil,
            recipient_suggestions: [],
@@ -362,7 +356,6 @@ defmodule EgregorosWeb.MessagesLive do
           end
 
         dm_peer_supports_e2ee? = dm_peer_e2ee_keys != []
-        dm_encrypt? = dm_peer_supports_e2ee?
 
         dm_form =
           Phoenix.Component.to_form(%{"recipient" => handle, "content" => "", "e2ee_dm" => ""},
@@ -386,7 +379,6 @@ defmodule EgregorosWeb.MessagesLive do
            conversation_e2ee?: conversation_e2ee?,
            dm_peer_e2ee_keys: dm_peer_e2ee_keys,
            dm_peer_supports_e2ee?: dm_peer_supports_e2ee?,
-           dm_encrypt?: dm_encrypt?,
            chat_messages_has_more?: chat_messages_has_more?,
            chat_messages_oldest_id: chat_messages_oldest_id,
            dm_markers: dm_markers,
@@ -477,15 +469,6 @@ defmodule EgregorosWeb.MessagesLive do
   end
 
   @impl true
-  def handle_event("toggle_dm_encrypt", _params, socket) do
-    if socket.assigns.dm_peer_supports_e2ee? do
-      {:noreply, assign(socket, :dm_encrypt?, not socket.assigns.dm_encrypt?)}
-    else
-      {:noreply, socket}
-    end
-  end
-
-  @impl true
   def handle_event("send_dm", %{"dm" => %{} = params}, socket) do
     recipient = params |> Map.get("recipient", "") |> to_string() |> String.trim()
     body = params |> Map.get("content", "") |> to_string() |> String.trim()
@@ -558,8 +541,6 @@ defmodule EgregorosWeb.MessagesLive do
 
             dm_peer_supports_e2ee? = dm_peer_e2ee_keys != []
 
-            dm_encrypt? = dm_peer_supports_e2ee?
-
             socket =
               socket
               |> assign(
@@ -571,7 +552,6 @@ defmodule EgregorosWeb.MessagesLive do
                 selected_peer: selected_peer,
                 dm_peer_e2ee_keys: dm_peer_e2ee_keys,
                 dm_peer_supports_e2ee?: dm_peer_supports_e2ee?,
-                dm_encrypt?: dm_encrypt?,
                 recipient_suggestions: [],
                 dm_form: dm_form
               )
@@ -918,7 +898,7 @@ defmodule EgregorosWeb.MessagesLive do
                     <input
                       type="hidden"
                       name="dm[encrypt]"
-                      value={if @dm_encrypt?, do: "true", else: "false"}
+                      value={if @dm_peer_supports_e2ee?, do: "true", else: "false"}
                       data-role="dm-encrypt-enabled"
                     />
 
@@ -1003,18 +983,12 @@ defmodule EgregorosWeb.MessagesLive do
                         <textarea
                           name="dm[content]"
                           rows="1"
-                          placeholder={
-                            if(@dm_encrypt?,
-                              do: "Type an encrypted message...",
-                              else: "Type a message..."
-                            )
-                          }
+                          placeholder="Type a message..."
                           class="absolute inset-0 resize-none border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-3 py-2 pr-10 text-sm text-[color:var(--text-primary)] focus:outline-none focus-brutal placeholder:text-[color:var(--text-muted)]"
                         ><%= @dm_form.params["content"] || "" %></textarea>
                         <span
-                          :if={@dm_encrypt?}
                           data-role="dm-composer-lock"
-                          class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[color:var(--success)]"
+                          class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 hidden text-[color:var(--success)]"
                         >
                           <.icon name="hero-lock-closed" class="size-4" />
                         </span>
@@ -1024,20 +998,22 @@ defmodule EgregorosWeb.MessagesLive do
                         :if={@dm_peer_supports_e2ee?}
                         type="button"
                         data-role="dm-encrypt-toggle"
-                        phx-click="toggle_dm_encrypt"
+                        data-state="encrypted"
                         class={[
                           "inline-flex h-[44px] shrink-0 cursor-pointer items-center gap-2 border-2 border-[color:var(--border-default)] px-3 text-xs font-bold uppercase tracking-widest transition focus-visible:outline-none focus-brutal",
-                          @dm_encrypt? &&
-                            "bg-[color:var(--success-subtle)] text-[color:var(--success)] hover:shadow-[3px_3px_0_var(--success)]",
-                          !@dm_encrypt? &&
-                            "bg-[color:var(--bg-subtle)] text-[color:var(--text-muted)] hover:shadow-[3px_3px_0_var(--border-default)]"
+                          "data-[state=encrypted]:bg-[color:var(--success-subtle)] data-[state=encrypted]:text-[color:var(--success)] data-[state=encrypted]:hover:shadow-[3px_3px_0_var(--success)]",
+                          "data-[state=plain]:bg-[color:var(--bg-subtle)] data-[state=plain]:text-[color:var(--text-muted)] data-[state=plain]:hover:shadow-[3px_3px_0_var(--border-default)]"
                         ]}
                       >
-                        <.icon
-                          name={if @dm_encrypt?, do: "hero-lock-closed", else: "hero-lock-open"}
-                          class="size-4"
-                        />
-                        {if @dm_encrypt?, do: "Encrypt", else: "Plain"}
+                        <span data-role="dm-encrypt-icon-encrypted">
+                          <.icon name="hero-lock-closed" class="size-4" />
+                        </span>
+                        <span data-role="dm-encrypt-icon-plain" class="hidden">
+                          <.icon name="hero-lock-open" class="size-4" />
+                        </span>
+
+                        <span data-role="dm-encrypt-label-encrypted">Encrypt</span>
+                        <span data-role="dm-encrypt-label-plain" class="hidden">Plain</span>
                       </button>
 
                       <button

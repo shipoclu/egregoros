@@ -12,11 +12,13 @@ defmodule EgregorosWeb.MastodonAPI.StatusesController do
   alias Egregoros.Objects
   alias Egregoros.Pipeline
   alias Egregoros.Publish
+  alias Egregoros.ScheduledStatuses
   alias Egregoros.Relationships
   alias Egregoros.User
   alias Egregoros.Users
   alias EgregorosWeb.MastodonAPI.AccountRenderer
   alias EgregorosWeb.MastodonAPI.Fallback
+  alias EgregorosWeb.MastodonAPI.ScheduledStatusRenderer
   alias EgregorosWeb.MastodonAPI.StatusRenderer
 
   def create(conn, %{"status" => status} = params) do
@@ -24,27 +26,51 @@ defmodule EgregorosWeb.MastodonAPI.StatusesController do
     media_ids = Map.get(params, "media_ids", [])
     in_reply_to_id = Map.get(params, "in_reply_to_id")
     visibility = Map.get(params, "visibility", "public")
+    scheduled_at = Map.get(params, "scheduled_at")
     spoiler_text = Map.get(params, "spoiler_text")
     sensitive = Map.get(params, "sensitive")
     language = Map.get(params, "language")
 
     user = conn.assigns.current_user
 
-    with {:ok, attachments} <- Media.attachments_from_ids(user, media_ids),
-         {:ok, in_reply_to} <- resolve_in_reply_to(in_reply_to_id, user),
-         {:ok, create_object} <-
-           Publish.post_note(user, status,
-             attachments: attachments,
-             in_reply_to: in_reply_to,
-             visibility: visibility,
-             spoiler_text: spoiler_text,
-             sensitive: sensitive,
-             language: language
-           ),
-         %{} = object <- Objects.get_by_ap_id(create_object.object) do
-      json(conn, StatusRenderer.render_status(object, user))
+    if is_binary(scheduled_at) and String.trim(scheduled_at) != "" do
+      schedule_attrs = %{
+        scheduled_at: scheduled_at,
+        params: %{
+          "text" => status,
+          "media_ids" => media_ids,
+          "in_reply_to_id" => in_reply_to_id,
+          "visibility" => visibility,
+          "spoiler_text" => spoiler_text,
+          "sensitive" => sensitive,
+          "language" => language
+        }
+      }
+
+      case ScheduledStatuses.create(user, schedule_attrs) do
+        {:ok, scheduled_status} ->
+          json(conn, ScheduledStatusRenderer.render_scheduled_status(scheduled_status, user))
+
+        {:error, _} ->
+          send_resp(conn, 422, "Unprocessable Entity")
+      end
     else
-      {:error, _} -> send_resp(conn, 422, "Unprocessable Entity")
+      with {:ok, attachments} <- Media.attachments_from_ids(user, media_ids),
+           {:ok, in_reply_to} <- resolve_in_reply_to(in_reply_to_id, user),
+           {:ok, create_object} <-
+             Publish.post_note(user, status,
+               attachments: attachments,
+               in_reply_to: in_reply_to,
+               visibility: visibility,
+               spoiler_text: spoiler_text,
+               sensitive: sensitive,
+               language: language
+             ),
+           %{} = object <- Objects.get_by_ap_id(create_object.object) do
+        json(conn, StatusRenderer.render_status(object, user))
+      else
+        {:error, _} -> send_resp(conn, 422, "Unprocessable Entity")
+      end
     end
   end
 

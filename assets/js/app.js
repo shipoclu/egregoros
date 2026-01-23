@@ -26,6 +26,7 @@ import {hooks as colocatedHooks} from "phoenix-colocated/egregoros"
 import topbar from "../vendor/topbar"
 import TimelineTopSentinel from "./hooks/timeline_top_sentinel"
 import TimelineBottomSentinel from "./hooks/timeline_bottom_sentinel"
+import ComposePanel from "./hooks/compose_panel"
 import ComposeCharCounter from "./hooks/compose_char_counter"
 import ComposeSettings from "./hooks/compose_settings"
 import ComposeMentions from "./hooks/compose_mentions"
@@ -40,6 +41,7 @@ import AudioPlayer from "./hooks/audio_player"
 import VideoPlayer from "./hooks/video_player"
 import {initImageCropper} from "./hooks/image_cropper"
 import {BIP39_ENGLISH_WORDS} from "./bip39_english_words"
+import {decryptE2EEDM as decryptE2EEDMOffline, encryptE2EEDM} from "./lib/e2ee_dm.mjs"
 
 const base64UrlEncode = bytes => {
   let binary = ""
@@ -933,25 +935,6 @@ const parseHandle = value => {
   return {nickname: nickname || null, domain: domain || null}
 }
 
-const stableStringify = value => {
-  if (value === null) return "null"
-  if (typeof value === "number") return Number.isFinite(value) ? JSON.stringify(value) : "null"
-  if (typeof value === "boolean") return value ? "true" : "false"
-  if (typeof value === "string") return JSON.stringify(value)
-
-  if (Array.isArray(value)) {
-    return `[${value.map(item => stableStringify(item)).join(",")}]`
-  }
-
-  if (typeof value === "object") {
-    const keys = Object.keys(value).sort()
-    const entries = keys.map(key => `${JSON.stringify(key)}:${stableStringify(value[key])}`)
-    return `{${entries.join(",")}}`
-  }
-
-  return "null"
-}
-
 const actorKeyCache = new Map()
 const actorKeyRequestCache = new Map()
 const handleE2EEKeyCache = new Map()
@@ -1084,89 +1067,11 @@ const resolveHandleE2EEKey = async handle => {
   }
 }
 
-const deriveDmKey = async (myPrivateKey, otherPublicKey, saltBytes, infoBytes) => {
-  const sharedBits = await crypto.subtle.deriveBits({name: "ECDH", public: otherPublicKey}, myPrivateKey, 256)
-  const hkdfKey = await crypto.subtle.importKey("raw", sharedBits, "HKDF", false, ["deriveKey"])
-
-  return crypto.subtle.deriveKey(
-    {name: "HKDF", hash: "SHA-256", salt: saltBytes, info: infoBytes},
-    hkdfKey,
-    {name: "AES-GCM", length: 256},
-    false,
-    ["encrypt", "decrypt"]
-  )
-}
-
-const encryptE2EEDM = async ({plaintext, senderApId, senderKid, senderPrivateKey, recipientApId, recipientKid, recipientJwk}) => {
-  const recipientPublicKey = await crypto.subtle.importKey(
-    "jwk",
-    recipientJwk,
-    {name: "ECDH", namedCurve: "P-256"},
-    false,
-    []
-  )
-
-  const salt = randomBytes(32)
-  const nonce = randomBytes(12)
-  const info = utf8Bytes("egregoros:e2ee:dm:v1")
-
-  const aad = {
-    sender_ap_id: senderApId,
-    recipient_ap_id: recipientApId,
-    sender_kid: senderKid,
-    recipient_kid: recipientKid,
-  }
-
-  const aadBytes = utf8Bytes(stableStringify(aad))
-
-  const key = await deriveDmKey(senderPrivateKey, recipientPublicKey, salt, info)
-
-  const ciphertext = await crypto.subtle.encrypt(
-    {name: "AES-GCM", iv: nonce, additionalData: aadBytes},
-    key,
-    utf8Bytes(plaintext)
-  )
-
-  return {
-    version: 1,
-    alg: "ECDH-P256+HKDF-SHA256+AES-256-GCM",
-    sender: {ap_id: senderApId, kid: senderKid},
-    recipient: {ap_id: recipientApId, kid: recipientKid},
-    nonce: base64UrlEncode(nonce),
-    salt: base64UrlEncode(salt),
-    aad,
-    ciphertext: base64UrlEncode(new Uint8Array(ciphertext)),
-  }
-}
-
 const decryptE2EEDM = async ({payload, myPrivateKey, otherApId, otherKid, myApId}) => {
   const otherKey = await fetchActorE2EEKey(otherApId, otherKid)
   if (!otherKey) throw new Error("e2ee_missing_sender_key")
 
-  const otherPublicKey = await crypto.subtle.importKey(
-    "jwk",
-    otherKey.jwk,
-    {name: "ECDH", namedCurve: "P-256"},
-    false,
-    []
-  )
-
-  const saltBytes = base64UrlDecode(payload.salt)
-  const nonceBytes = base64UrlDecode(payload.nonce)
-  const infoBytes = utf8Bytes("egregoros:e2ee:dm:v1")
-  const aadBytes = utf8Bytes(stableStringify(payload.aad || {}))
-  const ciphertextBytes = base64UrlDecode(payload.ciphertext)
-
-  const key = await deriveDmKey(myPrivateKey, otherPublicKey, saltBytes, infoBytes)
-
-  const plaintext = await crypto.subtle.decrypt(
-    {name: "AES-GCM", iv: nonceBytes, additionalData: aadBytes},
-    key,
-    sliceArrayBuffer(ciphertextBytes)
-  )
-
-  const decoded = new TextDecoder().decode(new Uint8Array(plaintext))
-  return decoded
+  return decryptE2EEDMOffline({payload, myPrivateKey, otherPublicJwk: otherKey.jwk})
 }
 
 const setDmE2EEFeedback = (form, message) => {
@@ -1187,7 +1092,73 @@ const E2EEDMComposer = {
   mounted() {
     this.encrypting = false
     this.skipNextSubmit = false
+    this.encryptEnabled = null
+    this.lastPeerApId = (this.el.dataset.peerApId || "").trim()
     restoreE2EEIdentityFromStorage()
+
+    this.readEncryptEnabled = () => {
+      const encryptInput = this.el.querySelector("[data-role='dm-encrypt-enabled']")
+      return ((encryptInput?.value || "true") + "").trim() !== "false"
+    }
+
+    this.syncEncryptUI = () => {
+      const encryptInput = this.el.querySelector("[data-role='dm-encrypt-enabled']")
+      const toggleButton = this.el.querySelector("[data-role='dm-encrypt-toggle']")
+      const contentInput = this.el.querySelector("textarea[name='dm[content]']")
+      const lockIcon = this.el.querySelector("[data-role='dm-composer-lock']")
+
+      if (this.encryptEnabled === null) this.encryptEnabled = this.readEncryptEnabled()
+
+      if (encryptInput) {
+        encryptInput.value = this.encryptEnabled ? "true" : "false"
+      }
+
+      if (contentInput) {
+        contentInput.placeholder = this.encryptEnabled
+          ? "Type an encrypted message..."
+          : "Type a message..."
+      }
+
+      if (lockIcon) lockIcon.classList.toggle("hidden", !this.encryptEnabled)
+
+      if (toggleButton) {
+        toggleButton.dataset.state = this.encryptEnabled ? "encrypted" : "plain"
+
+        toggleButton
+          .querySelector("[data-role='dm-encrypt-icon-encrypted']")
+          ?.classList?.toggle("hidden", !this.encryptEnabled)
+        toggleButton
+          .querySelector("[data-role='dm-encrypt-icon-plain']")
+          ?.classList?.toggle("hidden", this.encryptEnabled)
+
+        toggleButton
+          .querySelector("[data-role='dm-encrypt-label-encrypted']")
+          ?.classList?.toggle("hidden", !this.encryptEnabled)
+        toggleButton
+          .querySelector("[data-role='dm-encrypt-label-plain']")
+          ?.classList?.toggle("hidden", this.encryptEnabled)
+      } else {
+        this.encryptEnabled = false
+        if (encryptInput) encryptInput.value = "false"
+        if (lockIcon) lockIcon.classList.add("hidden")
+      }
+    }
+
+    this.toggleEncryptEnabled = () => {
+      this.encryptEnabled = !this.readEncryptEnabled()
+      this.syncEncryptUI()
+    }
+
+    this.onClick = e => {
+      const target = e?.target
+      if (!(target instanceof HTMLElement)) return
+
+      const toggle = target.closest?.("[data-role='dm-encrypt-toggle']")
+      if (!toggle || !this.el.contains(toggle)) return
+
+      e.preventDefault()
+      this.toggleEncryptEnabled()
+    }
 
     this.onSubmit = async e => {
       if (this.skipNextSubmit) {
@@ -1204,6 +1175,7 @@ const E2EEDMComposer = {
 
       clearDmE2EEFeedback(this.el)
 
+      this.syncEncryptUI()
       const encryptEnabled = ((encryptInput?.value || "true") + "").trim() !== "false"
       const recipientRaw = (recipientInput.value || "").trim()
       const plaintext = (contentInput.value || "").trim()
@@ -1303,10 +1275,25 @@ const E2EEDMComposer = {
       }
     }
 
+    this.encryptEnabled = this.readEncryptEnabled()
+    this.syncEncryptUI()
+
+    this.el.addEventListener("click", this.onClick)
     this.el.addEventListener("submit", this.onSubmit)
   },
 
+  updated() {
+    const peerApId = (this.el.dataset.peerApId || "").trim()
+    if (peerApId !== this.lastPeerApId) {
+      this.lastPeerApId = peerApId
+      this.encryptEnabled = this.readEncryptEnabled()
+    }
+
+    this.syncEncryptUI()
+  },
+
   destroyed() {
+    this.el.removeEventListener("click", this.onClick)
     this.el.removeEventListener("submit", this.onSubmit)
   },
 }
@@ -1434,6 +1421,7 @@ const liveSocket = new LiveSocket("/live", Socket, {
     ...colocatedHooks,
     TimelineTopSentinel,
     TimelineBottomSentinel,
+    ComposePanel,
     ComposeCharCounter,
     ComposeSettings,
     ComposeMentions,

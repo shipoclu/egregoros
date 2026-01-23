@@ -3,6 +3,8 @@ defmodule Egregoros.SafeURL do
 
   import Bitwise
 
+  alias Egregoros.Config
+
   @http_schemes ~w(http https)
 
   def validate_http_url(url) when is_binary(url) do
@@ -19,6 +21,16 @@ defmodule Egregoros.SafeURL do
 
   def validate_http_url(_), do: {:error, :unsafe_url}
 
+  def validate_http_url_federation(url) when is_binary(url) do
+    if allow_private_federation?() do
+      validate_http_url_no_dns(url)
+    else
+      validate_http_url(url)
+    end
+  end
+
+  def validate_http_url_federation(_), do: {:error, :unsafe_url}
+
   def validate_http_url_no_dns(url) when is_binary(url) do
     uri = URI.parse(url)
 
@@ -32,6 +44,16 @@ defmodule Egregoros.SafeURL do
   end
 
   def validate_http_url_no_dns(_), do: {:error, :unsafe_url}
+
+  defp allow_private_federation? do
+    case Config.get(:allow_private_federation, false) do
+      true -> true
+      "true" -> true
+      1 -> true
+      "1" -> true
+      _ -> false
+    end
+  end
 
   defp validate_host("localhost"), do: {:error, :unsafe_url}
 

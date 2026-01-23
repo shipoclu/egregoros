@@ -9,7 +9,7 @@ defmodule Egregoros.Federation.Delivery do
 
   def deliver(%User{} = user, inbox_url, activity)
       when is_binary(inbox_url) and is_map(activity) do
-    with :ok <- SafeURL.validate_http_url(inbox_url) do
+    with :ok <- SafeURL.validate_http_url_federation(inbox_url) do
       Oban.insert(
         DeliverActivity.new(%{
           "user_id" => user.id,
@@ -25,7 +25,7 @@ defmodule Egregoros.Federation.Delivery do
     activity = Map.put_new(activity, "@context", @activitystreams_context)
     body = Jason.encode!(activity)
 
-    with :ok <- SafeURL.validate_http_url(inbox_url),
+    with :ok <- SafeURL.validate_http_url_federation(inbox_url),
          {:ok, signed} <- HTTPSignature.sign_request(user, "post", inbox_url, body),
          {:ok, %{status: status} = response} <- HTTP.post(inbox_url, body, headers(signed)) do
       if status in 200..299 do

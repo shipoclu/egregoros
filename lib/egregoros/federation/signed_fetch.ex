@@ -14,7 +14,7 @@ defmodule Egregoros.Federation.SignedFetch do
     accept = Keyword.get(opts, :accept, @default_accept)
     user_agent = Keyword.get(opts, :user_agent, @default_user_agent)
 
-    with :ok <- SafeURL.validate_http_url(url),
+    with :ok <- SafeURL.validate_http_url_federation(url),
          :ok <- rate_limit(url),
          {:ok, actor} <- InstanceActor.get_actor(),
          {:ok, signed} <- HTTPSignature.sign_request(actor, "get", url, "", @signed_headers),

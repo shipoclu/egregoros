@@ -191,6 +191,8 @@ defmodule EgregorosWeb.Router do
     post "/notifications/clear", NotificationsController, :clear
     post "/notifications/:id/dismiss", NotificationsController, :dismiss
     post "/polls/:id/votes", PollsController, :vote
+    put "/scheduled_statuses/:id", ScheduledStatusesController, :update
+    delete "/scheduled_statuses/:id", ScheduledStatusesController, :delete
   end
 
   scope "/api/v1", EgregorosWeb.MastodonAPI do
@@ -211,6 +213,8 @@ defmodule EgregorosWeb.Router do
     get "/accounts/relationships", AccountsController, :relationships
     get "/timelines/home", TimelinesController, :home
     get "/notifications", NotificationsController, :index
+    get "/scheduled_statuses", ScheduledStatusesController, :index
+    get "/scheduled_statuses/:id", ScheduledStatusesController, :show
     get "/conversations", ConversationsController, :index
     get "/preferences", PreferencesController, :show
     get "/filters", EmptyListController, :index

@@ -34,7 +34,7 @@ defmodule Egregoros.Relays do
   def subscribe(relay_ap_id) when is_binary(relay_ap_id) do
     relay_ap_id = String.trim(relay_ap_id)
 
-    with :ok <- SafeURL.validate_http_url(relay_ap_id),
+    with :ok <- SafeURL.validate_http_url_federation(relay_ap_id),
          {:ok, relay_user} <- Actor.fetch_and_store(relay_ap_id),
          {:ok, internal} <- InstanceActor.get_actor(),
          {:ok, relay} <- upsert_relay(relay_user.ap_id),

@@ -34,7 +34,7 @@ defmodule Egregoros.Workers.RefreshRemoteFollowingGraph do
     ap_id = ap_id |> to_string() |> String.trim()
 
     with true <- ap_id != "",
-         :ok <- SafeURL.validate_http_url(ap_id),
+         :ok <- SafeURL.validate_http_url_federation(ap_id),
          {:ok, actor} <- fetch_json(ap_id),
          following_url when is_binary(following_url) <- following_url(actor, ap_id),
          following_url <- String.trim(following_url),
@@ -318,7 +318,7 @@ defmodule Egregoros.Workers.RefreshRemoteFollowingGraph do
   defp resolve_url(_url, _base), do: nil
 
   defp safe_http_url?(url) when is_binary(url) do
-    case SafeURL.validate_http_url(url) do
+    case SafeURL.validate_http_url_federation(url) do
       :ok -> true
       _ -> false
     end

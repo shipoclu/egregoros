@@ -1,0 +1,37 @@
+name: Federation Box
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  federation-box:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Clone Pleroma
+        run: git clone --depth 1 https://git.pleroma.social/pleroma/pleroma.git pleroma
+
+      - name: Build and start services
+        env:
+          PLEROMA_CONTEXT: ../../pleroma
+        run: docker compose -f docker/federation/compose.yml up -d --build
+
+      - name: Run federation smoke test
+        env:
+          PLEROMA_CONTEXT: ../../pleroma
+        run: docker compose -f docker/federation/compose.yml --profile fedtest run --rm fedtest
+
+      - name: Dump compose logs
+        if: failure()
+        env:
+          PLEROMA_CONTEXT: ../../pleroma
+        run: docker compose -f docker/federation/compose.yml logs --no-color
+
+      - name: Shutdown
+        if: always()
+        env:
+          PLEROMA_CONTEXT: ../../pleroma
+        run: docker compose -f docker/federation/compose.yml down -v --remove-orphans

@@ -9,6 +9,16 @@ defmodule Egregoros.HTTP.Req do
     Egregoros.Config.get(:req_options, @default_req_options)
   end
 
+  defp maybe_https_connect_options(url) when is_binary(url) do
+    with %URI{scheme: "https"} <- URI.parse(url),
+         transport_opts when is_list(transport_opts) and transport_opts != [] <-
+           Egregoros.Config.get(:req_https_transport_opts, []) do
+      [connect_options: [transport_opts: transport_opts]]
+    else
+      _ -> []
+    end
+  end
+
   defp max_response_bytes do
     Egregoros.Config.get(:http_max_response_bytes, @default_max_response_bytes)
   end
@@ -41,6 +51,7 @@ defmodule Egregoros.HTTP.Req do
   def get(url, headers) do
     opts =
       [headers: headers, into: limited_into_fun(max_response_bytes())] ++
+        maybe_https_connect_options(url) ++
         req_options() ++
         @default_opts
 
@@ -63,6 +74,7 @@ defmodule Egregoros.HTTP.Req do
   def post(url, body, headers) do
     opts =
       [body: body, headers: headers, into: limited_into_fun(max_response_bytes())] ++
+        maybe_https_connect_options(url) ++
         req_options() ++ @default_opts
 
     case Req.post(url, opts) do

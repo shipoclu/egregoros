@@ -77,4 +77,71 @@ defmodule Egregoros.Federation.WebFingerTest do
     assert {:error, :unsafe_url} = WebFinger.lookup("@alice@127.0.0.1")
     assert {:error, :unsafe_url} = WebFinger.lookup("@alice@localhost")
   end
+
+  test "lookup can be configured for http in federation-box environments" do
+    stub(Egregoros.DNS.Mock, :lookup_ips, fn _host ->
+      flunk("unexpected DNS lookup for federation-box webfinger")
+    end)
+
+    stub(Egregoros.Config.Mock, :get, fn
+      :allow_private_federation, _default -> true
+      :federation_webfinger_scheme, _default -> "http"
+      key, default -> Egregoros.Config.Stub.get(key, default)
+    end)
+
+    actor_url = "http://remote.example/users/alice"
+
+    expect(Egregoros.HTTP.Mock, :get, fn url, _headers ->
+      assert url ==
+               "http://remote.example/.well-known/webfinger?resource=acct:alice@remote.example"
+
+      {:ok,
+       %{
+         status: 200,
+         body: %{
+           "links" => [
+             %{
+               "rel" => "self",
+               "type" => "application/activity+json",
+               "href" => actor_url
+             }
+           ]
+         },
+         headers: []
+       }}
+    end)
+
+    assert {:ok, ^actor_url} = WebFinger.lookup("@alice@remote.example")
+  end
+
+  test "lookup falls back to https when configured with an invalid scheme" do
+    stub(Egregoros.Config.Mock, :get, fn
+      :federation_webfinger_scheme, _default -> "ftp"
+      key, default -> Egregoros.Config.Stub.get(key, default)
+    end)
+
+    actor_url = "https://remote.example/users/alice"
+
+    expect(Egregoros.HTTP.Mock, :get, fn url, _headers ->
+      assert url ==
+               "https://remote.example/.well-known/webfinger?resource=acct:alice@remote.example"
+
+      {:ok,
+       %{
+         status: 200,
+         body: %{
+           "links" => [
+             %{
+               "rel" => "self",
+               "type" => "application/activity+json",
+               "href" => actor_url
+             }
+           ]
+         },
+         headers: []
+       }}
+    end)
+
+    assert {:ok, ^actor_url} = WebFinger.lookup("@alice@remote.example")
+  end
 end

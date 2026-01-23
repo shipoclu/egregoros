@@ -321,7 +321,11 @@ defmodule EgregorosWeb.SearchLiveTest do
     assert has_element?(view, "[data-role='compose-options'][data-state='open']")
     assert has_element?(view, "[data-role='compose-cw'][data-state='open']")
 
-    _html = render_click(view, "toggle_reply_cw", %{})
+    _html =
+      render_change(view, "reply_change", %{
+        "reply" => %{"ui_cw_open" => "false", "spoiler_text" => "", "ui_options_open" => "true"}
+      })
+
     assert has_element?(view, "[data-role='compose-cw'][data-state='closed']")
   end
 

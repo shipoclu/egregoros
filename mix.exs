@@ -107,6 +107,7 @@ defmodule Egregoros.MixProject do
       "ecto.reset": ["ecto.drop", "ecto.setup"],
       test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
+      "assets.test": ["cmd --cd assets node --test"],
       "assets.build": ["compile", "tailwind egregoros", "esbuild egregoros"],
       "assets.deploy": [
         "tailwind egregoros --minify",
@@ -117,6 +118,7 @@ defmodule Egregoros.MixProject do
         "compile --warnings-as-errors",
         "deps.unlock --unused",
         "format --check-formatted",
+        "assets.test",
         "test --cover"
       ]
     ]
