@@ -106,6 +106,9 @@ defmodule EgregorosWeb.MastodonAPI.MediaController do
        when is_binary(href),
        do: href
 
+  defp attachment_preview_url(%Object{data: %{"icon" => %{"url" => href}}}) when is_binary(href),
+    do: href
+
   defp attachment_preview_url(_), do: nil
 
   defp owned_media?(%Object{actor: actor, type: type}, %User{ap_id: ap_id})

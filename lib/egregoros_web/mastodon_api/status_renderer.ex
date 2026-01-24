@@ -538,6 +538,11 @@ defmodule EgregorosWeb.MastodonAPI.StatusRenderer do
     SafeMediaURL.safe(href)
   end
 
+  defp attachment_preview_url(%{"icon" => %{"url" => href}} = _attachment, _object)
+       when is_binary(href) do
+    SafeMediaURL.safe(href)
+  end
+
   defp attachment_preview_url(_attachment, _object), do: nil
 
   defp mastodon_type(%{"mediaType" => media_type}) when is_binary(media_type) do
