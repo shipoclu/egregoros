@@ -24,6 +24,43 @@ defmodule EgregorosWeb.MastodonAPI.StatusesControllerTest do
     assert object.data["content"] == "<p>Hello API</p>"
   end
 
+  test "POST /api/v1/statuses creates a poll when poll params are provided", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("poll_author_api")
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, user} end)
+
+    conn =
+      post(conn, "/api/v1/statuses", %{
+        "status" => "Pick one",
+        "poll" => %{
+          "options" => ["Yes", "No"],
+          "multiple" => false,
+          "expires_in" => 3600
+        }
+      })
+
+    response = json_response(conn, 200)
+    assert is_binary(response["id"])
+    assert response["account"]["username"] == "poll_author_api"
+
+    assert %{
+             "id" => poll_id,
+             "multiple" => false,
+             "options" => [
+               %{"title" => "Yes"},
+               %{"title" => "No"}
+             ],
+             "voted" => true,
+             "own_votes" => []
+           } = response["poll"]
+
+    assert poll_id == response["id"]
+
+    assert %{} = object = Objects.get(response["id"])
+    assert object.type == "Question"
+  end
+
   test "POST /api/v1/statuses rejects missing status param", %{conn: conn} do
     {:ok, user} = Users.create_local_user("local")
 

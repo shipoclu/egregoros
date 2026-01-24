@@ -27,6 +27,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusesController do
     in_reply_to_id = Map.get(params, "in_reply_to_id")
     visibility = Map.get(params, "visibility", "public")
     scheduled_at = Map.get(params, "scheduled_at")
+    poll = Map.get(params, "poll")
     spoiler_text = Map.get(params, "spoiler_text")
     sensitive = Map.get(params, "sensitive")
     language = Map.get(params, "language")
@@ -58,14 +59,25 @@ defmodule EgregorosWeb.MastodonAPI.StatusesController do
       with {:ok, attachments} <- Media.attachments_from_ids(user, media_ids),
            {:ok, in_reply_to} <- resolve_in_reply_to(in_reply_to_id, user),
            {:ok, create_object} <-
-             Publish.post_note(user, status,
-               attachments: attachments,
-               in_reply_to: in_reply_to,
-               visibility: visibility,
-               spoiler_text: spoiler_text,
-               sensitive: sensitive,
-               language: language
-             ),
+             (if is_map(poll) do
+                Publish.post_poll(user, status, poll,
+                  attachments: attachments,
+                  in_reply_to: in_reply_to,
+                  visibility: visibility,
+                  spoiler_text: spoiler_text,
+                  sensitive: sensitive,
+                  language: language
+                )
+              else
+                Publish.post_note(user, status,
+                  attachments: attachments,
+                  in_reply_to: in_reply_to,
+                  visibility: visibility,
+                  spoiler_text: spoiler_text,
+                  sensitive: sensitive,
+                  language: language
+                )
+              end),
            %{} = object <- Objects.get_by_ap_id(create_object.object) do
         json(conn, StatusRenderer.render_status(object, user))
       else
