@@ -108,6 +108,11 @@ custom classes must fully style the input
   ```bash
   POSTGRES_USER=your_user POSTGRES_PASSWORD=your_password MIX_ENV=test mix test
   ```
+- **Federation-in-a-box E2E tests (fedbox)**: Requires Docker. Run with:
+  ```bash
+  mise run fed:test
+  ```
+  Tests live in `docker/federation/test_runner/test/federation_box_test.exs`. Use `mise run fed:logs` to tail logs and `mise run fed:down` to remove containers/volumes.
 - **Always use `start_supervised!/1`** to start processes in tests as it guarantees cleanup between tests
 - Keep the coverage gate in mind: `mix test --cover` must stay **≥ 85%**; add tests for new branches and run cover locally when touching core modules.
 - Coverage is enforced in `mix precommit` via `mix test --cover`; keep total **≥ 85%**.

@@ -194,6 +194,250 @@ defmodule FederationBoxTest do
     )
   end
 
+  test "polls: receives polls from followed accounts", ctx do
+    follow_and_assert_remote_accept!(
+      ctx.egregoros_base_url,
+      ctx.access_token,
+      ctx.bob_handle,
+      ctx.alice_actor_id_variants
+    )
+
+    follow_and_assert_remote_accept!(
+      ctx.egregoros_base_url,
+      ctx.access_token,
+      ctx.carol_handle,
+      ctx.alice_actor_id_variants
+    )
+
+    unique = unique_token()
+    bob_text = "fedbox: poll from bob #{unique}"
+    carol_text = "fedbox: poll from carol #{unique}"
+
+    _ = create_poll_status!(ctx.pleroma_base_url, ctx.bob_access_token, bob_text, ["yes", "no"])
+
+    _ =
+      create_poll_status!(ctx.mastodon_base_url, ctx.carol_access_token, carol_text, [
+        "cats",
+        "dogs"
+      ])
+
+    bob_status =
+      wait_until!(
+        fn -> find_status_by_content(ctx.egregoros_base_url, ctx.access_token, bob_text) end,
+        "egregoros received pleroma poll"
+      )
+
+    carol_status =
+      wait_until!(
+        fn -> find_status_by_content(ctx.egregoros_base_url, ctx.access_token, carol_text) end,
+        "egregoros received mastodon poll"
+      )
+
+    assert_poll_options!(bob_status, ["yes", "no"])
+    assert_poll_options!(carol_status, ["cats", "dogs"])
+  end
+
+  test "polls: remote receives our polls (pleroma + mastodon)", ctx do
+    unique = unique_token()
+
+    follow_and_assert_local_accept!(
+      ctx.pleroma_base_url,
+      ctx.bob_access_token,
+      ctx.alice_handle,
+      ctx.alice_actor_id,
+      ctx.bob_actor_id_variants
+    )
+
+    follow_and_assert_local_accept!(
+      ctx.mastodon_base_url,
+      ctx.carol_access_token,
+      ctx.alice_handle,
+      ctx.alice_actor_id,
+      ctx.carol_actor_id_variants
+    )
+
+    alice_text = "fedbox: poll from alice #{unique}"
+
+    alice_status =
+      create_poll_status!(ctx.egregoros_base_url, ctx.access_token, alice_text, ["tea", "coffee"])
+
+    alice_uri_variants =
+      alice_status
+      |> status_uri()
+      |> actor_id_variants()
+
+    pleroma_status =
+      wait_until!(
+        fn ->
+          find_status_by_uri_variant(
+            ctx.pleroma_base_url,
+            ctx.bob_access_token,
+            alice_uri_variants
+          )
+        end,
+        "pleroma received alice poll"
+      )
+
+    mastodon_status =
+      wait_until!(
+        fn ->
+          find_status_by_uri_variant(
+            ctx.mastodon_base_url,
+            ctx.carol_access_token,
+            alice_uri_variants
+          )
+        end,
+        "mastodon received alice poll"
+      )
+
+    assert_poll_options!(pleroma_status, ["tea", "coffee"])
+    assert_poll_options!(mastodon_status, ["tea", "coffee"])
+  end
+
+  test "polls: remote receives our poll with media attachments", ctx do
+    unique = unique_token()
+
+    follow_and_assert_local_accept!(
+      ctx.pleroma_base_url,
+      ctx.bob_access_token,
+      ctx.alice_handle,
+      ctx.alice_actor_id,
+      ctx.bob_actor_id_variants
+    )
+
+    follow_and_assert_local_accept!(
+      ctx.mastodon_base_url,
+      ctx.carol_access_token,
+      ctx.alice_handle,
+      ctx.alice_actor_id,
+      ctx.carol_actor_id_variants
+    )
+
+    media_id = upload_test_png!(ctx.egregoros_base_url, ctx.access_token)
+
+    alice_text = "fedbox: poll with media #{unique}"
+
+    alice_status =
+      create_poll_status!(
+        ctx.egregoros_base_url,
+        ctx.access_token,
+        alice_text,
+        ["on", "off"],
+        media_ids: [media_id]
+      )
+
+    alice_uri_variants =
+      alice_status
+      |> status_uri()
+      |> actor_id_variants()
+
+    pleroma_status =
+      wait_until!(
+        fn ->
+          find_status_by_uri_variant(
+            ctx.pleroma_base_url,
+            ctx.bob_access_token,
+            alice_uri_variants
+          )
+        end,
+        "pleroma received alice poll with media"
+      )
+
+    mastodon_status =
+      wait_until!(
+        fn ->
+          find_status_by_uri_variant(
+            ctx.mastodon_base_url,
+            ctx.carol_access_token,
+            alice_uri_variants
+          )
+        end,
+        "mastodon received alice poll with media"
+      )
+
+    assert_poll_options!(pleroma_status, ["on", "off"])
+    assert_poll_options!(mastodon_status, ["on", "off"])
+
+    assert length(Map.get(pleroma_status, "media_attachments", [])) > 0
+    assert length(Map.get(mastodon_status, "media_attachments", [])) > 0
+  end
+
+  test "polls: remote receives our scheduled poll", ctx do
+    unique = unique_token()
+
+    follow_and_assert_local_accept!(
+      ctx.pleroma_base_url,
+      ctx.bob_access_token,
+      ctx.alice_handle,
+      ctx.alice_actor_id,
+      ctx.bob_actor_id_variants
+    )
+
+    follow_and_assert_local_accept!(
+      ctx.mastodon_base_url,
+      ctx.carol_access_token,
+      ctx.alice_handle,
+      ctx.alice_actor_id,
+      ctx.carol_actor_id_variants
+    )
+
+    scheduled_at =
+      DateTime.utc_now()
+      |> DateTime.add(10, :second)
+      |> DateTime.truncate(:second)
+      |> DateTime.to_iso8601()
+
+    alice_text = "fedbox: scheduled poll #{unique}"
+
+    _scheduled_status =
+      create_poll_status!(
+        ctx.egregoros_base_url,
+        ctx.access_token,
+        alice_text,
+        ["one", "two"],
+        scheduled_at: scheduled_at
+      )
+
+    alice_status =
+      wait_until!(
+        fn -> find_status_by_content(ctx.egregoros_base_url, ctx.access_token, alice_text) end,
+        "egregoros published scheduled poll",
+        180_000
+      )
+
+    alice_uri_variants =
+      alice_status
+      |> status_uri()
+      |> actor_id_variants()
+
+    pleroma_status =
+      wait_until!(
+        fn ->
+          find_status_by_uri_variant(
+            ctx.pleroma_base_url,
+            ctx.bob_access_token,
+            alice_uri_variants
+          )
+        end,
+        "pleroma received alice scheduled poll"
+      )
+
+    mastodon_status =
+      wait_until!(
+        fn ->
+          find_status_by_uri_variant(
+            ctx.mastodon_base_url,
+            ctx.carol_access_token,
+            alice_uri_variants
+          )
+        end,
+        "mastodon received alice scheduled poll"
+      )
+
+    assert_poll_options!(pleroma_status, ["one", "two"])
+    assert_poll_options!(mastodon_status, ["one", "two"])
+  end
+
   test "receives likes from mastodon on our posts", ctx do
     unique = unique_token()
 
@@ -769,6 +1013,72 @@ defmodule FederationBoxTest do
     ensure_json!(resp.body)
   end
 
+  defp create_poll_status!(base_url, access_token, text, poll_options, opts \\ [])
+       when is_binary(base_url) and is_binary(access_token) and is_binary(text) and
+              is_list(poll_options) and is_list(opts) do
+    expires_in = Keyword.get(opts, :expires_in, 600)
+    visibility = Keyword.get(opts, :visibility, "public")
+    multiple? = Keyword.get(opts, :multiple, false)
+    scheduled_at = Keyword.get(opts, :scheduled_at)
+    media_ids = Keyword.get(opts, :media_ids, [])
+
+    form =
+      [
+        {"status", text},
+        {"visibility", visibility},
+        {"poll[expires_in]", Integer.to_string(expires_in)},
+        {"poll[multiple]", to_string(multiple?)}
+      ] ++
+        Enum.map(poll_options, &{"poll[options][]", &1}) ++
+        Enum.map(media_ids, &{"media_ids[]", &1}) ++
+        if(is_binary(scheduled_at) and scheduled_at != "",
+          do: [{"scheduled_at", scheduled_at}],
+          else: []
+        )
+
+    resp =
+      req_post!(
+        base_url <> "/api/v1/statuses",
+        headers: [{"authorization", "Bearer " <> access_token}],
+        form: form
+      )
+
+    if resp.status not in 200..299 do
+      raise(
+        "unexpected status when creating poll status: #{resp.status} body=#{inspect(resp.body)}"
+      )
+    end
+
+    ensure_json!(resp.body)
+  end
+
+  defp upload_test_png!(base_url, access_token)
+       when is_binary(base_url) and is_binary(access_token) do
+    png =
+      Base.decode64!(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMB/6X3cQAAAABJRU5ErkJggg=="
+      )
+
+    path = Path.join(System.tmp_dir!(), "fedbox-#{unique_token()}.png")
+    File.write!(path, png)
+
+    resp =
+      req_post!(
+        base_url <> "/api/v2/media",
+        headers: [{"authorization", "Bearer " <> access_token}],
+        form_multipart: [
+          {"file", {png, filename: "fedbox.png", content_type: "image/png", size: byte_size(png)}}
+        ]
+      )
+
+    if resp.status not in 200..299 do
+      raise("unexpected status when uploading media: #{resp.status} body=#{inspect(resp.body)}")
+    end
+
+    body = ensure_json!(resp.body)
+    Map.fetch!(body, "id")
+  end
+
   defp create_reply!(base_url, access_token, text, in_reply_to_id)
        when is_binary(base_url) and is_binary(access_token) and is_binary(text) and
               is_binary(in_reply_to_id) do
@@ -955,6 +1265,39 @@ defmodule FederationBoxTest do
           nil
       end
     end)
+  end
+
+  defp find_status_by_content(base_url, access_token, needle)
+       when is_binary(base_url) and is_binary(access_token) and is_binary(needle) do
+    statuses = fetch_home_timeline!(base_url, access_token, limit: 40)
+
+    Enum.find_value(statuses, fn status ->
+      content = Map.get(status, "content", "")
+
+      if is_binary(content) and String.contains?(content, needle) do
+        {:ok, status}
+      else
+        nil
+      end
+    end)
+  end
+
+  defp assert_poll_options!(status, expected_titles)
+       when is_map(status) and is_list(expected_titles) do
+    poll =
+      status
+      |> Map.get("poll")
+      |> case do
+        %{} = poll -> poll
+        _ -> flunk("expected status to include poll")
+      end
+
+    options = Map.get(poll, "options", [])
+    assert is_list(options)
+
+    titles = Enum.map(options, &Map.get(&1, "title"))
+
+    assert titles == expected_titles
   end
 
   defp fetch_home_timeline!(base_url, access_token, opts)
