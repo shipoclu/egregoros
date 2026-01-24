@@ -1,9 +1,11 @@
 defmodule EgregorosWeb.MastodonAPI.StatusesControllerTest do
   use EgregorosWeb.ConnCase, async: true
 
+  alias Egregoros.Object
   alias Egregoros.Objects
   alias Egregoros.Pipeline
   alias Egregoros.Publish
+  alias Egregoros.Repo
   alias Egregoros.Relationships
   alias Egregoros.Users
   alias EgregorosWeb.Endpoint
@@ -59,6 +61,48 @@ defmodule EgregorosWeb.MastodonAPI.StatusesControllerTest do
 
     assert %{} = object = Objects.get(response["id"])
     assert object.type == "Question"
+  end
+
+  test "POST /api/v1/statuses rejects polls with media_ids", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("poll_author_api_media")
+
+    {:ok, media_object} =
+      Objects.create_object(%{
+        ap_id: "https://example.com/objects/poll-api-media-1",
+        type: "Image",
+        actor: user.ap_id,
+        local: true,
+        published: DateTime.utc_now(),
+        data: %{
+          "id" => "https://example.com/objects/poll-api-media-1",
+          "type" => "Image",
+          "mediaType" => "image/png",
+          "url" => [
+            %{
+              "type" => "Link",
+              "mediaType" => "image/png",
+              "href" => "https://example.com/uploads/poll-api-media-1.png"
+            }
+          ]
+        }
+      })
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, user} end)
+
+    conn =
+      post(conn, "/api/v1/statuses", %{
+        "status" => "Pick one",
+        "media_ids" => [Integer.to_string(media_object.id)],
+        "poll" => %{
+          "options" => ["Yes", "No"],
+          "multiple" => false,
+          "expires_in" => 3600
+        }
+      })
+
+    assert response(conn, 422)
+    assert Repo.get_by(Object, type: "Question") == nil
   end
 
   test "POST /api/v1/statuses rejects missing status param", %{conn: conn} do
