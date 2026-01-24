@@ -272,8 +272,7 @@ defmodule Egregoros.Publish.Polls do
         {:error, "Poll can't contain more than #{@max_poll_options} options"}
 
       Enum.any?(options, &(String.length(&1) > @max_poll_option_chars)) ->
-        {:error,
-         "Poll options cannot be longer than #{@max_poll_option_chars} characters each"}
+        {:error, "Poll options cannot be longer than #{@max_poll_option_chars} characters each"}
 
       true ->
         {:ok, options}
@@ -455,7 +454,8 @@ defmodule Egregoros.Publish.Polls do
     Pipeline.ingest(create, local: true)
   end
 
-  defp maybe_put_attachments(question, attachments) when is_map(question) and is_list(attachments) do
+  defp maybe_put_attachments(question, attachments)
+       when is_map(question) and is_list(attachments) do
     if attachments == [] do
       question
     else

@@ -6,6 +6,7 @@ defmodule EgregorosWeb.ComposerPoll do
   attr :id_prefix, :string, required: true
   attr :open?, :boolean, default: false
   attr :toggle_event, :string, required: true
+
   def poll_toggle_button(assigns) do
     ~H"""
     <button
@@ -36,6 +37,7 @@ defmodule EgregorosWeb.ComposerPoll do
   attr :remove_event, :string, required: true
   attr :max_options, :integer, default: 4
   attr :min_options, :integer, default: 2
+
   def poll_fields(assigns) do
     assigns =
       assigns
@@ -77,8 +79,7 @@ defmodule EgregorosWeb.ComposerPoll do
               "text-[color:var(--text-primary)] hover:bg-[color:var(--bg-muted)]"
           ]}
         >
-          <.icon name="hero-plus-small" class="size-4" />
-          Add option
+          <.icon name="hero-plus-small" class="size-4" /> Add option
         </button>
       </div>
 
