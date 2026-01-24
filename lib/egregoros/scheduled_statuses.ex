@@ -155,18 +155,30 @@ defmodule Egregoros.ScheduledStatuses do
       language = Map.get(params, "language")
       media_ids = Map.get(params, "media_ids", [])
       in_reply_to_id = Map.get(params, "in_reply_to_id")
+      poll = Map.get(params, "poll")
 
       with {:ok, attachments} <- Media.attachments_from_ids(user, media_ids),
            {:ok, in_reply_to} <- resolve_in_reply_to(in_reply_to_id, user),
            {:ok, create_object} <-
-             Publish.post_note(user, text,
-               attachments: attachments,
-               in_reply_to: in_reply_to,
-               visibility: visibility,
-               spoiler_text: spoiler_text,
-               sensitive: sensitive,
-               language: language
-             ) do
+             (if is_map(poll) do
+                Publish.post_poll(user, text, poll,
+                  attachments: attachments,
+                  in_reply_to: in_reply_to,
+                  visibility: visibility,
+                  spoiler_text: spoiler_text,
+                  sensitive: sensitive,
+                  language: language
+                )
+              else
+                Publish.post_note(user, text,
+                  attachments: attachments,
+                  in_reply_to: in_reply_to,
+                  visibility: visibility,
+                  spoiler_text: spoiler_text,
+                  sensitive: sensitive,
+                  language: language
+                )
+              end) do
         Repo.update(Ecto.Changeset.change(scheduled_status, published_at: DateTime.utc_now()))
         {:ok, create_object}
       end

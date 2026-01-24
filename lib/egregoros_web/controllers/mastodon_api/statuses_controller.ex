@@ -37,22 +37,25 @@ defmodule EgregorosWeb.MastodonAPI.StatusesController do
     scheduled? = is_binary(scheduled_at) and String.trim(scheduled_at) != ""
 
     cond do
-      is_map(poll) and scheduled? ->
-        send_resp(conn, 422, "Unprocessable Entity")
-
       scheduled? ->
-        schedule_attrs = %{
-          scheduled_at: scheduled_at,
-          params: %{
-            "text" => status,
-            "media_ids" => media_ids,
-            "in_reply_to_id" => in_reply_to_id,
-            "visibility" => visibility,
-            "spoiler_text" => spoiler_text,
-            "sensitive" => sensitive,
-            "language" => language
-          }
+        schedule_params = %{
+          "text" => status,
+          "media_ids" => media_ids,
+          "in_reply_to_id" => in_reply_to_id,
+          "visibility" => visibility,
+          "spoiler_text" => spoiler_text,
+          "sensitive" => sensitive,
+          "language" => language
         }
+
+        schedule_params =
+          if is_map(poll) do
+            Map.put(schedule_params, "poll", poll)
+          else
+            schedule_params
+          end
+
+        schedule_attrs = %{scheduled_at: scheduled_at, params: schedule_params}
 
         case ScheduledStatuses.create(user, schedule_attrs) do
           {:ok, scheduled_status} ->

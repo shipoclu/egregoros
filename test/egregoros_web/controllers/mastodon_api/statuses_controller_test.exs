@@ -9,6 +9,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusesControllerTest do
   alias Egregoros.Relationships
   alias Egregoros.ScheduledStatus
   alias Egregoros.Users
+  alias Egregoros.Workers.PublishScheduledStatus
   alias EgregorosWeb.Endpoint
 
   test "POST /api/v1/statuses creates a status", %{conn: conn} do
@@ -121,7 +122,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusesControllerTest do
     assert [%{"id" => "https://example.com/objects/poll-api-media-1"}] = object.data["attachment"]
   end
 
-  test "POST /api/v1/statuses rejects scheduled polls", %{conn: conn} do
+  test "POST /api/v1/statuses schedules polls", %{conn: conn} do
     {:ok, user} = Users.create_local_user("poll_author_api_scheduled")
 
     Egregoros.Auth.Mock
@@ -144,8 +145,29 @@ defmodule EgregorosWeb.MastodonAPI.StatusesControllerTest do
         }
       })
 
-    assert response(conn, 422)
-    assert Repo.get_by(ScheduledStatus, user_id: user.id) == nil
+    response = json_response(conn, 200)
+    assert response["scheduled_at"] == scheduled_at
+    assert response["params"]["text"] == "Pick one later"
+    assert response["params"]["poll"]["options"] == ["Yes", "No"]
+
+    scheduled_status_id = String.to_integer(response["id"])
+
+    assert %ScheduledStatus{published_at: nil} =
+             Repo.get_by!(ScheduledStatus, id: scheduled_status_id, user_id: user.id)
+
+    assert Repo.get_by(Object, type: "Question") == nil
+
+    assert :ok =
+             perform_job(PublishScheduledStatus, %{
+               "scheduled_status_id" => Integer.to_string(scheduled_status_id)
+             })
+
+    assert %ScheduledStatus{published_at: %DateTime{}} =
+             Repo.get_by!(ScheduledStatus, id: scheduled_status_id, user_id: user.id)
+
+    assert %Object{type: "Question"} = poll = Repo.get_by(Object, type: "Question")
+    assert poll.data["content"] == "<p>Pick one later</p>"
+    assert Enum.map(poll.data["oneOf"], & &1["name"]) == ["Yes", "No"]
   end
 
   test "POST /api/v1/statuses rejects missing status param", %{conn: conn} do
