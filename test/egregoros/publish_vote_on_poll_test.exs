@@ -167,7 +167,7 @@ defmodule Egregoros.PublishVoteOnPollTest do
           "inbox_url" => remote_actor.inbox,
           "activity" => %{
             "type" => "Create",
-            "object" => %{"type" => "Answer"}
+            "object" => %{"type" => "Note"}
           }
         }
       )

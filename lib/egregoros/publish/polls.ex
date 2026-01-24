@@ -438,8 +438,8 @@ defmodule Egregoros.Publish.Polls do
       "attributedTo" => user.ap_id,
       "name" => option_name,
       "inReplyTo" => question.ap_id,
-      "to" => [],
-      "cc" => [question.actor],
+      "to" => [question.actor],
+      "cc" => [],
       "published" => DateTime.utc_now() |> DateTime.to_iso8601()
     }
 
