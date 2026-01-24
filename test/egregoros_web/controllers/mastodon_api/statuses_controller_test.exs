@@ -64,7 +64,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusesControllerTest do
     assert object.type == "Question"
   end
 
-  test "POST /api/v1/statuses rejects polls with media_ids", %{conn: conn} do
+  test "POST /api/v1/statuses allows polls with media_ids", %{conn: conn} do
     {:ok, user} = Users.create_local_user("poll_author_api_media")
 
     {:ok, media_object} =
@@ -102,8 +102,23 @@ defmodule EgregorosWeb.MastodonAPI.StatusesControllerTest do
         }
       })
 
-    assert response(conn, 422)
-    assert Repo.get_by(Object, type: "Question") == nil
+    response = json_response(conn, 200)
+    assert response["id"] == response["poll"]["id"]
+
+    assert [
+             %{
+               "id" => attachment_id,
+               "type" => "image",
+               "url" => "https://example.com/uploads/poll-api-media-1.png",
+               "preview_url" => "https://example.com/uploads/poll-api-media-1.png"
+             }
+           ] = response["media_attachments"]
+
+    assert attachment_id == Integer.to_string(media_object.id)
+
+    assert %Object{} = object = Objects.get(response["id"])
+    assert object.type == "Question"
+    assert [%{"id" => "https://example.com/objects/poll-api-media-1"}] = object.data["attachment"]
   end
 
   test "POST /api/v1/statuses rejects scheduled polls", %{conn: conn} do

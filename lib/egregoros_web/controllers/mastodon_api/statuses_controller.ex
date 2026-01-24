@@ -37,9 +37,6 @@ defmodule EgregorosWeb.MastodonAPI.StatusesController do
     scheduled? = is_binary(scheduled_at) and String.trim(scheduled_at) != ""
 
     cond do
-      is_map(poll) and List.wrap(media_ids) != [] ->
-        send_resp(conn, 422, "Unprocessable Entity")
-
       is_map(poll) and scheduled? ->
         send_resp(conn, 422, "Unprocessable Entity")
 
