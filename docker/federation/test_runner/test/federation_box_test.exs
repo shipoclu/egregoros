@@ -438,6 +438,159 @@ defmodule FederationBoxTest do
     assert_poll_options!(mastodon_status, ["one", "two"])
   end
 
+  test "polls: receives votes from pleroma and mastodon", ctx do
+    unique = unique_token()
+
+    follow_and_assert_local_accept!(
+      ctx.pleroma_base_url,
+      ctx.bob_access_token,
+      ctx.alice_handle,
+      ctx.alice_actor_id,
+      ctx.bob_actor_id_variants
+    )
+
+    follow_and_assert_local_accept!(
+      ctx.mastodon_base_url,
+      ctx.carol_access_token,
+      ctx.alice_handle,
+      ctx.alice_actor_id,
+      ctx.carol_actor_id_variants
+    )
+
+    alice_text = "fedbox: poll vote me #{unique}"
+
+    alice_status =
+      create_poll_status!(ctx.egregoros_base_url, ctx.access_token, alice_text, ["left", "right"])
+
+    alice_status_id = alice_status["id"]
+
+    alice_uri_variants =
+      alice_status
+      |> status_uri()
+      |> actor_id_variants()
+
+    bob_status =
+      wait_until!(
+        fn ->
+          find_status_by_uri_variant(ctx.pleroma_base_url, ctx.bob_access_token, alice_uri_variants)
+        end,
+        "pleroma received alice poll vote-me post"
+      )
+
+    carol_status =
+      wait_until!(
+        fn ->
+          find_status_by_uri_variant(
+            ctx.mastodon_base_url,
+            ctx.carol_access_token,
+            alice_uri_variants
+          )
+        end,
+        "mastodon received alice poll vote-me post"
+      )
+
+    bob_poll_id = bob_status |> Map.fetch!("poll") |> Map.fetch!("id")
+    carol_poll_id = carol_status |> Map.fetch!("poll") |> Map.fetch!("id")
+
+    _ = vote_on_poll!(ctx.pleroma_base_url, ctx.bob_access_token, bob_poll_id, [0])
+    _ = vote_on_poll!(ctx.mastodon_base_url, ctx.carol_access_token, carol_poll_id, [1])
+
+    wait_until!(
+      fn ->
+        status = fetch_status!(ctx.egregoros_base_url, ctx.access_token, alice_status_id)
+        poll_votes = poll_option_votes(status)
+
+        if poll_votes == [1, 1] do
+          true
+        else
+          false
+        end
+      end,
+      "egregoros received votes from pleroma + mastodon"
+    )
+  end
+
+  test "polls: remote receives our votes (pleroma + mastodon)", ctx do
+    unique = unique_token()
+
+    follow_and_assert_remote_accept!(
+      ctx.egregoros_base_url,
+      ctx.access_token,
+      ctx.bob_handle,
+      ctx.alice_actor_id_variants
+    )
+
+    follow_and_assert_remote_accept!(
+      ctx.egregoros_base_url,
+      ctx.access_token,
+      ctx.carol_handle,
+      ctx.alice_actor_id_variants
+    )
+
+    bob_text = "fedbox: poll from bob vote #{unique}"
+    carol_text = "fedbox: poll from carol vote #{unique}"
+
+    bob_status =
+      create_poll_status!(ctx.pleroma_base_url, ctx.bob_access_token, bob_text, ["yes", "no"])
+
+    carol_status =
+      create_poll_status!(
+        ctx.mastodon_base_url,
+        ctx.carol_access_token,
+        carol_text,
+        ["tea", "coffee"]
+      )
+
+    bob_status_id = bob_status["id"]
+    carol_status_id = carol_status["id"]
+
+    egregoros_bob_status =
+      wait_until!(
+        fn -> find_status_by_content(ctx.egregoros_base_url, ctx.access_token, bob_text) end,
+        "egregoros received bob poll"
+      )
+
+    egregoros_carol_status =
+      wait_until!(
+        fn -> find_status_by_content(ctx.egregoros_base_url, ctx.access_token, carol_text) end,
+        "egregoros received carol poll"
+      )
+
+    egregoros_bob_poll_id = egregoros_bob_status |> Map.fetch!("poll") |> Map.fetch!("id")
+    egregoros_carol_poll_id = egregoros_carol_status |> Map.fetch!("poll") |> Map.fetch!("id")
+
+    _ = vote_on_poll!(ctx.egregoros_base_url, ctx.access_token, egregoros_bob_poll_id, [0])
+    _ = vote_on_poll!(ctx.egregoros_base_url, ctx.access_token, egregoros_carol_poll_id, [1])
+
+    wait_until!(
+      fn ->
+        status = fetch_status!(ctx.pleroma_base_url, ctx.bob_access_token, bob_status_id)
+        poll_votes = poll_option_votes(status)
+
+        if poll_votes == [1, 0] do
+          true
+        else
+          false
+        end
+      end,
+      "pleroma received alice vote"
+    )
+
+    wait_until!(
+      fn ->
+        status = fetch_status!(ctx.mastodon_base_url, ctx.carol_access_token, carol_status_id)
+        poll_votes = poll_option_votes(status)
+
+        if poll_votes == [0, 1] do
+          true
+        else
+          false
+        end
+      end,
+      "mastodon received alice vote"
+    )
+  end
+
   test "receives likes from mastodon on our posts", ctx do
     unique = unique_token()
 
@@ -1102,6 +1255,19 @@ defmodule FederationBoxTest do
     ensure_json!(resp.body)
   end
 
+  defp vote_on_poll!(base_url, access_token, poll_id, choices)
+       when is_binary(base_url) and is_binary(access_token) and is_binary(poll_id) and
+              is_list(choices) do
+    resp =
+      req_post!(
+        base_url <> "/api/v1/polls/" <> poll_id <> "/votes",
+        headers: [{"authorization", "Bearer " <> access_token}],
+        json: %{"choices" => choices}
+      )
+
+    ensure_json!(resp.body)
+  end
+
   defp fetch_status!(base_url, access_token, status_id)
        when is_binary(base_url) and is_binary(access_token) and is_binary(status_id) do
     resp =
@@ -1111,6 +1277,24 @@ defmodule FederationBoxTest do
       )
 
     ensure_json!(resp.body)
+  end
+
+  defp poll_option_votes(status) when is_map(status) do
+    poll =
+      status
+      |> Map.get("poll")
+      |> case do
+        %{} = poll -> poll
+        _ -> %{}
+      end
+
+    poll
+    |> Map.get("options", [])
+    |> List.wrap()
+    |> Enum.map(fn
+      %{} = option -> Map.get(option, "votes_count", 0)
+      _ -> 0
+    end)
   end
 
   defp fetch_context!(base_url, access_token, status_id)
