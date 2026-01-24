@@ -216,23 +216,6 @@ defmodule EgregorosWeb.TimelineLive do
     {:noreply, assign(socket, mention_suggestions: mention_suggestions)}
   end
 
-  def handle_event("toggle_compose_cw", _params, socket) do
-    if socket.assigns.compose_cw_open? do
-      post_params =
-        default_post_params()
-        |> Map.merge(socket.assigns.form.params)
-        |> Map.put("spoiler_text", "")
-
-      {:noreply,
-       assign(socket,
-         compose_cw_open?: false,
-         form: Phoenix.Component.to_form(post_params, as: :post)
-       )}
-    else
-      {:noreply, assign(socket, compose_cw_open?: true)}
-    end
-  end
-
   def handle_event("toggle_compose_poll", _params, socket) do
     post_params =
       default_post_params()
@@ -442,10 +425,30 @@ defmodule EgregorosWeb.TimelineLive do
                        media_alt: media_alt
                      )}
 
+                  {:error, :invalid} ->
+                    {:noreply,
+                     assign(socket,
+                       error:
+                         if(socket.assigns.compose_poll_open?,
+                           do: "Invalid poll.",
+                           else: "Could not post."
+                         ),
+                       form: Phoenix.Component.to_form(post_params, as: :post),
+                       media_alt: media_alt
+                     )}
+
                   {:error, message} when is_binary(message) ->
                     {:noreply,
                      assign(socket,
                        error: message,
+                       form: Phoenix.Component.to_form(post_params, as: :post),
+                       media_alt: media_alt
+                     )}
+
+                  {:error, _reason} ->
+                    {:noreply,
+                     assign(socket,
+                       error: "Could not post.",
                        form: Phoenix.Component.to_form(post_params, as: :post),
                        media_alt: media_alt
                      )}
