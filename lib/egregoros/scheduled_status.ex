@@ -6,7 +6,7 @@ defmodule Egregoros.ScheduledStatus do
   @required_fields ~w(user_id scheduled_at params)a
   @optional_fields ~w(oban_job_id published_at)a
 
-  @min_offset_seconds 5 * 60
+  @default_min_offset_seconds 5 * 60
 
   schema "scheduled_statuses" do
     belongs_to :user, Egregoros.User
@@ -51,8 +51,15 @@ defmodule Egregoros.ScheduledStatus do
     end)
   end
 
+  defp min_offset_seconds do
+    case Application.get_env(:egregoros, :scheduled_status_min_offset_seconds) do
+      seconds when is_integer(seconds) and seconds >= 0 -> seconds
+      _ -> @default_min_offset_seconds
+    end
+  end
+
   defp far_enough?(%DateTime{} = scheduled_at) do
-    DateTime.diff(scheduled_at, DateTime.utc_now(), :second) >= @min_offset_seconds
+    DateTime.diff(scheduled_at, DateTime.utc_now(), :second) >= min_offset_seconds()
   end
 
   defp far_enough?(_scheduled_at), do: false
