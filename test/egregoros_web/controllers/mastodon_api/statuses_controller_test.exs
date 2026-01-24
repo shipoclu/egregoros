@@ -7,6 +7,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusesControllerTest do
   alias Egregoros.Publish
   alias Egregoros.Repo
   alias Egregoros.Relationships
+  alias Egregoros.ScheduledStatus
   alias Egregoros.Users
   alias EgregorosWeb.Endpoint
 
@@ -103,6 +104,33 @@ defmodule EgregorosWeb.MastodonAPI.StatusesControllerTest do
 
     assert response(conn, 422)
     assert Repo.get_by(Object, type: "Question") == nil
+  end
+
+  test "POST /api/v1/statuses rejects scheduled polls", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("poll_author_api_scheduled")
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, user} end)
+
+    scheduled_at =
+      DateTime.utc_now()
+      |> DateTime.add(10 * 60, :second)
+      |> DateTime.truncate(:second)
+      |> DateTime.to_iso8601()
+
+    conn =
+      post(conn, "/api/v1/statuses", %{
+        "status" => "Pick one later",
+        "scheduled_at" => scheduled_at,
+        "poll" => %{
+          "options" => ["Yes", "No"],
+          "multiple" => false,
+          "expires_in" => 3600
+        }
+      })
+
+    assert response(conn, 422)
+    assert Repo.get_by(ScheduledStatus, user_id: user.id) == nil
   end
 
   test "POST /api/v1/statuses rejects missing status param", %{conn: conn} do

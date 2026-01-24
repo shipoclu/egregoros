@@ -34,10 +34,16 @@ defmodule EgregorosWeb.MastodonAPI.StatusesController do
 
     user = conn.assigns.current_user
 
-    if is_map(poll) and List.wrap(media_ids) != [] do
-      send_resp(conn, 422, "Unprocessable Entity")
-    else
-      if is_binary(scheduled_at) and String.trim(scheduled_at) != "" do
+    scheduled? = is_binary(scheduled_at) and String.trim(scheduled_at) != ""
+
+    cond do
+      is_map(poll) and List.wrap(media_ids) != [] ->
+        send_resp(conn, 422, "Unprocessable Entity")
+
+      is_map(poll) and scheduled? ->
+        send_resp(conn, 422, "Unprocessable Entity")
+
+      scheduled? ->
         schedule_attrs = %{
           scheduled_at: scheduled_at,
           params: %{
@@ -58,7 +64,8 @@ defmodule EgregorosWeb.MastodonAPI.StatusesController do
           {:error, _} ->
             send_resp(conn, 422, "Unprocessable Entity")
         end
-      else
+
+      true ->
         with {:ok, attachments} <- Media.attachments_from_ids(user, media_ids),
              {:ok, in_reply_to} <- resolve_in_reply_to(in_reply_to_id, user),
              {:ok, create_object} <-
@@ -86,7 +93,6 @@ defmodule EgregorosWeb.MastodonAPI.StatusesController do
         else
           {:error, _} -> send_resp(conn, 422, "Unprocessable Entity")
         end
-      end
     end
   end
 
