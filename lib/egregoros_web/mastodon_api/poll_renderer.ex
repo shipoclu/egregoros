@@ -20,21 +20,14 @@ defmodule EgregorosWeb.MastodonAPI.PollRenderer do
   ## Returns
   A map conforming to the Mastodon Poll entity specification.
   """
-  def render(%Object{type: "Question", data: data} = object, current_user) when is_map(data) do
-    one_of = Map.get(data, "oneOf") |> List.wrap()
-    any_of = Map.get(data, "anyOf") |> List.wrap()
-
-    {options, multiple} =
-      cond do
-        any_of != [] -> {any_of, true}
-        one_of != [] -> {one_of, false}
-        true -> {[], false}
-      end
+  def render(%Object{type: "Question", data: %{} = _data} = object, current_user) do
+    options = Polls.options(object)
+    multiple = Polls.multiple?(object)
 
     rendered_options = Enum.map(options, &render_option/1)
     votes_count = Enum.reduce(rendered_options, 0, fn opt, acc -> acc + opt["votes_count"] end)
     voters_count = Polls.voters_count(object)
-    expires_at = parse_expiry(data)
+    expires_at = Polls.closed_at(object)
     expired = expired?(expires_at)
 
     poll = %{
@@ -89,22 +82,6 @@ defmodule EgregorosWeb.MastodonAPI.PollRenderer do
       "votes_count" => 0
     }
   end
-
-  defp parse_expiry(%{"closed" => closed}) when is_binary(closed) do
-    case DateTime.from_iso8601(closed) do
-      {:ok, dt, _} -> dt
-      _ -> nil
-    end
-  end
-
-  defp parse_expiry(%{"endTime" => end_time}) when is_binary(end_time) do
-    case DateTime.from_iso8601(end_time) do
-      {:ok, dt, _} -> dt
-      _ -> nil
-    end
-  end
-
-  defp parse_expiry(_data), do: nil
 
   defp expired?(nil), do: false
 

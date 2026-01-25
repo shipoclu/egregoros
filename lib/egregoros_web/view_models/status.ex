@@ -399,21 +399,11 @@ defmodule EgregorosWeb.ViewModels.Status do
 
   defp decorate_content_with_context(_object, _current_user, _ctx, _opts), do: nil
 
-  defp poll_view_model(%{data: data, actor: actor_ap_id} = object, current_user)
-       when is_map(data) do
-    one_of = Map.get(data, "oneOf") |> List.wrap()
-    any_of = Map.get(data, "anyOf") |> List.wrap()
-
-    {options, multiple?} =
-      cond do
-        any_of != [] -> {any_of, true}
-        one_of != [] -> {one_of, false}
-        true -> {[], false}
-      end
-
-    options = Enum.map(options, &poll_option_view_model/1)
+  defp poll_view_model(%{data: %{} = _data, actor: actor_ap_id} = object, current_user) do
+    options = object |> Polls.options() |> Enum.map(&poll_option_view_model/1)
+    multiple? = Polls.multiple?(object)
     total_votes = Enum.reduce(options, 0, fn opt, acc -> acc + opt.votes end)
-    closed = parse_poll_closed(data)
+    closed = Polls.closed_at(object)
     expired? = closed != nil and DateTime.compare(closed, DateTime.utc_now()) == :lt
 
     own_poll? = own_poll?(actor_ap_id, current_user)
@@ -445,15 +435,6 @@ defmodule EgregorosWeb.ViewModels.Status do
   end
 
   defp poll_option_view_model(_option), do: %{name: "", votes: 0}
-
-  defp parse_poll_closed(%{"closed" => closed}) when is_binary(closed) do
-    case DateTime.from_iso8601(closed) do
-      {:ok, dt, _} -> dt
-      _ -> nil
-    end
-  end
-
-  defp parse_poll_closed(_data), do: nil
 
   defp own_poll?(_actor_ap_id, nil), do: false
 

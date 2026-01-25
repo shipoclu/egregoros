@@ -324,24 +324,13 @@ defmodule Egregoros.Publish.Polls do
     end
   end
 
-  defp validate_poll_not_expired(%Object{data: data}) do
-    closed = Map.get(data, "closed") || Map.get(data, "endTime")
-
-    case closed do
-      nil ->
-        :ok
-
-      closed when is_binary(closed) ->
-        case DateTime.from_iso8601(closed) do
-          {:ok, closed_dt, _} ->
-            if DateTime.compare(closed_dt, DateTime.utc_now()) == :lt do
-              {:error, :poll_expired}
-            else
-              :ok
-            end
-
-          _ ->
-            :ok
+  defp validate_poll_not_expired(%Object{} = question) do
+    case Polls.closed_at(question) do
+      %DateTime{} = closed_dt ->
+        if DateTime.compare(closed_dt, DateTime.utc_now()) == :lt do
+          {:error, :poll_expired}
+        else
+          :ok
         end
 
       _ ->
@@ -349,14 +338,13 @@ defmodule Egregoros.Publish.Polls do
     end
   end
 
-  defp get_poll_options(%Object{data: data}) do
-    one_of = Map.get(data, "oneOf") |> List.wrap()
-    any_of = Map.get(data, "anyOf") |> List.wrap()
+  defp get_poll_options(%Object{} = question) do
+    options = Polls.options(question)
 
-    cond do
-      any_of != [] -> {:ok, any_of, true}
-      one_of != [] -> {:ok, one_of, false}
-      true -> {:error, :no_options}
+    if options == [] do
+      {:error, :no_options}
+    else
+      {:ok, options, Polls.multiple?(question)}
     end
   end
 

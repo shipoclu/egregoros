@@ -48,10 +48,11 @@ keeping behavior unchanged unless explicitly desired.
   - New module: `lib/egregoros_web/mastodon_api/media_urls.ex`
   - Tests: `test/egregoros_web/mastodon_api/media_urls_test.exs`
 
-- [ ] Centralize poll parsing (options/multiple/expiry) used in multiple layers
+- [x] Centralize poll parsing (options/multiple/expiry) used in multiple layers
   - `lib/egregoros/publish/polls.ex:352`
   - `lib/egregoros_web/mastodon_api/poll_renderer.ex:23`
   - `lib/egregoros_web/view_models/status.ex:402`
+  - New helpers: `Egregoros.Objects.Polls.options/1` and `Egregoros.Objects.Polls.closed_at/1`
 
 ## Architecture polish (non-urgent)
 

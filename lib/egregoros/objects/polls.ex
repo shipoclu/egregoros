@@ -53,6 +53,36 @@ defmodule Egregoros.Objects.Polls do
   def multiple?(_object), do: false
 
   @doc """
+  Returns the poll option list (Question's `oneOf` or `anyOf`).
+  """
+  def options(%Object{type: "Question", data: %{} = data}) do
+    case poll_choice_key(data) do
+      "anyOf" -> Map.get(data, "anyOf") |> List.wrap()
+      "oneOf" -> Map.get(data, "oneOf") |> List.wrap()
+      _ -> []
+    end
+  end
+
+  def options(_object), do: []
+
+  @doc """
+  Returns the poll closing time (parsed DateTime) if present.
+
+  Accepts both `closed` and `endTime` fields.
+  """
+  def closed_at(%Object{type: "Question", data: %{} = data}) do
+    data
+    |> Map.get("closed")
+    |> case do
+      value when is_binary(value) -> value
+      _ -> Map.get(data, "endTime")
+    end
+    |> parse_datetime()
+  end
+
+  def closed_at(_object), do: nil
+
+  @doc """
   Returns true if the given user has already voted on the poll.
   """
   def voted?(%Object{type: "Question", ap_id: ap_id}, %User{ap_id: voter_ap_id})
@@ -110,6 +140,15 @@ defmodule Egregoros.Objects.Polls do
   def update_from_remote(_object, _incoming), do: :noop
 
   # Private
+
+  defp parse_datetime(value) when is_binary(value) do
+    case DateTime.from_iso8601(value) do
+      {:ok, %DateTime{} = dt, _} -> dt
+      _ -> nil
+    end
+  end
+
+  defp parse_datetime(_value), do: nil
 
   defp poll_choice_key(%{"anyOf" => any_of}) when is_list(any_of) and any_of != [], do: "anyOf"
   defp poll_choice_key(%{"oneOf" => one_of}) when is_list(one_of) and one_of != [], do: "oneOf"

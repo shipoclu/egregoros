@@ -355,4 +355,34 @@ defmodule Egregoros.Objects.PollsTest do
     {:ok, poll} = Pipeline.ingest(question, local: true)
     poll
   end
+
+  describe "poll parsing helpers" do
+    test "options/1 returns oneOf for single-choice polls" do
+      object = %Egregoros.Object{type: "Question", data: %{"oneOf" => [%{"name" => "A"}]}}
+
+      assert Polls.options(object) == [%{"name" => "A"}]
+      assert Polls.multiple?(object) == false
+    end
+
+    test "options/1 returns anyOf for multiple-choice polls" do
+      object = %Egregoros.Object{type: "Question", data: %{"anyOf" => [%{"name" => "A"}]}}
+
+      assert Polls.options(object) == [%{"name" => "A"}]
+      assert Polls.multiple?(object) == true
+    end
+
+    test "closed_at/1 parses closed or endTime timestamps" do
+      assert %DateTime{} =
+               Polls.closed_at(%Egregoros.Object{
+                 type: "Question",
+                 data: %{"closed" => "2024-01-01T00:00:00Z"}
+               })
+
+      assert %DateTime{} =
+               Polls.closed_at(%Egregoros.Object{
+                 type: "Question",
+                 data: %{"endTime" => "2024-01-01T00:00:00Z"}
+               })
+    end
+  end
 end
