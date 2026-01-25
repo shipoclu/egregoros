@@ -56,9 +56,11 @@ keeping behavior unchanged unless explicitly desired.
 
 ## Architecture polish (non-urgent)
 
-- [ ] Prefer `Egregoros.Activities.Question.build/…` (like `Note.build/2`) and use it from `Publish.Polls`
+- [x] Prefer `Egregoros.Activities.Question.build/…` (like `Note.build/2`) and use it from `Publish.Polls`
   - Currently local poll creation is ad-hoc in `lib/egregoros/publish/polls.ex:177`
   - Compare with Note builder: `lib/egregoros/activities/note.ex:35`
+  - Added `Question.build/3` in `lib/egregoros/activities/question.ex`
+  - Tests: `test/egregoros/activities/question_build_test.exs`
 
 - [ ] If delivery quirks accumulate, move per-software payload rewrites out of `Activities.Create`
   - Example: Answer → Note payload rewrite for delivery:

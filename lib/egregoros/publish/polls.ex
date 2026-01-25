@@ -7,6 +7,7 @@ defmodule Egregoros.Publish.Polls do
 
   alias Egregoros.Activities.Answer
   alias Egregoros.Activities.Create
+  alias Egregoros.Activities.Question
   alias Egregoros.HTML
   alias Egregoros.Object
   alias Egregoros.Objects
@@ -134,7 +135,7 @@ defmodule Egregoros.Publish.Polls do
           content_html = HTML.to_safe_html(content, format: :text, mention_hrefs: mention_hrefs)
 
           question =
-            build_question(user, content, content_html)
+            Question.build(user, content, content_html)
             |> Map.merge(poll_data)
             |> PostBuilder.put_attachments(attachments)
             |> PostBuilder.put_in_reply_to(in_reply_to)
@@ -173,24 +174,6 @@ defmodule Egregoros.Publish.Polls do
   def post_poll(_user, _content, _poll_params, _opts), do: {:error, :invalid_poll}
 
   # Private functions
-
-  defp build_question(%User{ap_id: actor_ap_id}, content, content_html)
-       when is_binary(actor_ap_id) and is_binary(content_html) do
-    now = DateTime.utc_now() |> DateTime.to_iso8601()
-
-    %{
-      "id" => URL.absolute("/objects/" <> Ecto.UUID.generate()),
-      "type" => "Question",
-      "actor" => actor_ap_id,
-      "attributedTo" => actor_ap_id,
-      "context" => URL.absolute("/contexts/" <> Ecto.UUID.generate()),
-      "content" => content_html,
-      "source" => %{"content" => content, "mediaType" => "text/plain"},
-      "published" => now
-    }
-  end
-
-  defp build_question(_user, _content, _content_html), do: %{}
 
   defp build_poll_data(poll_params) when is_map(poll_params) do
     options = poll_param(poll_params, "options") |> List.wrap()

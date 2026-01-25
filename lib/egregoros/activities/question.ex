@@ -18,6 +18,8 @@ defmodule Egregoros.Activities.Question do
   alias Egregoros.InboxTargeting
   alias Egregoros.Objects
   alias Egregoros.Timeline
+  alias Egregoros.User
+  alias EgregorosWeb.Endpoint
 
   def type, do: "Question"
 
@@ -34,6 +36,24 @@ defmodule Egregoros.Activities.Question do
     field :published, APDateTime
     field :closed, APDateTime
   end
+
+  def build(%User{ap_id: actor_ap_id}, content, content_html)
+      when is_binary(actor_ap_id) and is_binary(content) and is_binary(content_html) do
+    now = DateTime.utc_now() |> DateTime.to_iso8601()
+
+    %{
+      "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
+      "type" => type(),
+      "actor" => actor_ap_id,
+      "attributedTo" => actor_ap_id,
+      "context" => Endpoint.url() <> "/contexts/" <> Ecto.UUID.generate(),
+      "content" => content_html,
+      "source" => %{"content" => content, "mediaType" => "text/plain"},
+      "published" => now
+    }
+  end
+
+  def build(_user, _content, _content_html), do: %{}
 
   def cast_and_validate(question) when is_map(question) do
     question =
