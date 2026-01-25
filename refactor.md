@@ -35,9 +35,11 @@ keeping behavior unchanged unless explicitly desired.
   - New module: `lib/egregoros/activity_pub/content_map.ex`
   - Tests: `test/egregoros/activity_pub/content_map_test.exs`
 
-- [ ] Unify mention-resolution helpers (`local_domains/normalize_host`) between PostBuilder and ResolveMentions
+- [x] Unify mention-resolution helpers (`local_domains/normalize_host`) between PostBuilder and ResolveMentions
   - `lib/egregoros/publish/post_builder.ex:152`
   - `lib/egregoros/workers/resolve_mentions.ex:288`
+  - New module: `lib/egregoros/mentions/domain.ex`
+  - Tests: `test/egregoros/mentions_domain_test.exs`
 
 - [ ] Deduplicate Mastodon attachment preview URL extraction
   - `lib/egregoros_web/mastodon_api/status_renderer.ex:516`

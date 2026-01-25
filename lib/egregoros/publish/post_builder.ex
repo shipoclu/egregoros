@@ -3,6 +3,7 @@ defmodule Egregoros.Publish.PostBuilder do
 
   alias Egregoros.Domain
   alias Egregoros.Mentions
+  alias Egregoros.Mentions.Domain, as: MentionDomain
   alias Egregoros.Objects
   alias Egregoros.User
   alias Egregoros.Users
@@ -151,12 +152,12 @@ defmodule Egregoros.Publish.PostBuilder do
 
   def resolve_mentions(content, actor_ap_id)
       when is_binary(content) and is_binary(actor_ap_id) do
-    local_domains = local_domains(actor_ap_id)
+    local_domains = MentionDomain.local_domains(actor_ap_id)
 
     content
     |> Mentions.extract()
     |> Enum.reduce({[], []}, fn {nickname, host}, {mentions, unresolved} ->
-      host_normalized = normalize_host(host)
+      host_normalized = MentionDomain.normalize_host(host)
       name = mention_name(nickname, host_normalized, local_domains)
 
       case resolve_mention_recipient(nickname, host_normalized, local_domains) do
@@ -194,7 +195,7 @@ defmodule Egregoros.Publish.PostBuilder do
     if in_reply_to == "" do
       []
     else
-      local_domains = local_domains(actor_ap_id)
+      local_domains = MentionDomain.local_domains(actor_ap_id)
 
       with %{} = parent <- Objects.get_by_ap_id(in_reply_to),
            parent_actor when is_binary(parent_actor) and parent_actor != "" <- parent.actor,
@@ -265,16 +266,6 @@ defmodule Egregoros.Publish.PostBuilder do
   end
 
   defp resolve_mention_recipient(_nickname, _host, _local_domains), do: nil
-
-  defp normalize_host(nil), do: nil
-
-  defp normalize_host(host) when is_binary(host) do
-    host
-    |> String.trim()
-    |> String.downcase()
-  end
-
-  defp normalize_host(_host), do: nil
 
   defp mention_name(nickname, nil, _local_domains) when is_binary(nickname) do
     "@" <> nickname
@@ -347,30 +338,4 @@ defmodule Egregoros.Publish.PostBuilder do
   end
 
   defp fallback_nickname(_path), do: "unknown"
-
-  # Domain helpers
-
-  defp local_domains(actor_ap_id) when is_binary(actor_ap_id) do
-    case URI.parse(String.trim(actor_ap_id)) do
-      %URI{host: host} when is_binary(host) and host != "" ->
-        host = String.downcase(host)
-
-        port =
-          case URI.parse(String.trim(actor_ap_id)) do
-            %URI{port: port} when is_integer(port) and port > 0 -> port
-            _ -> nil
-          end
-
-        domains =
-          [host, if(is_integer(port), do: host <> ":" <> Integer.to_string(port), else: nil)]
-          |> Enum.filter(&is_binary/1)
-
-        Enum.uniq(domains)
-
-      _ ->
-        []
-    end
-  end
-
-  defp local_domains(_actor_ap_id), do: []
 end
