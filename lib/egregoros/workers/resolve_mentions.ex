@@ -10,6 +10,7 @@ defmodule Egregoros.Workers.ResolveMentions do
   alias Egregoros.HTML
   alias Egregoros.Mentions
   alias Egregoros.Objects
+  alias Egregoros.Recipients
   alias Egregoros.Timeline
   alias Egregoros.User
   alias Egregoros.Users
@@ -118,7 +119,7 @@ defmodule Egregoros.Workers.ResolveMentions do
 
   defp fetch_missing_recipients(%{} = note_data) do
     note_data
-    |> recipient_actor_ids()
+    |> Recipients.recipient_actor_ids()
     |> Enum.each(fn ap_id ->
       case Users.get_by_ap_id(ap_id) do
         %User{} ->
@@ -267,23 +268,6 @@ defmodule Egregoros.Workers.ResolveMentions do
     cc = note_data |> Map.get("cc", []) |> List.wrap()
     {to, cc}
   end
-
-  @recipient_fields ~w(to cc bto bcc audience)
-
-  defp recipient_actor_ids(%{} = data) do
-    @recipient_fields
-    |> Enum.flat_map(fn field ->
-      data
-      |> Map.get(field, [])
-      |> List.wrap()
-    end)
-    |> Enum.filter(&is_binary/1)
-    |> Enum.map(&String.trim/1)
-    |> Enum.reject(&(&1 == "" or &1 == @as_public or String.ends_with?(&1, "/followers")))
-    |> Enum.uniq()
-  end
-
-  defp recipient_actor_ids(_data), do: []
 
   defp local_domains(actor_ap_id) when is_binary(actor_ap_id) do
     case URI.parse(String.trim(actor_ap_id)) do

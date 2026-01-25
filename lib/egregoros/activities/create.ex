@@ -17,8 +17,6 @@ defmodule Egregoros.Activities.Create do
   alias Egregoros.Users
   alias EgregorosWeb.Endpoint
 
-  @as_public "https://www.w3.org/ns/activitystreams#Public"
-
   def type, do: "Create"
 
   @primary_key false
@@ -157,7 +155,7 @@ defmodule Egregoros.Activities.Create do
 
     recipient_inboxes =
       data
-      |> recipient_actor_ids()
+      |> Egregoros.Recipients.recipient_actor_ids(fields: ["to", "cc"])
       |> Enum.map(fn actor_id ->
         case Users.get_by_ap_id(actor_id) do
           %User{local: false, inbox: inbox} when is_binary(inbox) and inbox != "" -> inbox
@@ -180,16 +178,6 @@ defmodule Egregoros.Activities.Create do
   end
 
   defp followers_addressed?(_data, _actor_ap_id), do: false
-
-  defp recipient_actor_ids(%{} = data) do
-    ((data |> Map.get("to", []) |> List.wrap()) ++ (data |> Map.get("cc", []) |> List.wrap()))
-    |> Enum.filter(&is_binary/1)
-    |> Enum.map(&String.trim/1)
-    |> Enum.reject(&(&1 == "" or &1 == @as_public or String.ends_with?(&1, "/followers")))
-    |> Enum.uniq()
-  end
-
-  defp recipient_actor_ids(_data), do: []
 
   defp to_object_attrs(activity, embedded_object, opts) do
     %{

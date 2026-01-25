@@ -4,11 +4,11 @@ defmodule Egregoros.Timeline do
   """
 
   alias Egregoros.Objects
+  alias Egregoros.Recipients
   alias Egregoros.Relationships
   alias Egregoros.User
   alias Egregoros.Users
 
-  @as_public "https://www.w3.org/ns/activitystreams#Public"
   @public_topic "timeline:public"
   @user_topic_prefix "timeline:user:"
 
@@ -91,7 +91,7 @@ defmodule Egregoros.Timeline do
         []
       end
 
-    recipient_ap_ids = recipient_actor_ids(object)
+    recipient_ap_ids = Recipients.recipient_actor_ids(object)
     follower_ap_ids = local_follower_ap_ids(actor)
 
     user_ap_ids =
@@ -141,27 +141,4 @@ defmodule Egregoros.Timeline do
     |> Enum.map(& &1.actor)
     |> local_user_ap_ids()
   end
-
-  @recipient_fields ~w(to cc bto bcc audience)
-
-  defp recipient_actor_ids(%Egregoros.Object{data: %{} = data}) do
-    @recipient_fields
-    |> Enum.flat_map(fn field ->
-      data
-      |> Map.get(field)
-      |> List.wrap()
-      |> Enum.map(&extract_recipient_id/1)
-    end)
-    |> Enum.filter(&is_binary/1)
-    |> Enum.map(&String.trim/1)
-    |> Enum.reject(&(&1 == "" or &1 == @as_public or String.ends_with?(&1, "/followers")))
-    |> Enum.uniq()
-  end
-
-  defp recipient_actor_ids(_object), do: []
-
-  defp extract_recipient_id(%{"id" => id}) when is_binary(id), do: id
-  defp extract_recipient_id(%{id: id}) when is_binary(id), do: id
-  defp extract_recipient_id(id) when is_binary(id), do: id
-  defp extract_recipient_id(_recipient), do: nil
 end

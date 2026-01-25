@@ -18,7 +18,6 @@ defmodule Egregoros.Activities.Note do
 
   def type, do: "Note"
 
-  @as_public "https://www.w3.org/ns/activitystreams#Public"
   @max_inbound_note_chars 20_000
 
   @primary_key false
@@ -135,7 +134,7 @@ defmodule Egregoros.Activities.Note do
   defp maybe_broadcast_mentions(%{actor: actor_ap_id, data: %{} = data} = object)
        when is_binary(actor_ap_id) do
     data
-    |> recipient_actor_ids()
+    |> Egregoros.Recipients.recipient_actor_ids(fields: ["to", "cc"])
     |> Enum.each(fn recipient_ap_id ->
       case Users.get_by_ap_id(recipient_ap_id) do
         %User{local: true, ap_id: ap_id} when ap_id != actor_ap_id ->
@@ -148,16 +147,6 @@ defmodule Egregoros.Activities.Note do
   end
 
   defp maybe_broadcast_mentions(_object), do: :ok
-
-  defp recipient_actor_ids(%{} = data) do
-    ((data |> Map.get("to", []) |> List.wrap()) ++ (data |> Map.get("cc", []) |> List.wrap()))
-    |> Enum.filter(&is_binary/1)
-    |> Enum.map(&String.trim/1)
-    |> Enum.reject(&(&1 == "" or &1 == @as_public or String.ends_with?(&1, "/followers")))
-    |> Enum.uniq()
-  end
-
-  defp recipient_actor_ids(_data), do: []
 
   defp validate_inbox_target(%{} = activity, opts) when is_list(opts) do
     InboxTargeting.validate(opts, fn inbox_user_ap_id ->
