@@ -6,6 +6,7 @@ defmodule EgregorosWeb.MastodonAPI.MediaController do
   alias Egregoros.Objects
   alias Egregoros.Object
   alias Egregoros.User
+  alias EgregorosWeb.MastodonAPI.MediaURLs
   alias EgregorosWeb.URL
 
   def create(conn, %{"file" => %Plug.Upload{} = upload}) do
@@ -51,7 +52,7 @@ defmodule EgregorosWeb.MastodonAPI.MediaController do
   defp mastodon_attachment_json(%Object{} = object) do
     href = attachment_url(object)
     url = URL.absolute(href) || href
-    preview_href = attachment_preview_url(object) || href
+    preview_href = MediaURLs.preview_url(object) || href
     preview_url = URL.absolute(preview_href) || preview_href
 
     meta =
@@ -97,19 +98,6 @@ defmodule EgregorosWeb.MastodonAPI.MediaController do
 
   defp attachment_url(%Object{data: %{"url" => href}}) when is_binary(href), do: href
   defp attachment_url(_), do: ""
-
-  defp attachment_preview_url(%Object{data: %{"icon" => %{"url" => [%{"href" => href} | _]}}})
-       when is_binary(href),
-       do: href
-
-  defp attachment_preview_url(%Object{data: %{"icon" => %{"url" => [%{"url" => href} | _]}}})
-       when is_binary(href),
-       do: href
-
-  defp attachment_preview_url(%Object{data: %{"icon" => %{"url" => href}}}) when is_binary(href),
-    do: href
-
-  defp attachment_preview_url(_), do: nil
 
   defp owned_media?(%Object{actor: actor, type: type}, %User{ap_id: ap_id})
        when is_binary(actor) and is_binary(ap_id) do

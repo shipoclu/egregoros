@@ -5,6 +5,7 @@ defmodule EgregorosWeb.MastodonAPI.ScheduledStatusRenderer do
   alias Egregoros.Repo
   alias Egregoros.ScheduledStatus
   alias Egregoros.User
+  alias EgregorosWeb.MastodonAPI.MediaURLs
   alias EgregorosWeb.URL
 
   @allowed_types ~w(Document Image)
@@ -109,7 +110,7 @@ defmodule EgregorosWeb.MastodonAPI.ScheduledStatusRenderer do
   defp render_attachment(%Object{} = object) do
     href = attachment_url(object)
     url = URL.absolute(href) || href
-    preview_href = attachment_preview_url(object) || href
+    preview_href = MediaURLs.preview_url(object) || href
     preview_url = URL.absolute(preview_href) || preview_href
 
     meta =
@@ -166,19 +167,6 @@ defmodule EgregorosWeb.MastodonAPI.ScheduledStatusRenderer do
 
   defp attachment_url(%Object{data: %{"url" => href}}) when is_binary(href), do: href
   defp attachment_url(_), do: ""
-
-  defp attachment_preview_url(%Object{data: %{"icon" => %{"url" => [%{"href" => href} | _]}}})
-       when is_binary(href),
-       do: href
-
-  defp attachment_preview_url(%Object{data: %{"icon" => %{"url" => [%{"url" => href} | _]}}})
-       when is_binary(href),
-       do: href
-
-  defp attachment_preview_url(%Object{data: %{"icon" => %{"url" => href}}}) when is_binary(href),
-    do: href
-
-  defp attachment_preview_url(_), do: nil
 
   defp format_datetime(%DateTime{} = dt),
     do: dt |> DateTime.truncate(:second) |> DateTime.to_iso8601()

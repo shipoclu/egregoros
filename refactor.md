@@ -41,10 +41,12 @@ keeping behavior unchanged unless explicitly desired.
   - New module: `lib/egregoros/mentions/domain.ex`
   - Tests: `test/egregoros/mentions_domain_test.exs`
 
-- [ ] Deduplicate Mastodon attachment preview URL extraction
+- [x] Deduplicate Mastodon attachment preview URL extraction
   - `lib/egregoros_web/mastodon_api/status_renderer.ex:516`
   - `lib/egregoros_web/mastodon_api/scheduled_status_renderer.ex:170`
   - `lib/egregoros_web/controllers/mastodon_api/media_controller.ex:101`
+  - New module: `lib/egregoros_web/mastodon_api/media_urls.ex`
+  - Tests: `test/egregoros_web/mastodon_api/media_urls_test.exs`
 
 - [ ] Centralize poll parsing (options/multiple/expiry) used in multiple layers
   - `lib/egregoros/publish/polls.ex:352`
