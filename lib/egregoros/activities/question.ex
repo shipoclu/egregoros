@@ -14,6 +14,7 @@ defmodule Egregoros.Activities.Question do
   alias Egregoros.ActivityPub.ObjectValidators.Types.ObjectID
   alias Egregoros.ActivityPub.ObjectValidators.Types.Recipients
   alias Egregoros.ActivityPub.ObjectValidators.Types.DateTime, as: APDateTime
+  alias Egregoros.ActivityPub.ContentMap
   alias Egregoros.InboxTargeting
   alias Egregoros.Objects
   alias Egregoros.Timeline
@@ -38,7 +39,7 @@ defmodule Egregoros.Activities.Question do
     question =
       question
       |> normalize_actor()
-      |> normalize_content_map()
+      |> ContentMap.normalize()
       |> normalize_closed()
       |> Map.put_new("content", "")
 
@@ -134,48 +135,6 @@ defmodule Egregoros.Activities.Question do
   end
 
   defp normalize_actor(question), do: question
-
-  defp normalize_content_map(%{"content" => content} = question) when is_binary(content) do
-    if String.trim(content) == "" do
-      do_normalize_content_map(question)
-    else
-      question
-    end
-  end
-
-  defp normalize_content_map(question), do: do_normalize_content_map(question)
-
-  defp do_normalize_content_map(%{"contentMap" => content_map} = question)
-       when is_map(content_map) do
-    case content_from_map(content_map) do
-      content when is_binary(content) -> Map.put(question, "content", content)
-      _ -> question
-    end
-  end
-
-  defp do_normalize_content_map(question), do: question
-
-  defp content_from_map(%{} = content_map) do
-    preferred = ["en", "und"]
-
-    Enum.find_value(preferred, fn key ->
-      case Map.get(content_map, key) do
-        "" <> _ = content ->
-          content = String.trim(content)
-          if content != "", do: content
-
-        _ ->
-          nil
-      end
-    end) ||
-      content_map
-      |> Enum.filter(fn {key, content} -> is_binary(key) and is_binary(content) end)
-      |> Enum.sort_by(fn {key, _} -> key end)
-      |> Enum.find_value(fn {_key, content} ->
-        content = String.trim(content)
-        if content != "", do: content
-      end)
-  end
 
   defp normalize_closed(%{"closed" => closed} = question) when is_binary(closed), do: question
 

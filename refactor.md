@@ -29,9 +29,11 @@ keeping behavior unchanged unless explicitly desired.
     `InboxTargeting.validate_addressed_or_followed_or_addressed_to_object/4`
   - Tests: `test/egregoros/inbox_targeting_test.exs`
 
-- [ ] Deduplicate `contentMap` → `content` normalization across `Note` and `Question`
+- [x] Deduplicate `contentMap` → `content` normalization across `Note` and `Question`
   - `lib/egregoros/activities/note.ex:211`
   - `lib/egregoros/activities/question.ex:138`
+  - New module: `lib/egregoros/activity_pub/content_map.ex`
+  - Tests: `test/egregoros/activity_pub/content_map_test.exs`
 
 - [ ] Unify mention-resolution helpers (`local_domains/normalize_host`) between PostBuilder and ResolveMentions
   - `lib/egregoros/publish/post_builder.ex:152`
