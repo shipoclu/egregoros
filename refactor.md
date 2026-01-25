@@ -62,6 +62,8 @@ keeping behavior unchanged unless explicitly desired.
   - Added `Question.build/3` in `lib/egregoros/activities/question.ex`
   - Tests: `test/egregoros/activities/question_build_test.exs`
 
-- [ ] If delivery quirks accumulate, move per-software payload rewrites out of `Activities.Create`
+- [x] If delivery quirks accumulate, move per-software payload rewrites out of `Activities.Create`
   - Example: Answer → Note payload rewrite for delivery:
     - `lib/egregoros/activities/create.ex:105`
+  - New module: `lib/egregoros/federation/delivery_payload.ex`
+  - Tests: `test/egregoros/federation/delivery_payload_test.exs`
