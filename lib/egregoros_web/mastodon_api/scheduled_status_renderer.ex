@@ -175,6 +175,9 @@ defmodule EgregorosWeb.MastodonAPI.ScheduledStatusRenderer do
        when is_binary(href),
        do: href
 
+  defp attachment_preview_url(%Object{data: %{"icon" => %{"url" => href}}}) when is_binary(href),
+    do: href
+
   defp attachment_preview_url(_), do: nil
 
   defp format_datetime(%DateTime{} = dt),

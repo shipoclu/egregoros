@@ -95,12 +95,26 @@ defmodule Egregoros.Activities.Create do
          inboxes when is_list(inboxes) and inboxes != [] <-
            inboxes_for_delivery(create_object, actor) do
       Enum.each(inboxes, fn inbox_url ->
-        Delivery.deliver(actor, inbox_url, create_object.data)
+        Delivery.deliver(actor, inbox_url, delivery_payload(create_object.data))
       end)
     else
       _ -> :ok
     end
   end
+
+  defp delivery_payload(%{"object" => %{"type" => "Answer"} = object} = data) when is_map(data) do
+    object =
+      object
+      |> Map.put("type", "Note")
+      |> Map.delete("cc")
+
+    data
+    |> Map.put("object", object)
+    |> Map.put("to", object |> Map.get("to", []) |> List.wrap())
+    |> Map.put("cc", object |> Map.get("cc", []) |> List.wrap())
+  end
+
+  defp delivery_payload(data), do: data
 
   defp validate_inbox_target(%{} = activity, opts) when is_list(opts) do
     InboxTargeting.validate(opts, fn inbox_user_ap_id ->

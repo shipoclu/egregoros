@@ -19,6 +19,9 @@ defmodule EgregorosWeb.TimelineLive do
 
   @initial_page_size 10
   @page_size 20
+  @poll_min_options 2
+  @poll_max_options 4
+  @default_poll_expiration 3600
   @impl true
   def mount(params, session, socket) do
     current_user =
@@ -49,6 +52,12 @@ defmodule EgregorosWeb.TimelineLive do
         notifications_count: notifications_count(current_user),
         compose_options_open?: false,
         compose_cw_open?: false,
+        compose_poll_open?: false,
+        poll_max_options: @poll_max_options,
+        poll_min_options: @poll_min_options,
+        reply_modal_open?: false,
+        reply_to_ap_id: nil,
+        reply_to_handle: nil,
         reply_form: reply_form,
         reply_media_alt: %{},
         reply_options_open?: false,
@@ -161,7 +170,7 @@ defmodule EgregorosWeb.TimelineLive do
 
   @impl true
   def handle_event("compose_change", %{"post" => %{} = post_params}, socket) do
-    post_params = Map.merge(default_post_params(), post_params)
+    post_params = normalize_compose_params(socket, post_params)
     media_alt = Map.get(post_params, "media_alt", %{})
 
     compose_options_open? = Param.truthy?(Map.get(post_params, "ui_options_open"))
@@ -207,6 +216,83 @@ defmodule EgregorosWeb.TimelineLive do
     {:noreply, assign(socket, mention_suggestions: mention_suggestions)}
   end
 
+  def handle_event("toggle_compose_poll", _params, socket) do
+    post_params =
+      default_post_params()
+      |> Map.merge(socket.assigns.form.params || %{})
+
+    if socket.assigns.compose_poll_open? do
+      post_params = Map.delete(post_params, "poll")
+
+      {:noreply,
+       assign(socket,
+         compose_poll_open?: false,
+         error: nil,
+         form: Phoenix.Component.to_form(post_params, as: :post)
+       )}
+    else
+      poll_params =
+        post_params
+        |> Map.get("poll", %{})
+        |> normalize_poll_params()
+
+      post_params = Map.put(post_params, "poll", poll_params)
+
+      {:noreply,
+       assign(socket,
+         compose_poll_open?: true,
+         form: Phoenix.Component.to_form(post_params, as: :post)
+       )}
+    end
+  end
+
+  def handle_event("poll_add_option", _params, socket) do
+    post_params =
+      socket
+      |> compose_params_from_form()
+      |> ensure_poll_params()
+
+    poll_params = Map.get(post_params, "poll", %{})
+    options = poll_params |> Map.get("options", []) |> List.wrap()
+
+    options =
+      if length(options) < @poll_max_options do
+        options ++ [""]
+      else
+        options
+      end
+
+    poll_params = Map.put(poll_params, "options", options)
+    post_params = Map.put(post_params, "poll", poll_params)
+
+    {:noreply, assign(socket, form: Phoenix.Component.to_form(post_params, as: :post))}
+  end
+
+  def handle_event("poll_remove_option", %{"index" => index}, socket) do
+    post_params =
+      socket
+      |> compose_params_from_form()
+      |> ensure_poll_params()
+
+    poll_params = Map.get(post_params, "poll", %{})
+    options = poll_params |> Map.get("options", []) |> List.wrap()
+
+    options =
+      if length(options) > @poll_min_options do
+        case Integer.parse(to_string(index)) do
+          {idx, ""} when idx >= 0 -> List.delete_at(options, idx)
+          _ -> options
+        end
+      else
+        options
+      end
+
+    poll_params = Map.put(poll_params, "options", ensure_min_poll_options(options))
+    post_params = Map.put(post_params, "poll", poll_params)
+
+    {:noreply, assign(socket, form: Phoenix.Component.to_form(post_params, as: :post))}
+  end
+
   def handle_event("timeline_at_top", %{"at_top" => at_top}, socket) do
     at_top? = Param.truthy?(at_top)
 
@@ -235,7 +321,7 @@ defmodule EgregorosWeb.TimelineLive do
         {:noreply, assign(socket, error: "Register to post.")}
 
       user ->
-        post_params = Map.merge(default_post_params(), post_params)
+        post_params = normalize_compose_params(socket, post_params)
         content = post_params |> Map.get("content", "") |> to_string()
         media_alt = Map.get(post_params, "media_alt", %{})
         visibility = Map.get(post_params, "visibility", "public")
@@ -292,13 +378,15 @@ defmodule EgregorosWeb.TimelineLive do
                  )}
 
               nil ->
-                case Publish.post_note(user, content,
-                       attachments: attachments,
-                       visibility: visibility,
-                       spoiler_text: spoiler_text,
-                       sensitive: sensitive,
-                       language: language
-                     ) do
+                publish_opts = [
+                  attachments: attachments,
+                  visibility: visibility,
+                  spoiler_text: spoiler_text,
+                  sensitive: sensitive,
+                  language: language
+                ]
+
+                case publish_compose(user, content, post_params, publish_opts, socket) do
                   {:ok, _post} ->
                     {:noreply,
                      socket
@@ -308,6 +396,7 @@ defmodule EgregorosWeb.TimelineLive do
                        form: Phoenix.Component.to_form(default_post_params(), as: :post),
                        compose_options_open?: false,
                        compose_cw_open?: false,
+                       compose_poll_open?: false,
                        error: nil,
                        media_alt: %{}
                      )}
@@ -324,6 +413,42 @@ defmodule EgregorosWeb.TimelineLive do
                     {:noreply,
                      assign(socket,
                        error: "Post can't be empty.",
+                       form: Phoenix.Component.to_form(post_params, as: :post),
+                       media_alt: media_alt
+                     )}
+
+                  {:error, :invalid_poll} ->
+                    {:noreply,
+                     assign(socket,
+                       error: "Invalid poll.",
+                       form: Phoenix.Component.to_form(post_params, as: :post),
+                       media_alt: media_alt
+                     )}
+
+                  {:error, :invalid} ->
+                    {:noreply,
+                     assign(socket,
+                       error:
+                         if(socket.assigns.compose_poll_open?,
+                           do: "Invalid poll.",
+                           else: "Could not post."
+                         ),
+                       form: Phoenix.Component.to_form(post_params, as: :post),
+                       media_alt: media_alt
+                     )}
+
+                  {:error, message} when is_binary(message) ->
+                    {:noreply,
+                     assign(socket,
+                       error: message,
+                       form: Phoenix.Component.to_form(post_params, as: :post),
+                       media_alt: media_alt
+                     )}
+
+                  {:error, _reason} ->
+                    {:noreply,
+                     assign(socket,
+                       error: "Could not post.",
                        form: Phoenix.Component.to_form(post_params, as: :post),
                        media_alt: media_alt
                      )}
@@ -783,6 +908,7 @@ defmodule EgregorosWeb.TimelineLive do
             </div>
 
             <%= if @current_user do %>
+              <% poll_params = Map.get(@form.params || %{}, "poll", %{}) %>
               <Composer.composer_form
                 id="timeline-form"
                 id_prefix="compose"
@@ -799,7 +925,28 @@ defmodule EgregorosWeb.TimelineLive do
                 options_open?={@compose_options_open?}
                 cw_open?={@compose_cw_open?}
                 submit_label="Post"
-              />
+              >
+                <:after_editor>
+                  <ComposerPoll.poll_fields
+                    id_prefix="compose"
+                    param_prefix="post"
+                    poll={poll_params}
+                    open?={@compose_poll_open?}
+                    add_event="poll_add_option"
+                    remove_event="poll_remove_option"
+                    max_options={@poll_max_options}
+                    min_options={@poll_min_options}
+                  />
+                </:after_editor>
+
+                <:toolbar_actions>
+                  <ComposerPoll.poll_toggle_button
+                    id_prefix="compose"
+                    open?={@compose_poll_open?}
+                    toggle_event="toggle_compose_poll"
+                  />
+                </:toolbar_actions>
+              </Composer.composer_form>
             <% else %>
               <div class="border-2 border-[color:var(--border-default)] bg-[color:var(--bg-subtle)] p-4 text-sm text-[color:var(--text-secondary)]">
                 <p>Posting requires a local account.</p>
@@ -1368,6 +1515,47 @@ defmodule EgregorosWeb.TimelineLive do
     Enum.uniq([user.ap_id | followed_actor_ids])
   end
 
+  defp normalize_compose_params(socket, post_params) do
+    post_params = default_post_params() |> Map.merge(post_params)
+
+    if socket.assigns.compose_poll_open? do
+      poll_params =
+        post_params
+        |> Map.get("poll")
+        |> Kernel.||(Map.get(socket.assigns.form.params || %{}, "poll"))
+        |> Kernel.||(default_poll_params())
+        |> normalize_poll_params()
+
+      Map.put(post_params, "poll", poll_params)
+    else
+      Map.delete(post_params, "poll")
+    end
+  end
+
+  defp compose_params_from_form(socket) do
+    default_post_params()
+    |> Map.merge(socket.assigns.form.params || %{})
+  end
+
+  defp ensure_poll_params(post_params) do
+    poll_params =
+      post_params
+      |> Map.get("poll", %{})
+      |> normalize_poll_params()
+
+    Map.put(post_params, "poll", poll_params)
+  end
+
+  defp publish_compose(%User{} = user, content, post_params, opts, socket) do
+    poll_params = Map.get(post_params, "poll")
+
+    if socket.assigns.compose_poll_open? and is_map(poll_params) do
+      Publish.post_poll(user, content, poll_params, opts)
+    else
+      Publish.post_note(user, content, opts)
+    end
+  end
+
   defp default_post_params do
     %{
       "content" => "",
@@ -1380,6 +1568,61 @@ defmodule EgregorosWeb.TimelineLive do
       "media_alt" => %{}
     }
   end
+
+  defp default_poll_params do
+    %{
+      "options" => List.duplicate("", @poll_min_options),
+      "multiple" => "false",
+      "expires_in" => @default_poll_expiration
+    }
+  end
+
+  defp normalize_poll_params(poll_params) when is_map(poll_params) do
+    options =
+      poll_params
+      |> Map.get("options")
+      |> Kernel.||(Map.get(poll_params, :options))
+      |> List.wrap()
+      |> Enum.map(&to_string/1)
+      |> ensure_min_poll_options()
+
+    multiple? = Param.truthy?(Map.get(poll_params, "multiple") || Map.get(poll_params, :multiple))
+
+    expires_in =
+      poll_params
+      |> Map.get("expires_in")
+      |> Kernel.||(Map.get(poll_params, :expires_in))
+      |> normalize_poll_expires_in()
+
+    %{
+      "options" => options,
+      "multiple" => if(multiple?, do: "true", else: "false"),
+      "expires_in" => expires_in
+    }
+  end
+
+  defp normalize_poll_params(_poll_params), do: default_poll_params()
+
+  defp ensure_min_poll_options(options) when is_list(options) do
+    if length(options) < @poll_min_options do
+      options ++ List.duplicate("", @poll_min_options - length(options))
+    else
+      options
+    end
+  end
+
+  defp ensure_min_poll_options(_options), do: List.duplicate("", @poll_min_options)
+
+  defp normalize_poll_expires_in(value) when is_integer(value), do: value
+
+  defp normalize_poll_expires_in(value) when is_binary(value) do
+    case Integer.parse(value) do
+      {int, ""} -> int
+      _ -> @default_poll_expiration
+    end
+  end
+
+  defp normalize_poll_expires_in(_value), do: @default_poll_expiration
 
   defp notifications_count(nil), do: 0
 

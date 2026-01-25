@@ -46,6 +46,102 @@ defmodule EgregorosWeb.TimelineLiveTest do
     assert render(view) =~ "Posted."
   end
 
+  test "posting a poll creates a Question", %{conn: conn, user: user} do
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/")
+
+    _html = render_click(view, "toggle_compose_poll", %{})
+
+    view
+    |> form("#timeline-form",
+      post: %{
+        content: "Pick one",
+        poll: %{"options" => ["Red", "Blue"], "multiple" => "false", "expires_in" => 3600}
+      }
+    )
+    |> render_submit()
+
+    [poll | _] = Objects.list_public_statuses(limit: 1)
+
+    assert poll.type == "Question"
+    assert Enum.map(poll.data["oneOf"], & &1["name"]) == ["Red", "Blue"]
+  end
+
+  test "poll option events respect min/max limits", %{conn: conn, user: user} do
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/")
+
+    _html = render_click(view, "toggle_compose_poll", %{})
+
+    socket = :sys.get_state(view.pid).socket
+    poll_options = socket.assigns.form.params |> get_in(["poll", "options"]) |> List.wrap()
+
+    assert length(poll_options) == 2
+
+    _html = render_click(view, "poll_add_option", %{})
+    _html = render_click(view, "poll_add_option", %{})
+    _html = render_click(view, "poll_add_option", %{})
+
+    socket = :sys.get_state(view.pid).socket
+    poll_options = socket.assigns.form.params |> get_in(["poll", "options"]) |> List.wrap()
+
+    assert length(poll_options) == 4
+
+    _html = render_click(view, "poll_remove_option", %{"index" => "0"})
+    _html = render_click(view, "poll_remove_option", %{"index" => "0"})
+    _html = render_click(view, "poll_remove_option", %{"index" => "0"})
+
+    socket = :sys.get_state(view.pid).socket
+    poll_options = socket.assigns.form.params |> get_in(["poll", "options"]) |> List.wrap()
+
+    assert length(poll_options) == 2
+  end
+
+  test "toggling the poll panel off clears poll params", %{conn: conn, user: user} do
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/")
+
+    _html = render_click(view, "toggle_compose_poll", %{})
+
+    socket = :sys.get_state(view.pid).socket
+    assert socket.assigns.compose_poll_open?
+
+    assert Map.has_key?(socket.assigns.form.params, "poll")
+
+    _html = render_click(view, "toggle_compose_poll", %{})
+
+    socket = :sys.get_state(view.pid).socket
+    refute socket.assigns.compose_poll_open?
+
+    refute Map.has_key?(socket.assigns.form.params, "poll")
+  end
+
+  test "posting a direct poll without recipients shows an error instead of crashing", %{
+    conn: conn,
+    user: user
+  } do
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/")
+
+    _html = render_click(view, "toggle_compose_poll", %{})
+
+    view
+    |> form("#timeline-form",
+      post: %{
+        content: "Pick one",
+        visibility: "direct",
+        poll: %{
+          "options" => ["Red", "Blue"],
+          "multiple" => "false",
+          "expires_in" => 3600
+        }
+      }
+    )
+    |> render_submit()
+
+    assert has_element?(view, "[data-role='compose-error']", "Invalid poll.")
+  end
+
   test "create_post is rejected when signed out", %{conn: conn} do
     {:ok, view, _html} = live(conn, "/")
 
@@ -111,6 +207,23 @@ defmodule EgregorosWeb.TimelineLiveTest do
     refute html =~ "close_compose"
     refute html =~ "toggle_compose_cw"
     refute html =~ "toggle_reply_cw"
+  end
+
+  test "mention_search and mention_clear manage mention suggestions", %{conn: conn, user: user} do
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/")
+
+    _html = render_hook(view, "mention_search", %{"q" => "", "scope" => "compose"})
+
+    assert :sys.get_state(view.pid).socket.assigns.mention_suggestions == %{"compose" => []}
+
+    _html = render_hook(view, "mention_clear", %{"scope" => "compose"})
+    assert :sys.get_state(view.pid).socket.assigns.mention_suggestions == %{}
+  end
+
+  test "timeline does not keep a dead toggle_compose_cw server handler" do
+    source = File.read!("lib/egregoros_web/live/timeline_live.ex")
+    refute source =~ "toggle_compose_cw"
   end
 
   test "timeline includes a scroll restore hook for returning from threads", %{

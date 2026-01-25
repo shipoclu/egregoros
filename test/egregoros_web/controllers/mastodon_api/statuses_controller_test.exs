@@ -1,11 +1,15 @@
 defmodule EgregorosWeb.MastodonAPI.StatusesControllerTest do
   use EgregorosWeb.ConnCase, async: true
 
+  alias Egregoros.Object
   alias Egregoros.Objects
   alias Egregoros.Pipeline
   alias Egregoros.Publish
+  alias Egregoros.Repo
   alias Egregoros.Relationships
+  alias Egregoros.ScheduledStatus
   alias Egregoros.Users
+  alias Egregoros.Workers.PublishScheduledStatus
   alias EgregorosWeb.Endpoint
 
   test "POST /api/v1/statuses creates a status", %{conn: conn} do
@@ -22,6 +26,148 @@ defmodule EgregorosWeb.MastodonAPI.StatusesControllerTest do
 
     [object] = Objects.list_notes()
     assert object.data["content"] == "<p>Hello API</p>"
+  end
+
+  test "POST /api/v1/statuses creates a poll when poll params are provided", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("poll_author_api")
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, user} end)
+
+    conn =
+      post(conn, "/api/v1/statuses", %{
+        "status" => "Pick one",
+        "poll" => %{
+          "options" => ["Yes", "No"],
+          "multiple" => false,
+          "expires_in" => 3600
+        }
+      })
+
+    response = json_response(conn, 200)
+    assert is_binary(response["id"])
+    assert response["account"]["username"] == "poll_author_api"
+
+    assert %{
+             "id" => poll_id,
+             "multiple" => false,
+             "options" => [
+               %{"title" => "Yes"},
+               %{"title" => "No"}
+             ],
+             "voted" => true,
+             "own_votes" => []
+           } = response["poll"]
+
+    assert poll_id == response["id"]
+
+    assert %{} = object = Objects.get(response["id"])
+    assert object.type == "Question"
+  end
+
+  test "POST /api/v1/statuses allows polls with media_ids", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("poll_author_api_media")
+
+    {:ok, media_object} =
+      Objects.create_object(%{
+        ap_id: "https://example.com/objects/poll-api-media-1",
+        type: "Image",
+        actor: user.ap_id,
+        local: true,
+        published: DateTime.utc_now(),
+        data: %{
+          "id" => "https://example.com/objects/poll-api-media-1",
+          "type" => "Image",
+          "mediaType" => "image/png",
+          "url" => [
+            %{
+              "type" => "Link",
+              "mediaType" => "image/png",
+              "href" => "https://example.com/uploads/poll-api-media-1.png"
+            }
+          ]
+        }
+      })
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, user} end)
+
+    conn =
+      post(conn, "/api/v1/statuses", %{
+        "status" => "Pick one",
+        "media_ids" => [Integer.to_string(media_object.id)],
+        "poll" => %{
+          "options" => ["Yes", "No"],
+          "multiple" => false,
+          "expires_in" => 3600
+        }
+      })
+
+    response = json_response(conn, 200)
+    assert response["id"] == response["poll"]["id"]
+
+    assert [
+             %{
+               "id" => attachment_id,
+               "type" => "image",
+               "url" => "https://example.com/uploads/poll-api-media-1.png",
+               "preview_url" => "https://example.com/uploads/poll-api-media-1.png"
+             }
+           ] = response["media_attachments"]
+
+    assert attachment_id == Integer.to_string(media_object.id)
+
+    assert %Object{} = object = Objects.get(response["id"])
+    assert object.type == "Question"
+    assert [%{"id" => "https://example.com/objects/poll-api-media-1"}] = object.data["attachment"]
+  end
+
+  test "POST /api/v1/statuses schedules polls", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("poll_author_api_scheduled")
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, user} end)
+
+    scheduled_at =
+      DateTime.utc_now()
+      |> DateTime.add(10 * 60, :second)
+      |> DateTime.truncate(:second)
+      |> DateTime.to_iso8601()
+
+    conn =
+      post(conn, "/api/v1/statuses", %{
+        "status" => "Pick one later",
+        "scheduled_at" => scheduled_at,
+        "poll" => %{
+          "options" => ["Yes", "No"],
+          "multiple" => false,
+          "expires_in" => 3600
+        }
+      })
+
+    response = json_response(conn, 200)
+    assert response["scheduled_at"] == scheduled_at
+    assert response["params"]["text"] == "Pick one later"
+    assert response["params"]["poll"]["options"] == ["Yes", "No"]
+
+    scheduled_status_id = String.to_integer(response["id"])
+
+    assert %ScheduledStatus{published_at: nil} =
+             Repo.get_by!(ScheduledStatus, id: scheduled_status_id, user_id: user.id)
+
+    assert Repo.get_by(Object, type: "Question") == nil
+
+    assert :ok =
+             perform_job(PublishScheduledStatus, %{
+               "scheduled_status_id" => Integer.to_string(scheduled_status_id)
+             })
+
+    assert %ScheduledStatus{published_at: %DateTime{}} =
+             Repo.get_by!(ScheduledStatus, id: scheduled_status_id, user_id: user.id)
+
+    assert %Object{type: "Question"} = poll = Repo.get_by(Object, type: "Question")
+    assert poll.data["content"] == "<p>Pick one later</p>"
+    assert Enum.map(poll.data["oneOf"], & &1["name"]) == ["Yes", "No"]
   end
 
   test "POST /api/v1/statuses rejects missing status param", %{conn: conn} do

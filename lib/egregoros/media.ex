@@ -121,13 +121,9 @@ defmodule Egregoros.Media do
     %{
       "type" => "Image",
       "mediaType" => media_type,
-      "url" => [
-        %{
-          "type" => "Link",
-          "mediaType" => media_type,
-          "href" => preview_href
-        }
-      ]
+      # Mastodon expects `icon.url` to be a string, not an array of links.
+      # Use a simple URL for compatibility.
+      "url" => preview_href
     }
   end
 

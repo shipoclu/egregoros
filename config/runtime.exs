@@ -32,6 +32,20 @@ if allow_private_federation in ~w(true 1) do
   config :egregoros, :allow_private_federation, true
 end
 
+scheduled_status_min_offset_seconds =
+  System.get_env("EGREGOROS_SCHEDULED_STATUS_MIN_OFFSET_SECONDS", "")
+  |> String.trim()
+
+if scheduled_status_min_offset_seconds != "" do
+  case Integer.parse(scheduled_status_min_offset_seconds) do
+    {seconds, ""} when seconds >= 0 ->
+      config :egregoros, :scheduled_status_min_offset_seconds, seconds
+
+    _ ->
+      :ok
+  end
+end
+
 webfinger_scheme =
   System.get_env("EGREGOROS_FEDERATION_WEBFINGER_SCHEME", "")
   |> String.trim()

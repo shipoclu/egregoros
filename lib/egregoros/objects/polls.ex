@@ -97,6 +97,7 @@ defmodule Egregoros.Objects.Polls do
       updated_data =
         data
         |> Map.put(key, updated_options)
+        |> maybe_put_voters_count(incoming)
 
       object
       |> Object.changeset(%{data: updated_data})
@@ -113,6 +114,15 @@ defmodule Egregoros.Objects.Polls do
   defp poll_choice_key(%{"anyOf" => any_of}) when is_list(any_of) and any_of != [], do: "anyOf"
   defp poll_choice_key(%{"oneOf" => one_of}) when is_list(one_of) and one_of != [], do: "oneOf"
   defp poll_choice_key(_data), do: nil
+
+  defp maybe_put_voters_count(%{} = data, %{} = incoming) do
+    case Map.get(incoming, "votersCount") do
+      count when is_integer(count) and count >= 0 -> Map.put(data, "votersCount", count)
+      _ -> data
+    end
+  end
+
+  defp maybe_put_voters_count(data, _incoming), do: data
 
   defp options_match?(existing_options, incoming_options)
        when is_list(existing_options) and is_list(incoming_options) do
