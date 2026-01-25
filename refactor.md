@@ -17,13 +17,17 @@ keeping behavior unchanged unless explicitly desired.
   - New module: `lib/egregoros/recipients.ex`
   - Tests: `test/egregoros/recipients_test.exs`
 
-- [ ] Consolidate inbox-targeting patterns in `Egregoros.InboxTargeting`
+- [x] Consolidate inbox-targeting patterns in `Egregoros.InboxTargeting`
   - Many activities re-implement `validate_inbox_target/2` with small variations:
     - `lib/egregoros/activities/create.ex:119`
     - `lib/egregoros/activities/note.ex:162`
     - `lib/egregoros/activities/question.ex:230`
     - `lib/egregoros/activities/update.ex:220`
     - (and others under `lib/egregoros/activities/*`)
+  - New helpers: `InboxTargeting.validate_addressed_or_followed/3`,
+    `InboxTargeting.validate_addressed_or_followed_or_object_owned/4`,
+    `InboxTargeting.validate_addressed_or_followed_or_addressed_to_object/4`
+  - Tests: `test/egregoros/inbox_targeting_test.exs`
 
 - [ ] Deduplicate `contentMap` → `content` normalization across `Note` and `Question`
   - `lib/egregoros/activities/note.ex:211`

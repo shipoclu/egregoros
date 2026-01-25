@@ -115,24 +115,12 @@ defmodule Egregoros.Activities.Create do
   defp delivery_payload(data), do: data
 
   defp validate_inbox_target(%{} = activity, opts) when is_list(opts) do
-    InboxTargeting.validate(opts, fn inbox_user_ap_id ->
-      actor_ap_id = Map.get(activity, "actor")
-      object = Map.get(activity, "object")
-
-      cond do
-        InboxTargeting.addressed_to?(activity, inbox_user_ap_id) ->
-          :ok
-
-        InboxTargeting.addressed_to?(object, inbox_user_ap_id) ->
-          :ok
-
-        InboxTargeting.follows?(inbox_user_ap_id, actor_ap_id) ->
-          :ok
-
-        true ->
-          {:error, :not_targeted}
-      end
-    end)
+    InboxTargeting.validate_addressed_or_followed_or_addressed_to_object(
+      opts,
+      activity,
+      Map.get(activity, "actor"),
+      Map.get(activity, "object")
+    )
   end
 
   defp validate_inbox_target(_activity, _opts), do: :ok

@@ -25,6 +25,82 @@ defmodule Egregoros.InboxTargeting do
     end
   end
 
+  def validate_addressed_or_followed(opts, %{} = activity, actor_ap_id) when is_list(opts) do
+    validate(opts, fn inbox_user_ap_id ->
+      if addressed_to?(activity, inbox_user_ap_id) or follows?(inbox_user_ap_id, actor_ap_id) do
+        :ok
+      else
+        {:error, :not_targeted}
+      end
+    end)
+  end
+
+  def validate_addressed_or_followed(_opts, _activity, _actor_ap_id), do: :ok
+
+  def validate_addressed_or_followed_or_object_owned(
+        opts,
+        %{} = activity,
+        actor_ap_id,
+        object_ap_id
+      )
+      when is_list(opts) do
+    validate(opts, fn inbox_user_ap_id ->
+      cond do
+        addressed_to?(activity, inbox_user_ap_id) ->
+          :ok
+
+        follows?(inbox_user_ap_id, actor_ap_id) ->
+          :ok
+
+        object_owned_by?(object_ap_id, inbox_user_ap_id) ->
+          :ok
+
+        true ->
+          {:error, :not_targeted}
+      end
+    end)
+  end
+
+  def validate_addressed_or_followed_or_object_owned(
+        _opts,
+        _activity,
+        _actor_ap_id,
+        _object_ap_id
+      ),
+      do: :ok
+
+  def validate_addressed_or_followed_or_addressed_to_object(
+        opts,
+        %{} = activity,
+        actor_ap_id,
+        object
+      )
+      when is_list(opts) do
+    validate(opts, fn inbox_user_ap_id ->
+      cond do
+        addressed_to?(activity, inbox_user_ap_id) ->
+          :ok
+
+        addressed_to?(object, inbox_user_ap_id) ->
+          :ok
+
+        follows?(inbox_user_ap_id, actor_ap_id) ->
+          :ok
+
+        true ->
+          {:error, :not_targeted}
+      end
+    end)
+  end
+
+  def validate_addressed_or_followed_or_addressed_to_object(
+        _opts,
+        _activity,
+        _actor_ap_id,
+        _object
+      ),
+      do: :ok
+
   def addressed_to?(%{} = activity, inbox_user_ap_id) when is_binary(inbox_user_ap_id) do
     inbox_user_ap_id = String.trim(inbox_user_ap_id)
 
