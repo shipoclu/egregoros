@@ -635,6 +635,124 @@ defmodule FederationBoxTest do
     )
   end
 
+  test "receives likes from pleroma on our posts", ctx do
+    unique = unique_token()
+
+    follow_and_assert_local_accept!(
+      ctx.pleroma_base_url,
+      ctx.bob_access_token,
+      ctx.alice_handle,
+      ctx.alice_actor_id,
+      ctx.bob_actor_id_variants
+    )
+
+    alice_text = "fedbox: like me (pleroma) #{unique}"
+    alice_status = create_status!(ctx.egregoros_base_url, ctx.access_token, alice_text)
+    alice_status_id = alice_status["id"]
+
+    alice_uri_variants =
+      alice_status
+      |> status_uri()
+      |> actor_id_variants()
+
+    pleroma_status =
+      wait_until!(
+        fn ->
+          find_status_by_uri_variant(ctx.pleroma_base_url, ctx.bob_access_token, alice_uri_variants)
+        end,
+        "pleroma received alice post"
+      )
+
+    favourite_status!(ctx.pleroma_base_url, ctx.bob_access_token, pleroma_status["id"])
+
+    wait_until!(
+      fn ->
+        status = fetch_status!(ctx.egregoros_base_url, ctx.access_token, alice_status_id)
+        favourites_count = Map.get(status, "favourites_count", 0)
+        is_integer(favourites_count) and favourites_count > 0
+      end,
+      "egregoros received pleroma like"
+    )
+  end
+
+  test "remote receives our likes (pleroma)", ctx do
+    unique = unique_token()
+
+    follow_and_assert_remote_accept!(
+      ctx.egregoros_base_url,
+      ctx.access_token,
+      ctx.bob_handle,
+      ctx.alice_actor_id_variants
+    )
+
+    bob_text = "fedbox: like this (pleroma) #{unique}"
+    bob_status = create_status!(ctx.pleroma_base_url, ctx.bob_access_token, bob_text)
+    bob_status_id = bob_status["id"]
+
+    bob_uri_variants =
+      bob_status
+      |> status_uri()
+      |> actor_id_variants()
+
+    egregoros_bob_status =
+      wait_until!(
+        fn ->
+          find_status_by_uri_variant(ctx.egregoros_base_url, ctx.access_token, bob_uri_variants)
+        end,
+        "egregoros received bob post"
+      )
+
+    favourite_status!(ctx.egregoros_base_url, ctx.access_token, egregoros_bob_status["id"])
+
+    wait_until!(
+      fn ->
+        status = fetch_status!(ctx.pleroma_base_url, ctx.bob_access_token, bob_status_id)
+        favourites_count = Map.get(status, "favourites_count", 0)
+        is_integer(favourites_count) and favourites_count > 0
+      end,
+      "pleroma received alice like"
+    )
+  end
+
+  test "remote receives our likes (mastodon)", ctx do
+    unique = unique_token()
+
+    follow_and_assert_remote_accept!(
+      ctx.egregoros_base_url,
+      ctx.access_token,
+      ctx.carol_handle,
+      ctx.alice_actor_id_variants
+    )
+
+    carol_text = "fedbox: like this (mastodon) #{unique}"
+    carol_status = create_status!(ctx.mastodon_base_url, ctx.carol_access_token, carol_text)
+    carol_status_id = carol_status["id"]
+
+    carol_uri_variants =
+      carol_status
+      |> status_uri()
+      |> actor_id_variants()
+
+    egregoros_carol_status =
+      wait_until!(
+        fn ->
+          find_status_by_uri_variant(ctx.egregoros_base_url, ctx.access_token, carol_uri_variants)
+        end,
+        "egregoros received carol post"
+      )
+
+    favourite_status!(ctx.egregoros_base_url, ctx.access_token, egregoros_carol_status["id"])
+
+    wait_until!(
+      fn ->
+        status = fetch_status!(ctx.mastodon_base_url, ctx.carol_access_token, carol_status_id)
+        favourites_count = Map.get(status, "favourites_count", 0)
+        is_integer(favourites_count) and favourites_count > 0
+      end,
+      "mastodon received alice like"
+    )
+  end
+
   test "receives boosts from mastodon on our posts", ctx do
     unique = unique_token()
 
@@ -679,6 +797,46 @@ defmodule FederationBoxTest do
     )
   end
 
+  test "receives boosts from pleroma on our posts", ctx do
+    unique = unique_token()
+
+    follow_and_assert_local_accept!(
+      ctx.pleroma_base_url,
+      ctx.bob_access_token,
+      ctx.alice_handle,
+      ctx.alice_actor_id,
+      ctx.bob_actor_id_variants
+    )
+
+    alice_text = "fedbox: boost me (pleroma) #{unique}"
+    alice_status = create_status!(ctx.egregoros_base_url, ctx.access_token, alice_text)
+    alice_status_id = alice_status["id"]
+
+    alice_uri_variants =
+      alice_status
+      |> status_uri()
+      |> actor_id_variants()
+
+    pleroma_status =
+      wait_until!(
+        fn ->
+          find_status_by_uri_variant(ctx.pleroma_base_url, ctx.bob_access_token, alice_uri_variants)
+        end,
+        "pleroma received alice post"
+      )
+
+    reblog_status!(ctx.pleroma_base_url, ctx.bob_access_token, pleroma_status["id"])
+
+    wait_until!(
+      fn ->
+        status = fetch_status!(ctx.egregoros_base_url, ctx.access_token, alice_status_id)
+        reblogs_count = Map.get(status, "reblogs_count", 0)
+        is_integer(reblogs_count) and reblogs_count > 0
+      end,
+      "egregoros received pleroma boost"
+    )
+  end
+
   test "remote receives our boosts", ctx do
     unique = unique_token()
 
@@ -715,6 +873,45 @@ defmodule FederationBoxTest do
         is_integer(reblogs_count) and reblogs_count > 0
       end,
       "pleroma received alice boost"
+    )
+  end
+
+  test "remote receives our boosts (mastodon)", ctx do
+    unique = unique_token()
+
+    follow_and_assert_remote_accept!(
+      ctx.egregoros_base_url,
+      ctx.access_token,
+      ctx.carol_handle,
+      ctx.alice_actor_id_variants
+    )
+
+    carol_text = "fedbox: boost this (mastodon) #{unique}"
+    carol_status = create_status!(ctx.mastodon_base_url, ctx.carol_access_token, carol_text)
+    carol_status_id = carol_status["id"]
+
+    carol_uri_variants =
+      carol_status
+      |> status_uri()
+      |> actor_id_variants()
+
+    egregoros_carol_status =
+      wait_until!(
+        fn ->
+          find_status_by_uri_variant(ctx.egregoros_base_url, ctx.access_token, carol_uri_variants)
+        end,
+        "egregoros received carol post"
+      )
+
+    _reblog = reblog_status!(ctx.egregoros_base_url, ctx.access_token, egregoros_carol_status["id"])
+
+    wait_until!(
+      fn ->
+        status = fetch_status!(ctx.mastodon_base_url, ctx.carol_access_token, carol_status_id)
+        reblogs_count = Map.get(status, "reblogs_count", 0)
+        is_integer(reblogs_count) and reblogs_count > 0
+      end,
+      "mastodon received alice boost"
     )
   end
 
@@ -1039,6 +1236,71 @@ defmodule FederationBoxTest do
     )
   end
 
+  test "threads: receives replies from pleroma on our posts", ctx do
+    unique = unique_token()
+
+    follow_and_assert_local_accept!(
+      ctx.pleroma_base_url,
+      ctx.bob_access_token,
+      ctx.alice_handle,
+      ctx.alice_actor_id,
+      ctx.bob_actor_id_variants
+    )
+
+    alice_text = "fedbox: thread root (pleroma) #{unique}"
+    alice_status = create_status!(ctx.egregoros_base_url, ctx.access_token, alice_text)
+    alice_status_id = alice_status["id"]
+
+    alice_uri_variants =
+      alice_status
+      |> status_uri()
+      |> actor_id_variants()
+
+    pleroma_root =
+      wait_until!(
+        fn ->
+          find_status_by_uri_variant(
+            ctx.pleroma_base_url,
+            ctx.bob_access_token,
+            alice_uri_variants
+          )
+        end,
+        "pleroma received alice root"
+      )
+
+    reply_text = "#{ctx.alice_handle} fedbox: reply from bob #{unique}"
+
+    reply_status =
+      create_reply!(
+        ctx.pleroma_base_url,
+        ctx.bob_access_token,
+        reply_text,
+        pleroma_root["id"]
+      )
+
+    reply_uri_variants =
+      reply_status
+      |> status_uri()
+      |> actor_id_variants()
+
+    wait_until!(
+      fn ->
+        context = fetch_context!(ctx.egregoros_base_url, ctx.access_token, alice_status_id)
+        descendants = Map.get(context, "descendants", [])
+
+        Enum.any?(descendants, fn status ->
+          status
+          |> status_uri()
+          |> case do
+            uri when is_binary(uri) -> uri in reply_uri_variants
+            _ -> false
+          end
+        end)
+      end,
+      "egregoros received pleroma reply in context"
+    )
+  end
+
   test "threads: remote receives our replies", ctx do
     unique = unique_token()
 
@@ -1096,6 +1358,66 @@ defmodule FederationBoxTest do
         end)
       end,
       "pleroma received alice reply in context"
+    )
+  end
+
+  test "threads: remote receives our replies (mastodon)", ctx do
+    unique = unique_token()
+
+    follow_and_assert_remote_accept!(
+      ctx.egregoros_base_url,
+      ctx.access_token,
+      ctx.carol_handle,
+      ctx.alice_actor_id_variants
+    )
+
+    carol_text = "fedbox: carol thread root #{unique}"
+    carol_status = create_status!(ctx.mastodon_base_url, ctx.carol_access_token, carol_text)
+    carol_status_id = carol_status["id"]
+
+    carol_uri_variants =
+      carol_status
+      |> status_uri()
+      |> actor_id_variants()
+
+    egregoros_carol_status =
+      wait_until!(
+        fn ->
+          find_status_by_uri_variant(ctx.egregoros_base_url, ctx.access_token, carol_uri_variants)
+        end,
+        "egregoros received carol root"
+      )
+
+    reply_text = "fedbox: reply from alice #{unique}"
+
+    reply_status =
+      create_reply!(
+        ctx.egregoros_base_url,
+        ctx.access_token,
+        reply_text,
+        egregoros_carol_status["id"]
+      )
+
+    reply_uri_variants =
+      reply_status
+      |> status_uri()
+      |> actor_id_variants()
+
+    wait_until!(
+      fn ->
+        context = fetch_context!(ctx.mastodon_base_url, ctx.carol_access_token, carol_status_id)
+        descendants = Map.get(context, "descendants", [])
+
+        Enum.any?(descendants, fn status ->
+          status
+          |> status_uri()
+          |> case do
+            uri when is_binary(uri) -> uri in reply_uri_variants
+            _ -> false
+          end
+        end)
+      end,
+      "mastodon received alice reply in context"
     )
   end
 
