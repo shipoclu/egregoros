@@ -300,10 +300,22 @@ defmodule Egregoros.Users do
       when is_binary(nickname) and is_binary(password) do
     nickname = String.trim(nickname)
 
-    with %User{local: true, password_hash: hash} when is_binary(hash) <-
+    with %User{local: true, password_hash: hash} = user when is_binary(hash) <-
            get_by_nickname(nickname),
          true <- Password.verify(password, hash) do
-      {:ok, get_by_nickname(nickname)}
+      user =
+        if Password.pleroma_hash?(hash) do
+          case user
+               |> User.changeset(%{password_hash: Password.hash(password)})
+               |> Repo.update() do
+            {:ok, %User{} = updated} -> updated
+            {:error, _changeset} -> user
+          end
+        else
+          user
+        end
+
+      {:ok, user}
     else
       _ -> {:error, :unauthorized}
     end

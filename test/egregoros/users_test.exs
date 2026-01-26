@@ -11,6 +11,27 @@ defmodule Egregoros.UsersTest do
     prefix <> Integer.to_string(System.unique_integer([:positive]))
   end
 
+  defp pleroma_pbkdf2_hash(password, opts) when is_binary(password) and is_list(opts) do
+    digest = Keyword.get(opts, :digest, :sha512)
+    iterations = Keyword.fetch!(opts, :iterations)
+    salt = Keyword.fetch!(opts, :salt)
+
+    derived =
+      Plug.Crypto.KeyGenerator.generate(password, salt,
+        digest: digest,
+        iterations: iterations,
+        length: 64
+      )
+
+    "$pbkdf2-#{digest}$#{iterations}$#{pleroma_base64(salt)}$#{pleroma_base64(derived)}"
+  end
+
+  defp pleroma_base64(bin) when is_binary(bin) do
+    bin
+    |> Base.encode64(padding: false)
+    |> String.replace("+", ".")
+  end
+
   test "create_user stores a user" do
     attrs = %{
       nickname: "alice",
@@ -357,6 +378,37 @@ defmodule Egregoros.UsersTest do
 
     assert {:ok, %User{nickname: ^nickname}} =
              Users.authenticate_local_user(nickname, "new-password")
+  end
+
+  test "authenticate_local_user/2 supports Pleroma pbkdf2 hashes and upgrades them on login" do
+    nickname = unique_nickname("alice")
+    password = "my-old-pleroma-password"
+
+    assert {:ok, %User{} = user} =
+             Users.register_local_user(%{
+               nickname: nickname,
+               password: "some-other-password"
+             })
+
+    pleroma_hash =
+      pleroma_pbkdf2_hash(password,
+        digest: :sha512,
+        iterations: 1000,
+        salt: <<1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16>>
+      )
+
+    assert {:ok, %User{} = user} =
+             user
+             |> User.changeset(%{password_hash: pleroma_hash})
+             |> Repo.update()
+
+    assert {:ok, %User{nickname: ^nickname}} = Users.authenticate_local_user(nickname, password)
+
+    upgraded = Repo.get(User, user.id)
+    assert upgraded.password_hash != pleroma_hash
+    assert String.starts_with?(upgraded.password_hash, "pbkdf2_sha256$")
+
+    assert {:ok, %User{nickname: ^nickname}} = Users.authenticate_local_user(nickname, password)
   end
 
   test "update_password/3 rejects password changes for passkey-only users" do
