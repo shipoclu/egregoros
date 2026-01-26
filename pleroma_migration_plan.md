@@ -11,10 +11,10 @@ It’s intentionally split into:
 
 Migration is feasible, but there are a few “must solve” compatibility areas:
 
-1) **Passwords**: Pleroma stores password hashes in bcrypt/argon2/pbkdf2 formats and verifies them via pattern matching on the hash prefix; Egregoros uses a custom `pbkdf2_sha256$...` format and currently won’t verify Pleroma hashes.
-2) **Media URLs and storage layout**: Pleroma’s default upload URLs are under `/media/<uuid>/<filename>`; Egregoros serves uploads under `/uploads/...` with a different filesystem layout.
-3) **Activity IDs and fetchability**: Pleroma ActivityPub activity IDs are `/activities/<uuid>`; Egregoros currently generates `/activities/<type>/<uuid>` and **does not expose any `/activities/...` route**.
-4) **IDs used by the Mastodon API**: Pleroma uses Flake IDs (base62 string) for `users.id`, `activities.id`, etc (stored in Postgres `uuid` via `FlakeId.Ecto.CompatType`), while Egregoros uses integer primary keys and returns decimal string IDs in its Mastodon API. This primarily impacts “seamless client continuity”.
+1) **Passwords**: Pleroma stores password hashes in bcrypt/argon2/pbkdf2 formats and verifies them via pattern matching on the hash prefix; Egregoros uses a custom `pbkdf2_sha256$...` format. (Status: pbkdf2 compatibility is implemented; bcrypt/argon2 remain unsupported without additional deps.)
+2) **Media URLs and storage layout**: Pleroma’s default upload URLs are under `/media/<uuid>/<filename>`; Egregoros serves uploads under `/uploads/...` with a different filesystem layout. (Status: `/media/*` static serving is implemented, configurable via `:pleroma_media_dir`.)
+3) **Activity IDs and fetchability**: Pleroma ActivityPub activity IDs are `/activities/<uuid>`; Egregoros currently generates `/activities/<type>/<uuid>`. (Status: both `/activities/:uuid` and `/activities/:type/:uuid` are now routed and served.)
+4) **IDs used by the Mastodon API**: Egregoros now uses Flake IDs (base62 string) as primary keys, matching Pleroma’s general approach. Remaining “seamless continuity” work is primarily about *which* resource owns the ID (Pleroma uses activity IDs for statuses; Egregoros uses object IDs for Note/Question statuses).
 
 Given that, there are two sensible migration modes:
 
@@ -33,7 +33,7 @@ Pleroma generates:
 Egregoros generates:
 - Notes: `https://<domain>/objects/<uuid>` (`lib/egregoros/activities/note.ex`)
 - Activities: `https://<domain>/activities/<type>/<uuid>` (`lib/egregoros/activities/*`)
-…while currently only routing `/objects/:uuid` and `/users/:nickname`, not `/activities/...`. (`lib/egregoros_web/router.ex`)
+…and now routes `/activities/:uuid` (Pleroma style) and `/activities/:type/:uuid` (Egregoros style). (`lib/egregoros_web/router.ex`)
 
 ### 1.2 Primary keys / “flake IDs” in this Pleroma worktree
 
@@ -47,7 +47,7 @@ This Pleroma tree uses `FlakeId.Ecto.CompatType` as the `@primary_key` for (at l
 
 Implication:
 - Pleroma’s Mastodon API IDs (e.g. `status.id`) are base62 strings like `"9n2ciuz1wdesFnrGJU"`, because they render `to_string(activity.id)` (see `StatusView`). (`lib/pleroma/web/mastodon_api/views/status_view.ex`)
-- If we want **client continuity**, Egregoros needs to either adopt this ID format for the Mastodon API, or maintain a mapping layer.
+- If we want **client continuity**, we still need to decide whether to preserve Pleroma’s “status id == activity id” convention (Egregoros currently uses the Note/Question object ID as the status ID).
 
 ### 1.3 Password hashing
 
@@ -116,6 +116,10 @@ Add a password verification layer similar to Pleroma:
 
 Then “rehash on login” into the Egregoros native format.
 
+Status:
+- Implemented `$pbkdf2-...` verification and rehash-on-login to `pbkdf2_sha256$...` (`lib/egregoros/password.ex`, `lib/egregoros/users.ex`).
+- bcrypt/argon2 remain TODO (requires deps).
+
 This keeps migration friction low without needing to import Pleroma auth/session tables.
 
 ### 4.2 Serve Pleroma media URLs (high priority)
@@ -126,6 +130,9 @@ Add a Plug/static mount for `/media/*`:
 
 Alternatively, implement a 301 redirect `/media/<path>` → `/uploads/<mapped-path>` but this is hard because Egregoros’ storage layout differs; serving the old directory is the simplest.
 
+Status:
+- Implemented `/media/*` serving via `EgregorosWeb.Plugs.PleromaMedia` and `:pleroma_media_dir` runtime config (`lib/egregoros_web/plugs/pleroma_media.ex`).
+
 ### 4.3 Activity fetch endpoint(s) (medium-high priority)
 
 Implement GET:
@@ -133,6 +140,9 @@ Implement GET:
 Return `application/activity+json` and serve the stored activity by AP id.
 
 This is important because historical activity IDs in remote databases point to `/activities/<uuid>`.
+
+Status:
+- Implemented `EgregorosWeb.ActivityController` and routes for both shapes (`lib/egregoros_web/controllers/activity_controller.ex`, `lib/egregoros_web/router.ex`).
 
 ### 4.4 Decide on Mastodon API ID strategy (big fork)
 
@@ -153,6 +163,9 @@ This is important because historical activity IDs in remote databases point to `
 
 Recommendation:
 - Start with **Option 1** unless we’re committed to full Pleroma-like client continuity.
+
+Status:
+- Option 2 is now implemented: Egregoros uses Flake IDs as primary keys and returns base62 IDs via the Mastodon API.
 
 ### 4.5 Prevent federation side-effects during import (required for any importer)
 
@@ -257,4 +270,3 @@ Rollback: switch traffic back to the old Pleroma deployment and DB snapshot.
 5) Implement `/activities/:uuid` fetch controller.
 6) Implement `mix egregoros.import_pleroma` importer (users → objects → activities → follows).
 7) Test in fedbox-like environment by restoring a small Pleroma DB snapshot into a container and running the importer + federation smoke tests.
-

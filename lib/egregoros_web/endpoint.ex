@@ -62,6 +62,7 @@ defmodule EgregorosWeb.Endpoint do
   plug Plug.MethodOverride
   plug Plug.Head
   plug EgregorosWeb.Plugs.Session
+  plug EgregorosWeb.Plugs.PleromaMedia
   plug EgregorosWeb.Plugs.Uploads
   plug EgregorosWeb.Router
 end

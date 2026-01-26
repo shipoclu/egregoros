@@ -150,6 +150,8 @@ defmodule EgregorosWeb.Router do
     get "/users/:nickname/followers", FollowCollectionController, :followers
     get "/users/:nickname/following", FollowCollectionController, :following
     get "/objects/:uuid", ObjectController, :show
+    get "/activities/:uuid", ActivityController, :show
+    get "/activities/:type/:uuid", ActivityController, :show_typed
     get "/poco", PocoController, :index
     get "/.well-known/webfinger", WebFingerController, :webfinger
     get "/.well-known/nodeinfo", NodeinfoController, :nodeinfo_index
