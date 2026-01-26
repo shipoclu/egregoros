@@ -3,8 +3,19 @@ defmodule Egregoros.PleromaMigration do
 
   alias Egregoros.Activities.Helpers
   alias Egregoros.Object
+  alias Egregoros.PleromaMigration.Source
   alias Egregoros.Repo
   alias Egregoros.User
+
+  def run(opts \\ []) when is_list(opts) do
+    with {:ok, users} <- Source.list_users(opts),
+         {:ok, statuses} <- Source.list_statuses(opts) do
+      %{
+        users: import_users(users),
+        statuses: import_statuses(statuses)
+      }
+    end
+  end
 
   def import_users(rows) when is_list(rows) do
     now = DateTime.utc_now() |> DateTime.truncate(:microsecond)

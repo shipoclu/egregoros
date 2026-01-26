@@ -110,4 +110,36 @@ defmodule Egregoros.MixTasksTest do
       assert output =~ "EXPLAIN"
     end
   end
+
+  describe "mix egregoros.import_pleroma" do
+    test "imports users and statuses from a source and prints a summary" do
+      alias Egregoros.PleromaMigration.Source
+
+      previous_source = Application.get_env(:egregoros, Source)
+      Application.put_env(:egregoros, Source, Source.Mock)
+
+      on_exit(fn ->
+        if is_nil(previous_source) do
+          Application.delete_env(:egregoros, Source)
+        else
+          Application.put_env(:egregoros, Source, previous_source)
+        end
+      end)
+
+      Source.Mock
+      |> expect(:list_users, fn opts ->
+        assert opts[:url] == "postgres://example"
+        {:ok, []}
+      end)
+      |> expect(:list_statuses, fn _opts -> {:ok, []} end)
+
+      output =
+        capture_io(fn ->
+          Mix.Tasks.Egregoros.ImportPleroma.run(["--url", "postgres://example"])
+        end)
+
+      assert output =~ "Imported users: 0/0"
+      assert output =~ "Imported statuses: 0/0"
+    end
+  end
 end

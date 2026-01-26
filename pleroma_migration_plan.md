@@ -188,6 +188,12 @@ Instead:
 - Treat the Pleroma DB as **read-only source**.
 - Run a one-shot importer (Mix task) that reads from Pleroma and writes to Egregoros.
 
+Status:
+- Implemented `mix egregoros.import_pleroma` which imports **users** and **status activities** from a Pleroma Postgres DB.
+  - It imports both **local and remote** statuses and preserves Pleroma-style `status.id` by setting the imported status object primary key to the Pleroma activity flake ID.
+  - It uses Pleroma’s `associated_object_id/1` database function to join Create activities to their objects.
+  - Configure the source DB via `--url` or `PLEROMA_DATABASE_URL`.
+
 ### 5.1 Data sets to import (MVP)
 
 1) **Local users**

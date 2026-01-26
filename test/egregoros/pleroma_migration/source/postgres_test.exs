@@ -1,0 +1,162 @@
+defmodule Egregoros.PleromaMigration.Source.PostgresTest do
+  use Egregoros.DataCase, async: true
+
+  alias Egregoros.PleromaMigration.PostgresClient
+  alias Egregoros.PleromaMigration.Source.Postgres
+
+  setup do
+    previous_impl = Application.get_env(:egregoros, PostgresClient)
+
+    Application.put_env(:egregoros, PostgresClient, PostgresClient.Mock)
+
+    on_exit(fn ->
+      if is_nil(previous_impl) do
+        Application.delete_env(:egregoros, PostgresClient)
+      else
+        Application.put_env(:egregoros, PostgresClient, previous_impl)
+      end
+    end)
+
+    :ok
+  end
+
+  test "list_users/1 parses url options and maps remote users" do
+    url = "postgres://user:pass@host:5432/pleroma_db"
+    conn = {:conn, System.unique_integer([:positive])}
+
+    user_id = FlakeId.get()
+    inserted_at = ~N[2026-01-01 00:00:00.000000]
+    updated_at = ~N[2026-01-01 00:00:01.000000]
+
+    PostgresClient.Mock
+    |> expect(:start_link, fn opts ->
+      assert opts[:hostname] == "host"
+      assert opts[:port] == 5432
+      assert opts[:username] == "user"
+      assert opts[:password] == "pass"
+      assert opts[:database] == "pleroma_db"
+      {:ok, conn}
+    end)
+    |> expect(:query!, fn ^conn, sql, [] ->
+      assert String.contains?(sql, "FROM users")
+
+      %{
+        rows: [
+          [
+            user_id,
+            "bob@remote.example",
+            "https://remote.example/users/bob",
+            "https://remote.example/users/bob/inbox",
+            "PUB",
+            "PRIV",
+            false,
+            true,
+            false,
+            "bob@remote.example",
+            "$pbkdf2-v2$stub",
+            "Bob",
+            "Bio",
+            inserted_at,
+            updated_at
+          ]
+        ]
+      }
+    end)
+    |> expect(:stop, fn ^conn -> :ok end)
+
+    assert {:ok, [user]} = Postgres.list_users(url: url)
+    assert user.id == user_id
+    assert user.nickname == "bob"
+    assert user.domain == "remote.example"
+    assert user.ap_id == "https://remote.example/users/bob"
+    assert user.outbox == "https://remote.example/users/bob/outbox"
+    assert user.private_key == "PRIV"
+    assert user.admin == true
+    assert user.locked == false
+    assert %DateTime{} = user.inserted_at
+    assert %DateTime{} = user.updated_at
+  end
+
+  test "list_statuses/1 maps Create and Announce activities" do
+    url = "postgres://user:pass@host:5432/pleroma_db"
+    conn = {:conn, System.unique_integer([:positive])}
+
+    create_id = FlakeId.get()
+    announce_id = FlakeId.get()
+    inserted_at = ~N[2026-01-01 00:00:00.000000]
+    updated_at = ~N[2026-01-01 00:00:01.000000]
+
+    create = %{
+      "id" => "https://example.com/activities/#{Ecto.UUID.generate()}",
+      "type" => "Create",
+      "actor" => "https://example.com/users/alice",
+      "object" => "https://example.com/objects/#{Ecto.UUID.generate()}"
+    }
+
+    note = %{
+      "id" => create["object"],
+      "type" => "Note",
+      "actor" => create["actor"],
+      "content" => "hi"
+    }
+
+    announce = %{
+      "id" => "https://example.com/activities/#{Ecto.UUID.generate()}",
+      "type" => "Announce",
+      "actor" => create["actor"],
+      "object" => create["object"]
+    }
+
+    PostgresClient.Mock
+    |> expect(:start_link, fn _opts -> {:ok, conn} end)
+    |> expect(:query!, fn ^conn, sql, [] ->
+      assert String.contains?(sql, "JOIN objects")
+
+      %{
+        rows: [
+          [
+            create_id,
+            create,
+            true,
+            inserted_at,
+            updated_at,
+            note
+          ]
+        ]
+      }
+    end)
+    |> expect(:query!, fn ^conn, sql, [] ->
+      assert String.contains?(sql, "WHERE data->>'type' = 'Announce'")
+
+      %{
+        rows: [
+          [
+            announce_id,
+            announce,
+            false,
+            inserted_at,
+            updated_at
+          ]
+        ]
+      }
+    end)
+    |> expect(:stop, fn ^conn -> :ok end)
+
+    assert {:ok, statuses} = Postgres.list_statuses(url: url)
+
+    assert Enum.any?(statuses, fn status ->
+             status.activity_id == create_id and status.activity == create and
+               status.object == note and
+               status.local == true
+           end)
+
+    assert Enum.any?(statuses, fn status ->
+             status.activity_id == announce_id and status.activity == announce and
+               status.local == false
+           end)
+
+    assert Enum.all?(statuses, fn status ->
+             match?(%DateTime{}, status.inserted_at) and match?(%DateTime{}, status.updated_at)
+           end)
+  end
+end
