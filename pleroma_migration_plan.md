@@ -47,7 +47,7 @@ This Pleroma tree uses `FlakeId.Ecto.CompatType` as the `@primary_key` for (at l
 
 Implication:
 - Pleroma’s Mastodon API IDs (e.g. `status.id`) are base62 strings like `"9n2ciuz1wdesFnrGJU"`, because they render `to_string(activity.id)` (see `StatusView`). (`lib/pleroma/web/mastodon_api/views/status_view.ex`)
-- If we want **client continuity**, we still need to decide whether to preserve Pleroma’s “status id == activity id” convention (Egregoros currently uses the Note/Question object ID as the status ID).
+- If we want **client continuity**, we should preserve those IDs in Egregoros’ Mastodon API. The simplest way is to import each Pleroma “status activity id” (flake) as the **primary key of the corresponding status object row** in Egregoros (e.g. the Note/Question row), so `status.id` stays the same while `status.uri` remains the object’s ActivityPub ID.
 
 ### 1.3 Password hashing
 
@@ -166,6 +166,10 @@ Recommendation:
 
 Status:
 - Option 2 is now implemented: Egregoros uses Flake IDs as primary keys and returns base62 IDs via the Mastodon API.
+
+Additional status-id note:
+- Pleroma uses `status.id == activity.id` (Create/Announce primary key), while Egregoros historically used the Note/Question object primary key.
+- For migration, we can preserve Pleroma status IDs by assigning the imported Note/Question/Announce row’s **primary key** to the Pleroma activity flake ID during import (implemented in `Egregoros.PleromaMigration.import_statuses/1`).
 
 ### 4.5 Prevent federation side-effects during import (required for any importer)
 
