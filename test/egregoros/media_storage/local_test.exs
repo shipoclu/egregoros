@@ -20,7 +20,7 @@ defmodule Egregoros.MediaStorage.LocalTest do
 
   test "stores media and returns the public url path" do
     root = uploads_root()
-    user = %{id: 42}
+    user = %{id: "42"}
 
     upload = %Plug.Upload{
       path: fixture_path("DSCN0010.png"),
@@ -40,7 +40,7 @@ defmodule Egregoros.MediaStorage.LocalTest do
 
   test "supports storing video media" do
     root = uploads_root()
-    user = %{id: 42}
+    user = %{id: "42"}
 
     upload_path = write_temp_file!("clip.mp4", "video")
 
@@ -58,7 +58,7 @@ defmodule Egregoros.MediaStorage.LocalTest do
 
   test "rejects unsupported media content types" do
     root = uploads_root()
-    user = %{id: 1}
+    user = %{id: "1"}
 
     upload_path = write_temp_file!("photo.bmp", "nope")
 
@@ -73,7 +73,7 @@ defmodule Egregoros.MediaStorage.LocalTest do
 
   test "rejects media larger than the size limit" do
     root = uploads_root()
-    user = %{id: 1}
+    user = %{id: "1"}
 
     upload_path = write_temp_file!("big.mp4", :binary.copy("a", 10_000_001))
 
@@ -88,7 +88,7 @@ defmodule Egregoros.MediaStorage.LocalTest do
 
   test "returns a file error when the upload path is missing" do
     root = uploads_root()
-    user = %{id: 1}
+    user = %{id: "1"}
 
     upload = %Plug.Upload{
       path: Path.join(root, "missing.mp4"),

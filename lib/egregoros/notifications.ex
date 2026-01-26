@@ -93,13 +93,13 @@ defmodule Egregoros.Notifications do
     @topic_prefix <> ":" <> user_ap_id
   end
 
-  defp maybe_where_max_id(query, max_id) when is_integer(max_id) and max_id > 0 do
+  defp maybe_where_max_id(query, max_id) when is_binary(max_id) do
     from(a in query, where: a.id < ^max_id)
   end
 
   defp maybe_where_max_id(query, _max_id), do: query
 
-  defp maybe_where_since_id(query, since_id) when is_integer(since_id) and since_id > 0 do
+  defp maybe_where_since_id(query, since_id) when is_binary(since_id) do
     from(a in query, where: a.id > ^since_id)
   end
 
@@ -121,16 +121,39 @@ defmodule Egregoros.Notifications do
   defp normalize_limit(_), do: 20
 
   defp normalize_id(nil), do: nil
-  defp normalize_id(id) when is_integer(id) and id > 0, do: id
 
   defp normalize_id(id) when is_binary(id) do
-    case Integer.parse(id) do
-      {int, ""} when int > 0 -> int
-      _ -> nil
+    id = String.trim(id)
+
+    if flake_id?(id) do
+      id
+    else
+      nil
     end
   end
 
-  defp normalize_id(_), do: nil
+  defp normalize_id(_id), do: nil
+
+  defp flake_id?(id) when is_binary(id) do
+    id = String.trim(id)
+
+    cond do
+      id == "" ->
+        false
+
+      byte_size(id) < 18 ->
+        false
+
+      true ->
+        try do
+          match?(<<_::128>>, FlakeId.from_string(id))
+        rescue
+          _ -> false
+        end
+    end
+  end
+
+  defp flake_id?(_id), do: false
 
   defp normalize_boolean(value, _default) when is_boolean(value), do: value
 

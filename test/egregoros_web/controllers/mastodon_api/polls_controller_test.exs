@@ -44,7 +44,7 @@ defmodule EgregorosWeb.MastodonAPI.PollsControllerTest do
       conn = get(conn, "/api/v1/polls/#{poll.id}")
 
       response = json_response(conn, 200)
-      assert response["id"] == Integer.to_string(poll.id)
+      assert response["id"] == poll.id
       assert response["multiple"] == false
       assert response["votes_count"] == 8
       assert response["voters_count"] == 0
@@ -199,7 +199,7 @@ defmodule EgregorosWeb.MastodonAPI.PollsControllerTest do
       conn = post(conn, "/api/v1/polls/#{poll.id}/votes", %{"choices" => [0]})
 
       response = json_response(conn, 200)
-      assert response["id"] == Integer.to_string(poll.id)
+      assert response["id"] == poll.id
       assert response["voted"] == true
 
       [opt1, opt2] = response["options"]

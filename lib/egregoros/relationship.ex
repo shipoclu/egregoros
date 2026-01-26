@@ -3,6 +3,9 @@ defmodule Egregoros.Relationship do
 
   import Ecto.Changeset
 
+  @primary_key {:id, FlakeId.Ecto.Type, autogenerate: true}
+  @foreign_key_type FlakeId.Ecto.Type
+
   schema "relationships" do
     field :type, :string
     field :actor, :string

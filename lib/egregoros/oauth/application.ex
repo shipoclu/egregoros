@@ -3,6 +3,9 @@ defmodule Egregoros.OAuth.Application do
 
   import Ecto.Changeset
 
+  @primary_key {:id, FlakeId.Ecto.Type, autogenerate: true}
+  @foreign_key_type FlakeId.Ecto.Type
+
   @required_fields ~w(name redirect_uris client_id client_secret)a
   @optional_fields ~w(website scopes)a
 

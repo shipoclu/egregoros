@@ -81,8 +81,8 @@ defmodule EgregorosWeb.Components.TimelineItems.PollCard do
 
   attr :id, :string, required: true
   attr :poll, :map, required: true
-  attr :object_id, :integer, required: true
-  attr :feed_id, :integer, required: true
+  attr :object_id, :string, required: true
+  attr :feed_id, :string, required: true
   attr :current_user, :any, default: nil
 
   defp poll_section(assigns) do
@@ -126,8 +126,8 @@ defmodule EgregorosWeb.Components.TimelineItems.PollCard do
 
   attr :id, :string, required: true
   attr :poll, :map, required: true
-  attr :object_id, :integer, required: true
-  attr :feed_id, :integer, required: true
+  attr :object_id, :string, required: true
+  attr :feed_id, :string, required: true
 
   defp poll_voting_form(assigns) do
     ~H"""
@@ -322,9 +322,9 @@ defmodule EgregorosWeb.Components.TimelineItems.PollCard do
   end
 
   defp status_permalink_path(%{object: %{id: id, local: false}, actor: actor})
-       when is_integer(id) do
+       when is_binary(id) do
     case ProfilePaths.profile_path(actor) do
-      "/@" <> _rest = profile_path -> profile_path <> "/" <> Integer.to_string(id)
+      "/@" <> _rest = profile_path -> profile_path <> "/" <> id
       _ -> nil
     end
   end

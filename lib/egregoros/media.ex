@@ -53,12 +53,10 @@ defmodule Egregoros.Media do
   def attachments_from_ids(%User{} = user, ids) do
     ids = List.wrap(ids)
 
-    with {:ok, int_ids} <- parse_ids(ids),
-         {:ok, objects} <- fetch_owned_media(user, int_ids) do
+    with {:ok, parsed_ids} <- parse_ids(ids),
+         {:ok, objects} <- fetch_owned_media(user, parsed_ids) do
       attachments =
-        int_ids
-        |> Enum.map(fn id -> Map.fetch!(objects, id) end)
-        |> Enum.map(& &1.data)
+        render_attachments(parsed_ids, objects)
 
       {:ok, attachments}
     end
@@ -68,27 +66,31 @@ defmodule Egregoros.Media do
 
   defp parse_ids(ids) when is_list(ids) do
     parsed =
-      Enum.map(ids, fn
-        id when is_integer(id) -> id
-        id when is_binary(id) -> parse_int(id)
-        _ -> nil
+      ids
+      |> Enum.flat_map(fn
+        id when is_binary(id) ->
+          id = String.trim(id)
+
+          if flake_id?(id) do
+            [id]
+          else
+            []
+          end
+
+        _ ->
+          []
       end)
 
-    if Enum.any?(parsed, &is_nil/1) do
-      {:error, :invalid_media_id}
-    else
-      {:ok, parsed}
+    cond do
+      length(parsed) != length(ids) ->
+        {:error, :invalid_media_id}
+
+      true ->
+        {:ok, parsed}
     end
   end
 
-  defp parse_int(value) when is_binary(value) do
-    case Integer.parse(value) do
-      {int, ""} -> int
-      _ -> nil
-    end
-  end
-
-  defp fetch_owned_media(_user, []), do: {:ok, %{}}
+  defp fetch_owned_media(_user, []), do: {:ok, []}
 
   defp fetch_owned_media(%User{} = user, ids) when is_list(ids) do
     records =
@@ -98,14 +100,47 @@ defmodule Egregoros.Media do
       )
       |> Repo.all()
 
-    objects = Map.new(records, &{&1.id, &1})
+    found_ids = MapSet.new(Enum.map(records, & &1.id))
+    expected_ids = MapSet.new(ids)
 
-    if map_size(objects) == length(ids) do
-      {:ok, objects}
+    if MapSet.subset?(expected_ids, found_ids) do
+      {:ok, records}
     else
       {:error, :not_found}
     end
   end
+
+  defp render_attachments(ids, objects) when is_list(ids) and is_list(objects) do
+    objects_by_id = Map.new(objects, &{&1.id, &1})
+
+    Enum.flat_map(ids, fn id ->
+      case Map.get(objects_by_id, id) do
+        %Object{} = object -> [object.data]
+        _ -> []
+      end
+    end)
+  end
+
+  defp flake_id?(id) when is_binary(id) do
+    id = String.trim(id)
+
+    cond do
+      id == "" ->
+        false
+
+      byte_size(id) < 18 ->
+        false
+
+      true ->
+        try do
+          match?(<<_::128>>, FlakeId.from_string(id))
+        rescue
+          _ -> false
+        end
+    end
+  end
+
+  defp flake_id?(_id), do: false
 
   defp activity_type(content_type) when is_binary(content_type) do
     if String.starts_with?(content_type, "image/"), do: "Image", else: "Document"

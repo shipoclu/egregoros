@@ -5,6 +5,9 @@ defmodule Egregoros.User do
 
   alias Egregoros.Domain
 
+  @primary_key {:id, FlakeId.Ecto.Type, autogenerate: true}
+  @foreign_key_type FlakeId.Ecto.Type
+
   @fields ~w(
     nickname
     domain
@@ -56,7 +59,7 @@ defmodule Egregoros.User do
     field :remote_followers_count, :integer
     field :remote_following_count, :integer
     field :remote_counts_checked_at, :utc_datetime_usec
-    field :notifications_last_seen_id, :integer, default: 0
+    field :notifications_last_seen_id, FlakeId.Ecto.Type
 
     timestamps(type: :utc_datetime_usec)
   end

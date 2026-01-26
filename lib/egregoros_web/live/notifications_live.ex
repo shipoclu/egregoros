@@ -118,8 +118,10 @@ defmodule EgregorosWeb.NotificationsLive do
   end
 
   def handle_event("follow_request_accept", %{"id" => id}, socket) do
+    relationship_id = id |> to_string() |> String.trim()
+
     with %User{} = current_user <- socket.assigns.current_user,
-         {relationship_id, ""} <- Integer.parse(to_string(id)),
+         true <- flake_id?(relationship_id),
          %{type: "FollowRequest", object: object_ap_id, activity_ap_id: follow_ap_id} <-
            Relationships.get(relationship_id),
          true <- object_ap_id == current_user.ap_id,
@@ -141,8 +143,10 @@ defmodule EgregorosWeb.NotificationsLive do
   end
 
   def handle_event("follow_request_reject", %{"id" => id}, socket) do
+    relationship_id = id |> to_string() |> String.trim()
+
     with %User{} = current_user <- socket.assigns.current_user,
-         {relationship_id, ""} <- Integer.parse(to_string(id)),
+         true <- flake_id?(relationship_id),
          %{type: "FollowRequest", object: object_ap_id, activity_ap_id: follow_ap_id} <-
            Relationships.get(relationship_id),
          true <- object_ap_id == current_user.ap_id,
@@ -551,9 +555,9 @@ defmodule EgregorosWeb.NotificationsLive do
           _ -> nil
         end
 
-      is_integer(note.id) ->
+      is_binary(note.id) ->
         with "/@" <> _rest = profile_path <- ProfilePaths.profile_path(actor.handle) do
-          profile_path <> "/" <> Integer.to_string(note.id)
+          profile_path <> "/" <> note.id
         else
           _ -> nil
         end
@@ -589,13 +593,19 @@ defmodule EgregorosWeb.NotificationsLive do
 
   defp notifications_cursor(notifications) when is_list(notifications) do
     case List.last(notifications) do
-      %{id: id} when is_integer(id) -> id
+      %{id: id} when is_binary(id) -> id
       _ -> nil
     end
   end
 
-  defp notification_dom_id(%{notification: %{id: id}}) when is_integer(id),
+  defp notification_dom_id(%{notification: %{id: id}}) when is_binary(id),
     do: "notification-#{id}"
 
   defp notification_dom_id(_notification), do: Ecto.UUID.generate()
+
+  defp flake_id?(id) when is_binary(id) do
+    match?(<<_::128>>, FlakeId.from_string(id))
+  end
+
+  defp flake_id?(_id), do: false
 end

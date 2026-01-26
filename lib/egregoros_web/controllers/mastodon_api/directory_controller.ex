@@ -16,7 +16,7 @@ defmodule EgregorosWeb.MastodonAPI.DirectoryController do
     if Config.get(:profile_directory, true) do
       current_user_id =
         case conn.assigns[:current_user] do
-          %User{id: id} when is_integer(id) -> id
+          %User{id: id} when is_binary(id) -> id
           _ -> nil
         end
 
@@ -49,7 +49,7 @@ defmodule EgregorosWeb.MastodonAPI.DirectoryController do
   defp maybe_where_local(query, true), do: from(u in query, where: u.local == true)
   defp maybe_where_local(query, false), do: query
 
-  defp maybe_where_not_id(query, id) when is_integer(id), do: from(u in query, where: u.id != ^id)
+  defp maybe_where_not_id(query, id) when is_binary(id), do: from(u in query, where: u.id != ^id)
   defp maybe_where_not_id(query, _id), do: query
 
   defp apply_order(query, :new), do: from(u in query, order_by: [desc: u.inserted_at, desc: u.id])

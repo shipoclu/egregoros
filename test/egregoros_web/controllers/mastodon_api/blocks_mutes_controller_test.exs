@@ -22,7 +22,7 @@ defmodule EgregorosWeb.MastodonAPI.BlocksMutesControllerTest do
     conn = get(conn, "/api/v1/blocks")
     response = json_response(conn, 200)
 
-    assert Enum.any?(response, &(&1["id"] == Integer.to_string(blocked.id)))
+    assert Enum.any?(response, &(&1["id"] == blocked.id))
   end
 
   test "GET /api/v1/mutes returns muted accounts", %{conn: conn} do
@@ -43,6 +43,6 @@ defmodule EgregorosWeb.MastodonAPI.BlocksMutesControllerTest do
     conn = get(conn, "/api/v1/mutes")
     response = json_response(conn, 200)
 
-    assert Enum.any?(response, &(&1["id"] == Integer.to_string(muted.id)))
+    assert Enum.any?(response, &(&1["id"] == muted.id))
   end
 end

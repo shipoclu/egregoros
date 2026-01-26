@@ -48,17 +48,23 @@ defmodule Egregoros.Relays do
 
   def subscribe(_relay_ap_id), do: {:error, :invalid_relay}
 
-  def unsubscribe(relay_id) when is_integer(relay_id) and relay_id > 0 do
-    case Repo.get(Relay, relay_id) do
-      %Relay{} = relay ->
-        with {:ok, internal} <- InstanceActor.get_actor() do
-          _ = undo_follow(internal.ap_id, relay.ap_id, internal)
-          _ = Repo.delete(relay)
-          {:ok, relay}
-        end
+  def unsubscribe(relay_id) when is_binary(relay_id) do
+    relay_id = String.trim(relay_id)
 
-      nil ->
-        {:error, :not_found}
+    if flake_id?(relay_id) do
+      case Repo.get(Relay, relay_id) do
+        %Relay{} = relay ->
+          with {:ok, internal} <- InstanceActor.get_actor() do
+            _ = undo_follow(internal.ap_id, relay.ap_id, internal)
+            _ = Repo.delete(relay)
+            {:ok, relay}
+          end
+
+        nil ->
+          {:error, :not_found}
+      end
+    else
+      {:error, :invalid_relay}
     end
   end
 
@@ -88,6 +94,27 @@ defmodule Egregoros.Relays do
         |> Repo.insert()
     end
   end
+
+  defp flake_id?(id) when is_binary(id) do
+    id = String.trim(id)
+
+    cond do
+      id == "" ->
+        false
+
+      byte_size(id) < 18 ->
+        false
+
+      true ->
+        try do
+          match?(<<_::128>>, FlakeId.from_string(id))
+        rescue
+          _ -> false
+        end
+    end
+  end
+
+  defp flake_id?(_id), do: false
 
   defp ensure_following(internal_ap_id, relay_ap_id, internal, relay_user)
        when is_binary(internal_ap_id) and is_binary(relay_ap_id) do

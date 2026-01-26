@@ -32,7 +32,7 @@ defmodule EgregorosWeb.MastodonAPI.ScheduledStatusesControllerTest do
 
     assert Objects.list_notes() == []
 
-    scheduled_status_id = String.to_integer(response["id"])
+    scheduled_status_id = response["id"]
 
     assert_enqueued(
       worker: PublishScheduledStatus,
@@ -79,11 +79,11 @@ defmodule EgregorosWeb.MastodonAPI.ScheduledStatusesControllerTest do
       post(conn, "/api/v1/statuses", %{"status" => "Hello future", "scheduled_at" => scheduled_at})
 
     created = json_response(conn, 200)
-    scheduled_status_id = String.to_integer(created["id"])
+    scheduled_status_id = created["id"]
 
     assert :ok =
              perform_job(PublishScheduledStatus, %{
-               "scheduled_status_id" => Integer.to_string(scheduled_status_id)
+               "scheduled_status_id" => scheduled_status_id
              })
 
     [note] = Objects.list_notes()
@@ -134,11 +134,11 @@ defmodule EgregorosWeb.MastodonAPI.ScheduledStatusesControllerTest do
       post(conn, "/api/v1/statuses", %{
         "status" => "Hello with media",
         "scheduled_at" => scheduled_at,
-        "media_ids" => [Integer.to_string(media_object.id)]
+        "media_ids" => [media_object.id]
       })
 
     response = json_response(conn, 200)
-    assert response["params"]["media_ids"] == [Integer.to_string(media_object.id)]
+    assert response["params"]["media_ids"] == [media_object.id]
 
     assert [
              %{
@@ -150,7 +150,7 @@ defmodule EgregorosWeb.MastodonAPI.ScheduledStatusesControllerTest do
              }
            ] = response["media_attachments"]
 
-    assert attachment_id == Integer.to_string(media_object.id)
+    assert attachment_id == media_object.id
   end
 
   test "scheduled statuses render icon preview_url and normalize sensitive", %{conn: conn} do
@@ -206,7 +206,7 @@ defmodule EgregorosWeb.MastodonAPI.ScheduledStatusesControllerTest do
 
     response = json_response(conn, 200)
     assert response["params"]["sensitive"] == true
-    assert response["params"]["media_ids"] == [Integer.to_string(media_object.id)]
+    assert response["params"]["media_ids"] == [media_object.id]
 
     assert [%{"preview_url" => "https://example.com/uploads/scheduled-media-preview-1-thumb.png"}] =
              response["media_attachments"]
@@ -273,7 +273,7 @@ defmodule EgregorosWeb.MastodonAPI.ScheduledStatusesControllerTest do
 
     conn = post(conn, "/api/v1/statuses", %{"status" => "Hello", "scheduled_at" => scheduled_at})
     created = json_response(conn, 200)
-    scheduled_status_id = String.to_integer(created["id"])
+    scheduled_status_id = created["id"]
 
     new_scheduled_at =
       DateTime.utc_now()
@@ -310,10 +310,10 @@ defmodule EgregorosWeb.MastodonAPI.ScheduledStatusesControllerTest do
 
     conn = post(conn, "/api/v1/statuses", %{"status" => "Hello", "scheduled_at" => scheduled_at})
     created = json_response(conn, 200)
-    scheduled_status_id = String.to_integer(created["id"])
+    scheduled_status_id = created["id"]
 
     conn = delete(conn, "/api/v1/scheduled_statuses/#{scheduled_status_id}")
-    assert json_response(conn, 200)["id"] == Integer.to_string(scheduled_status_id)
+    assert json_response(conn, 200)["id"] == scheduled_status_id
 
     list_conn = get(conn, "/api/v1/scheduled_statuses")
     assert json_response(list_conn, 200) == []

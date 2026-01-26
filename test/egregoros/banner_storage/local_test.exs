@@ -20,7 +20,7 @@ defmodule Egregoros.BannerStorage.LocalTest do
 
   test "stores a banner and returns the public url path" do
     root = uploads_root()
-    user = %{id: 123}
+    user = %{id: "123"}
 
     upload_path = write_temp_file!("banner.png", "png")
 
@@ -38,7 +38,7 @@ defmodule Egregoros.BannerStorage.LocalTest do
 
   test "rejects unsupported banner content types" do
     root = uploads_root()
-    user = %{id: 1}
+    user = %{id: "1"}
 
     upload_path = write_temp_file!("banner.txt", "nope")
 
@@ -53,7 +53,7 @@ defmodule Egregoros.BannerStorage.LocalTest do
 
   test "rejects banners larger than the size limit" do
     root = uploads_root()
-    user = %{id: 1}
+    user = %{id: "1"}
 
     upload_path = write_temp_file!("big.png", :binary.copy("a", 10_000_001))
 
@@ -68,7 +68,7 @@ defmodule Egregoros.BannerStorage.LocalTest do
 
   test "returns a file error when the upload path is missing" do
     root = uploads_root()
-    user = %{id: 1}
+    user = %{id: "1"}
 
     upload = %Plug.Upload{
       path: Path.join(root, "missing.png"),

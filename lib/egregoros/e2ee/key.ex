@@ -5,6 +5,9 @@ defmodule Egregoros.E2EE.Key do
 
   alias Egregoros.User
 
+  @primary_key {:id, FlakeId.Ecto.Type, autogenerate: true}
+  @foreign_key_type FlakeId.Ecto.Type
+
   @fields ~w(user_id kid public_key_jwk fingerprint active)a
   @required_fields ~w(user_id kid public_key_jwk fingerprint active)a
 

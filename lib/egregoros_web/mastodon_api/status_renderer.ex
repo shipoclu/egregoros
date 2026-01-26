@@ -22,7 +22,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusRenderer do
   def render_status(%Object{} = object, current_user) do
     case render_statuses([object], current_user) do
       [rendered] -> rendered
-      _ -> %{"id" => Integer.to_string(object.id)}
+      _ -> %{"id" => status_id(object)}
     end
   end
 
@@ -155,7 +155,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusRenderer do
     {in_reply_to_id, in_reply_to_account_id} = in_reply_to(object)
 
     %{
-      "id" => Integer.to_string(object.id),
+      "id" => status_id(object),
       "uri" => object.ap_id,
       "url" => status_url(object),
       "visibility" => visibility(object),
@@ -217,7 +217,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusRenderer do
       end
 
     %{
-      "id" => Integer.to_string(announce.id),
+      "id" => status_id(announce),
       "uri" => announce.ap_id,
       "url" =>
         if(is_map(reblog), do: Map.get(reblog, "url", announce.ap_id), else: announce.ap_id),
@@ -263,7 +263,6 @@ defmodule EgregorosWeb.MastodonAPI.StatusRenderer do
 
   defp conversation_id_for_reblog(%{} = reblog, _announce, _ctx) do
     case get_in(reblog, ["pleroma", "conversation_id"]) do
-      id when is_integer(id) and id > 0 -> id
       id when is_binary(id) and id != "" -> id
       _ -> nil
     end
@@ -279,23 +278,23 @@ defmodule EgregorosWeb.MastodonAPI.StatusRenderer do
 
     cond do
       object_ap_id == "" ->
-        announce.id
+        status_id(announce)
 
       true ->
         case Map.get(ctx.reblogs_by_ap_id, object_ap_id) do
           %Object{} = object -> conversation_id(object, ctx)
-          _ -> announce.id
+          _ -> status_id(announce)
         end
     end
   end
 
   defp conversation_id(%Object{type: "Note"} = object, _ctx) do
     root = conversation_root_note(object)
-    root.id
+    status_id(root)
   end
 
   defp conversation_id(%Object{} = object, _ctx) do
-    object.id
+    status_id(object)
   end
 
   defp conversation_root_note(%Object{type: "Note"} = object) do
@@ -350,11 +349,11 @@ defmodule EgregorosWeb.MastodonAPI.StatusRenderer do
           %Object{} = parent ->
             account_id =
               case Users.get_by_ap_id(parent.actor) do
-                %User{} = user -> Integer.to_string(user.id)
+                %User{} = user -> account_id(user)
                 _ -> nil
               end
 
-            {Integer.to_string(parent.id), account_id}
+            {status_id(parent), account_id}
 
           _ ->
             {nil, nil}
@@ -486,7 +485,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusRenderer do
     end
   end
 
-  defp media_id(%Object{} = object, _fallback), do: Integer.to_string(object.id)
+  defp media_id(%Object{} = object, _fallback), do: status_id(object)
   defp media_id(_object, fallback), do: fallback
 
   defp attachment_meta(attachment, %Object{} = object) when is_map(attachment) do
@@ -582,7 +581,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusRenderer do
       case Users.get_by_ap_id(href) do
         %User{} = user ->
           %{
-            "id" => Integer.to_string(user.id),
+            "id" => account_id(user),
             "username" => user.nickname,
             "url" => URL.absolute(ProfilePaths.profile_path(user)),
             "acct" => acct_for_user(user)
@@ -753,8 +752,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusRenderer do
 
   defp local_status_path(_object), do: nil
 
-  defp remote_status_path(%Object{id: id, actor: actor_ap_id})
-       when is_integer(id) and is_binary(actor_ap_id) do
+  defp remote_status_path(%Object{actor: actor_ap_id} = object) when is_binary(actor_ap_id) do
     actor =
       case Users.get_by_ap_id(actor_ap_id) do
         %User{} = user -> user
@@ -762,7 +760,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusRenderer do
       end
 
     case ProfilePaths.profile_path(actor) do
-      "/@" <> _rest = profile_path -> profile_path <> "/" <> Integer.to_string(id)
+      "/@" <> _rest = profile_path -> profile_path <> "/" <> status_id(object)
       _ -> nil
     end
   end
@@ -777,4 +775,10 @@ defmodule EgregorosWeb.MastodonAPI.StatusRenderer do
   end
 
   defp activity_tags(_), do: []
+
+  defp status_id(%Object{id: id}) when is_binary(id) and id != "", do: id
+  defp status_id(_object), do: "unknown"
+
+  defp account_id(%User{id: id}) when is_binary(id) and id != "", do: id
+  defp account_id(_user), do: "unknown"
 end

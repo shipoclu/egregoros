@@ -1,23 +1,19 @@
 defmodule Egregoros.InstanceSettings do
+  import Ecto.Query, only: [from: 2]
+
   alias Egregoros.InstanceSetting
   alias Egregoros.Repo
 
-  @singleton_id 1
-
   def get do
-    case Repo.get(InstanceSetting, @singleton_id) do
+    case Repo.one(from(s in InstanceSetting, limit: 1)) do
       %InstanceSetting{} = setting ->
         setting
 
       nil ->
-        _ =
-          Repo.insert(
-            %InstanceSetting{id: @singleton_id, registrations_open: true},
-            on_conflict: :nothing,
-            conflict_target: :id
-          )
+        {:ok, %InstanceSetting{} = setting} =
+          Repo.insert(%InstanceSetting{registrations_open: true})
 
-        Repo.get!(InstanceSetting, @singleton_id)
+        setting
     end
   end
 

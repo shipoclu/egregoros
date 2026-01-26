@@ -26,8 +26,8 @@ defmodule EgregorosWeb.MastodonAPI.DirectoryControllerTest do
 
     assert is_list(response)
 
-    assert Enum.any?(response, &(&1["id"] == Integer.to_string(alice.id)))
-    assert Enum.any?(response, &(&1["id"] == Integer.to_string(bob.id)))
+    assert Enum.any?(response, &(&1["id"] == alice.id))
+    assert Enum.any?(response, &(&1["id"] == bob.id))
 
     refute Enum.any?(response, &(&1["username"] in ["internal.fetch", "instance.actor"]))
   end
@@ -43,7 +43,7 @@ defmodule EgregorosWeb.MastodonAPI.DirectoryControllerTest do
       |> json_response(200)
 
     assert [%{"id" => id}] = response
-    assert id == Integer.to_string(bob.id)
+    assert id == bob.id
   end
 
   test "GET /api/v1/directory orders accounts by recent activity", %{conn: conn} do
@@ -53,7 +53,7 @@ defmodule EgregorosWeb.MastodonAPI.DirectoryControllerTest do
 
     response = conn |> get("/api/v1/directory", %{"order" => "active"}) |> json_response(200)
 
-    assert List.first(response)["id"] == Integer.to_string(bob.id)
+    assert List.first(response)["id"] == bob.id
   end
 
   test "GET /api/v1/directory includes remote users when local=false", %{conn: conn} do
@@ -71,7 +71,7 @@ defmodule EgregorosWeb.MastodonAPI.DirectoryControllerTest do
 
     response = conn |> get("/api/v1/directory", %{"local" => "false"}) |> json_response(200)
 
-    assert Enum.any?(response, &(&1["id"] == Integer.to_string(remote.id)))
+    assert Enum.any?(response, &(&1["id"] == remote.id))
   end
 
   test "GET /api/v1/directory excludes the current user when authenticated", %{conn: conn} do
@@ -87,7 +87,7 @@ defmodule EgregorosWeb.MastodonAPI.DirectoryControllerTest do
       |> get("/api/v1/directory")
       |> json_response(200)
 
-    assert Enum.any?(response, &(&1["id"] == Integer.to_string(alice.id)))
-    refute Enum.any?(response, &(&1["id"] == Integer.to_string(bob.id)))
+    assert Enum.any?(response, &(&1["id"] == alice.id))
+    refute Enum.any?(response, &(&1["id"] == bob.id))
   end
 end

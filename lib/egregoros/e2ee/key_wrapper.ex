@@ -5,6 +5,9 @@ defmodule Egregoros.E2EE.KeyWrapper do
 
   alias Egregoros.User
 
+  @primary_key {:id, FlakeId.Ecto.Type, autogenerate: true}
+  @foreign_key_type FlakeId.Ecto.Type
+
   @fields ~w(user_id kid type wrapped_private_key params)a
   @required_fields ~w(user_id kid type wrapped_private_key params)a
 

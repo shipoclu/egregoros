@@ -236,9 +236,9 @@ defmodule EgregorosWeb.Components.TimelineItems.NoteCard do
   end
 
   defp status_permalink_path(%{object: %{id: id, local: false}, actor: actor})
-       when is_integer(id) do
+       when is_binary(id) do
     case ProfilePaths.profile_path(actor) do
-      "/@" <> _rest = profile_path -> profile_path <> "/" <> Integer.to_string(id)
+      "/@" <> _rest = profile_path -> profile_path <> "/" <> id
       _ -> nil
     end
   end

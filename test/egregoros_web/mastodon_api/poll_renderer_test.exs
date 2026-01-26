@@ -13,13 +13,13 @@ defmodule EgregorosWeb.MastodonAPI.PollRendererTest do
 
   describe "render/2" do
     test "returns nil for non-Question objects" do
-      object = %Object{id: 1, type: "Note", data: %{}}
+      object = %Object{id: "1", type: "Note", data: %{}}
       assert PollRenderer.render(object, nil) == nil
     end
 
     test "renders an empty poll when oneOf/anyOf are missing" do
       object = %Object{
-        id: 1,
+        id: "1",
         type: "Question",
         actor: "https://example.com/users/alice",
         data: %{}
@@ -72,7 +72,7 @@ defmodule EgregorosWeb.MastodonAPI.PollRendererTest do
 
       rendered = PollRenderer.render(poll, nil)
 
-      assert rendered["id"] == Integer.to_string(poll.id)
+      assert rendered["id"] == poll.id
       assert rendered["multiple"] == false
       assert rendered["votes_count"] == 0
       assert rendered["voters_count"] == 0
@@ -89,7 +89,7 @@ defmodule EgregorosWeb.MastodonAPI.PollRendererTest do
 
     test "uses votersCount from ActivityPub data for remote polls" do
       object = %Object{
-        id: 1,
+        id: "1",
         type: "Question",
         actor: "https://example.com/users/alice",
         local: false,

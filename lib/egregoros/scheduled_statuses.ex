@@ -63,18 +63,15 @@ defmodule Egregoros.ScheduledStatuses do
     |> Repo.all()
   end
 
-  def get_pending_for_user(%User{} = user, id) when is_integer(id) do
-    ScheduledStatus
-    |> where_user(user)
-    |> where_pending()
-    |> where([s], s.id == ^id)
-    |> Repo.one()
-  end
-
   def get_pending_for_user(%User{} = user, id) when is_binary(id) do
-    case Integer.parse(String.trim(id)) do
-      {int, ""} -> get_pending_for_user(user, int)
-      _ -> nil
+    id = String.trim(id)
+
+    if flake_id?(id) do
+      ScheduledStatus
+      |> where_user(user)
+      |> where_pending()
+      |> where([s], s.id == ^id)
+      |> Repo.one()
     end
   end
 
@@ -107,8 +104,10 @@ defmodule Egregoros.ScheduledStatuses do
     end
   end
 
-  def publish(id) when is_integer(id) do
-    case Repo.get(ScheduledStatus, id) do
+  def publish(id) when is_binary(id) do
+    id = String.trim(id)
+
+    case if(flake_id?(id), do: Repo.get(ScheduledStatus, id)) do
       %ScheduledStatus{published_at: %DateTime{}} ->
         :ok
 
@@ -117,13 +116,6 @@ defmodule Egregoros.ScheduledStatuses do
 
       _ ->
         :ok
-    end
-  end
-
-  def publish(id) when is_binary(id) do
-    case Integer.parse(String.trim(id)) do
-      {int, ""} -> publish(int)
-      _ -> :ok
     end
   end
 
@@ -205,21 +197,6 @@ defmodule Egregoros.ScheduledStatuses do
     end
   end
 
-  defp resolve_in_reply_to(in_reply_to_id, user)
-       when is_integer(in_reply_to_id) and is_map(user) do
-    case Objects.get(in_reply_to_id) do
-      %{} = object ->
-        if Objects.visible_to?(object, user) do
-          {:ok, object.ap_id}
-        else
-          {:error, :not_found}
-        end
-
-      _ ->
-        {:error, :not_found}
-    end
-  end
-
   defp resolve_in_reply_to(_in_reply_to_id, _user), do: {:error, :not_found}
 
   defp normalize_attrs(%User{} = user, attrs) when is_map(attrs) do
@@ -272,15 +249,29 @@ defmodule Egregoros.ScheduledStatuses do
 
   defp maybe_where_max_id(query, nil), do: query
 
-  defp maybe_where_max_id(query, max_id) when is_integer(max_id),
-    do: from(s in query, where: s.id < ^max_id)
+  defp maybe_where_max_id(query, max_id) when is_binary(max_id) do
+    max_id = String.trim(max_id)
+
+    if flake_id?(max_id) do
+      from(s in query, where: s.id < ^max_id)
+    else
+      query
+    end
+  end
 
   defp maybe_where_max_id(query, _max_id), do: query
 
   defp maybe_where_since_id(query, nil), do: query
 
-  defp maybe_where_since_id(query, since_id) when is_integer(since_id),
-    do: from(s in query, where: s.id > ^since_id)
+  defp maybe_where_since_id(query, since_id) when is_binary(since_id) do
+    since_id = String.trim(since_id)
+
+    if flake_id?(since_id) do
+      from(s in query, where: s.id > ^since_id)
+    else
+      query
+    end
+  end
 
   defp maybe_where_since_id(query, _since_id), do: query
 
@@ -311,4 +302,25 @@ defmodule Egregoros.ScheduledStatuses do
   end
 
   defp maybe_update_job_scheduled_at(_scheduled_status), do: :ok
+
+  defp flake_id?(id) when is_binary(id) do
+    id = String.trim(id)
+
+    cond do
+      id == "" ->
+        false
+
+      byte_size(id) < 18 ->
+        false
+
+      true ->
+        try do
+          match?(<<_::128>>, FlakeId.from_string(id))
+        rescue
+          _ -> false
+        end
+    end
+  end
+
+  defp flake_id?(_id), do: false
 end

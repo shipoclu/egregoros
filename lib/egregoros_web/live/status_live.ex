@@ -329,8 +329,10 @@ defmodule EgregorosWeb.StatusLive do
   end
 
   def handle_event("toggle_like", %{"id" => id}, socket) do
+    post_id = id |> to_string() |> String.trim()
+
     with %User{} = user <- socket.assigns.current_user,
-         {post_id, ""} <- Integer.parse(to_string(id)) do
+         true <- flake_id?(post_id) do
       _ = Interactions.toggle_like(user, post_id)
 
       {:noreply, refresh_thread(socket)}
@@ -344,8 +346,10 @@ defmodule EgregorosWeb.StatusLive do
   end
 
   def handle_event("toggle_repost", %{"id" => id}, socket) do
+    post_id = id |> to_string() |> String.trim()
+
     with %User{} = user <- socket.assigns.current_user,
-         {post_id, ""} <- Integer.parse(to_string(id)) do
+         true <- flake_id?(post_id) do
       _ = Interactions.toggle_repost(user, post_id)
 
       {:noreply, refresh_thread(socket)}
@@ -359,8 +363,10 @@ defmodule EgregorosWeb.StatusLive do
   end
 
   def handle_event("toggle_reaction", %{"id" => id, "emoji" => emoji}, socket) do
+    post_id = id |> to_string() |> String.trim()
+
     with %User{} = user <- socket.assigns.current_user,
-         {post_id, ""} <- Integer.parse(to_string(id)) do
+         true <- flake_id?(post_id) do
       emoji = to_string(emoji)
       _ = Interactions.toggle_reaction(user, post_id, emoji)
 
@@ -375,8 +381,10 @@ defmodule EgregorosWeb.StatusLive do
   end
 
   def handle_event("toggle_bookmark", %{"id" => id}, socket) do
+    post_id = id |> to_string() |> String.trim()
+
     with %User{} = user <- socket.assigns.current_user,
-         {post_id, ""} <- Integer.parse(to_string(id)) do
+         true <- flake_id?(post_id) do
       _ = Interactions.toggle_bookmark(user, post_id)
 
       {:noreply, refresh_thread(socket)}
@@ -390,8 +398,10 @@ defmodule EgregorosWeb.StatusLive do
   end
 
   def handle_event("vote_on_poll", %{"poll-id" => poll_id, "choices" => choices}, socket) do
+    poll_id = poll_id |> to_string() |> String.trim()
+
     with %User{} = user <- socket.assigns.current_user,
-         {poll_id, ""} <- Integer.parse(to_string(poll_id)),
+         true <- flake_id?(poll_id),
          %{type: "Question"} = question <- Objects.get(poll_id),
          choices <- parse_choices(choices),
          {:ok, _updated} <- Publish.vote_on_poll(user, question, choices) do
@@ -434,8 +444,10 @@ defmodule EgregorosWeb.StatusLive do
   end
 
   def handle_event("delete_post", %{"id" => id}, socket) do
+    post_id = id |> to_string() |> String.trim()
+
     with %User{} = user <- socket.assigns.current_user,
-         {post_id, ""} <- Integer.parse(to_string(id)),
+         true <- flake_id?(post_id),
          {:ok, _delete} <- Interactions.delete_post(user, post_id) do
       socket =
         case socket.assigns.status do
@@ -892,14 +904,8 @@ defmodule EgregorosWeb.StatusLive do
     if uuid == "" do
       nil
     else
-      case Integer.parse(uuid) do
-        {id, ""} ->
-          Objects.get(id)
-
-        _ ->
-          ap_id = Endpoint.url() <> "/objects/" <> uuid
-          Objects.get_by_ap_id(ap_id)
-      end
+      ap_id = Endpoint.url() <> "/objects/" <> uuid
+      Objects.get_by_ap_id(ap_id) || Objects.get(uuid)
     end
   end
 
@@ -1254,7 +1260,7 @@ defmodule EgregorosWeb.StatusLive do
           _ -> ""
         end
 
-      if ap_id != "" and is_integer(object_id) do
+      if ap_id != "" and is_binary(object_id) and object_id != "" do
         acc
         |> put_in([:dom_id_by_ap_id, ap_id], "post-#{object_id}")
         |> put_in([:handle_by_ap_id, ap_id], handle)
@@ -1462,4 +1468,10 @@ defmodule EgregorosWeb.StatusLive do
   end
 
   defp parse_choices(_choices), do: []
+
+  defp flake_id?(id) when is_binary(id) do
+    match?(<<_::128>>, FlakeId.from_string(id))
+  end
+
+  defp flake_id?(_id), do: false
 end

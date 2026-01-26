@@ -20,7 +20,7 @@ defmodule Egregoros.AvatarStorage.LocalTest do
 
   test "stores an avatar and returns the public url path" do
     root = uploads_root()
-    user = %{id: 123}
+    user = %{id: "123"}
 
     upload_path = write_temp_file!("avatar.png", "png")
 
@@ -38,7 +38,7 @@ defmodule Egregoros.AvatarStorage.LocalTest do
 
   test "rejects unsupported avatar content types" do
     root = uploads_root()
-    user = %{id: 1}
+    user = %{id: "1"}
 
     upload_path = write_temp_file!("avatar.txt", "nope")
 
@@ -53,7 +53,7 @@ defmodule Egregoros.AvatarStorage.LocalTest do
 
   test "rejects avatars larger than the size limit" do
     root = uploads_root()
-    user = %{id: 1}
+    user = %{id: "1"}
 
     upload_path = write_temp_file!("big.png", :binary.copy("a", 5_000_001))
 
@@ -68,7 +68,7 @@ defmodule Egregoros.AvatarStorage.LocalTest do
 
   test "returns a file error when the upload path is missing" do
     root = uploads_root()
-    user = %{id: 1}
+    user = %{id: "1"}
 
     upload = %Plug.Upload{
       path: Path.join(root, "missing.png"),

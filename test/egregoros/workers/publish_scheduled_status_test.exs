@@ -6,8 +6,8 @@ defmodule Egregoros.Workers.PublishScheduledStatusTest do
   alias Egregoros.Users
   alias Egregoros.Workers.PublishScheduledStatus
 
-  test "perform/1 publishes when scheduled_status_id is an integer" do
-    assert :ok =
+  test "perform/1 discards when scheduled_status_id is an integer" do
+    assert {:discard, :invalid_args} =
              PublishScheduledStatus.perform(%Oban.Job{
                args: %{"scheduled_status_id" => 123_456_789}
              })
@@ -74,7 +74,7 @@ defmodule Egregoros.Workers.PublishScheduledStatusTest do
 
     assert {:error, :invalid_media_id} =
              PublishScheduledStatus.perform(%Oban.Job{
-               args: %{"scheduled_status_id" => Integer.to_string(scheduled_status.id)}
+               args: %{"scheduled_status_id" => scheduled_status.id}
              })
   end
 end

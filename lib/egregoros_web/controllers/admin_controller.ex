@@ -70,8 +70,9 @@ defmodule EgregorosWeb.AdminController do
   end
 
   def delete_relay(conn, %{"id" => id}) do
-    with {id, _rest} <- Integer.parse(to_string(id)),
-         {:ok, _relay} <- Relays.unsubscribe(id) do
+    id = id |> to_string() |> String.trim()
+
+    with {:ok, _relay} <- Relays.unsubscribe(id) do
       conn
       |> put_flash(:info, "Relay unsubscribed.")
       |> redirect(to: ~p"/admin")

@@ -630,8 +630,10 @@ defmodule EgregorosWeb.TimelineLive do
   end
 
   def handle_event("toggle_like", %{"id" => id} = params, socket) do
+    post_id = id |> to_string() |> String.trim()
+
     with %User{} = user <- socket.assigns.current_user,
-         {post_id, ""} <- Integer.parse(to_string(id)) do
+         true <- flake_id?(post_id) do
       _ = Interactions.toggle_like(user, post_id)
 
       {:noreply, refresh_post(socket, post_id, feed_id(params, post_id))}
@@ -645,8 +647,10 @@ defmodule EgregorosWeb.TimelineLive do
   end
 
   def handle_event("toggle_repost", %{"id" => id} = params, socket) do
+    post_id = id |> to_string() |> String.trim()
+
     with %User{} = user <- socket.assigns.current_user,
-         {post_id, ""} <- Integer.parse(to_string(id)) do
+         true <- flake_id?(post_id) do
       _ = Interactions.toggle_repost(user, post_id)
 
       {:noreply, refresh_post(socket, post_id, feed_id(params, post_id))}
@@ -660,8 +664,10 @@ defmodule EgregorosWeb.TimelineLive do
   end
 
   def handle_event("toggle_reaction", %{"id" => id, "emoji" => emoji} = params, socket) do
+    post_id = id |> to_string() |> String.trim()
+
     with %User{} = user <- socket.assigns.current_user,
-         {post_id, ""} <- Integer.parse(to_string(id)) do
+         true <- flake_id?(post_id) do
       emoji = to_string(emoji)
       _ = Interactions.toggle_reaction(user, post_id, emoji)
 
@@ -676,8 +682,10 @@ defmodule EgregorosWeb.TimelineLive do
   end
 
   def handle_event("toggle_bookmark", %{"id" => id} = params, socket) do
+    post_id = id |> to_string() |> String.trim()
+
     with %User{} = user <- socket.assigns.current_user,
-         {post_id, ""} <- Integer.parse(to_string(id)) do
+         true <- flake_id?(post_id) do
       _ = Interactions.toggle_bookmark(user, post_id)
 
       {:noreply, refresh_post(socket, post_id, feed_id(params, post_id))}
@@ -691,8 +699,10 @@ defmodule EgregorosWeb.TimelineLive do
   end
 
   def handle_event("vote_on_poll", %{"poll-id" => poll_id, "choices" => choices} = params, socket) do
+    poll_id = poll_id |> to_string() |> String.trim()
+
     with %User{} = user <- socket.assigns.current_user,
-         {poll_id, ""} <- Integer.parse(to_string(poll_id)),
+         true <- flake_id?(poll_id),
          %{type: "Question"} = question <- Objects.get(poll_id),
          choices <- parse_choices(choices),
          {:ok, _updated} <- Publish.vote_on_poll(user, question, choices) do
@@ -726,8 +736,10 @@ defmodule EgregorosWeb.TimelineLive do
 
   def handle_event("vote_on_poll", %{"poll-id" => poll_id} = params, socket) do
     # Handle case where no choices were selected
+    poll_id = poll_id |> to_string() |> String.trim()
+
     with %User{} <- socket.assigns.current_user,
-         {poll_id, ""} <- Integer.parse(to_string(poll_id)) do
+         true <- flake_id?(poll_id) do
       {:noreply,
        socket
        |> put_flash(:error, "Please select at least one option.")
@@ -742,8 +754,10 @@ defmodule EgregorosWeb.TimelineLive do
   end
 
   def handle_event("delete_post", %{"id" => id}, socket) do
+    post_id = id |> to_string() |> String.trim()
+
     with %User{} = user <- socket.assigns.current_user,
-         {post_id, ""} <- Integer.parse(to_string(id)),
+         true <- flake_id?(post_id),
          {:ok, _delete} <- Interactions.delete_post(user, post_id) do
       {:noreply,
        socket
@@ -805,7 +819,7 @@ defmodule EgregorosWeb.TimelineLive do
         cursor =
           case socket.assigns.posts_cursor do
             nil -> post.id
-            existing -> min(existing, post.id)
+            existing -> min_flake_id(existing, post.id)
           end
 
         {:noreply,
@@ -843,7 +857,7 @@ defmodule EgregorosWeb.TimelineLive do
   end
 
   @impl true
-  def handle_info({:post_deleted, %{id: id}}, socket) when is_integer(id) do
+  def handle_info({:post_deleted, %{id: id}}, socket) when is_binary(id) do
     pending_posts =
       socket.assigns.pending_posts
       |> Enum.reject(&(&1.id == id))
@@ -1415,11 +1429,11 @@ defmodule EgregorosWeb.TimelineLive do
     post = List.last(posts)
 
     cond do
-      match?(%{internal: %{"for_you_like_id" => like_id}} when is_integer(like_id), post) ->
+      match?(%{internal: %{"for_you_like_id" => like_id}} when is_binary(like_id), post) ->
         %{"for_you_like_id" => like_id} = post.internal
         like_id
 
-      match?(%{internal: %{for_you_like_id: like_id}} when is_integer(like_id), post) ->
+      match?(%{internal: %{for_you_like_id: like_id}} when is_binary(like_id), post) ->
         %{for_you_like_id: like_id} = post.internal
         like_id
 
@@ -1430,13 +1444,13 @@ defmodule EgregorosWeb.TimelineLive do
 
   defp posts_cursor(posts, _timeline) when is_list(posts) do
     case List.last(posts) do
-      %{id: id} when is_integer(id) -> id
+      %{id: id} when is_binary(id) -> id
       _ -> nil
     end
   end
 
-  defp post_dom_id(%{feed_id: id}) when is_integer(id), do: "post-#{id}"
-  defp post_dom_id(%{object: %{id: id}}) when is_integer(id), do: "post-#{id}"
+  defp post_dom_id(%{feed_id: id}) when is_binary(id), do: "post-#{id}"
+  defp post_dom_id(%{object: %{id: id}}) when is_binary(id), do: "post-#{id}"
   defp post_dom_id(_post), do: Ecto.UUID.generate()
 
   @timeline_types ["Note", "Announce", "Question"]
@@ -1649,7 +1663,7 @@ defmodule EgregorosWeb.TimelineLive do
           cursor =
             case cursor do
               nil -> post.id
-              existing -> min(existing, post.id)
+              existing -> min_flake_id(existing, post.id)
             end
 
           {socket, cursor}
@@ -1673,7 +1687,7 @@ defmodule EgregorosWeb.TimelineLive do
   defp timeline_label(_timeline), do: "Public"
 
   defp refresh_post(socket, post_id, feed_id)
-       when is_integer(post_id) and is_integer(feed_id) do
+       when is_binary(post_id) and is_binary(feed_id) do
     current_user = socket.assigns.current_user
 
     case Objects.get(post_id) do
@@ -1696,7 +1710,7 @@ defmodule EgregorosWeb.TimelineLive do
   end
 
   defp refresh_announce_post(socket, feed_id, current_user)
-       when is_integer(feed_id) do
+       when is_binary(feed_id) do
     case Objects.get(feed_id) do
       nil ->
         delete_post(socket, feed_id)
@@ -1712,18 +1726,18 @@ defmodule EgregorosWeb.TimelineLive do
     end
   end
 
-  defp feed_id(%{} = params, fallback) when is_integer(fallback) do
+  defp feed_id(%{} = params, fallback) when is_binary(fallback) do
     case Map.get(params, "feed_id") do
       nil ->
         fallback
 
       value ->
-        case Integer.parse(to_string(value)) do
-          {id, ""} -> id
-          _ -> fallback
-        end
+        id = value |> to_string() |> String.trim()
+        if flake_id?(id), do: id, else: fallback
     end
   end
+
+  defp feed_id(_params, fallback), do: fallback
 
   defp parse_choices(choices) when is_list(choices) do
     choices
@@ -1751,4 +1765,22 @@ defmodule EgregorosWeb.TimelineLive do
   end
 
   defp parse_choices(_choices), do: []
+
+  defp flake_id?(id) when is_binary(id) do
+    match?(<<_::128>>, FlakeId.from_string(id))
+  end
+
+  defp flake_id?(_id), do: false
+
+  defp min_flake_id(left, right) when is_binary(left) and is_binary(right) do
+    with <<_::128>> = left_bin <- FlakeId.from_string(left),
+         <<_::128>> = right_bin <- FlakeId.from_string(right) do
+      if left_bin <= right_bin, do: left, else: right
+    else
+      _ -> left
+    end
+  end
+
+  defp min_flake_id(nil, right) when is_binary(right), do: right
+  defp min_flake_id(left, _right), do: left
 end

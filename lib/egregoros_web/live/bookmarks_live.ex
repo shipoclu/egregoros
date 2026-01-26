@@ -286,8 +286,10 @@ defmodule EgregorosWeb.BookmarksLive do
   end
 
   def handle_event("toggle_like", %{"id" => id}, socket) do
+    post_id = id |> to_string() |> String.trim()
+
     with %User{} = user <- socket.assigns.current_user,
-         {post_id, ""} <- Integer.parse(to_string(id)) do
+         true <- flake_id?(post_id) do
       _ = Interactions.toggle_like(user, post_id)
 
       socket =
@@ -307,8 +309,10 @@ defmodule EgregorosWeb.BookmarksLive do
   end
 
   def handle_event("toggle_repost", %{"id" => id}, socket) do
+    post_id = id |> to_string() |> String.trim()
+
     with %User{} = user <- socket.assigns.current_user,
-         {post_id, ""} <- Integer.parse(to_string(id)) do
+         true <- flake_id?(post_id) do
       _ = Interactions.toggle_repost(user, post_id)
       {:noreply, refresh_post(socket, post_id)}
     else
@@ -321,8 +325,10 @@ defmodule EgregorosWeb.BookmarksLive do
   end
 
   def handle_event("toggle_reaction", %{"id" => id, "emoji" => emoji}, socket) do
+    post_id = id |> to_string() |> String.trim()
+
     with %User{} = user <- socket.assigns.current_user,
-         {post_id, ""} <- Integer.parse(to_string(id)),
+         true <- flake_id?(post_id),
          emoji when is_binary(emoji) <- to_string(emoji) do
       _ = Interactions.toggle_reaction(user, post_id, emoji)
       {:noreply, refresh_post(socket, post_id)}
@@ -336,8 +342,10 @@ defmodule EgregorosWeb.BookmarksLive do
   end
 
   def handle_event("toggle_bookmark", %{"id" => id}, socket) do
+    post_id = id |> to_string() |> String.trim()
+
     with %User{} = user <- socket.assigns.current_user,
-         {post_id, ""} <- Integer.parse(to_string(id)),
+         true <- flake_id?(post_id),
          {:ok, result} <- Interactions.toggle_bookmark(user, post_id) do
       socket =
         case {socket.assigns.kind, result} do
@@ -359,8 +367,10 @@ defmodule EgregorosWeb.BookmarksLive do
   end
 
   def handle_event("delete_post", %{"id" => id}, socket) do
+    post_id = id |> to_string() |> String.trim()
+
     with %User{} = user <- socket.assigns.current_user,
-         {post_id, ""} <- Integer.parse(to_string(id)),
+         true <- flake_id?(post_id),
          {:ok, _delete} <- Interactions.delete_post(user, post_id) do
       {:noreply,
        socket
@@ -547,7 +557,7 @@ defmodule EgregorosWeb.BookmarksLive do
     """
   end
 
-  defp refresh_post(socket, post_id) when is_integer(post_id) do
+  defp refresh_post(socket, post_id) when is_binary(post_id) do
     current_user = socket.assigns.current_user
 
     case Objects.get(post_id) do
@@ -563,7 +573,7 @@ defmodule EgregorosWeb.BookmarksLive do
     end
   end
 
-  defp refresh_or_drop_favourite(socket, post_id) when is_integer(post_id) do
+  defp refresh_or_drop_favourite(socket, post_id) when is_binary(post_id) do
     current_user = socket.assigns.current_user
 
     case Objects.get(post_id) do
@@ -652,20 +662,26 @@ defmodule EgregorosWeb.BookmarksLive do
     |> Repo.all()
   end
 
-  defp maybe_where_max_id(query, max_id) when is_integer(max_id) and max_id > 0 do
-    from([r, _o] in query, where: r.id < ^max_id)
+  defp maybe_where_max_id(query, max_id) when is_binary(max_id) do
+    max_id = String.trim(max_id)
+
+    if flake_id?(max_id) do
+      from([r, _o] in query, where: r.id < ^max_id)
+    else
+      query
+    end
   end
 
   defp maybe_where_max_id(query, _max_id), do: query
 
   defp saved_cursor(saved) when is_list(saved) do
     case List.last(saved) do
-      {cursor_id, _object} when is_integer(cursor_id) -> cursor_id
+      {cursor_id, _object} when is_binary(cursor_id) -> cursor_id
       _ -> nil
     end
   end
 
-  defp post_dom_id(%{object: %{id: id}}) when is_integer(id), do: "post-#{id}"
+  defp post_dom_id(%{object: %{id: id}}) when is_binary(id), do: "post-#{id}"
   defp post_dom_id(_post), do: Ecto.UUID.generate()
 
   defp normalize_limit(limit) when is_integer(limit) do
@@ -677,16 +693,19 @@ defmodule EgregorosWeb.BookmarksLive do
   defp normalize_limit(_), do: @page_size
 
   defp normalize_id(nil), do: nil
-  defp normalize_id(id) when is_integer(id) and id > 0, do: id
 
   defp normalize_id(id) when is_binary(id) do
-    case Integer.parse(id) do
-      {int, ""} when int > 0 -> int
-      _ -> nil
-    end
+    id = String.trim(id)
+    if flake_id?(id), do: id, else: nil
   end
 
   defp normalize_id(_), do: nil
+
+  defp flake_id?(id) when is_binary(id) do
+    match?(<<_::128>>, FlakeId.from_string(id))
+  end
+
+  defp flake_id?(_id), do: false
 
   defp notifications_count(nil), do: 0
 

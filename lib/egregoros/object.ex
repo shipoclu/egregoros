@@ -3,6 +3,9 @@ defmodule Egregoros.Object do
 
   import Ecto.Changeset
 
+  @primary_key {:id, FlakeId.Ecto.Type, autogenerate: true}
+  @foreign_key_type FlakeId.Ecto.Type
+
   @required_fields ~w(ap_id type data)a
   @optional_fields ~w(actor object published local thread_replies_checked_at internal)a
 

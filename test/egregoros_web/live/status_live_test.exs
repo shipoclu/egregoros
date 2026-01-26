@@ -875,7 +875,7 @@ defmodule EgregorosWeb.StatusLiveTest do
     nickname = Path.basename(path)
     handle = nickname <> "@shitposter.world"
 
-    status_path = "/@" <> handle <> "/" <> Integer.to_string(note.id)
+    status_path = "/@" <> handle <> "/" <> note.id
 
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     assert {:ok, view, _html} = live(conn, status_path <> "?reply=true")
@@ -910,7 +910,7 @@ defmodule EgregorosWeb.StatusLiveTest do
     assert {:ok, question} = Pipeline.ingest(poll, local: false)
 
     handle = "bob@remote.example"
-    path = "/@" <> handle <> "/" <> Integer.to_string(question.id)
+    path = "/@" <> handle <> "/" <> question.id
 
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     assert {:ok, view, _html} = live(conn, path)

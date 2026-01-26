@@ -38,7 +38,7 @@ defmodule EgregorosWeb.PasskeysControllerTest do
       |> post("/passkeys/registration/finish", Map.put(payload, "_csrf_token", csrf_token))
 
     assert %{"redirect_to" => "/"} = json_response(conn, 201)
-    assert is_integer(get_session(conn, :user_id))
+    assert is_binary(get_session(conn, :user_id))
 
     assert user = Users.get_by_nickname("alice")
     assert user.local

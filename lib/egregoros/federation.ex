@@ -18,7 +18,7 @@ defmodule Egregoros.Federation do
   end
 
   def follow_remote_async(%User{id: user_id} = local_user, handle)
-      when is_integer(user_id) and is_binary(handle) do
+      when is_binary(user_id) and is_binary(handle) do
     with {:ok, nickname, host} <- parse_remote_handle(handle),
          :ok <- SafeURL.validate_http_url_no_dns("https://" <> host <> "/") do
       handle = nickname <> "@" <> String.downcase(host)

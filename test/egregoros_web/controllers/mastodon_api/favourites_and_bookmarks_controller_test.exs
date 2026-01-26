@@ -42,7 +42,7 @@ defmodule EgregorosWeb.MastodonAPI.FavouritesAndBookmarksControllerTest do
     response = conn |> get("/api/v1/favourites") |> json_response(200)
 
     assert [%{} = status] = response
-    assert status["id"] == Integer.to_string(object.id)
+    assert status["id"] == object.id
     assert status["favourited"] == true
   end
 
@@ -77,7 +77,7 @@ defmodule EgregorosWeb.MastodonAPI.FavouritesAndBookmarksControllerTest do
     response = conn |> get("/api/v1/bookmarks") |> json_response(200)
 
     assert [%{} = status] = response
-    assert status["id"] == Integer.to_string(object.id)
+    assert status["id"] == object.id
     assert status["bookmarked"] == true
   end
 end

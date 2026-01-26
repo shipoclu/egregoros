@@ -3,6 +3,9 @@ defmodule Egregoros.E2EE.ActorKey do
 
   import Ecto.Changeset
 
+  @primary_key {:id, FlakeId.Ecto.Type, autogenerate: true}
+  @foreign_key_type FlakeId.Ecto.Type
+
   @fields ~w(actor_ap_id kid jwk fingerprint position present fetched_at)a
   @required_fields ~w(actor_ap_id kid jwk position present fetched_at)a
 

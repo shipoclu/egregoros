@@ -31,7 +31,7 @@ defmodule EgregorosWeb.MastodonAPI.PollRenderer do
     expired = expired?(expires_at)
 
     poll = %{
-      "id" => Integer.to_string(object.id),
+      "id" => poll_id(object),
       "expires_at" => format_datetime(expires_at),
       "expired" => expired,
       "multiple" => multiple,
@@ -59,6 +59,9 @@ defmodule EgregorosWeb.MastodonAPI.PollRenderer do
   end
 
   def render(_object, _current_user), do: nil
+
+  defp poll_id(%Object{id: id}) when is_binary(id) and id != "", do: id
+  defp poll_id(_object), do: "unknown"
 
   defp render_option(option) when is_map(option) do
     name = Map.get(option, "name", "")

@@ -165,10 +165,10 @@ defmodule Egregoros.DirectMessagesTest do
     assert [^newest, ^middle, ^oldest] = DirectMessages.list_for_user(alice)
 
     assert DirectMessages.list_for_user(alice, max_id: middle.id) == [oldest]
-    assert DirectMessages.list_for_user(alice, max_id: Integer.to_string(middle.id)) == [oldest]
+    assert DirectMessages.list_for_user(alice, max_id: "  #{middle.id}  ") == [oldest]
 
     assert DirectMessages.list_for_user(alice, since_id: middle.id) == [newest]
-    assert DirectMessages.list_for_user(alice, since_id: Integer.to_string(middle.id)) == [newest]
+    assert DirectMessages.list_for_user(alice, since_id: "  #{middle.id}  ") == [newest]
   end
 
   test "direct?/1 returns true only when not public and not followers-only" do

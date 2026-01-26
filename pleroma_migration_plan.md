@@ -1,0 +1,260 @@
+# Pleroma → Egregoros migration plan (draft)
+
+This document is an engineering plan for migrating an existing **Pleroma** instance (codebase: `/Users/lainsoykaf/repos/pleroma-worktrees/develop`) to **Egregoros** (this repo), with a focus on preserving federation identity and minimizing user disruption.
+
+It’s intentionally split into:
+- **What’s feasible today** (with the current Egregoros architecture),
+- **What gaps exist** (based on concrete Pleroma implementation details),
+- **A phased plan** (from “minimum viable migration” to “near-seamless migration”).
+
+## 0) Executive summary
+
+Migration is feasible, but there are a few “must solve” compatibility areas:
+
+1) **Passwords**: Pleroma stores password hashes in bcrypt/argon2/pbkdf2 formats and verifies them via pattern matching on the hash prefix; Egregoros uses a custom `pbkdf2_sha256$...` format and currently won’t verify Pleroma hashes.
+2) **Media URLs and storage layout**: Pleroma’s default upload URLs are under `/media/<uuid>/<filename>`; Egregoros serves uploads under `/uploads/...` with a different filesystem layout.
+3) **Activity IDs and fetchability**: Pleroma ActivityPub activity IDs are `/activities/<uuid>`; Egregoros currently generates `/activities/<type>/<uuid>` and **does not expose any `/activities/...` route**.
+4) **IDs used by the Mastodon API**: Pleroma uses Flake IDs (base62 string) for `users.id`, `activities.id`, etc (stored in Postgres `uuid` via `FlakeId.Ecto.CompatType`), while Egregoros uses integer primary keys and returns decimal string IDs in its Mastodon API. This primarily impacts “seamless client continuity”.
+
+Given that, there are two sensible migration modes:
+
+- **Mode A (MVP / federation-first):** preserve **ActivityPub URLs**, keys, posts, follows, and media; users re-login and re-authorize apps; Mastodon API IDs change.
+- **Mode B (seamless-ish):** additionally preserve Pleroma-style IDs (flake/base62) for accounts + statuses (and ideally notifications/media), so existing clients don’t “forget” everything.
+
+## 1) What Pleroma actually does (relevant implementation facts)
+
+### 1.1 ActivityPub URL schemes
+
+Pleroma generates:
+- Object IDs: `https://<domain>/objects/<uuid>` via `Pleroma.Web.ActivityPub.Utils.generate_object_id/0` (UUID). (`lib/pleroma/web/activity_pub/utils.ex`)
+- Activity IDs: `https://<domain>/activities/<uuid>` via `Pleroma.Web.ActivityPub.Utils.generate_activity_id/0` → `generate_id("activities")`. (`lib/pleroma/web/activity_pub/utils.ex`)
+- Context IDs: `https://<domain>/contexts/<uuid>` via `generate_context_id/0`. (`lib/pleroma/web/activity_pub/utils.ex`)
+
+Egregoros generates:
+- Notes: `https://<domain>/objects/<uuid>` (`lib/egregoros/activities/note.ex`)
+- Activities: `https://<domain>/activities/<type>/<uuid>` (`lib/egregoros/activities/*`)
+…while currently only routing `/objects/:uuid` and `/users/:nickname`, not `/activities/...`. (`lib/egregoros_web/router.ex`)
+
+### 1.2 Primary keys / “flake IDs” in this Pleroma worktree
+
+This Pleroma tree uses `FlakeId.Ecto.CompatType` as the `@primary_key` for (at least) users and activities:
+- `@primary_key {:id, FlakeId.Ecto.CompatType, autogenerate: true}` in `Pleroma.User` and `Pleroma.Activity`. (`lib/pleroma/user.ex`, `lib/pleroma/activity.ex`)
+
+`FlakeId.Ecto.CompatType`:
+- uses **Postgres `uuid`** as the storage type (`def type, do: :uuid`)
+- autogenerates via `FlakeId.get/0`
+- loads/casts to a **base62 string** (`FlakeId.to_string/1`) and dumps back to 128-bit binary. (`deps/flake_id/lib/flake_id/ecto/compat_type.ex`, `deps/flake_id/lib/flake_id.ex`)
+
+Implication:
+- Pleroma’s Mastodon API IDs (e.g. `status.id`) are base62 strings like `"9n2ciuz1wdesFnrGJU"`, because they render `to_string(activity.id)` (see `StatusView`). (`lib/pleroma/web/mastodon_api/views/status_view.ex`)
+- If we want **client continuity**, Egregoros needs to either adopt this ID format for the Mastodon API, or maintain a mapping layer.
+
+### 1.3 Password hashing
+
+Pleroma:
+- stores `users.password_hash` in a format that can be bcrypt (`$2...`), pbkdf2 (`$pbkdf2...`), or argon2 (`$argon2...`).
+- verifies using `Pleroma.Web.Plugs.AuthenticationPlug.checkpw/2` which dispatches by prefix. (`lib/pleroma/web/plugs/authentication_plug.ex`)
+
+Egregoros:
+- uses a custom `pbkdf2_sha256$<iters>$<salt>$<hash>` format. (`lib/egregoros/password.ex`)
+
+Implication:
+- importing `password_hash` from Pleroma will not work until Egregoros supports verifying these hashes (or forces password resets).
+
+### 1.4 Upload URLs and storage
+
+Pleroma uploads:
+- default `base_url` is `Endpoint.url() <> "/media/"` (`Pleroma.Upload.base_url/0`)
+- local uploader stores files under `uploads_root/<upload.path>` where `upload.path` defaults to `<uuid>/<filename>` (`Pleroma.Upload.store/2`, `Pleroma.Uploaders.Local.put_file/1`)
+So historical posts will reference URLs like: `https://<domain>/media/<uuid>/<filename>`.
+
+Egregoros uploads:
+- served under `/uploads/...` (see `EgregorosWeb.Plugs.Uploads`)
+- stored in a different directory layout (`uploads/media/<user_id>/...`, `uploads/avatars/<user_id>/...` etc).
+
+Implication:
+- without explicit compatibility, old media links break after cutover.
+
+## 2) What Egregoros already matches well
+
+Good news: the core federation URL shape is already close to Pleroma:
+- `/users/:nickname`, `/users/:nickname/inbox`, `/users/:nickname/outbox`, `/users/:nickname/followers`, `/users/:nickname/following`
+- `/inbox` and `/outbox`
+- `/objects/:uuid`
+(`lib/egregoros_web/router.ex`)
+
+So **preserving ActivityPub actor IDs and object IDs** is mostly a matter of importing the right data and ensuring Egregoros serves the same domain.
+
+## 3) Migration goals (clarify before implementing)
+
+### 3.1 Minimum viable goals (recommended starting point)
+- Preserve **actor IDs** and **object IDs** (AP URIs).
+- Preserve **local users’ keypairs**, so remote servers can still verify signatures.
+- Preserve **all local posts** (Create + Note/Question/etc).
+- Preserve **follow graph** (followers + following).
+- Preserve **media URLs** (`/media/...`) so historical attachments still load.
+
+Acceptable trade-offs:
+- Users re-login, re-authorize apps (OAuth tokens not migrated).
+- Mastodon API IDs change (clients refresh state).
+
+### 3.2 “Seamless-ish” goals (optional)
+- Preserve Pleroma’s **account IDs** and **status IDs** as seen by the Mastodon API (flake/base62).
+- Preserve scheduled posts, bookmarks, markers, filters, notification cursors, etc.
+
+This requires extra schema/API compatibility work in Egregoros.
+
+## 4) Proposed Egregoros changes (by priority)
+
+### 4.1 Password compatibility (high priority)
+
+Add a password verification layer similar to Pleroma:
+- Accept `$2...` → bcrypt verify
+- Accept `$argon2...` → argon2 verify
+- Accept `$pbkdf2...` → pbkdf2-sha512 verify (Pleroma’s)
+- Accept current Egregoros `pbkdf2_sha256$...`
+
+Then “rehash on login” into the Egregoros native format.
+
+This keeps migration friction low without needing to import Pleroma auth/session tables.
+
+### 4.2 Serve Pleroma media URLs (high priority)
+
+Add a Plug/static mount for `/media/*`:
+- configurable filesystem root pointing at the existing Pleroma uploads directory
+- served read-only (or optionally allow new uploads there too, but that’s not required for migration)
+
+Alternatively, implement a 301 redirect `/media/<path>` → `/uploads/<mapped-path>` but this is hard because Egregoros’ storage layout differs; serving the old directory is the simplest.
+
+### 4.3 Activity fetch endpoint(s) (medium-high priority)
+
+Implement GET:
+- `/activities/:uuid` (Pleroma style), and optionally also accept Egregoros’ current `/activities/<type>/<uuid>`
+Return `application/activity+json` and serve the stored activity by AP id.
+
+This is important because historical activity IDs in remote databases point to `/activities/<uuid>`.
+
+### 4.4 Decide on Mastodon API ID strategy (big fork)
+
+**Option 1: Mapping layer (smaller DB change)**
+- Keep integer primary keys internally.
+- Add a column (or table) to store “external_id” for relevant resources:
+  - accounts (users)
+  - statuses (notes/questions/announces)
+  - media attachments
+  - notifications
+- Update Mastodon API renderers to emit `external_id` when present.
+- Update controllers to accept either integer IDs or external IDs and resolve them.
+- Update pagination to work with external IDs.
+
+**Option 2: Adopt Flake IDs as primary keys (bigger, but clean)**
+- Introduce FlakeId generation and change `users.id`, `objects.id`, etc to `uuid` flake IDs (base62 string at the API boundary).
+- This aligns with Pleroma’s scheme and can simplify “seamless-ish” migration, but it’s a sweeping refactor in Egregoros.
+
+Recommendation:
+- Start with **Option 1** unless we’re committed to full Pleroma-like client continuity.
+
+### 4.5 Prevent federation side-effects during import (required for any importer)
+
+Egregoros currently delivers many local side effects purely gated by `opts[:local]` (e.g. Like/Announce/Delete/Undo/Follow), not by a `deliver: false` option.
+
+For safe imports, we need either:
+- a global `side_effects: false` / `deliver: false` option honored by all activities, **or**
+- an importer that inserts DB rows directly and never calls `Pipeline.ingest/2`.
+
+## 5) Import strategy (recommended: DB-level import, idempotent, no side effects)
+
+Because table names collide (`users`, `objects` exist in both apps), do **not** point Egregoros at the same DB.
+
+Instead:
+- Create a fresh Egregoros DB.
+- Treat the Pleroma DB as **read-only source**.
+- Run a one-shot importer (Mix task) that reads from Pleroma and writes to Egregoros.
+
+### 5.1 Data sets to import (MVP)
+
+1) **Local users**
+   - from `pleroma.users`
+   - map:
+     - `nickname`, `ap_id`, `inbox`, `outbox`, `public_key`
+     - private key: `users.keys` (RSA private pem) → `egregoros.users.private_key`
+     - profile: `name`, `bio`, avatar/banner URLs (best-effort)
+     - auth: `password_hash` (store as-is; requires password compatibility in Egregoros)
+2) **Remote users (minimum subset)**
+   - at least: users involved in follow graph and in local objects/activities
+   - split Pleroma remote nickname (`"user@domain"`) into `nickname` + `domain` for Egregoros
+3) **Objects**
+   - from `pleroma.objects.data` (JSONB)
+   - insert into `egregoros.objects` with:
+     - `ap_id = data["id"]`
+     - `type = data["type"]`
+     - `actor` derived from `actor` or `attributedTo`
+     - `published` from `data["published"]` when present
+     - `local` derived from domain match
+4) **Activities**
+   - from `pleroma.activities.data` (JSONB)
+   - insert into `egregoros.objects` similarly
+   - set `object` column from the activity’s object id (for Create, use embedded object id if present)
+5) **Follow graph**
+   - Prefer deriving from Pleroma’s `following_relationships` (accepted state) and/or Follow activities:
+     - insert into `egregoros.relationships` with
+       - `type = "Follow"` (or `"FollowRequest"` if pending)
+       - `actor = follower.ap_id`
+       - `object = following.ap_id`
+       - `activity_ap_id = <follow activity id>` (must be non-null in Egregoros DB)
+
+### 5.2 “Nice to have” imports
+- Likes / boosts / emoji reactions (relationships)
+- Scheduled posts (`scheduled_activities` → `scheduled_statuses`)
+- Markers / bookmarks
+
+### 5.3 Preserve ordering / timestamps
+
+Egregoros currently orders many collections by `objects.id` and/or `inserted_at`.
+If we bulk-import with “now” timestamps, timelines and outbox ordering will be wrong.
+
+Importer should preserve:
+- `inserted_at` and `updated_at` from Pleroma rows where possible
+- and/or `published` timestamps
+
+This likely implies using `Repo.insert_all/3` so we can set timestamps explicitly in bulk.
+
+## 6) Cutover procedure (Mode A / MVP)
+
+1) Put Pleroma in maintenance / read-only, stop federation jobs if possible.
+2) Snapshot:
+   - Postgres DB dump
+   - uploads directory (Pleroma local storage)
+3) Deploy Egregoros on the same domain (behind the same proxy).
+4) Configure Egregoros:
+   - endpoint base URL matches old Pleroma
+   - `/media/*` serves the old uploads directory
+5) Run importer into a fresh Egregoros DB.
+6) Smoke tests:
+   - local login for at least one migrated user
+   - actor + object URLs resolve
+   - `/media/...` resolves for a historical post
+   - fedbox: follow, receive post, replies, likes, boosts, deletes
+7) Re-enable federation and monitor.
+
+Rollback: switch traffic back to the old Pleroma deployment and DB snapshot.
+
+## 7) Risks / unknowns to validate early
+
+- Some remote servers may dereference old activity IDs (`/activities/<uuid>`). Egregoros needs to serve them.
+- Media path mismatches will break historical posts unless `/media` is preserved.
+- Importing large datasets: performance and lock time; design importer to be resumable and idempotent.
+- If we want “seamless-ish” client continuity, ID strategy becomes a major architectural decision (flake/base62 vs int).
+
+## 8) Next concrete steps (recommended)
+
+1) Decide migration mode (A vs B).
+2) Prototype a read-only “Pleroma DB scanner”:
+   - count rows by type for `activities.data->>'type'` and `objects.data->>'type'`
+   - list unknown/unhandled types
+3) Implement Egregoros password compatibility.
+4) Implement `/media` static serving.
+5) Implement `/activities/:uuid` fetch controller.
+6) Implement `mix egregoros.import_pleroma` importer (users → objects → activities → follows).
+7) Test in fedbox-like environment by restoring a small Pleroma DB snapshot into a container and running the importer + federation smoke tests.
+

@@ -3,6 +3,9 @@ defmodule Egregoros.Marker do
 
   import Ecto.Changeset
 
+  @primary_key {:id, FlakeId.Ecto.Type, autogenerate: true}
+  @foreign_key_type FlakeId.Ecto.Type
+
   schema "markers" do
     field :timeline, :string
     field :last_read_id, :string

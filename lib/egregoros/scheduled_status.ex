@@ -3,6 +3,9 @@ defmodule Egregoros.ScheduledStatus do
 
   import Ecto.Changeset
 
+  @primary_key {:id, FlakeId.Ecto.Type, autogenerate: true}
+  @foreign_key_type FlakeId.Ecto.Type
+
   @required_fields ~w(user_id scheduled_at params)a
   @optional_fields ~w(oban_job_id published_at)a
 

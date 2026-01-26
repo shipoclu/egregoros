@@ -64,7 +64,7 @@ defmodule EgregorosWeb.MastodonAPI.PerformanceRegressionsTest do
     response = json_response(conn, 200)
 
     for follower <- followers do
-      assert Enum.any?(response, &(&1["id"] == Integer.to_string(follower.id)))
+      assert Enum.any?(response, &(&1["id"] == follower.id))
     end
 
     assert length(queries) <= 12
@@ -99,7 +99,7 @@ defmodule EgregorosWeb.MastodonAPI.PerformanceRegressionsTest do
     response = json_response(conn, 200)
 
     for target <- targets do
-      assert Enum.any?(response, &(&1["id"] == Integer.to_string(target.id)))
+      assert Enum.any?(response, &(&1["id"] == target.id))
     end
 
     assert length(queries) <= 12
@@ -149,7 +149,7 @@ defmodule EgregorosWeb.MastodonAPI.PerformanceRegressionsTest do
     response = json_response(conn, 200)
 
     for liker <- likers do
-      assert Enum.any?(response, &(&1["id"] == Integer.to_string(liker.id)))
+      assert Enum.any?(response, &(&1["id"] == liker.id))
     end
 
     assert length(queries) <= 12
@@ -199,7 +199,7 @@ defmodule EgregorosWeb.MastodonAPI.PerformanceRegressionsTest do
     response = json_response(conn, 200)
 
     for reblogger <- rebloggers do
-      assert Enum.any?(response, &(&1["id"] == Integer.to_string(reblogger.id)))
+      assert Enum.any?(response, &(&1["id"] == reblogger.id))
     end
 
     assert length(queries) <= 12

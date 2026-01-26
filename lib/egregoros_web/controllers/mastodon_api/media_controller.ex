@@ -72,7 +72,7 @@ defmodule EgregorosWeb.MastodonAPI.MediaController do
       end
 
     %{
-      "id" => Integer.to_string(object.id),
+      "id" => media_id(object),
       "type" => mastodon_media_type(media_type_from_object(object)),
       "url" => url,
       "preview_url" => preview_url,
@@ -105,6 +105,9 @@ defmodule EgregorosWeb.MastodonAPI.MediaController do
   end
 
   defp owned_media?(_object, _user), do: false
+
+  defp media_id(%Object{id: id}) when is_binary(id) and id != "", do: id
+  defp media_id(_object), do: "unknown"
 
   defp update_name(data, description) when is_map(data) and is_binary(description) do
     Map.put(data, "name", description)

@@ -3,6 +3,9 @@ defmodule Egregoros.OAuth.AuthorizationCode do
 
   import Ecto.Changeset
 
+  @primary_key {:id, FlakeId.Ecto.Type, autogenerate: true}
+  @foreign_key_type FlakeId.Ecto.Type
+
   @required_fields ~w(code redirect_uri expires_at user_id application_id)a
   @optional_fields ~w(scopes)a
 

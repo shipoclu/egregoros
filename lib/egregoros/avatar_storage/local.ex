@@ -16,7 +16,7 @@ defmodule Egregoros.AvatarStorage.Local do
   end
 
   def store_avatar(%{id: user_id}, %Plug.Upload{} = upload, uploads_root)
-      when is_integer(user_id) and is_binary(uploads_root) do
+      when is_binary(user_id) and is_binary(uploads_root) do
     with {:ok, ext} <- extension(upload),
          :ok <- validate_size(upload),
          {:ok, url_path} <- persist(upload, uploads_root, user_id, ext) do
@@ -54,9 +54,9 @@ defmodule Egregoros.AvatarStorage.Local do
   defp persist(%Plug.Upload{path: path}, uploads_root, user_id, ext)
        when is_binary(path) and is_binary(uploads_root) do
     filename = "#{Ecto.UUID.generate()}#{ext}"
-    relative_dir = Path.join(["uploads", "avatars", Integer.to_string(user_id)])
+    relative_dir = Path.join(["uploads", "avatars", user_id])
     relative_path = Path.join(relative_dir, filename)
-    destination_dir = Path.join([uploads_root, "avatars", Integer.to_string(user_id)])
+    destination_dir = Path.join([uploads_root, "avatars", user_id])
     destination_path = Path.join(destination_dir, filename)
 
     with :ok <- File.mkdir_p(destination_dir),

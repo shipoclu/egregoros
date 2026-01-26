@@ -7,7 +7,7 @@ defmodule EgregorosWeb.MastodonAPI.AppsController do
     case OAuth.create_application(params) do
       {:ok, app} ->
         json(conn, %{
-          "id" => Integer.to_string(app.id),
+          "id" => app.id,
           "name" => app.name,
           "website" => app.website,
           "redirect_uri" => List.first(app.redirect_uris) || "",

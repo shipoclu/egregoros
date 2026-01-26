@@ -8,6 +8,7 @@ defmodule Egregoros.Bench.Seed do
   alias Egregoros.User
   alias Egregoros.Object
   alias EgregorosWeb.Endpoint
+  alias FlakeId
 
   @default_password "bench-password-1234"
   @max_pg_params 65_535
@@ -88,6 +89,7 @@ defmodule Egregoros.Bench.Seed do
             actor_ap_id = "https://#{domain}/users/#{nickname}"
 
             %{
+              id: FlakeId.get(),
               nickname: nickname,
               domain: domain,
               ap_id: actor_ap_id,
@@ -116,6 +118,7 @@ defmodule Egregoros.Bench.Seed do
     {public_key, private_key} = Keys.generate_rsa_keypair()
 
     %{
+      id: FlakeId.get(),
       nickname: nickname,
       domain: nil,
       ap_id: actor_ap_id,
@@ -164,6 +167,7 @@ defmodule Egregoros.Bench.Seed do
 
         Enum.map(follow_targets, fn target ->
           %{
+            id: FlakeId.get(),
             type: "Follow",
             actor: local_user.ap_id,
             object: target,
@@ -310,6 +314,7 @@ defmodule Egregoros.Bench.Seed do
     }
 
     %{
+      id: FlakeId.get(),
       ap_id: ap_id,
       type: "Note",
       actor: actor,
@@ -372,6 +377,7 @@ defmodule Egregoros.Bench.Seed do
       end
 
     %{
+      id: FlakeId.get(),
       ap_id: ap_id,
       type: "Note",
       actor: actor,

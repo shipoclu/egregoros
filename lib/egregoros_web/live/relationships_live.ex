@@ -334,7 +334,7 @@ defmodule EgregorosWeb.RelationshipsLive do
 
   defp cursor_from_relationships(relationships) when is_list(relationships) do
     case List.last(relationships) do
-      %{id: id} when is_integer(id) -> id
+      %{id: id} when is_binary(id) -> id
       _ -> nil
     end
   end

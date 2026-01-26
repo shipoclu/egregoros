@@ -1,5 +1,5 @@
 defmodule Egregoros.Users do
-  import Ecto.Query, only: [from: 2]
+  import Ecto.Query
 
   alias Egregoros.Keys
   alias Egregoros.Password
@@ -233,14 +233,23 @@ defmodule Egregoros.Users do
     end
   end
 
-  def get(id) when is_integer(id), do: Repo.get(User, id)
-
   def get(id) when is_binary(id) do
-    case Integer.parse(id) do
-      {int, ""} -> Repo.get(User, int)
-      _ -> nil
+    id = String.trim(id)
+
+    cond do
+      id == "" ->
+        nil
+
+      true ->
+        if flake_id?(id) do
+          Repo.get(User, id)
+        else
+          nil
+        end
     end
   end
+
+  def get(_id), do: nil
 
   def get_by_nickname(nil), do: nil
 
@@ -380,21 +389,26 @@ defmodule Egregoros.Users do
   def bump_last_activity_at(_actor_ap_id, _at), do: :ok
 
   def bump_notifications_last_seen_id(%User{} = user, last_seen_id)
-      when is_integer(last_seen_id) and last_seen_id > 0 do
-    from(u in User,
-      where: u.id == ^user.id,
-      update: [
-        set: [
-          notifications_last_seen_id:
-            fragment(
-              "GREATEST(COALESCE(?, 0), ?)",
-              u.notifications_last_seen_id,
-              ^last_seen_id
-            )
+      when is_binary(last_seen_id) do
+    last_seen_id = String.trim(last_seen_id)
+
+    if flake_id?(last_seen_id) do
+      from(u in User,
+        where: u.id == ^user.id,
+        update: [
+          set: [
+            notifications_last_seen_id:
+              fragment(
+                "GREATEST(COALESCE(?, ?), ?)",
+                u.notifications_last_seen_id,
+                type(^last_seen_id, FlakeId.Ecto.Type),
+                type(^last_seen_id, FlakeId.Ecto.Type)
+              )
+          ]
         ]
-      ]
-    )
-    |> Repo.update_all([])
+      )
+      |> Repo.update_all([])
+    end
 
     :ok
   end
@@ -422,7 +436,7 @@ defmodule Egregoros.Users do
           )
         else
           from(r in Relationship,
-            where: r.id == -1,
+            where: false,
             select: %{object: r.object, followed: true}
           )
         end
@@ -565,7 +579,7 @@ defmodule Egregoros.Users do
         )
       else
         from(r in Relationship,
-          where: r.id == -1,
+          where: false,
           select: %{object: r.object, followed: true}
         )
       end
@@ -644,4 +658,25 @@ defmodule Egregoros.Users do
         []
     end
   end
+
+  defp flake_id?(id) when is_binary(id) do
+    id = String.trim(id)
+
+    cond do
+      id == "" ->
+        false
+
+      byte_size(id) < 18 ->
+        false
+
+      true ->
+        try do
+          match?(<<_::128>>, FlakeId.from_string(id))
+        rescue
+          _ -> false
+        end
+    end
+  end
+
+  defp flake_id?(_id), do: false
 end

@@ -25,7 +25,7 @@ defmodule EgregorosWeb.RegistrationControllerTest do
 
     assert redirected_to(conn) == "/"
     assert conn.private[:plug_session_info] == :renew
-    assert is_integer(get_session(conn, :user_id))
+    assert is_binary(get_session(conn, :user_id))
 
     assert user = Users.get_by_nickname("alice")
     assert user.email == nil
@@ -45,7 +45,7 @@ defmodule EgregorosWeb.RegistrationControllerTest do
 
     assert redirected_to(conn) == "/settings"
     assert conn.private[:plug_session_info] == :renew
-    assert is_integer(get_session(conn, :user_id))
+    assert is_binary(get_session(conn, :user_id))
   end
 
   test "POST /register is forbidden when registrations are closed", %{conn: conn} do

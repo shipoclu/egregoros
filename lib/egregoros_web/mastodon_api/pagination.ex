@@ -18,8 +18,8 @@ defmodule EgregorosWeb.MastodonAPI.Pagination do
         conn
 
       _ ->
-        first_id = List.first(items).id
-        last_id = List.last(items).id
+        first_id = cursor_id(List.first(items))
+        last_id = cursor_id(List.last(items))
 
         base_params =
           conn.query_params
@@ -39,14 +39,16 @@ defmodule EgregorosWeb.MastodonAPI.Pagination do
     end
   end
 
-  defp maybe_put_prev(links, conn, base_params, first_id) when is_list(links) do
-    prev_params = Map.put(base_params, "since_id", Integer.to_string(first_id))
+  defp maybe_put_prev(links, conn, base_params, first_id)
+       when is_list(links) and is_binary(first_id) and first_id != "" do
+    prev_params = Map.put(base_params, "since_id", first_id)
     prev_url = build_url(conn.request_path, prev_params)
     links ++ ["<#{prev_url}>; rel=\"prev\""]
   end
 
-  defp maybe_put_next(links, conn, base_params, last_id, true) when is_list(links) do
-    next_params = Map.put(base_params, "max_id", Integer.to_string(last_id))
+  defp maybe_put_next(links, conn, base_params, last_id, true)
+       when is_list(links) and is_binary(last_id) and last_id != "" do
+    next_params = Map.put(base_params, "max_id", last_id)
     next_url = build_url(conn.request_path, next_params)
     links ++ ["<#{next_url}>; rel=\"next\""]
   end
@@ -84,14 +86,43 @@ defmodule EgregorosWeb.MastodonAPI.Pagination do
 
   defp parse_id(nil), do: nil
 
-  defp parse_id(value) when is_integer(value) and value > 0, do: value
+  defp parse_id(value) when is_integer(value) and value > 0, do: nil
 
   defp parse_id(value) when is_binary(value) do
-    case Integer.parse(value) do
-      {int, ""} when int > 0 -> int
-      _ -> nil
+    value = String.trim(value)
+
+    cond do
+      value == "" ->
+        nil
+
+      true ->
+        if flake_id?(value), do: value, else: nil
     end
   end
 
   defp parse_id(_), do: nil
+
+  defp cursor_id(%{id: id}) when is_binary(id), do: String.trim(id)
+  defp cursor_id(_item), do: nil
+
+  defp flake_id?(id) when is_binary(id) do
+    id = String.trim(id)
+
+    cond do
+      id == "" ->
+        false
+
+      byte_size(id) < 18 ->
+        false
+
+      true ->
+        try do
+          match?(<<_::128>>, FlakeId.from_string(id))
+        rescue
+          _ -> false
+        end
+    end
+  end
+
+  defp flake_id?(_id), do: false
 end

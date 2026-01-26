@@ -3,6 +3,9 @@ defmodule Egregoros.OAuth.Token do
 
   import Ecto.Changeset
 
+  @primary_key {:id, FlakeId.Ecto.Type, autogenerate: true}
+  @foreign_key_type FlakeId.Ecto.Type
+
   @required_fields ~w(token_digest refresh_token_digest application_id)a
   @optional_fields ~w(user_id scopes expires_at refresh_expires_at revoked_at)a
 

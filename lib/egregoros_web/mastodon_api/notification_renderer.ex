@@ -18,7 +18,7 @@ defmodule EgregorosWeb.MastodonAPI.NotificationRenderer do
   def render_notifications(_activities, _current_user), do: []
 
   def render_notification(%Object{} = activity, %User{} = current_user) do
-    notifications_last_seen_id = Map.get(current_user, :notifications_last_seen_id, 0) || 0
+    notifications_last_seen_id = Map.get(current_user, :notifications_last_seen_id)
 
     status =
       case activity.type do
@@ -29,15 +29,13 @@ defmodule EgregorosWeb.MastodonAPI.NotificationRenderer do
       end
 
     %{
-      "id" => Integer.to_string(activity.id),
+      "id" => notification_id(activity),
       "type" => mastodon_type(activity.type),
       "created_at" => format_datetime(activity),
       "account" => AccountRenderer.render_account(account_for_actor(activity.actor)),
       "status" => if(status, do: StatusRenderer.render_status(status, current_user), else: nil),
       "pleroma" => %{
-        "is_seen" =>
-          is_integer(notifications_last_seen_id) and notifications_last_seen_id > 0 and
-            activity.id <= notifications_last_seen_id
+        "is_seen" => seen?(activity, notifications_last_seen_id)
       }
     }
   end
@@ -159,8 +157,8 @@ defmodule EgregorosWeb.MastodonAPI.NotificationRenderer do
 
     notifications_last_seen_id =
       case current_user do
-        %User{} = user -> Map.get(user, :notifications_last_seen_id, 0) || 0
-        _ -> 0
+        %User{} = user -> Map.get(user, :notifications_last_seen_id)
+        _ -> nil
       end
 
     %{
@@ -189,15 +187,13 @@ defmodule EgregorosWeb.MastodonAPI.NotificationRenderer do
       end
 
     %{
-      "id" => Integer.to_string(activity.id),
+      "id" => notification_id(activity),
       "type" => mastodon_type(activity.type),
       "created_at" => format_datetime(activity),
       "account" => account_from_context(activity.actor, ctx),
       "status" => status,
       "pleroma" => %{
-        "is_seen" =>
-          is_integer(ctx.notifications_last_seen_id) and ctx.notifications_last_seen_id > 0 and
-            activity.id <= ctx.notifications_last_seen_id
+        "is_seen" => seen?(activity, ctx.notifications_last_seen_id)
       }
     }
   end
@@ -235,6 +231,48 @@ defmodule EgregorosWeb.MastodonAPI.NotificationRenderer do
   defp account_from_context(_actor_ap_id, _ctx) do
     AccountRenderer.render_account(%{ap_id: "unknown", nickname: "unknown"})
   end
+
+  defp notification_id(%Object{id: id}) when is_binary(id) and id != "", do: id
+  defp notification_id(_activity), do: "unknown"
+
+  defp seen?(%Object{} = activity, last_seen_id) when is_binary(last_seen_id) do
+    activity_id = Map.get(activity, :id)
+
+    with true <- is_binary(activity_id),
+         true <- flake_id?(activity_id),
+         true <- flake_id?(last_seen_id),
+         <<_::128>> = activity_bin <- FlakeId.from_string(activity_id),
+         <<_::128>> = last_seen_bin <- FlakeId.from_string(last_seen_id) do
+      activity_bin <= last_seen_bin
+    else
+      _ -> false
+    end
+  rescue
+    _ -> false
+  end
+
+  defp seen?(_activity, _last_seen_id), do: false
+
+  defp flake_id?(id) when is_binary(id) do
+    id = String.trim(id)
+
+    cond do
+      id == "" ->
+        false
+
+      byte_size(id) < 18 ->
+        false
+
+      true ->
+        try do
+          match?(<<_::128>>, FlakeId.from_string(id))
+        rescue
+          _ -> false
+        end
+    end
+  end
+
+  defp flake_id?(_id), do: false
 
   defp normalize_ap_ids(list) when is_list(list) do
     list

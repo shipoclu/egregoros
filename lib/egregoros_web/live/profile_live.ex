@@ -625,8 +625,10 @@ defmodule EgregorosWeb.ProfileLive do
   end
 
   def handle_event("toggle_like", %{"id" => id} = params, socket) do
+    post_id = id |> to_string() |> String.trim()
+
     with %User{} = user <- socket.assigns.current_user,
-         {post_id, ""} <- Integer.parse(to_string(id)) do
+         true <- flake_id?(post_id) do
       _ = Interactions.toggle_like(user, post_id)
 
       {:noreply, refresh_post(socket, post_id, feed_id(params, post_id))}
@@ -640,8 +642,10 @@ defmodule EgregorosWeb.ProfileLive do
   end
 
   def handle_event("toggle_repost", %{"id" => id} = params, socket) do
+    post_id = id |> to_string() |> String.trim()
+
     with %User{} = user <- socket.assigns.current_user,
-         {post_id, ""} <- Integer.parse(to_string(id)) do
+         true <- flake_id?(post_id) do
       _ = Interactions.toggle_repost(user, post_id)
 
       {:noreply, refresh_post(socket, post_id, feed_id(params, post_id))}
@@ -655,8 +659,10 @@ defmodule EgregorosWeb.ProfileLive do
   end
 
   def handle_event("toggle_reaction", %{"id" => id, "emoji" => emoji} = params, socket) do
+    post_id = id |> to_string() |> String.trim()
+
     with %User{} = user <- socket.assigns.current_user,
-         {post_id, ""} <- Integer.parse(to_string(id)) do
+         true <- flake_id?(post_id) do
       emoji = to_string(emoji)
       _ = Interactions.toggle_reaction(user, post_id, emoji)
 
@@ -671,8 +677,10 @@ defmodule EgregorosWeb.ProfileLive do
   end
 
   def handle_event("toggle_bookmark", %{"id" => id} = params, socket) do
+    post_id = id |> to_string() |> String.trim()
+
     with %User{} = user <- socket.assigns.current_user,
-         {post_id, ""} <- Integer.parse(to_string(id)) do
+         true <- flake_id?(post_id) do
       _ = Interactions.toggle_bookmark(user, post_id)
 
       {:noreply, refresh_post(socket, post_id, feed_id(params, post_id))}
@@ -686,8 +694,10 @@ defmodule EgregorosWeb.ProfileLive do
   end
 
   def handle_event("delete_post", %{"id" => id}, socket) do
+    post_id = id |> to_string() |> String.trim()
+
     with %User{} = user <- socket.assigns.current_user,
-         {post_id, ""} <- Integer.parse(to_string(id)),
+         true <- flake_id?(post_id),
          {:ok, _delete} <- Interactions.delete_post(user, post_id) do
       profile_user = socket.assigns.profile_user
 
@@ -1081,17 +1091,17 @@ defmodule EgregorosWeb.ProfileLive do
 
   defp posts_cursor(posts) when is_list(posts) do
     case List.last(posts) do
-      %{id: id} when is_integer(id) -> id
+      %{id: id} when is_binary(id) -> id
       _ -> nil
     end
   end
 
-  defp post_dom_id(%{feed_id: id}) when is_integer(id), do: "post-#{id}"
-  defp post_dom_id(%{object: %{id: id}}) when is_integer(id), do: "post-#{id}"
+  defp post_dom_id(%{feed_id: id}) when is_binary(id), do: "post-#{id}"
+  defp post_dom_id(%{object: %{id: id}}) when is_binary(id), do: "post-#{id}"
   defp post_dom_id(_post), do: Ecto.UUID.generate()
 
   defp refresh_post(socket, post_id, feed_id)
-       when is_integer(post_id) and is_integer(feed_id) do
+       when is_binary(post_id) and is_binary(feed_id) do
     current_user = socket.assigns.current_user
 
     case Objects.get(post_id) do
@@ -1114,7 +1124,7 @@ defmodule EgregorosWeb.ProfileLive do
   end
 
   defp refresh_announce_post(socket, feed_id, current_user)
-       when is_integer(feed_id) do
+       when is_binary(feed_id) do
     case Objects.get(feed_id) do
       nil ->
         stream_delete(socket, :posts, %{feed_id: feed_id})
@@ -1130,18 +1140,24 @@ defmodule EgregorosWeb.ProfileLive do
     end
   end
 
-  defp feed_id(%{} = params, fallback) when is_integer(fallback) do
+  defp feed_id(%{} = params, fallback) when is_binary(fallback) do
     case Map.get(params, "feed_id") do
       nil ->
         fallback
 
       value ->
-        case Integer.parse(to_string(value)) do
-          {id, ""} -> id
-          _ -> fallback
-        end
+        id = value |> to_string() |> String.trim()
+        if flake_id?(id), do: id, else: fallback
     end
   end
+
+  defp feed_id(_params, fallback), do: fallback
+
+  defp flake_id?(id) when is_binary(id) do
+    match?(<<_::128>>, FlakeId.from_string(id))
+  end
+
+  defp flake_id?(_id), do: false
 
   defp default_reply_params do
     %{

@@ -9,10 +9,10 @@ defmodule EgregorosWeb.StatusCardTest do
     html =
       render_component(&StatusCard.status_card/1, %{
         id: "post-1",
-        current_user: %{id: 1},
+        current_user: %{id: "1"},
         entry: %{
           object: %{
-            id: 1,
+            id: "1",
             type: "Note",
             inserted_at: ~U[2025-01-01 00:00:00Z],
             local: true,
@@ -46,10 +46,10 @@ defmodule EgregorosWeb.StatusCardTest do
     html =
       render_component(&StatusCard.status_card/1, %{
         id: "post-1",
-        current_user: %{id: 1},
+        current_user: %{id: "1"},
         entry: %{
           object: %{
-            id: 1,
+            id: "1",
             type: "Note",
             inserted_at: ~U[2025-01-01 00:00:00Z],
             local: true,
@@ -80,10 +80,10 @@ defmodule EgregorosWeb.StatusCardTest do
     html =
       render_component(&StatusCard.status_card/1, %{
         id: "post-1",
-        current_user: %{id: 1},
+        current_user: %{id: "1"},
         entry: %{
           object: %{
-            id: 1,
+            id: "1",
             type: "Note",
             inserted_at: ~U[2025-01-01 00:00:00Z],
             local: true,
@@ -120,11 +120,11 @@ defmodule EgregorosWeb.StatusCardTest do
     html =
       render_component(&StatusCard.status_card/1, %{
         id: "post-1",
-        current_user: %{id: 1},
+        current_user: %{id: "1"},
         reply_mode: :navigate,
         entry: %{
           object: %{
-            id: 1,
+            id: "1",
             ap_id: "http://localhost:4000/objects/uuid-1",
             type: "Note",
             inserted_at: ~U[2025-01-01 00:00:00Z],
@@ -153,10 +153,10 @@ defmodule EgregorosWeb.StatusCardTest do
     html =
       render_component(&StatusCard.status_card/1, %{
         id: "post-1",
-        current_user: %{id: 1},
+        current_user: %{id: "1"},
         entry: %{
           object: %{
-            id: 1,
+            id: "1",
             type: "Note",
             inserted_at: ~U[2025-01-01 00:00:00Z],
             local: false,
@@ -193,10 +193,10 @@ defmodule EgregorosWeb.StatusCardTest do
     html =
       render_component(&StatusCard.status_card/1, %{
         id: "post-1",
-        current_user: %{id: 1},
+        current_user: %{id: "1"},
         entry: %{
           object: %{
-            id: 1,
+            id: "1",
             type: "Note",
             inserted_at: ~U[2025-01-01 00:00:00Z],
             local: true,
@@ -225,10 +225,10 @@ defmodule EgregorosWeb.StatusCardTest do
     html =
       render_component(&StatusCard.status_card/1, %{
         id: "post-1",
-        current_user: %{id: 1},
+        current_user: %{id: "1"},
         entry: %{
           object: %{
-            id: 1,
+            id: "1",
             type: "Note",
             inserted_at: ~U[2025-01-01 00:00:00Z],
             local: false,
@@ -259,10 +259,10 @@ defmodule EgregorosWeb.StatusCardTest do
     html =
       render_component(&StatusCard.status_card/1, %{
         id: "post-1",
-        current_user: %{id: 1},
+        current_user: %{id: "1"},
         entry: %{
           object: %{
-            id: 1,
+            id: "1",
             type: "Note",
             inserted_at: ~U[2025-01-01 00:00:00Z],
             local: false,
@@ -292,10 +292,10 @@ defmodule EgregorosWeb.StatusCardTest do
     html =
       render_component(&StatusCard.status_card/1, %{
         id: "post-1",
-        current_user: %{id: 1},
+        current_user: %{id: "1"},
         entry: %{
           object: %{
-            id: 1,
+            id: "1",
             type: "Note",
             inserted_at: ~U[2025-01-01 00:00:00Z],
             local: false,
@@ -327,10 +327,10 @@ defmodule EgregorosWeb.StatusCardTest do
     html =
       render_component(&StatusCard.status_card/1, %{
         id: "post-1",
-        current_user: %{id: 1},
+        current_user: %{id: "1"},
         entry: %{
           object: %{
-            id: 1,
+            id: "1",
             type: "Note",
             inserted_at: ~U[2025-01-01 00:00:00Z],
             local: false,
@@ -368,7 +368,7 @@ defmodule EgregorosWeb.StatusCardTest do
         current_user: nil,
         entry: %{
           object: %{
-            id: 1,
+            id: "1",
             type: "Note",
             inserted_at: ~U[2025-01-01 00:00:00Z],
             local: false,
@@ -405,7 +405,7 @@ defmodule EgregorosWeb.StatusCardTest do
         current_user: nil,
         entry: %{
           object: %{
-            id: 1,
+            id: "1",
             type: "Note",
             inserted_at: ~U[2025-01-01 00:00:00Z],
             local: true,
@@ -437,7 +437,7 @@ defmodule EgregorosWeb.StatusCardTest do
         current_user: nil,
         entry: %{
           object: %{
-            id: 1,
+            id: "1",
             type: "Note",
             inserted_at: ~U[2025-01-01 00:00:00Z],
             local: false,
@@ -469,7 +469,7 @@ defmodule EgregorosWeb.StatusCardTest do
         current_user: nil,
         entry: %{
           object: %{
-            id: 1,
+            id: "1",
             type: "Note",
             inserted_at: ~U[2025-01-01 00:00:00Z],
             local: true,
@@ -499,7 +499,7 @@ defmodule EgregorosWeb.StatusCardTest do
         current_user: nil,
         entry: %{
           object: %{
-            id: 1,
+            id: "1",
             type: "Note",
             inserted_at: ~U[2025-01-01 00:00:00Z],
             local: true,
@@ -534,7 +534,7 @@ defmodule EgregorosWeb.StatusCardTest do
         current_user: nil,
         entry: %{
           object: %{
-            id: 1,
+            id: "1",
             type: "Note",
             ap_id: ap_id,
             inserted_at: ~U[2025-01-01 00:00:00Z],
@@ -570,7 +570,7 @@ defmodule EgregorosWeb.StatusCardTest do
         current_user: nil,
         entry: %{
           object: %{
-            id: 1,
+            id: "1",
             type: "Note",
             inserted_at: now,
             published: published,
@@ -604,10 +604,10 @@ defmodule EgregorosWeb.StatusCardTest do
     html =
       render_component(&StatusCard.status_card/1, %{
         id: "post-1",
-        current_user: %{id: 1},
+        current_user: %{id: "1"},
         entry: %{
           object: %{
-            id: 1,
+            id: "1",
             type: "Note",
             ap_id: ap_id,
             inserted_at: ~U[2025-01-01 00:00:00Z],
@@ -647,10 +647,10 @@ defmodule EgregorosWeb.StatusCardTest do
     html =
       render_component(&StatusCard.status_card/1, %{
         id: "post-1",
-        current_user: %{id: 1},
+        current_user: %{id: "1"},
         entry: %{
           object: %{
-            id: 1,
+            id: "1",
             type: "Note",
             ap_id: ap_id,
             inserted_at: ~U[2025-01-01 00:00:00Z],
@@ -680,10 +680,10 @@ defmodule EgregorosWeb.StatusCardTest do
     html =
       render_component(&StatusCard.status_card/1, %{
         id: "post-123",
-        current_user: %{id: 1},
+        current_user: %{id: "1"},
         entry: %{
           object: %{
-            id: 123,
+            id: "123",
             type: "Note",
             ap_id: "https://remote.example/objects/123",
             inserted_at: ~U[2025-01-01 00:00:00Z],
@@ -716,7 +716,7 @@ defmodule EgregorosWeb.StatusCardTest do
         current_user: nil,
         entry: %{
           object: %{
-            id: 1,
+            id: "1",
             type: "Note",
             inserted_at: ~U[2025-01-01 00:00:00Z],
             local: true,
@@ -748,7 +748,7 @@ defmodule EgregorosWeb.StatusCardTest do
         current_user: nil,
         entry: %{
           object: %{
-            id: 1,
+            id: "1",
             type: "Note",
             inserted_at: ~U[2025-01-01 00:00:00Z],
             local: true,
@@ -785,7 +785,7 @@ defmodule EgregorosWeb.StatusCardTest do
         current_user: nil,
         entry: %{
           object: %{
-            id: 1,
+            id: "1",
             type: "Note",
             inserted_at: ~U[2025-01-01 00:00:00Z],
             local: true,
@@ -814,10 +814,10 @@ defmodule EgregorosWeb.StatusCardTest do
     html =
       render_component(&StatusCard.status_card/1, %{
         id: "post-1",
-        current_user: %{id: 1},
+        current_user: %{id: "1"},
         entry: %{
           object: %{
-            id: 1,
+            id: "1",
             type: "Note",
             ap_id: "javascript:alert(1)",
             inserted_at: ~U[2025-01-01 00:00:00Z],

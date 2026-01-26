@@ -86,17 +86,17 @@ defmodule EgregorosWeb.MessagesLive do
 
     chat_messages_oldest_id =
       case List.first(messages) do
-        %{id: id} when is_integer(id) -> id
+        %{id: id} when is_binary(id) -> id
         _ -> nil
       end
 
     chat_messages_has_more? =
-      length(messages) == @messages_page_size and is_integer(chat_messages_oldest_id)
+      length(messages) == @messages_page_size and is_binary(chat_messages_oldest_id)
 
     dm_markers =
       case {current_user, List.first(conversations)} do
         {%User{} = user, %{peer: %{ap_id: peer_ap_id}, last_message: %{id: id}}}
-        when is_binary(peer_ap_id) and peer_ap_id != "" and is_integer(id) ->
+        when is_binary(peer_ap_id) and peer_ap_id != "" and is_binary(id) ->
           mark_dm_conversation_read(user, peer_ap_id, id, dm_markers)
 
         _ ->
@@ -210,12 +210,12 @@ defmodule EgregorosWeb.MessagesLive do
 
         chat_messages_oldest_id =
           case List.first(messages) do
-            %{id: id} when is_integer(id) -> id
+            %{id: id} when is_binary(id) -> id
             _ -> nil
           end
 
         chat_messages_has_more? =
-          length(messages) == @messages_page_size and is_integer(chat_messages_oldest_id)
+          length(messages) == @messages_page_size and is_binary(chat_messages_oldest_id)
 
         dm_peer_e2ee_keys =
           case ActorKeys.list_actor_keys(peer_ap_id) do
@@ -227,7 +227,7 @@ defmodule EgregorosWeb.MessagesLive do
 
         dm_markers =
           case List.last(messages) do
-            %{id: id} when is_integer(id) ->
+            %{id: id} when is_binary(id) ->
               mark_dm_conversation_read(user, peer_ap_id, id, socket.assigns.dm_markers)
 
             _ ->
@@ -251,7 +251,7 @@ defmodule EgregorosWeb.MessagesLive do
          |> stream(:chat_messages, messages, reset: true)
          |> then(fn socket ->
            case List.last(messages) do
-             %{id: id} = last_message when is_integer(id) ->
+             %{id: id} = last_message when is_binary(id) ->
                stream_insert(socket, :conversations, %{
                  peer: selected_peer,
                  last_message: last_message
@@ -342,12 +342,12 @@ defmodule EgregorosWeb.MessagesLive do
 
         chat_messages_oldest_id =
           case List.first(messages) do
-            %{id: id} when is_integer(id) -> id
+            %{id: id} when is_binary(id) -> id
             _ -> nil
           end
 
         chat_messages_has_more? =
-          length(messages) == @messages_page_size and is_integer(chat_messages_oldest_id)
+          length(messages) == @messages_page_size and is_binary(chat_messages_oldest_id)
 
         dm_peer_e2ee_keys =
           case ActorKeys.list_actor_keys(ap_id) do
@@ -364,7 +364,7 @@ defmodule EgregorosWeb.MessagesLive do
 
         dm_markers =
           case List.last(messages) do
-            %{id: id} when is_integer(id) ->
+            %{id: id} when is_binary(id) ->
               mark_dm_conversation_read(user, ap_id, id, socket.assigns.dm_markers)
 
             _ ->
@@ -399,7 +399,7 @@ defmodule EgregorosWeb.MessagesLive do
     case {socket.assigns.current_user, socket.assigns.selected_peer_ap_id,
           socket.assigns.chat_messages_oldest_id} do
       {%User{} = user, peer_ap_id, oldest_id}
-      when is_binary(peer_ap_id) and peer_ap_id != "" and is_integer(oldest_id) ->
+      when is_binary(peer_ap_id) and peer_ap_id != "" and is_binary(oldest_id) ->
         older_messages =
           DirectMessages.list_conversation(user, peer_ap_id,
             max_id: oldest_id,
@@ -413,12 +413,12 @@ defmodule EgregorosWeb.MessagesLive do
 
         chat_messages_oldest_id =
           case List.last(older_messages) do
-            %{id: id} when is_integer(id) -> id
+            %{id: id} when is_binary(id) -> id
             _ -> oldest_id
           end
 
         chat_messages_has_more? =
-          length(older_messages) == @messages_page_size and is_integer(chat_messages_oldest_id)
+          length(older_messages) == @messages_page_size and is_binary(chat_messages_oldest_id)
 
         socket =
           if socket.assigns.conversation_e2ee? do
@@ -445,7 +445,7 @@ defmodule EgregorosWeb.MessagesLive do
   def handle_event("load_more_conversations", _params, socket) do
     case {socket.assigns.current_user, socket.assigns.conversations_seen_peers,
           socket.assigns.conversations_max_id} do
-      {%User{} = user, %MapSet{} = seen_peers, max_id} when is_integer(max_id) ->
+      {%User{} = user, %MapSet{} = seen_peers, max_id} when is_binary(max_id) ->
         {conversations, seen_peers, conversations_max_id, conversations_has_more?} =
           conversations_page(user, seen_peers, max_id: max_id)
 
@@ -566,16 +566,16 @@ defmodule EgregorosWeb.MessagesLive do
 
                 chat_messages_oldest_id =
                   case List.first(messages) do
-                    %{id: id} when is_integer(id) -> id
+                    %{id: id} when is_binary(id) -> id
                     _ -> nil
                   end
 
                 chat_messages_has_more? =
-                  length(messages) == @messages_page_size and is_integer(chat_messages_oldest_id)
+                  length(messages) == @messages_page_size and is_binary(chat_messages_oldest_id)
 
                 dm_markers =
                   case List.last(messages) do
-                    %{id: id} when is_integer(id) ->
+                    %{id: id} when is_binary(id) ->
                       mark_dm_conversation_read(
                         socket.assigns.current_user,
                         peer_ap_id,
@@ -1060,9 +1060,7 @@ defmodule EgregorosWeb.MessagesLive do
     <% current_user_ap_id = current_user_ap_id(@current_user) %>
 
     <div
-      id={
-        if is_integer(@message.id), do: "dm-message-body-#{@message.id}", else: Ecto.UUID.generate()
-      }
+      id={if is_binary(@message.id), do: "dm-message-body-#{@message.id}", else: Ecto.UUID.generate()}
       data-role="dm-message-body"
       data-e2ee-dm={e2ee_payload}
       data-current-user-ap-id={current_user_ap_id}
@@ -1112,12 +1110,12 @@ defmodule EgregorosWeb.MessagesLive do
 
     next_max_id =
       case List.last(messages) do
-        %{id: id} when is_integer(id) -> id
+        %{id: id} when is_binary(id) -> id
         _ -> nil
       end
 
     conversations_has_more? =
-      length(messages) == @conversations_page_size and is_integer(next_max_id)
+      length(messages) == @conversations_page_size and is_binary(next_max_id)
 
     {conversations, seen_peers} =
       Enum.reduce(messages, {[], seen_peers}, fn message, {acc, seen_peers} ->
@@ -1205,7 +1203,7 @@ defmodule EgregorosWeb.MessagesLive do
 
   defp conversation_dom_id(_conversation), do: Ecto.UUID.generate()
 
-  defp message_dom_id(%{id: id}) when is_integer(id), do: "dm-message-#{id}"
+  defp message_dom_id(%{id: id}) when is_binary(id), do: "dm-message-#{id}"
   defp message_dom_id(_message), do: Ecto.UUID.generate()
 
   defp avatar_initial(name) when is_binary(name) do
@@ -1251,9 +1249,9 @@ defmodule EgregorosWeb.MessagesLive do
   defp dm_marker_timeline(_peer_ap_id), do: nil
 
   defp mark_dm_conversation_read(%User{} = user, peer_ap_id, last_message_id, dm_markers)
-       when is_binary(peer_ap_id) and is_integer(last_message_id) and is_map(dm_markers) do
+       when is_binary(peer_ap_id) and is_binary(last_message_id) and is_map(dm_markers) do
     timeline = dm_marker_timeline(peer_ap_id)
-    last_read_id = Integer.to_string(last_message_id)
+    last_read_id = last_message_id
 
     if is_binary(timeline) and timeline != "" do
       _ = Markers.upsert(user, timeline, last_read_id)
@@ -1273,26 +1271,14 @@ defmodule EgregorosWeb.MessagesLive do
        when is_binary(user_ap_id) and is_map(dm_markers) do
     case conversation do
       %{peer: %{ap_id: peer_ap_id}, last_message: %{id: last_message_id, actor: actor}}
-      when is_binary(peer_ap_id) and is_integer(last_message_id) and is_binary(actor) ->
+      when is_binary(peer_ap_id) and is_binary(last_message_id) and is_binary(actor) ->
         if actor == user_ap_id do
           false
         else
           timeline = dm_marker_timeline(peer_ap_id)
           last_read_id = if is_binary(timeline), do: Map.get(dm_markers, timeline), else: nil
 
-          last_read_int =
-            case last_read_id do
-              id when is_binary(id) ->
-                case Integer.parse(id) do
-                  {int, ""} -> int
-                  _ -> 0
-                end
-
-              _ ->
-                0
-            end
-
-          last_read_int < last_message_id
+          unread_id?(last_read_id, last_message_id)
         end
 
       _ ->
@@ -1301,6 +1287,26 @@ defmodule EgregorosWeb.MessagesLive do
   end
 
   defp conversation_unread?(_conversation, _dm_markers, _current_user), do: false
+
+  defp unread_id?(last_read_id, last_message_id)
+       when is_binary(last_message_id) do
+    with <<_::128>> = last_message_bin <- FlakeId.from_string(last_message_id) do
+      case last_read_id do
+        id when is_binary(id) ->
+          case FlakeId.from_string(id) do
+            <<_::128>> = last_read_bin -> last_read_bin < last_message_bin
+            _ -> true
+          end
+
+        _ ->
+          true
+      end
+    else
+      _ -> false
+    end
+  end
+
+  defp unread_id?(_last_read_id, _last_message_id), do: false
 
   defp dm_last_message_at(%{published: %DateTime{} = published}), do: published
 

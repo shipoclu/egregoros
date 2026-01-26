@@ -19,7 +19,7 @@ defmodule EgregorosWeb.MastodonAPI.SearchControllerTest do
 
     assert Enum.any?(
              response["accounts"],
-             &(&1["id"] == Integer.to_string(alice.id) and &1["username"] == "alice")
+             &(&1["id"] == alice.id and &1["username"] == "alice")
            )
   end
 
@@ -36,7 +36,7 @@ defmodule EgregorosWeb.MastodonAPI.SearchControllerTest do
 
     assert Enum.any?(
              response["accounts"],
-             &(&1["id"] == Integer.to_string(alice.id) and &1["username"] == "alice")
+             &(&1["id"] == alice.id and &1["username"] == "alice")
            )
   end
 

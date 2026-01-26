@@ -154,17 +154,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusesController do
 
   defp resolve_in_reply_to(in_reply_to_id, user)
        when is_integer(in_reply_to_id) and is_map(user) do
-    case Objects.get(in_reply_to_id) do
-      %{} = object ->
-        if Objects.visible_to?(object, user) do
-          {:ok, object.ap_id}
-        else
-          {:error, :not_found}
-        end
-
-      _ ->
-        {:error, :not_found}
-    end
+    resolve_in_reply_to(Integer.to_string(in_reply_to_id), user)
   end
 
   defp resolve_in_reply_to(_in_reply_to_id, _user), do: {:error, :not_found}
@@ -272,7 +262,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusesController do
       %{} = object ->
         if object.type == "Note" and object.local == true and object.actor == current_user.ap_id do
           json(conn, %{
-            "id" => Integer.to_string(object.id),
+            "id" => mastodon_id(object),
             "text" => source_text(object),
             "spoiler_text" => source_spoiler_text(object)
           })
@@ -320,6 +310,9 @@ defmodule EgregorosWeb.MastodonAPI.StatusesController do
   defp source_text(%{data: %{"content" => content}}) when is_binary(content), do: content
 
   defp source_text(_object), do: ""
+
+  defp mastodon_id(%{id: id}) when is_binary(id) and id != "", do: id
+  defp mastodon_id(_object), do: "unknown"
 
   defp source_spoiler_text(%{data: %{"summary" => summary}}) when is_binary(summary), do: summary
   defp source_spoiler_text(_object), do: ""

@@ -64,11 +64,13 @@ defmodule Egregoros.Objects.ForYouTest do
     {:ok, bob} = Users.create_local_user("bob")
     {:ok, carol} = Users.create_local_user("carol")
     {:ok, dave} = Users.create_local_user("dave")
+    {:ok, frank} = Users.create_local_user("frank")
     {:ok, eve} = Users.create_local_user("eve")
 
     assert {:ok, note_1} = Pipeline.ingest(Note.build(bob, "A"), local: true)
     assert {:ok, note_2} = Pipeline.ingest(Note.build(carol, "B"), local: true)
     assert {:ok, note_3} = Pipeline.ingest(Note.build(dave, "C"), local: true)
+    assert {:ok, note_4} = Pipeline.ingest(Note.build(frank, "D"), local: true)
 
     assert {:ok, _} = Pipeline.ingest(Like.build(alice, note_1), local: true)
     assert {:ok, _} = Pipeline.ingest(Like.build(alice, note_2), local: true)
@@ -76,21 +78,32 @@ defmodule Egregoros.Objects.ForYouTest do
     assert {:ok, _} = Pipeline.ingest(Like.build(eve, note_1), local: true)
     assert {:ok, _} = Pipeline.ingest(Like.build(eve, note_2), local: true)
     assert {:ok, _} = Pipeline.ingest(Like.build(eve, note_3), local: true)
+    assert {:ok, _} = Pipeline.ingest(Like.build(eve, note_4), local: true)
 
-    [status] = Objects.list_for_you_statuses(alice.ap_id, limit: 20)
-    like_id = status.internal["for_you_like_id"]
-    assert is_integer(like_id)
+    [status_1, status_2] = Objects.list_for_you_statuses(alice.ap_id, limit: 20)
+    assert Enum.map([status_1.ap_id, status_2.ap_id], & &1) == [note_4.ap_id, note_3.ap_id]
 
-    statuses = Objects.list_for_you_statuses(alice.ap_id, limit: 20, max_id: like_id)
+    like_id_1 = status_1.internal["for_you_like_id"]
+    like_id_2 = status_2.internal["for_you_like_id"]
+
+    assert is_binary(like_id_1) and is_binary(like_id_2)
+
+    like_1_int = like_id_1 |> FlakeId.from_string() |> FlakeId.to_integer()
+    like_2_int = like_id_2 |> FlakeId.from_string() |> FlakeId.to_integer()
+    assert like_1_int > like_2_int
+
+    statuses = Objects.list_for_you_statuses(alice.ap_id, limit: 20, max_id: like_id_1)
+    assert Enum.any?(statuses, &(&1.ap_id == note_3.ap_id))
+    refute Enum.any?(statuses, &(&1.ap_id == note_4.ap_id))
+
+    statuses = Objects.list_for_you_statuses(alice.ap_id, limit: 20, since_id: like_id_2)
+    assert Enum.any?(statuses, &(&1.ap_id == note_4.ap_id))
     refute Enum.any?(statuses, &(&1.ap_id == note_3.ap_id))
 
-    statuses = Objects.list_for_you_statuses(alice.ap_id, limit: 20, max_id: like_id + 1)
-    assert Enum.any?(statuses, &(&1.ap_id == note_3.ap_id))
+    statuses = Objects.list_for_you_statuses(alice.ap_id, limit: 20, max_id: like_id_2)
+    refute Enum.any?(statuses, &(&1.ap_id in [note_3.ap_id, note_4.ap_id]))
 
-    statuses = Objects.list_for_you_statuses(alice.ap_id, limit: 20, since_id: like_id)
-    refute Enum.any?(statuses, &(&1.ap_id == note_3.ap_id))
-
-    statuses = Objects.list_for_you_statuses(alice.ap_id, limit: 20, since_id: like_id - 1)
-    assert Enum.any?(statuses, &(&1.ap_id == note_3.ap_id))
+    statuses = Objects.list_for_you_statuses(alice.ap_id, limit: 20, since_id: like_id_1)
+    refute Enum.any?(statuses, &(&1.ap_id in [note_3.ap_id, note_4.ap_id]))
   end
 end

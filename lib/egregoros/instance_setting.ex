@@ -3,6 +3,9 @@ defmodule Egregoros.InstanceSetting do
 
   import Ecto.Changeset
 
+  @primary_key {:id, FlakeId.Ecto.Type, autogenerate: true}
+  @foreign_key_type FlakeId.Ecto.Type
+
   schema "instance_settings" do
     field :registrations_open, :boolean, default: true
 

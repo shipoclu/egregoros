@@ -43,7 +43,7 @@ defmodule Egregoros.RelaysTest do
   end
 
   test "unsubscribe/1 returns an error when the relay doesn't exist" do
-    assert {:error, :not_found} = Relays.unsubscribe(123)
+    assert {:error, :not_found} = Relays.unsubscribe(FlakeId.get())
     assert {:error, :invalid_relay} = Relays.unsubscribe(-1)
     assert {:error, :invalid_relay} = Relays.unsubscribe("nope")
   end

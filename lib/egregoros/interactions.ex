@@ -13,7 +13,7 @@ defmodule Egregoros.Interactions do
   alias Egregoros.User
   alias EgregorosWeb.Endpoint
 
-  def toggle_like(%User{} = user, post_id) when is_integer(post_id) do
+  def toggle_like(%User{} = user, post_id) when is_binary(post_id) do
     with %{} = post <- Objects.get(post_id),
          true <- post.type in ["Note", "Question"],
          true <- Objects.visible_to?(post, user) do
@@ -29,7 +29,7 @@ defmodule Egregoros.Interactions do
     end
   end
 
-  def toggle_repost(%User{} = user, post_id) when is_integer(post_id) do
+  def toggle_repost(%User{} = user, post_id) when is_binary(post_id) do
     with %{} = post <- Objects.get(post_id),
          true <- post.type in ["Note", "Question"],
          true <- Objects.visible_to?(post, user) do
@@ -46,7 +46,7 @@ defmodule Egregoros.Interactions do
   end
 
   def toggle_reaction(%User{} = user, post_id, emoji)
-      when is_integer(post_id) and is_binary(emoji) do
+      when is_binary(post_id) and is_binary(emoji) do
     with %{} = post <- Objects.get(post_id),
          true <- post.type in ["Note", "Question"],
          true <- Objects.visible_to?(post, user) do
@@ -64,7 +64,7 @@ defmodule Egregoros.Interactions do
     end
   end
 
-  def toggle_bookmark(%User{} = user, post_id) when is_integer(post_id) do
+  def toggle_bookmark(%User{} = user, post_id) when is_binary(post_id) do
     with %{} = post <- Objects.get(post_id),
          true <- post.type in ["Note", "Question"],
          true <- Objects.visible_to?(post, user) do
@@ -90,7 +90,7 @@ defmodule Egregoros.Interactions do
     end
   end
 
-  def delete_post(%User{} = user, post_id) when is_integer(post_id) do
+  def delete_post(%User{} = user, post_id) when is_binary(post_id) do
     with %{} = post <- Objects.get(post_id),
          true <- post.type in ["Note", "Question"],
          true <- post.local,

@@ -40,7 +40,7 @@ defmodule EgregorosWeb.Components.Shared.InteractionBarTest do
         current_user: %{id: 1},
         entry: %{
           object: %{
-            "id" => 123,
+            "id" => "123",
             id: nil,
             ap_id: Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
             type: "Note",

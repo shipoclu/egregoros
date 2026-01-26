@@ -74,7 +74,7 @@ defmodule EgregorosWeb.MastodonAPI.NotificationRendererTest do
 
     assert rendered["type"] == "favourite"
     assert %{"id" => note_id} = rendered["status"]
-    assert note_id == Integer.to_string(note.id)
+    assert note_id == note.id
   end
 
   test "renders reblog notifications with a rendered status" do
@@ -114,7 +114,7 @@ defmodule EgregorosWeb.MastodonAPI.NotificationRendererTest do
 
     assert rendered["type"] == "reblog"
     assert %{"id" => note_id} = rendered["status"]
-    assert note_id == Integer.to_string(note.id)
+    assert note_id == note.id
   end
 
   test "renders unknown actors with a fallback acct" do
@@ -165,7 +165,7 @@ defmodule EgregorosWeb.MastodonAPI.NotificationRendererTest do
 
     assert rendered["type"] == "mention"
     assert %{"id" => note_id} = rendered["status"]
-    assert note_id == Integer.to_string(note.id)
+    assert note_id == note.id
     assert rendered["pleroma"]["is_seen"]
   end
 

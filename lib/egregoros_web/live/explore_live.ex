@@ -375,7 +375,7 @@ defmodule EgregorosWeb.ExploreLive do
   defp directory_accounts(current_user, limit) when is_integer(limit) do
     current_user_id =
       case current_user do
-        %User{id: id} when is_integer(id) -> id
+        %User{id: id} when is_binary(id) -> id
         _ -> nil
       end
 
@@ -391,7 +391,7 @@ defmodule EgregorosWeb.ExploreLive do
 
   defp directory_accounts(_current_user, _limit), do: []
 
-  defp maybe_where_not_id(query, id) when is_integer(id), do: from(u in query, where: u.id != ^id)
+  defp maybe_where_not_id(query, id) when is_binary(id), do: from(u in query, where: u.id != ^id)
   defp maybe_where_not_id(query, _id), do: query
 
   defp trending_tags(limit) when is_integer(limit) do

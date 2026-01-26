@@ -280,8 +280,10 @@ defmodule EgregorosWeb.TagLive do
   end
 
   def handle_event("toggle_like", %{"id" => id}, socket) do
+    post_id = id |> to_string() |> String.trim()
+
     with %User{} = user <- socket.assigns.current_user,
-         {post_id, ""} <- Integer.parse(to_string(id)),
+         true <- flake_id?(post_id),
          {:ok, _activity} <- Interactions.toggle_like(user, post_id) do
       {:noreply, refresh_posts(socket)}
     else
@@ -294,8 +296,10 @@ defmodule EgregorosWeb.TagLive do
   end
 
   def handle_event("toggle_repost", %{"id" => id}, socket) do
+    post_id = id |> to_string() |> String.trim()
+
     with %User{} = user <- socket.assigns.current_user,
-         {post_id, ""} <- Integer.parse(to_string(id)),
+         true <- flake_id?(post_id),
          {:ok, _activity} <- Interactions.toggle_repost(user, post_id) do
       {:noreply, refresh_posts(socket)}
     else
@@ -308,8 +312,10 @@ defmodule EgregorosWeb.TagLive do
   end
 
   def handle_event("toggle_reaction", %{"id" => id, "emoji" => emoji}, socket) do
+    post_id = id |> to_string() |> String.trim()
+
     with %User{} = user <- socket.assigns.current_user,
-         {post_id, ""} <- Integer.parse(to_string(id)),
+         true <- flake_id?(post_id),
          emoji when is_binary(emoji) <- to_string(emoji),
          {:ok, _activity} <- Interactions.toggle_reaction(user, post_id, emoji) do
       {:noreply, refresh_posts(socket)}
@@ -323,8 +329,10 @@ defmodule EgregorosWeb.TagLive do
   end
 
   def handle_event("toggle_bookmark", %{"id" => id}, socket) do
+    post_id = id |> to_string() |> String.trim()
+
     with %User{} = user <- socket.assigns.current_user,
-         {post_id, ""} <- Integer.parse(to_string(id)),
+         true <- flake_id?(post_id),
          {:ok, _} <- Interactions.toggle_bookmark(user, post_id) do
       {:noreply, refresh_posts(socket)}
     else
@@ -337,8 +345,10 @@ defmodule EgregorosWeb.TagLive do
   end
 
   def handle_event("delete_post", %{"id" => id}, socket) do
+    post_id = id |> to_string() |> String.trim()
+
     with %User{} = user <- socket.assigns.current_user,
-         {post_id, ""} <- Integer.parse(to_string(id)),
+         true <- flake_id?(post_id),
          {:ok, _delete} <- Interactions.delete_post(user, post_id) do
       posts =
         socket.assigns.posts
@@ -533,10 +543,16 @@ defmodule EgregorosWeb.TagLive do
 
   defp posts_cursor(posts) when is_list(posts) do
     case List.last(posts) do
-      %{id: id} when is_integer(id) -> id
+      %{id: id} when is_binary(id) -> id
       _ -> nil
     end
   end
+
+  defp flake_id?(id) when is_binary(id) do
+    match?(<<_::128>>, FlakeId.from_string(id))
+  end
+
+  defp flake_id?(_id), do: false
 
   defp timeline_href(%{id: _}), do: ~p"/?timeline=home"
   defp timeline_href(_user), do: ~p"/?timeline=public"

@@ -3,6 +3,9 @@ defmodule Egregoros.Relay do
 
   import Ecto.Changeset
 
+  @primary_key {:id, FlakeId.Ecto.Type, autogenerate: true}
+  @foreign_key_type FlakeId.Ecto.Type
+
   @fields ~w(ap_id)a
 
   schema "relays" do

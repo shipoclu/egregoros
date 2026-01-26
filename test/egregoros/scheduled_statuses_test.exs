@@ -222,7 +222,7 @@ defmodule Egregoros.ScheduledStatusesTest do
                scheduled_at: scheduled_at,
                params: %{
                  "text" => "Reply by id as string",
-                 "in_reply_to_id" => Integer.to_string(parent.id)
+                 "in_reply_to_id" => to_string(parent.id)
                }
              })
 

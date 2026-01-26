@@ -22,7 +22,7 @@ defmodule EgregorosWeb.MastodonAPI.ScheduledStatusRenderer do
     media_ids = Map.get(params, "media_ids", [])
 
     %{
-      "id" => Integer.to_string(scheduled_status.id),
+      "id" => scheduled_status.id,
       "scheduled_at" => format_datetime(scheduled_status.scheduled_at),
       "params" => render_params(params),
       "media_attachments" => render_media_attachments(user, media_ids)
@@ -39,17 +39,9 @@ defmodule EgregorosWeb.MastodonAPI.ScheduledStatusRenderer do
       params
       |> Map.get("media_ids", [])
       |> List.wrap()
-      |> Enum.flat_map(fn
-        id when is_integer(id) ->
-          [Integer.to_string(id)]
-
-        id when is_binary(id) ->
-          id = String.trim(id)
-          if id == "", do: [], else: [id]
-
-        _ ->
-          []
-      end)
+      |> Enum.filter(&is_binary/1)
+      |> Enum.map(&String.trim/1)
+      |> Enum.reject(&(&1 == ""))
 
     params
     |> Map.put("media_ids", media_ids)
@@ -63,21 +55,26 @@ defmodule EgregorosWeb.MastodonAPI.ScheduledStatusRenderer do
   defp truthy?(_), do: false
 
   defp render_media_attachments(%User{} = user, media_ids) do
-    ids = parse_int_ids(media_ids)
+    media_ids = normalize_media_ids(media_ids)
 
-    if ids == [] do
+    if media_ids == [] do
       []
     else
       objects =
         from(o in Object,
-          where: o.id in ^ids and o.actor == ^user.ap_id and o.type in ^@allowed_types
+          where: o.id in ^media_ids,
+          where: o.actor == ^user.ap_id and o.type in ^@allowed_types
         )
         |> Repo.all()
-        |> Map.new(&{&1.id, &1})
 
-      ids
+      objects_by_id = Map.new(objects, &{&1.id, &1})
+
+      media_ids
+      |> List.wrap()
+      |> Enum.filter(&is_binary/1)
+      |> Enum.map(&String.trim/1)
       |> Enum.flat_map(fn id ->
-        case Map.get(objects, id) do
+        case Map.get(objects_by_id, id) do
           %Object{} = object -> [render_attachment(object)]
           _ -> []
         end
@@ -87,25 +84,14 @@ defmodule EgregorosWeb.MastodonAPI.ScheduledStatusRenderer do
 
   defp render_media_attachments(_user, _media_ids), do: []
 
-  defp parse_int_ids(media_ids) do
+  defp normalize_media_ids(media_ids) do
     media_ids
     |> List.wrap()
-    |> Enum.map(fn
-      id when is_integer(id) -> id
-      id when is_binary(id) -> parse_int(id)
-      _ -> nil
-    end)
-    |> Enum.filter(&is_integer/1)
+    |> Enum.filter(&is_binary/1)
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.filter(&flake_id?/1)
   end
-
-  defp parse_int(value) when is_binary(value) do
-    case Integer.parse(String.trim(value)) do
-      {int, ""} -> int
-      _ -> nil
-    end
-  end
-
-  defp parse_int(_value), do: nil
 
   defp render_attachment(%Object{} = object) do
     href = attachment_url(object)
@@ -130,7 +116,7 @@ defmodule EgregorosWeb.MastodonAPI.ScheduledStatusRenderer do
       end
 
     %{
-      "id" => Integer.to_string(object.id),
+      "id" => media_id(object),
       "type" => mastodon_media_type(media_type_from_object(object)),
       "url" => url,
       "preview_url" => preview_url,
@@ -140,6 +126,30 @@ defmodule EgregorosWeb.MastodonAPI.ScheduledStatusRenderer do
       "blurhash" => Map.get(object.data, "blurhash")
     }
   end
+
+  defp media_id(%Object{id: id}) when is_binary(id) and id != "", do: id
+  defp media_id(_object), do: "unknown"
+
+  defp flake_id?(id) when is_binary(id) do
+    id = String.trim(id)
+
+    cond do
+      id == "" ->
+        false
+
+      byte_size(id) < 18 ->
+        false
+
+      true ->
+        try do
+          match?(<<_::128>>, FlakeId.from_string(id))
+        rescue
+          _ -> false
+        end
+    end
+  end
+
+  defp flake_id?(_id), do: false
 
   defp mastodon_media_type(content_type) when is_binary(content_type) do
     cond do

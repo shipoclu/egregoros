@@ -1,5 +1,6 @@
 defmodule Egregoros.Objects do
-  import Ecto.Query, only: [from: 2, dynamic: 2, recursive_ctes: 2, with_cte: 3]
+  import Ecto.Query,
+    only: [from: 2, dynamic: 2, recursive_ctes: 2, with_cte: 3, subquery: 1]
 
   alias Egregoros.Object
   alias Egregoros.Objects.Polls
@@ -92,14 +93,23 @@ defmodule Egregoros.Objects do
     Repo.delete(object)
   end
 
-  def get(id) when is_integer(id), do: Repo.get(Object, id)
-
   def get(id) when is_binary(id) do
-    case Integer.parse(id) do
-      {int, ""} -> Repo.get(Object, int)
-      _ -> nil
+    id = String.trim(id)
+
+    cond do
+      id == "" ->
+        nil
+
+      true ->
+        if flake_id?(id) do
+          Repo.get(Object, id)
+        else
+          nil
+        end
     end
   end
+
+  def get(_id), do: nil
 
   def get_by_type_actor_object(type, actor, object)
       when is_binary(type) and is_binary(actor) and is_binary(object) do
@@ -763,15 +773,20 @@ defmodule Egregoros.Objects do
               limit: ^@for_you_neighbor_limit
             )
 
-          latest_like_ids_by_object =
+          latest_like_by_object =
             from(l in Object,
               where:
                 l.type == "Like" and l.actor in subquery(similar_actors) and
                   l.object not in subquery(viewer_liked_objects) and not is_nil(l.object) and
                   l.object != "",
-              group_by: l.object,
-              select: %{object_ap_id: l.object, like_id: max(l.id)},
-              order_by: [desc: max(l.id)],
+              distinct: l.object,
+              order_by: [asc: l.object, desc: l.id],
+              select: %{object_ap_id: l.object, like_id: l.id}
+            )
+
+          latest_like_ids_by_object =
+            from(lr in subquery(latest_like_by_object),
+              order_by: [desc: lr.like_id],
               limit: ^@for_you_like_scan_limit
             )
 
@@ -815,14 +830,26 @@ defmodule Egregoros.Objects do
 
   def list_for_you_statuses(_actor_ap_id, _opts), do: []
 
-  defp maybe_where_for_you_max_like_id(query, max_like_id) when is_integer(max_like_id) do
-    from([_o, lr] in query, where: lr.like_id < ^max_like_id)
+  defp maybe_where_for_you_max_like_id(query, max_like_id) when is_binary(max_like_id) do
+    max_like_id = String.trim(max_like_id)
+
+    if flake_id?(max_like_id) do
+      from([_o, lr] in query, where: lr.like_id < ^max_like_id)
+    else
+      query
+    end
   end
 
   defp maybe_where_for_you_max_like_id(query, _max_like_id), do: query
 
-  defp maybe_where_for_you_since_like_id(query, since_like_id) when is_integer(since_like_id) do
-    from([_o, lr] in query, where: lr.like_id > ^since_like_id)
+  defp maybe_where_for_you_since_like_id(query, since_like_id) when is_binary(since_like_id) do
+    since_like_id = String.trim(since_like_id)
+
+    if flake_id?(since_like_id) do
+      from([_o, lr] in query, where: lr.like_id > ^since_like_id)
+    else
+      query
+    end
   end
 
   defp maybe_where_for_you_since_like_id(query, _since_like_id), do: query
@@ -1149,7 +1176,7 @@ defmodule Egregoros.Objects do
           id: o.id,
           ap_id: o.ap_id,
           depth: 0,
-          path_ids: fragment("ARRAY[?]::bigint[]", o.id)
+          path_ids: fragment("ARRAY[?]::uuid[]", o.id)
         }
       )
 
@@ -1265,14 +1292,26 @@ defmodule Egregoros.Objects do
     |> Repo.delete_all()
   end
 
-  defp maybe_where_max_id(query, max_id) when is_integer(max_id) and max_id > 0 do
-    from(o in query, where: o.id < ^max_id)
+  defp maybe_where_max_id(query, max_id) when is_binary(max_id) do
+    max_id = String.trim(max_id)
+
+    if flake_id?(max_id) do
+      from(o in query, where: o.id < ^max_id)
+    else
+      query
+    end
   end
 
   defp maybe_where_max_id(query, _max_id), do: query
 
-  defp maybe_where_since_id(query, since_id) when is_integer(since_id) and since_id > 0 do
-    from(o in query, where: o.id > ^since_id)
+  defp maybe_where_since_id(query, since_id) when is_binary(since_id) do
+    since_id = String.trim(since_id)
+
+    if flake_id?(since_id) do
+      from(o in query, where: o.id > ^since_id)
+    else
+      query
+    end
   end
 
   defp maybe_where_since_id(query, _since_id), do: query
@@ -1337,4 +1376,25 @@ defmodule Egregoros.Objects do
       _ -> false
     end)
   end
+
+  defp flake_id?(id) when is_binary(id) do
+    id = String.trim(id)
+
+    cond do
+      id == "" ->
+        false
+
+      byte_size(id) < 18 ->
+        false
+
+      true ->
+        try do
+          match?(<<_::128>>, FlakeId.from_string(id))
+        rescue
+          _ -> false
+        end
+    end
+  end
+
+  defp flake_id?(_id), do: false
 end

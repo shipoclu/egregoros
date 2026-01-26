@@ -78,7 +78,7 @@ defmodule EgregorosWeb.MastodonAPI.AccountRenderer do
       end
 
     %{
-      "id" => Integer.to_string(user.id),
+      "id" => account_id(user),
       "username" => user.nickname,
       "acct" => acct(user),
       "display_name" => user.name || user.nickname,
@@ -125,6 +125,10 @@ defmodule EgregorosWeb.MastodonAPI.AccountRenderer do
   end
 
   defp acct(_), do: "unknown"
+
+  defp account_id(%User{id: id}) when is_binary(id) and id != "", do: id
+
+  defp account_id(_user), do: "unknown"
 
   defp format_datetime(%DateTime{} = dt), do: DateTime.to_iso8601(dt)
 

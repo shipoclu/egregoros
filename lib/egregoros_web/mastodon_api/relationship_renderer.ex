@@ -23,7 +23,7 @@ defmodule EgregorosWeb.MastodonAPI.RelationshipRenderer do
       Relationships.get_by_type_actor_object("Mute", actor.ap_id, target.ap_id) != nil
 
     %{
-      "id" => Integer.to_string(target.id),
+      "id" => account_id(target),
       "following" => following?,
       "showing_reblogs" => true,
       "notifying" => false,
@@ -39,4 +39,8 @@ defmodule EgregorosWeb.MastodonAPI.RelationshipRenderer do
       "note" => ""
     }
   end
+
+  defp account_id(%User{id: id}) when is_binary(id) and id != "", do: id
+
+  defp account_id(_user), do: "unknown"
 end

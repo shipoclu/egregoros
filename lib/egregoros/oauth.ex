@@ -217,7 +217,7 @@ defmodule Egregoros.OAuth do
   def revoke_token(_params), do: {:error, :invalid_request}
 
   defp create_token(%OAuthApplication{} = application, user_id, scopes)
-       when is_integer(user_id) and user_id > 0 and is_binary(scopes) do
+       when is_binary(user_id) and is_binary(scopes) do
     now = DateTime.utc_now()
     ttl_seconds = access_token_ttl_seconds()
     refresh_ttl_seconds = refresh_token_ttl_seconds()
@@ -393,7 +393,7 @@ defmodule Egregoros.OAuth do
   defp revoke_token_record(_token), do: :ok
 
   defp revoke_token_record_for_token(application_id, token)
-       when is_integer(application_id) and application_id > 0 and is_binary(token) do
+       when is_binary(application_id) and is_binary(token) do
     now = DateTime.utc_now()
     token_digest = digest_token(token)
 

@@ -149,7 +149,7 @@ defmodule EgregorosWeb.SettingsControllerTest do
       })
 
     assert redirected_to(conn) == "/"
-    assert is_integer(get_session(conn, :user_id))
+    assert is_binary(get_session(conn, :user_id))
   end
 
   test "POST /settings/password updates the password and allows logging in again", %{conn: conn} do
@@ -181,6 +181,6 @@ defmodule EgregorosWeb.SettingsControllerTest do
       })
 
     assert redirected_to(conn) == "/"
-    assert is_integer(get_session(conn, :user_id))
+    assert is_binary(get_session(conn, :user_id))
   end
 end

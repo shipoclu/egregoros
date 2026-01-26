@@ -3,6 +3,9 @@ defmodule Egregoros.Passkeys.Credential do
 
   import Ecto.Changeset
 
+  @primary_key {:id, FlakeId.Ecto.Type, autogenerate: true}
+  @foreign_key_type FlakeId.Ecto.Type
+
   schema "passkey_credentials" do
     field :credential_id, :binary
     field :public_key, :binary

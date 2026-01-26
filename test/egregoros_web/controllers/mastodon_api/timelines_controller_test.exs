@@ -104,7 +104,7 @@ defmodule EgregorosWeb.MastodonAPI.TimelinesControllerTest do
     response = json_response(conn, 200)
 
     assert Enum.any?(response, &(&1["content"] == "<p>Local post</p>"))
-    refute Enum.any?(response, &(&1["id"] == Integer.to_string(announce.id)))
+    refute Enum.any?(response, &(&1["id"] == announce.id))
   end
 
   test "GET /api/v1/timelines/public includes reblog statuses", %{conn: conn} do
@@ -293,7 +293,7 @@ defmodule EgregorosWeb.MastodonAPI.TimelinesControllerTest do
     conn = get(conn, "/api/v1/timelines/home")
     response = json_response(conn, 200)
 
-    refute Enum.any?(response, &(&1["id"] == Integer.to_string(announce.id)))
+    refute Enum.any?(response, &(&1["id"] == announce.id))
   end
 
   test "GET /api/v1/timelines/home includes reblog statuses by the current user", %{conn: conn} do

@@ -236,8 +236,8 @@ defmodule EgregorosWeb.MastodonAPI.StatusRendererTest do
 
     rendered = StatusRenderer.render_status(child)
 
-    assert rendered["in_reply_to_id"] == Integer.to_string(parent.id)
-    assert rendered["in_reply_to_account_id"] == Integer.to_string(alice.id)
+    assert rendered["in_reply_to_id"] == parent.id
+    assert rendered["in_reply_to_account_id"] == alice.id
   end
 
   test "includes pleroma.conversation_id so pleroma-fe can group threads" do
@@ -353,7 +353,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusRendererTest do
              }
            ] = rendered["media_attachments"]
 
-    assert media_id == Integer.to_string(media_object.id)
+    assert media_id == media_object.id
     assert url == Endpoint.url() <> "/media/clip.mp4"
     assert preview == url
   end
@@ -743,7 +743,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusRendererTest do
     assert [%{"id" => id, "acct" => "bob@remote.example", "username" => "bob"}] =
              rendered["mentions"]
 
-    assert id == Integer.to_string(remote.id)
+    assert id == remote.id
   end
 
   test "renders custom emojis when icon urls are provided in lists" do
@@ -1017,8 +1017,8 @@ defmodule EgregorosWeb.MastodonAPI.StatusRendererTest do
 
     rendered = StatusRenderer.render_status(child)
 
-    assert rendered["in_reply_to_id"] == Integer.to_string(parent.id)
-    assert rendered["in_reply_to_account_id"] == Integer.to_string(alice.id)
+    assert rendered["in_reply_to_id"] == parent.id
+    assert rendered["in_reply_to_account_id"] == alice.id
   end
 
   test "renders nil in_reply_to fields when the parent cannot be found" do

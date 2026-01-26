@@ -37,8 +37,8 @@ defmodule EgregorosWeb.MastodonAPI.SuggestionsControllerTest do
       |> get("/api/v1/suggestions")
       |> json_response(200)
 
-    assert Enum.any?(response, &(&1["id"] == Integer.to_string(carol.id)))
-    refute Enum.any?(response, &(&1["id"] == Integer.to_string(bob.id)))
+    assert Enum.any?(response, &(&1["id"] == carol.id))
+    refute Enum.any?(response, &(&1["id"] == bob.id))
   end
 
   test "GET /api/v1/suggestions uses remote following graph relationships", %{conn: conn} do
@@ -93,7 +93,7 @@ defmodule EgregorosWeb.MastodonAPI.SuggestionsControllerTest do
       |> get("/api/v1/suggestions")
       |> json_response(200)
 
-    assert Enum.any?(response, &(&1["id"] == Integer.to_string(carol.id)))
+    assert Enum.any?(response, &(&1["id"] == carol.id))
   end
 
   test "GET /api/v1/suggestions falls back to recent local accounts", %{conn: conn} do
@@ -111,8 +111,8 @@ defmodule EgregorosWeb.MastodonAPI.SuggestionsControllerTest do
       |> get("/api/v1/suggestions")
       |> json_response(200)
 
-    assert Enum.any?(response, &(&1["id"] == Integer.to_string(bob.id)))
-    refute Enum.any?(response, &(&1["id"] == Integer.to_string(alice.id)))
+    assert Enum.any?(response, &(&1["id"] == bob.id))
+    refute Enum.any?(response, &(&1["id"] == alice.id))
   end
 
   test "GET /api/v1/suggestions respects limit", %{conn: conn} do

@@ -23,6 +23,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusesControllerTest do
     response = json_response(conn, 200)
     assert response["content"] == "<p>Hello API</p>"
     assert response["account"]["username"] == "local"
+    refute response["id"] =~ ~r/^\d+$/
 
     [object] = Objects.list_notes()
     assert object.data["content"] == "<p>Hello API</p>"
@@ -95,7 +96,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusesControllerTest do
     conn =
       post(conn, "/api/v1/statuses", %{
         "status" => "Pick one",
-        "media_ids" => [Integer.to_string(media_object.id)],
+        "media_ids" => [media_object.id],
         "poll" => %{
           "options" => ["Yes", "No"],
           "multiple" => false,
@@ -115,7 +116,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusesControllerTest do
              }
            ] = response["media_attachments"]
 
-    assert attachment_id == Integer.to_string(media_object.id)
+    assert attachment_id == media_object.id
 
     assert %Object{} = object = Objects.get(response["id"])
     assert object.type == "Question"
@@ -150,7 +151,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusesControllerTest do
     assert response["params"]["text"] == "Pick one later"
     assert response["params"]["poll"]["options"] == ["Yes", "No"]
 
-    scheduled_status_id = String.to_integer(response["id"])
+    scheduled_status_id = response["id"]
 
     assert %ScheduledStatus{published_at: nil} =
              Repo.get_by!(ScheduledStatus, id: scheduled_status_id, user_id: user.id)
@@ -159,7 +160,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusesControllerTest do
 
     assert :ok =
              perform_job(PublishScheduledStatus, %{
-               "scheduled_status_id" => Integer.to_string(scheduled_status_id)
+               "scheduled_status_id" => scheduled_status_id
              })
 
     assert %ScheduledStatus{published_at: %DateTime{}} =
@@ -194,7 +195,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusesControllerTest do
     conn = put(conn, "/api/v1/statuses/#{note.id}", %{"status" => "Edited"})
 
     response = json_response(conn, 200)
-    assert response["id"] == Integer.to_string(note.id)
+    assert response["id"] == note.id
     assert response["content"] == "<p>Edited</p>"
 
     note = Objects.get(note.id)
@@ -306,7 +307,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusesControllerTest do
       |> get("/api/v1/statuses/#{note.id}/source")
 
     response = json_response(conn, 200)
-    assert response["id"] == Integer.to_string(note.id)
+    assert response["id"] == note.id
     assert response["text"] == "Hello source"
     assert response["spoiler_text"] == "cw"
   end
@@ -376,12 +377,12 @@ defmodule EgregorosWeb.MastodonAPI.StatusesControllerTest do
     conn =
       post(conn, "/api/v1/statuses", %{
         "status" => "Reply post",
-        "in_reply_to_id" => Integer.to_string(parent.id)
+        "in_reply_to_id" => parent.id
       })
 
     response = json_response(conn, 200)
     assert response["content"] == "<p>Reply post</p>"
-    assert response["in_reply_to_id"] == Integer.to_string(parent.id)
+    assert response["in_reply_to_id"] == parent.id
 
     [reply, _parent] = Objects.list_notes()
     assert reply.data["content"] == "<p>Reply post</p>"
@@ -411,7 +412,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusesControllerTest do
     conn =
       post(conn, "/api/v1/statuses", %{
         "status" => "Should fail",
-        "in_reply_to_id" => Integer.to_string(dm.id)
+        "in_reply_to_id" => dm.id
       })
 
     assert response(conn, 422)
@@ -479,7 +480,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusesControllerTest do
     conn = get(conn, "/api/v1/statuses/#{object.id}")
 
     response = json_response(conn, 200)
-    assert response["id"] == Integer.to_string(object.id)
+    assert response["id"] == object.id
     assert response["content"] == "<p>Hello show</p>"
   end
 
@@ -514,11 +515,11 @@ defmodule EgregorosWeb.MastodonAPI.StatusesControllerTest do
     conn = get(conn, "/api/v1/statuses/#{poll.id}")
     response = json_response(conn, 200)
 
-    assert response["id"] == Integer.to_string(poll.id)
+    assert response["id"] == poll.id
     assert is_map(response["poll"])
 
     poll_entity = response["poll"]
-    assert poll_entity["id"] == Integer.to_string(poll.id)
+    assert poll_entity["id"] == poll.id
     assert poll_entity["multiple"] == false
 
     assert poll_entity["options"] == [
@@ -565,7 +566,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusesControllerTest do
       |> get("/api/v1/statuses/#{note.id}")
 
     response = json_response(conn, 200)
-    assert response["id"] == Integer.to_string(note.id)
+    assert response["id"] == note.id
     assert response["content"] == "<p>Secret DM for local</p>"
     assert response["visibility"] == "direct"
   end
@@ -685,7 +686,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusesControllerTest do
     conn = post(conn, "/api/v1/statuses/#{object.id}/bookmark")
     response = json_response(conn, 200)
 
-    assert response["id"] == Integer.to_string(object.id)
+    assert response["id"] == object.id
     assert response["bookmarked"] == true
 
     assert Relationships.get_by_type_actor_object("Bookmark", user.ap_id, object.ap_id)
@@ -720,7 +721,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusesControllerTest do
     conn = post(conn, "/api/v1/statuses/#{note.id}/unbookmark")
     response = json_response(conn, 200)
 
-    assert response["id"] == Integer.to_string(note.id)
+    assert response["id"] == note.id
     assert response["bookmarked"] == false
 
     refute Relationships.get_by_type_actor_object("Bookmark", user.ap_id, note.ap_id)
@@ -805,7 +806,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusesControllerTest do
     assert response["content"] == ""
 
     assert is_map(response["reblog"])
-    assert response["reblog"]["id"] == Integer.to_string(note.id)
+    assert response["reblog"]["id"] == note.id
     assert response["reblog"]["account"]["username"] == "alice"
     assert response["reblog"]["content"] == "<p>Hello reblog</p>"
 
@@ -936,7 +937,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusesControllerTest do
     conn =
       post(conn, "/api/v1/statuses", %{
         "status" => "Hello with media",
-        "media_ids" => [Integer.to_string(media.id)]
+        "media_ids" => [media.id]
       })
 
     response = json_response(conn, 200)
@@ -945,7 +946,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusesControllerTest do
     assert length(response["media_attachments"]) == 1
 
     attachment = Enum.at(response["media_attachments"], 0)
-    assert attachment["id"] == Integer.to_string(media.id)
+    assert attachment["id"] == media.id
     assert attachment["type"] == "image"
     assert String.ends_with?(attachment["url"], "/uploads/media/#{user.id}/image.png")
 
@@ -987,7 +988,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusesControllerTest do
     conn =
       post(conn, "/api/v1/statuses", %{
         "status" => "  ",
-        "media_ids" => [Integer.to_string(media.id)]
+        "media_ids" => [media.id]
       })
 
     response = json_response(conn, 200)
@@ -1030,7 +1031,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusesControllerTest do
     conn =
       post(conn, "/api/v1/statuses", %{
         "status" => "Hello with media",
-        "media_ids" => [Integer.to_string(media.id)]
+        "media_ids" => [media.id]
       })
 
     assert response(conn, 422)
@@ -1287,7 +1288,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusesControllerTest do
     conn = delete(conn, "/api/v1/statuses/#{note.id}")
     response = json_response(conn, 200)
 
-    assert response["id"] == Integer.to_string(note.id)
+    assert response["id"] == note.id
     assert Objects.get(note.id) == nil
   end
 
@@ -1406,7 +1407,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusesControllerTest do
     assert response(conn, 422)
   end
 
-  test "POST /api/v1/statuses accepts integer in_reply_to_id when sent as JSON", %{conn: conn} do
+  test "POST /api/v1/statuses accepts in_reply_to_id when sent as JSON", %{conn: conn} do
     {:ok, user} = Users.create_local_user("local")
 
     Egregoros.Auth.Mock
@@ -1439,7 +1440,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusesControllerTest do
 
     response = json_response(conn, 200)
     assert response["content"] == "<p>Reply post</p>"
-    assert response["in_reply_to_id"] == Integer.to_string(parent.id)
+    assert response["in_reply_to_id"] == parent.id
   end
 
   test "POST /api/v1/statuses rejects unsupported in_reply_to_id types", %{conn: conn} do

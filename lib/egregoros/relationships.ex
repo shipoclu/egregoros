@@ -28,7 +28,15 @@ defmodule Egregoros.Relationships do
     end
   end
 
-  def get(id) when is_integer(id), do: Repo.get(Relationship, id)
+  def get(id) when is_binary(id) do
+    id = String.trim(id)
+
+    if flake_id?(id) do
+      Repo.get(Relationship, id)
+    end
+  end
+
+  def get(_id), do: nil
 
   def get_by_type_actor_object(type, actor, object)
       when is_binary(type) and is_binary(actor) and is_binary(object) do
@@ -282,8 +290,14 @@ defmodule Egregoros.Relationships do
     end
   end
 
-  defp maybe_where_max_id(query, max_id) when is_integer(max_id) and max_id > 0 do
-    from(r in query, where: r.id < ^max_id)
+  defp maybe_where_max_id(query, max_id) when is_binary(max_id) do
+    max_id = String.trim(max_id)
+
+    if flake_id?(max_id) do
+      from(r in query, where: r.id < ^max_id)
+    else
+      query
+    end
   end
 
   defp maybe_where_max_id(query, _max_id), do: query
@@ -303,4 +317,25 @@ defmodule Egregoros.Relationships do
     |> Enum.reject(&(&1 == ""))
     |> Enum.uniq()
   end
+
+  defp flake_id?(id) when is_binary(id) do
+    id = String.trim(id)
+
+    cond do
+      id == "" ->
+        false
+
+      byte_size(id) < 18 ->
+        false
+
+      true ->
+        try do
+          match?(<<_::128>>, FlakeId.from_string(id))
+        rescue
+          _ -> false
+        end
+    end
+  end
+
+  defp flake_id?(_id), do: false
 end

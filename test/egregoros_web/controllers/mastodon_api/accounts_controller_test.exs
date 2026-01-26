@@ -17,7 +17,7 @@ defmodule EgregorosWeb.MastodonAPI.AccountsControllerTest do
     conn = get(conn, "/api/v1/accounts/verify_credentials")
     response = json_response(conn, 200)
 
-    assert response["id"] == Integer.to_string(user.id)
+    refute response["id"] =~ ~r/^\d+$/
     assert response["username"] == "local"
   end
 
@@ -27,7 +27,7 @@ defmodule EgregorosWeb.MastodonAPI.AccountsControllerTest do
     conn = get(conn, "/api/v1/accounts/#{user.id}")
     response = json_response(conn, 200)
 
-    assert response["id"] == Integer.to_string(user.id)
+    refute response["id"] =~ ~r/^\d+$/
     assert response["username"] == "alice"
   end
 
@@ -220,7 +220,7 @@ defmodule EgregorosWeb.MastodonAPI.AccountsControllerTest do
     conn = get(conn, "/api/v1/accounts/lookup", %{"acct" => "alice"})
     response = json_response(conn, 200)
 
-    assert response["id"] == Integer.to_string(user.id)
+    assert response["id"] == user.id
     assert response["username"] == "alice"
   end
 
@@ -230,7 +230,7 @@ defmodule EgregorosWeb.MastodonAPI.AccountsControllerTest do
     conn = get(conn, "/api/v1/accounts/lookup", %{"acct" => "alice@"})
     response = json_response(conn, 200)
 
-    assert response["id"] == Integer.to_string(user.id)
+    assert response["id"] == user.id
     assert response["username"] == "alice"
   end
 
@@ -245,7 +245,7 @@ defmodule EgregorosWeb.MastodonAPI.AccountsControllerTest do
     conn = get(conn, "/api/v1/accounts/lookup", %{"acct" => "alice@#{domain}"})
     response = json_response(conn, 200)
 
-    assert response["id"] == Integer.to_string(user.id)
+    assert response["id"] == user.id
     assert response["username"] == "alice"
   end
 
@@ -363,7 +363,7 @@ defmodule EgregorosWeb.MastodonAPI.AccountsControllerTest do
     conn = post(conn, "/api/v1/accounts/#{target.id}/follow")
     response = json_response(conn, 200)
 
-    assert response["id"] == Integer.to_string(target.id)
+    assert response["id"] == target.id
     assert response["following"] == true
 
     assert Egregoros.Objects.get_by_type_actor_object("Follow", user.ap_id, target.ap_id)
@@ -391,7 +391,7 @@ defmodule EgregorosWeb.MastodonAPI.AccountsControllerTest do
     conn = post(conn, "/api/v1/accounts/#{target.id}/follow")
     response = json_response(conn, 200)
 
-    assert response["id"] == Integer.to_string(target.id)
+    assert response["id"] == target.id
     assert response["following"] == false
     assert response["requested"] == true
 
@@ -425,7 +425,7 @@ defmodule EgregorosWeb.MastodonAPI.AccountsControllerTest do
 
     conn = post(conn, "/api/v1/accounts/#{target.id}/unfollow")
     response = json_response(conn, 200)
-    assert response["id"] == Integer.to_string(target.id)
+    assert response["id"] == target.id
     assert response["following"] == false
 
     assert Egregoros.Objects.get_by_type_actor_object("Undo", user.ap_id, follow.ap_id)
@@ -558,7 +558,7 @@ defmodule EgregorosWeb.MastodonAPI.AccountsControllerTest do
     conn = post(conn, "/api/v1/accounts/#{target.id}/block")
     response = json_response(conn, 200)
 
-    assert response["id"] == Integer.to_string(target.id)
+    assert response["id"] == target.id
     assert response["blocking"] == true
     assert Relationships.get_by_type_actor_object("Block", user.ap_id, target.ap_id)
     assert Relationships.get_by_type_actor_object("Follow", user.ap_id, target.ap_id) == nil
@@ -585,7 +585,7 @@ defmodule EgregorosWeb.MastodonAPI.AccountsControllerTest do
     conn = post(conn, "/api/v1/accounts/#{target.id}/unblock")
     response = json_response(conn, 200)
 
-    assert response["id"] == Integer.to_string(target.id)
+    assert response["id"] == target.id
     assert response["blocking"] == false
     assert Relationships.get_by_type_actor_object("Block", user.ap_id, target.ap_id) == nil
   end
@@ -600,7 +600,7 @@ defmodule EgregorosWeb.MastodonAPI.AccountsControllerTest do
     conn = post(conn, "/api/v1/accounts/#{target.id}/mute")
     response = json_response(conn, 200)
 
-    assert response["id"] == Integer.to_string(target.id)
+    assert response["id"] == target.id
     assert response["muting"] == true
     assert Relationships.get_by_type_actor_object("Mute", user.ap_id, target.ap_id)
   end
@@ -625,7 +625,7 @@ defmodule EgregorosWeb.MastodonAPI.AccountsControllerTest do
     conn = post(conn, "/api/v1/accounts/#{target.id}/unmute")
     response = json_response(conn, 200)
 
-    assert response["id"] == Integer.to_string(target.id)
+    assert response["id"] == target.id
     assert response["muting"] == false
     assert Relationships.get_by_type_actor_object("Mute", user.ap_id, target.ap_id) == nil
   end
@@ -641,8 +641,8 @@ defmodule EgregorosWeb.MastodonAPI.AccountsControllerTest do
     conn = get(conn, "/api/v1/accounts/relationships", %{"id" => [target_1.id, target_2.id]})
     response = json_response(conn, 200)
 
-    assert Enum.any?(response, &(&1["id"] == Integer.to_string(target_1.id)))
-    assert Enum.any?(response, &(&1["id"] == Integer.to_string(target_2.id)))
+    assert Enum.any?(response, &(&1["id"] == target_1.id))
+    assert Enum.any?(response, &(&1["id"] == target_2.id))
   end
 
   test "GET /api/v1/accounts/:id/followers returns follower accounts", %{conn: conn} do
@@ -663,7 +663,7 @@ defmodule EgregorosWeb.MastodonAPI.AccountsControllerTest do
     conn = get(conn, "/api/v1/accounts/#{target.id}/followers")
     response = json_response(conn, 200)
 
-    assert Enum.any?(response, &(&1["id"] == Integer.to_string(follower.id)))
+    assert Enum.any?(response, &(&1["id"] == follower.id))
   end
 
   test "GET /api/v1/accounts/:id/following returns followed accounts", %{conn: conn} do
@@ -684,7 +684,7 @@ defmodule EgregorosWeb.MastodonAPI.AccountsControllerTest do
     conn = get(conn, "/api/v1/accounts/#{follower.id}/following")
     response = json_response(conn, 200)
 
-    assert Enum.any?(response, &(&1["id"] == Integer.to_string(target.id)))
+    assert Enum.any?(response, &(&1["id"] == target.id))
   end
 
   defp tmp_upload_path do
@@ -902,6 +902,6 @@ defmodule EgregorosWeb.MastodonAPI.AccountsControllerTest do
     response = json_response(conn, 200)
 
     assert is_list(response)
-    assert Enum.any?(response, &(&1["id"] == Integer.to_string(bob.id)))
+    assert Enum.any?(response, &(&1["id"] == bob.id))
   end
 end

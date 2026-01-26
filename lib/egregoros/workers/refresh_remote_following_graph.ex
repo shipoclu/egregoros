@@ -102,6 +102,7 @@ defmodule Egregoros.Workers.RefreshRemoteFollowingGraph do
         rows =
           Enum.map(actor_ids, fn object_ap_id ->
             %{
+              id: FlakeId.get(),
               type: @relationship_type,
               actor: actor_ap_id,
               object: object_ap_id,

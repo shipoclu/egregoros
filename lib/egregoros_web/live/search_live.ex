@@ -318,8 +318,10 @@ defmodule EgregorosWeb.SearchLive do
   end
 
   def handle_event("toggle_like", %{"id" => id}, socket) do
+    post_id = id |> to_string() |> String.trim()
+
     with %User{} = user <- socket.assigns.current_user,
-         {post_id, ""} <- Integer.parse(to_string(id)) do
+         true <- flake_id?(post_id) do
       _ = Interactions.toggle_like(user, post_id)
       {:noreply, refresh_post(socket, post_id)}
     else
@@ -328,8 +330,10 @@ defmodule EgregorosWeb.SearchLive do
   end
 
   def handle_event("toggle_repost", %{"id" => id}, socket) do
+    post_id = id |> to_string() |> String.trim()
+
     with %User{} = user <- socket.assigns.current_user,
-         {post_id, ""} <- Integer.parse(to_string(id)) do
+         true <- flake_id?(post_id) do
       _ = Interactions.toggle_repost(user, post_id)
       {:noreply, refresh_post(socket, post_id)}
     else
@@ -338,8 +342,10 @@ defmodule EgregorosWeb.SearchLive do
   end
 
   def handle_event("toggle_reaction", %{"id" => id, "emoji" => emoji}, socket) do
+    post_id = id |> to_string() |> String.trim()
+
     with %User{} = user <- socket.assigns.current_user,
-         {post_id, ""} <- Integer.parse(to_string(id)),
+         true <- flake_id?(post_id),
          emoji when is_binary(emoji) <- to_string(emoji) do
       _ = Interactions.toggle_reaction(user, post_id, emoji)
       {:noreply, refresh_post(socket, post_id)}
@@ -349,8 +355,10 @@ defmodule EgregorosWeb.SearchLive do
   end
 
   def handle_event("toggle_bookmark", %{"id" => id}, socket) do
+    post_id = id |> to_string() |> String.trim()
+
     with %User{} = user <- socket.assigns.current_user,
-         {post_id, ""} <- Integer.parse(to_string(id)) do
+         true <- flake_id?(post_id) do
       _ = Interactions.toggle_bookmark(user, post_id)
       {:noreply, refresh_post(socket, post_id)}
     else
@@ -359,8 +367,10 @@ defmodule EgregorosWeb.SearchLive do
   end
 
   def handle_event("delete_post", %{"id" => id}, socket) do
+    post_id = id |> to_string() |> String.trim()
+
     with %User{} = user <- socket.assigns.current_user,
-         {post_id, ""} <- Integer.parse(to_string(id)),
+         true <- flake_id?(post_id),
          {:ok, _delete} <- Interactions.delete_post(user, post_id) do
       {:noreply,
        socket
@@ -712,10 +722,10 @@ defmodule EgregorosWeb.SearchLive do
     )
   end
 
-  defp post_dom_id(%{object: %{id: id}}) when is_integer(id), do: "search-post-#{id}"
+  defp post_dom_id(%{object: %{id: id}}) when is_binary(id), do: "search-post-#{id}"
   defp post_dom_id(_post), do: Ecto.UUID.generate()
 
-  defp refresh_post(socket, post_id) when is_integer(post_id) do
+  defp refresh_post(socket, post_id) when is_binary(post_id) do
     current_user = socket.assigns.current_user
 
     case Objects.get(post_id) do
@@ -742,6 +752,12 @@ defmodule EgregorosWeb.SearchLive do
         socket
     end
   end
+
+  defp flake_id?(id) when is_binary(id) do
+    match?(<<_::128>>, FlakeId.from_string(id))
+  end
+
+  defp flake_id?(_id), do: false
 
   defp default_reply_params do
     %{

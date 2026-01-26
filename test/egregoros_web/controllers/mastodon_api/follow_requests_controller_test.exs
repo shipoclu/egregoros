@@ -30,7 +30,7 @@ defmodule EgregorosWeb.MastodonAPI.FollowRequestsControllerTest do
     response = json_response(conn, 200)
 
     assert length(response) == 1
-    assert hd(response)["id"] == Integer.to_string(bob.id)
+    assert hd(response)["id"] == bob.id
   end
 
   test "POST /api/v1/follow_requests/:id/authorize accepts request", %{

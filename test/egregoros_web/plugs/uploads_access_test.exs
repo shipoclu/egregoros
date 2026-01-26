@@ -14,7 +14,7 @@ defmodule EgregorosWeb.Plugs.UploadsAccessTest do
 
     uploads_root = Application.fetch_env!(:egregoros, :uploads_dir)
 
-    media_dir = Path.join([uploads_root, "media", Integer.to_string(author.id)])
+    media_dir = Path.join([uploads_root, "media", author.id])
     File.mkdir_p!(media_dir)
     file_path = Path.join(media_dir, filename)
     File.write!(file_path, "ok")
@@ -25,7 +25,7 @@ defmodule EgregorosWeb.Plugs.UploadsAccessTest do
     assert File.exists?(thumbnail_file_path)
 
     on_exit(fn ->
-      File.rm_rf!(Path.join([uploads_root, "media", Integer.to_string(author.id)]))
+      File.rm_rf!(Path.join([uploads_root, "media", author.id]))
     end)
 
     assert response(get(conn, url_path), 200) == "ok"

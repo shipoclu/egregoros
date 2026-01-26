@@ -147,9 +147,9 @@ defmodule EgregorosWeb.Components.Shared.StatusMenu do
 
   defp can_delete_post?(_entry, _user), do: false
 
-  defp feed_id_for_entry(%{feed_id: id}) when is_integer(id), do: id
-  defp feed_id_for_entry(%{object: %{id: id}}) when is_integer(id), do: id
-  defp feed_id_for_entry(%{object: %{"id" => id}}) when is_integer(id), do: id
+  defp feed_id_for_entry(%{feed_id: id}) when is_binary(id), do: id
+  defp feed_id_for_entry(%{object: %{id: id}}) when is_binary(id), do: id
+  defp feed_id_for_entry(%{object: %{"id" => id}}) when is_binary(id), do: id
   defp feed_id_for_entry(_entry), do: nil
 
   defp status_share_url(entry) when is_map(entry) do
@@ -178,9 +178,9 @@ defmodule EgregorosWeb.Components.Shared.StatusMenu do
   end
 
   defp status_permalink_path(%{object: %{id: id, local: false}, actor: actor})
-       when is_integer(id) do
+       when is_binary(id) do
     case ProfilePaths.profile_path(actor) do
-      "/@" <> _rest = profile_path -> profile_path <> "/" <> Integer.to_string(id)
+      "/@" <> _rest = profile_path -> profile_path <> "/" <> id
       _ -> nil
     end
   end

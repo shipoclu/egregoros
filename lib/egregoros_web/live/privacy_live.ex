@@ -42,8 +42,10 @@ defmodule EgregorosWeb.PrivacyLive do
   end
 
   defp delete_relationship(socket, id, type, key) do
+    relationship_id = id |> to_string() |> String.trim()
+
     with %User{} = current_user <- socket.assigns.current_user,
-         {relationship_id, ""} <- Integer.parse(to_string(id)),
+         true <- flake_id?(relationship_id),
          %Relationship{} = relationship <- Relationships.get(relationship_id),
          true <- relationship.type == type,
          true <- relationship.actor == current_user.ap_id,
@@ -58,6 +60,12 @@ defmodule EgregorosWeb.PrivacyLive do
       _ -> socket
     end
   end
+
+  defp flake_id?(id) when is_binary(id) do
+    match?(<<_::128>>, FlakeId.from_string(id))
+  end
+
+  defp flake_id?(_id), do: false
 
   defp refresh_targets(socket) do
     mutes = Map.get(socket.assigns, :mutes, [])
