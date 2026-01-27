@@ -50,6 +50,21 @@ defmodule Egregoros.PleromaMigrationTest do
     assert %User{nickname: ^nickname} = Repo.get_by(User, nickname: nickname, local: true)
   end
 
+  test "Source.list_users/0 and list_statuses/0 delegate to the configured source" do
+    Source.Mock
+    |> expect(:list_users, fn opts ->
+      assert opts == []
+      {:ok, []}
+    end)
+    |> expect(:list_statuses, fn opts ->
+      assert opts == []
+      {:ok, []}
+    end)
+
+    assert {:ok, []} = Source.list_users()
+    assert {:ok, []} = Source.list_statuses()
+  end
+
   test "run/1 imports users and statuses (including remote) via a source module" do
     now = DateTime.utc_now() |> DateTime.truncate(:microsecond)
 

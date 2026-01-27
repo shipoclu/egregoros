@@ -84,9 +84,9 @@ defmodule Egregoros.PleromaMigration.Source.Postgres do
             nickname: nickname,
             domain: domain,
             ap_id: ap_id,
-            inbox: inbox,
+            inbox: derive_inbox(inbox, ap_id),
             outbox: derive_outbox(ap_id),
-            public_key: public_key,
+            public_key: derive_public_key(public_key, keys),
             private_key: keys,
             local: local,
             admin: is_admin,
@@ -238,7 +238,57 @@ defmodule Egregoros.PleromaMigration.Source.Postgres do
   defp derive_outbox(ap_id) when is_binary(ap_id), do: ap_id <> "/outbox"
   defp derive_outbox(_ap_id), do: ""
 
-  defp to_utc_datetime(%NaiveDateTime{} = naive), do: DateTime.from_naive!(naive, "Etc/UTC")
-  defp to_utc_datetime(%DateTime{} = dt), do: dt
+  defp derive_inbox(inbox, ap_id) when is_binary(inbox) do
+    case String.trim(inbox) do
+      "" -> derive_inbox(nil, ap_id)
+      trimmed -> trimmed
+    end
+  end
+
+  defp derive_inbox(_inbox, ap_id) when is_binary(ap_id), do: String.trim(ap_id) <> "/inbox"
+  defp derive_inbox(_inbox, _ap_id), do: ""
+
+  defp derive_public_key(public_key, keys) when is_binary(public_key) do
+    case String.trim(public_key) do
+      "" -> derive_public_key(nil, keys)
+      trimmed -> trimmed
+    end
+  end
+
+  defp derive_public_key(_public_key, keys) when is_binary(keys) and keys != "" do
+    with [entry | _] <- :public_key.pem_decode(keys),
+         private_key <- :public_key.pem_entry_decode(entry),
+         {:ok, public_key} <- rsa_public_key_from_private(private_key) do
+      :public_key.pem_entry_encode(:SubjectPublicKeyInfo, public_key)
+      |> List.wrap()
+      |> :public_key.pem_encode()
+      |> IO.iodata_to_binary()
+    else
+      _ -> nil
+    end
+  end
+
+  defp derive_public_key(_public_key, _keys), do: nil
+
+  defp rsa_public_key_from_private(
+         {:RSAPrivateKey, _version, modulus, public_exponent, _private_exponent, _prime1, _prime2,
+          _exponent1, _exponent2, _coefficient, _other_prime_infos}
+       ) do
+    {:ok, {:RSAPublicKey, modulus, public_exponent}}
+  end
+
+  defp rsa_public_key_from_private(_private_key), do: :error
+
+  defp to_utc_datetime(%NaiveDateTime{} = naive) do
+    naive
+    |> DateTime.from_naive!("Etc/UTC")
+    |> force_utc_datetime_usec()
+  end
+
+  defp to_utc_datetime(%DateTime{} = dt), do: force_utc_datetime_usec(dt)
   defp to_utc_datetime(nil), do: nil
+
+  defp force_utc_datetime_usec(%DateTime{microsecond: {value, _precision}} = datetime) do
+    %{datetime | microsecond: {value, 6}}
+  end
 end

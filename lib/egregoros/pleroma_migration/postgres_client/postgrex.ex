@@ -5,6 +5,7 @@ defmodule Egregoros.PleromaMigration.PostgresClient.Postgrex do
 
   @impl true
   def start_link(opts) when is_list(opts) do
+    {:ok, _} = Application.ensure_all_started(:postgrex)
     Postgrex.start_link(opts)
   end
 

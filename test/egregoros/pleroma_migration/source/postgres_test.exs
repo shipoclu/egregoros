@@ -25,8 +25,8 @@ defmodule Egregoros.PleromaMigration.Source.PostgresTest do
     conn = {:conn, System.unique_integer([:positive])}
 
     user_id = FlakeId.get()
-    inserted_at = ~N[2026-01-01 00:00:00.000000]
-    updated_at = ~N[2026-01-01 00:00:01.000000]
+    inserted_at = ~N[2026-01-01 00:00:00]
+    updated_at = ~N[2026-01-01 00:00:01]
 
     PostgresClient.Mock
     |> expect(:start_link, fn opts ->
@@ -75,6 +75,61 @@ defmodule Egregoros.PleromaMigration.Source.PostgresTest do
     assert user.locked == false
     assert %DateTime{} = user.inserted_at
     assert %DateTime{} = user.updated_at
+    assert user.inserted_at.microsecond == {0, 6}
+    assert user.updated_at.microsecond == {0, 6}
+  end
+
+  test "list_users/1 derives inbox/public_key for local users and normalizes microseconds" do
+    url = "postgres://user:pass@host:5432/pleroma_db"
+    conn = {:conn, System.unique_integer([:positive])}
+
+    user_id = FlakeId.get()
+    inserted_at = ~N[2026-01-01 00:00:00]
+    updated_at = ~N[2026-01-01 00:00:01]
+
+    private_key_pem = rsa_private_key_pem()
+
+    PostgresClient.Mock
+    |> expect(:start_link, fn _opts -> {:ok, conn} end)
+    |> expect(:query!, fn ^conn, _sql, [] ->
+      %{
+        rows: [
+          [
+            user_id,
+            "bob",
+            "https://pleroma.test/users/bob",
+            nil,
+            nil,
+            private_key_pem,
+            true,
+            false,
+            false,
+            "bob@pleroma.test",
+            "$pbkdf2-v2$stub",
+            "Bob",
+            "Bio",
+            inserted_at,
+            updated_at
+          ]
+        ]
+      }
+    end)
+    |> expect(:stop, fn ^conn -> :ok end)
+
+    assert {:ok, [user]} = Postgres.list_users(url: url)
+    assert user.id == user_id
+    assert user.nickname == "bob"
+    assert user.domain == nil
+    assert user.ap_id == "https://pleroma.test/users/bob"
+    assert user.inbox == "https://pleroma.test/users/bob/inbox"
+    assert user.outbox == "https://pleroma.test/users/bob/outbox"
+    assert String.starts_with?(user.public_key, "-----BEGIN PUBLIC KEY-----")
+    assert user.private_key == private_key_pem
+    assert user.local == true
+    assert user.admin == false
+    assert user.locked == false
+    assert user.inserted_at.microsecond == {0, 6}
+    assert user.updated_at.microsecond == {0, 6}
   end
 
   test "list_statuses/1 maps Create and Announce activities" do
@@ -83,8 +138,8 @@ defmodule Egregoros.PleromaMigration.Source.PostgresTest do
 
     create_id = FlakeId.get()
     announce_id = FlakeId.get()
-    inserted_at = ~N[2026-01-01 00:00:00.000000]
-    updated_at = ~N[2026-01-01 00:00:01.000000]
+    inserted_at = ~N[2026-01-01 00:00:00]
+    updated_at = ~N[2026-01-01 00:00:01]
 
     create = %{
       "id" => "https://example.com/activities/#{Ecto.UUID.generate()}",
@@ -158,5 +213,18 @@ defmodule Egregoros.PleromaMigration.Source.PostgresTest do
     assert Enum.all?(statuses, fn status ->
              match?(%DateTime{}, status.inserted_at) and match?(%DateTime{}, status.updated_at)
            end)
+
+    assert Enum.all?(statuses, fn status ->
+             status.inserted_at.microsecond == {0, 6} and status.updated_at.microsecond == {0, 6}
+           end)
+  end
+
+  defp rsa_private_key_pem do
+    key = :public_key.generate_key({:rsa, 1024, 65_537})
+
+    :public_key.pem_entry_encode(:RSAPrivateKey, key)
+    |> List.wrap()
+    |> :public_key.pem_encode()
+    |> IO.iodata_to_binary()
   end
 end
