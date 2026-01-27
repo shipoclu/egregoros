@@ -1,0 +1,21 @@
+[Unit]
+Description=Egregoros (Docker Compose)
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+
+# Directory that contains your compose files and .env
+# (copy this service to /etc/systemd/system and adjust as needed)
+WorkingDirectory=/opt/egregoros
+
+# Start/stop the standalone Caddy stack.
+ExecStart=/usr/bin/docker compose -f docker-compose.yml -f docker-compose.standalone.yml up -d --remove-orphans
+ExecStop=/usr/bin/docker compose -f docker-compose.yml -f docker-compose.standalone.yml down --remove-orphans
+ExecReload=/usr/bin/docker compose -f docker-compose.yml -f docker-compose.standalone.yml up -d --remove-orphans
+
+[Install]
+WantedBy=multi-user.target

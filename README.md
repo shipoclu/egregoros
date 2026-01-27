@@ -114,6 +114,95 @@ DNS is expected to point at the server for:
 
 You can customize routing/TLS options by editing `docker/caddy/Caddyfile`.
 
+Uploads are stored on the `egregoros_uploads` named volume (mounted at `/data/uploads` in the `web` container).
+In the standalone setup, uploads are served from `https://i.${EGREGOROS_DOMAIN}` by default.
+
+For backups, persist/backup at least:
+
+- `egregoros_db` (PostgreSQL data)
+- `egregoros_uploads` (user uploads)
+- `caddy_data` + `caddy_config` (TLS certs/config; optional but avoids re-issuing)
+
+### Migrating from Pleroma (systemd + host PostgreSQL)
+
+If you have an existing Pleroma deployment managed via `systemd` and PostgreSQL installed on the host (Ubuntu packages),
+you can migrate users + statuses into Egregoros (preserving status IDs) by letting the **Egregoros container connect to
+the host Postgres over TCP**.
+
+1) Start Egregoros (standalone Caddy):
+
+```sh
+cp .env.example .env
+# Set: SECRET_KEY_BASE, POSTGRES_PASSWORD, EGREGOROS_DOMAIN
+docker compose -f docker-compose.yml -f docker-compose.standalone.yml up -d --build
+```
+
+2) Temporarily allow the container network to reach host Postgres:
+
+- Ensure your Pleroma DB user has a password (peer/local auth won’t work from Docker).
+- Edit host Postgres config:
+  - `/etc/postgresql/<ver>/main/postgresql.conf`: set `listen_addresses = '*'` (or include the docker bridge iface)
+  - `/etc/postgresql/<ver>/main/pg_hba.conf`: add an allow rule for your Docker compose subnet
+
+Get the compose subnet:
+
+```sh
+docker network inspect egregoros_default --format '{{(index .IPAM.Config 0).Subnet}}'
+```
+
+Add a rule like:
+
+```conf
+host  pleroma  pleroma  <SUBNET_FROM_ABOVE>  scram-sha-256
+```
+
+Reload:
+
+```sh
+sudo systemctl reload postgresql
+```
+
+3) On Linux, make `host.docker.internal` resolve to the host gateway for the `web` container.
+Create `docker-compose.migrate.yml`:
+
+```yml
+services:
+  web:
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+```
+
+4) Run the import from inside the release container:
+
+```sh
+docker compose \
+  -f docker-compose.yml \
+  -f docker-compose.standalone.yml \
+  -f docker-compose.migrate.yml \
+  run --rm \
+  -e PLEROMA_DATABASE_URL='postgres://pleroma:PASSWORD@host.docker.internal:5432/pleroma' \
+  web sh -lc 'bin/egregoros eval "case Application.ensure_all_started(:egregoros) do {:ok, _} -> :ok; other -> IO.inspect(other, label: :start_error); System.halt(1) end; IO.inspect(Egregoros.PleromaMigration.run(), label: :import)"'
+```
+
+After the import, remove the `pg_hba.conf` rule (and tighten `listen_addresses`) if you don’t want host Postgres reachable
+from Docker anymore.
+
+Note: this importer currently migrates **users + statuses** only. It does not copy Pleroma’s local media uploads or rewrite
+historic attachment URLs.
+
+### Running via systemd (Docker Compose)
+
+If you want systemd to (re)start the compose stack on boot, see:
+
+- `deploy/systemd/egregoros-compose.service`
+
+Copy it to `/etc/systemd/system/egregoros-compose.service`, adjust `WorkingDirectory`, then:
+
+```sh
+sudo systemctl daemon-reload
+sudo systemctl enable --now egregoros-compose
+```
+
 ### Coolify notes
 
 - Use the **Docker Compose** deployment type and point it at this repo.
