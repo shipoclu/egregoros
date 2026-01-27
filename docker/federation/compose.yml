@@ -155,6 +155,7 @@ services:
     entrypoint: []
     environment:
       DOMAIN: pleroma.test
+      FEDTEST_MIGRATION_SEED_TEXT: "fedbox: pleroma migration seed"
       DB_HOST: pleroma_db
       DB_PORT: 5432
       DB_NAME: pleroma
@@ -178,11 +179,6 @@ services:
             needs_seed=1
           fi
         done
-
-        if [ "$$needs_seed" -eq 0 ]; then
-          echo "[fedbox] pleroma: users already exist"
-          exit 0
-        fi
 
         app=$$(
           wget -qO- \
@@ -223,6 +219,27 @@ services:
             sleep 1
           done
         done
+
+        seed_text=$${FEDTEST_MIGRATION_SEED_TEXT:-fedbox: pleroma migration seed}
+
+        bob_token=$$(
+          wget -qO- \
+            --post-data "client_id=$$client_id&client_secret=$$client_secret&grant_type=password&username=bob&password=password&scope=read+write+follow" \
+            "http://pleroma_web:4000/oauth/token"
+        )
+        bob_access_token=$$(echo "$$bob_token" | sed -n 's/.*"access_token":"\([^"]*\)".*/\1/p')
+
+        if wget -qO- \
+          --header "Authorization: Bearer $$bob_access_token" \
+          "http://pleroma_web:4000/api/v1/timelines/home?limit=40" | grep -q "$$seed_text"; then
+          echo "[fedbox] pleroma: seed status already exists"
+        else
+          wget -qO- \
+            --header "Authorization: Bearer $$bob_access_token" \
+            --post-data "status=$$seed_text&visibility=public" \
+            "http://pleroma_web:4000/api/v1/statuses" >/dev/null
+          echo "[fedbox] pleroma: created seed status"
+        fi
     networks:
       - federation
 
@@ -350,6 +367,39 @@ services:
     networks:
       - federation
 
+  egregoros_import_pleroma:
+    profiles: ["fedtest"]
+    image: egregoros-fedbox
+    restart: "no"
+    depends_on:
+      egregoros_web:
+        condition: service_healthy
+      pleroma_seed:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: ecto://postgres:postgres@egregoros_db:5432/egregoros_prod
+      # Must be at least 64 bytes for Plug.Session cookie store.
+      SECRET_KEY_BASE: "fedbox_secret_key_base_egregoros_0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      PHX_HOST: egregoros.test
+      PHX_SCHEME: https
+      PHX_PORT: 443
+      EGREGOROS_ALLOW_PRIVATE_FEDERATION: "true"
+      EGREGOROS_FEDERATION_WEBFINGER_SCHEME: https
+      # Mastodon enforces a 5-minute minimum for scheduled statuses, but we want
+      # fast E2E tests in fedbox.
+      EGREGOROS_SCHEDULED_STATUS_MIN_OFFSET_SECONDS: "0"
+      EGREGOROS_UPLOADS_DIR: /data/uploads
+      EGREGOROS_REQ_CACERTFILE: /caddy/pki/authorities/local/root.crt
+      SSL_CERT_FILE: /caddy/pki/authorities/local/root.crt
+      PLEROMA_DATABASE_URL: postgres://pleroma:pleroma@pleroma_db:5432/pleroma
+    volumes:
+      - egregoros_fed_uploads:/data/uploads
+      - caddy_fed_data:/caddy:ro
+    command: >
+      sh -lc 'bin/egregoros eval "case Application.ensure_all_started(:egregoros) do {:ok, _} -> :ok; {:error, error} -> IO.inspect(error, label: :egregoros_start_error); System.halt(1) end; case Egregoros.PleromaMigration.run() do %{users: _, statuses: _} -> :ok; {:error, error} -> IO.inspect(error, label: :pleroma_import_error); System.halt(1) end"'
+    networks:
+      - federation
+
   fedtest:
     profiles: ["fedtest"]
     build:
@@ -360,6 +410,8 @@ services:
         condition: service_completed_successfully
       egregoros_web:
         condition: service_healthy
+      egregoros_import_pleroma:
+        condition: service_completed_successfully
       pleroma_seed:
         condition: service_completed_successfully
       pleroma_web:
@@ -374,6 +426,7 @@ services:
       FEDTEST_MASTODON_HANDLE: "@carol@mastodon.test"
       FEDTEST_PASSWORD: "password"
       FEDTEST_SCHEME: https
+      FEDTEST_MIGRATION_SEED_TEXT: "fedbox: pleroma migration seed"
       FEDTEST_CACERTFILE: /caddy/pki/authorities/local/root.crt
     networks:
       - federation

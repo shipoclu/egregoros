@@ -19,12 +19,12 @@ compose() {
 }
 
 cleanup() {
-  compose down -v --remove-orphans || true
+  compose --profile fedtest down -v --remove-orphans || true
 }
 
 trap cleanup EXIT
 
-compose down -v --remove-orphans || true
+compose --profile fedtest down -v --remove-orphans || true
 compose --profile fedtest run --rm --build fedtest
 '''
 
@@ -34,4 +34,4 @@ run = "docker compose -f docker/federation/compose.yml logs -f --no-color"
 
 [tasks."fed:down"]
 description = "Stop federation-in-a-box and delete volumes"
-run = "docker compose -f docker/federation/compose.yml down -v --remove-orphans"
+run = "docker compose -f docker/federation/compose.yml --profile fedtest down -v --remove-orphans"

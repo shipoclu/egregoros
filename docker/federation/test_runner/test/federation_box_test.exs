@@ -194,6 +194,33 @@ defmodule FederationBoxTest do
     )
   end
 
+  test "migration: imported Pleroma statuses preserve their ids", ctx do
+    seed_text = System.get_env("FEDTEST_MIGRATION_SEED_TEXT", "fedbox: pleroma migration seed")
+
+    pleroma_status =
+      wait_until!(
+        fn -> find_status_by_content(ctx.pleroma_base_url, ctx.bob_access_token, seed_text) end,
+        "pleroma seed status exists"
+      )
+
+    pleroma_status_id = pleroma_status["id"]
+
+    resp =
+      req_get!(
+        ctx.egregoros_base_url <> "/api/v1/statuses/" <> pleroma_status_id,
+        headers: [{"authorization", "Bearer " <> ctx.access_token}]
+      )
+
+    assert resp.status in 200..299
+
+    egregoros_status = ensure_json!(resp.body)
+
+    assert egregoros_status["id"] == pleroma_status_id
+
+    assert is_binary(egregoros_status["content"]) and
+             String.contains?(egregoros_status["content"], seed_text)
+  end
+
   test "polls: receives polls from followed accounts", ctx do
     follow_and_assert_remote_accept!(
       ctx.egregoros_base_url,
