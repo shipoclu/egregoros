@@ -2,6 +2,7 @@ defmodule Egregoros.Objects do
   import Ecto.Query,
     only: [from: 2, dynamic: 2, recursive_ctes: 2, with_cte: 3, subquery: 1]
 
+  alias Egregoros.ActivityPub.TypeNormalizer
   alias Egregoros.Object
   alias Egregoros.Objects.Polls
   alias Egregoros.Relationship
@@ -17,6 +18,10 @@ defmodule Egregoros.Objects do
   defdelegate poll_is_multiple?(object), to: Polls, as: :multiple?
 
   def create_object(attrs) do
+    # Apply multi-type metadata before persistence so the canonical type array
+    # stays in data and auxiliary types live in internal state.
+    attrs = TypeNormalizer.apply_type_metadata(attrs)
+
     %Object{}
     |> Object.changeset(attrs)
     |> Repo.insert()
@@ -31,6 +36,9 @@ defmodule Egregoros.Objects do
   end
 
   def update_object(%Object{} = object, attrs) do
+    # Apply multi-type metadata on updates as well to preserve canonical data.
+    attrs = TypeNormalizer.apply_type_metadata(attrs)
+
     object
     |> Object.changeset(attrs)
     |> Repo.update()
@@ -48,6 +56,9 @@ defmodule Egregoros.Objects do
   end
 
   def upsert_object(attrs, opts) when is_list(opts) do
+    # Normalize multi-type metadata once up front so both inserts and conflict
+    # resolutions see canonical data and auxiliary types.
+    attrs = TypeNormalizer.apply_type_metadata(attrs)
     conflict = Keyword.get(opts, :conflict, :nothing)
 
     case create_object(attrs) do
@@ -1341,12 +1352,28 @@ defmodule Egregoros.Objects do
           |> Map.delete("ap_id")
           |> Map.delete(:type)
           |> Map.delete("type")
+          # Preserve existing internal state (e.g. polls) while adding auxiliary types.
+          |> merge_internal(object)
 
         update_object(object, attrs)
     end
   end
 
   defp resolve_conflict(_other, %Object{} = object, _attrs, _changeset), do: {:ok, object}
+
+  defp merge_internal(attrs, %Object{internal: existing_internal}) when is_map(attrs) do
+    incoming_internal = Map.get(attrs, :internal) || Map.get(attrs, "internal")
+
+    if is_map(incoming_internal) do
+      merged_internal = Map.merge(existing_internal || %{}, incoming_internal)
+
+      attrs
+      |> Map.delete("internal")
+      |> Map.put(:internal, merged_internal)
+    else
+      attrs
+    end
+  end
 
   defp ap_id_mismatch?(%Object{ap_id: existing}, attrs)
        when is_map(attrs) and is_binary(existing) do

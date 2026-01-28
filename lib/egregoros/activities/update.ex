@@ -8,6 +8,7 @@ defmodule Egregoros.Activities.Update do
   alias Egregoros.ActivityPub.ObjectValidators.Types.DateTime, as: APDateTime
   alias Egregoros.ActivityPub.ObjectValidators.Types.ObjectID
   alias Egregoros.ActivityPub.ObjectValidators.Types.Recipients
+  alias Egregoros.ActivityPub.TypeNormalizer
   alias Egregoros.Domain
   alias Egregoros.Federation.Delivery
   alias Egregoros.Federation.Actor
@@ -96,29 +97,38 @@ defmodule Egregoros.Activities.Update do
 
   def side_effects(_object, _opts), do: :ok
 
-  defp maybe_apply_actor_update(actor_ap_id, %{"type" => type} = object)
-       when is_binary(type) and type in @actor_types do
-    object_id = Map.get(object, "id")
+  defp maybe_apply_actor_update(actor_ap_id, %{} = object) when is_binary(actor_ap_id) do
+    case TypeNormalizer.primary_type(object) do
+      type when is_binary(type) and type in @actor_types ->
+        object_id = Map.get(object, "id")
 
-    if is_binary(object_id) and object_id == actor_ap_id do
-      _ = Actor.upsert_from_map(object)
+        if is_binary(object_id) and object_id == actor_ap_id do
+          _ = Actor.upsert_from_map(object)
+        end
+
+        :ok
+
+      _ ->
+        :ok
     end
-
-    :ok
   end
 
   defp maybe_apply_actor_update(_actor_ap_id, _object), do: :ok
 
-  defp maybe_apply_note_update(actor_ap_id, %{"type" => "Note"} = object, opts)
+  defp maybe_apply_note_update(actor_ap_id, %{} = object, opts)
        when is_binary(actor_ap_id) and is_list(opts) do
     note_id = Map.get(object, "id")
 
     with note_id when is_binary(note_id) and note_id != "" <- note_id,
+         # Normalize multi-type objects so Note validation still works, while keeping
+         # metadata around to restore the canonical type array on persistence.
+         {:ok, normalized_object, type_metadata} <- TypeNormalizer.normalize_incoming(object),
          existing_note <- Objects.get_by_ap_id(note_id),
-         {:ok, validated_note} <- Note.cast_and_validate(object),
+         {:ok, validated_note} <- Note.cast_and_validate(normalized_object),
          note_actor when is_binary(note_actor) <- Map.get(validated_note, "actor"),
          true <- note_actor == actor_ap_id do
-      note_attrs = Note.to_object_attrs(validated_note, opts)
+      note_opts = TypeNormalizer.put_type_metadata(opts, type_metadata)
+      note_attrs = Note.to_object_attrs(validated_note, note_opts)
 
       note_attrs =
         if existing_note do
@@ -260,6 +270,7 @@ defmodule Egregoros.Activities.Update do
       published: Helpers.parse_datetime(activity["published"]),
       local: Keyword.get(opts, :local, true)
     }
+    |> Helpers.attach_type_metadata(opts)
   end
 
   defp object_id(%{"object" => %{"id" => id}}) when is_binary(id), do: id
@@ -287,7 +298,8 @@ defmodule Egregoros.Activities.Update do
 
     validate_change(changeset, :object, fn :object, object_value ->
       object_id = get_in(object_value, ["id"]) || get_in(object_value, [:id])
-      object_type = get_in(object_value, ["type"]) || get_in(object_value, [:type])
+      # Accept multi-type objects by validating against the primary type only.
+      object_type = TypeNormalizer.primary_type(object_value)
 
       errors =
         if is_binary(object_id) and String.trim(object_id) != "" and is_binary(object_type) and
