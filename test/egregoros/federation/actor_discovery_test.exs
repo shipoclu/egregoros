@@ -37,4 +37,13 @@ defmodule Egregoros.Federation.ActorDiscoveryTest do
                "https://remote2.example/users/bob"
              ])
   end
+
+  test "actor_ids includes issuer when actor is omitted" do
+    activity = %{
+      "issuer" => "https://remote.example/actors/instance",
+      "to" => ["https://www.w3.org/ns/activitystreams#Public"]
+    }
+
+    assert ActorDiscovery.actor_ids(activity) == ["https://remote.example/actors/instance"]
+  end
 end

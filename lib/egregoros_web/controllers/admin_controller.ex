@@ -85,7 +85,7 @@ defmodule EgregorosWeb.AdminController do
   end
 
   defp notifications_count(%User{} = user) do
-    Egregoros.Notifications.list_for_user(user, limit: 20)
+    Egregoros.Notifications.list_for_user(user, limit: 20, include_offers?: true)
     |> length()
   end
 

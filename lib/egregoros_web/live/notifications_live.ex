@@ -2,6 +2,7 @@ defmodule EgregorosWeb.NotificationsLive do
   use EgregorosWeb, :live_view
 
   alias Egregoros.Activities.Accept
+  alias Egregoros.Activities.Offer
   alias Egregoros.Activities.Reject
   alias Egregoros.CustomEmojis
   alias Egregoros.EmojiReactions
@@ -110,7 +111,7 @@ defmodule EgregorosWeb.NotificationsLive do
   def handle_event("set_notifications_filter", %{"filter" => filter}, socket) do
     filter = filter |> to_string() |> String.trim()
 
-    if filter in ~w(all follows requests likes reposts mentions reactions) do
+    if filter in ~w(all follows requests likes reposts mentions reactions offers) do
       {:noreply, assign(socket, notifications_filter: filter)}
     else
       {:noreply, socket}
@@ -167,6 +168,36 @@ defmodule EgregorosWeb.NotificationsLive do
     end
   end
 
+  def handle_event("offer_accept", %{"id" => id}, socket) do
+    offer_id = id |> to_string() |> String.trim()
+
+    with %User{} = current_user <- socket.assigns.current_user,
+         %Object{type: "Offer"} = offer_object <- fetch_offer(offer_id),
+         true <- offer_addressed_to_user?(offer_object, current_user),
+         {:ok, _accept_object} <-
+           Pipeline.ingest(Accept.build(current_user, offer_object), local: true) do
+      {:noreply, put_flash(socket, :info, "Offer accepted.")}
+    else
+      _ ->
+        {:noreply, socket}
+    end
+  end
+
+  def handle_event("offer_reject", %{"id" => id}, socket) do
+    offer_id = id |> to_string() |> String.trim()
+
+    with %User{} = current_user <- socket.assigns.current_user,
+         %Object{type: "Offer"} = offer_object <- fetch_offer(offer_id),
+         true <- offer_addressed_to_user?(offer_object, current_user),
+         {:ok, _reject_object} <-
+           Pipeline.ingest(Reject.build(current_user, offer_object), local: true) do
+      {:noreply, put_flash(socket, :info, "Offer rejected.")}
+    else
+      _ ->
+        {:noreply, socket}
+    end
+  end
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -210,6 +241,12 @@ defmodule EgregorosWeb.NotificationsLive do
                 current={@notifications_filter}
                 label="Requests"
                 icon="hero-user-circle"
+              />
+              <.filter_button
+                filter="offers"
+                current={@notifications_filter}
+                label="Offers"
+                icon="hero-gift"
               />
               <.filter_button
                 filter="likes"
@@ -369,7 +406,7 @@ defmodule EgregorosWeb.NotificationsLive do
   defp list_notifications(nil, _opts), do: []
 
   defp list_notifications(%User{} = user, opts) when is_list(opts) do
-    Notifications.list_for_user(user, opts)
+    Notifications.list_for_user(user, Keyword.put(opts, :include_offers?, true))
   end
 
   defp list_follow_requests(nil, _opts), do: []
@@ -478,6 +515,9 @@ defmodule EgregorosWeb.NotificationsLive do
 
           {"hero-face-smile", message, message_emojis, reaction_display}
 
+        "Offer" ->
+          {"hero-gift", "#{actor.display_name} offered you a credential", actor.emojis, nil}
+
         "Note" ->
           {"hero-at-symbol", "#{actor.display_name} mentioned you", actor.emojis, nil}
 
@@ -543,6 +583,26 @@ defmodule EgregorosWeb.NotificationsLive do
 
   defp note_for_ap_id(_ap_id), do: nil
 
+  defp fetch_offer(offer_id) when is_binary(offer_id) do
+    offer_id = String.trim(offer_id)
+
+    cond do
+      offer_id == "" ->
+        nil
+
+      true ->
+        Objects.get(offer_id) || Objects.get_by_ap_id(offer_id)
+    end
+  end
+
+  defp fetch_offer(_offer_id), do: nil
+
+  defp offer_addressed_to_user?(%Object{} = offer_object, %User{} = user) do
+    user.ap_id in Offer.recipient_ap_ids(offer_object)
+  end
+
+  defp offer_addressed_to_user?(_offer_object, _user), do: false
+
   defp status_path_for_note(%Object{} = note) do
     actor = ActorVM.card(note.actor)
 
@@ -585,7 +645,7 @@ defmodule EgregorosWeb.NotificationsLive do
 
   defp notifications_count(%User{} = user) do
     user
-    |> Notifications.list_for_user(limit: @page_size)
+    |> Notifications.list_for_user(limit: @page_size, include_offers?: true)
     |> length()
   end
 

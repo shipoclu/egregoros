@@ -524,7 +524,7 @@ defmodule EgregorosWeb.TagLive do
 
   defp notifications_count(%User{} = user) do
     user
-    |> Notifications.list_for_user(limit: @page_size)
+    |> Notifications.list_for_user(limit: @page_size, include_offers?: true)
     |> length()
   end
 

@@ -4,6 +4,7 @@ defmodule Egregoros.Activities.Reject do
   import Ecto.Changeset
 
   alias Egregoros.Activities.Helpers
+  alias Egregoros.ActivityPub.TypeNormalizer
   alias Egregoros.ActivityPub.ObjectValidators.Types.DateTime, as: APDateTime
   alias Egregoros.ActivityPub.ObjectValidators.Types.ObjectID
   alias Egregoros.ActivityPub.ObjectValidators.Types.Recipients
@@ -71,6 +72,16 @@ defmodule Egregoros.Activities.Reject do
       "type" => type(),
       "actor" => actor.ap_id,
       "object" => follow_object.data,
+      "published" => DateTime.utc_now() |> DateTime.to_iso8601()
+    }
+  end
+
+  def build(%User{} = actor, %Object{type: "Offer"} = offer_object) do
+    %{
+      "id" => Endpoint.url() <> "/activities/reject/" <> Ecto.UUID.generate(),
+      "type" => type(),
+      "actor" => actor.ap_id,
+      "object" => offer_object.data,
       "published" => DateTime.utc_now() |> DateTime.to_iso8601()
     }
   end
@@ -183,9 +194,9 @@ defmodule Egregoros.Activities.Reject do
 
   defp deliver_reject(%Object{} = reject_object) do
     with %{} = actor <- Users.get_by_ap_id(reject_object.actor),
-         %{} = follower <- rejected_follower(reject_object),
-         false <- follower.local do
-      Delivery.deliver(actor, follower.inbox, reject_object.data)
+         %{} = target <- rejected_target(reject_object),
+         false <- target.local do
+      Delivery.deliver(actor, target.inbox, reject_object.data)
     end
   end
 
@@ -198,6 +209,36 @@ defmodule Egregoros.Activities.Reject do
         case Objects.get_by_ap_id(object_id) do
           %Object{actor: actor} when is_binary(actor) -> Users.get_by_ap_id(actor)
           _ -> nil
+        end
+
+      _ ->
+        nil
+    end
+  end
+
+  defp rejected_target(%Object{} = reject_object) do
+    rejected_follower(reject_object) || rejected_offer_actor(reject_object)
+  end
+
+  defp rejected_offer_actor(%Object{} = reject_object) do
+    case reject_object.data["object"] do
+      %{} = offer ->
+        if TypeNormalizer.primary_type(offer) == "Offer" do
+          offer
+          |> Map.get("actor")
+          |> extract_id()
+          |> Users.get_by_ap_id()
+        else
+          nil
+        end
+
+      offer_ap_id when is_binary(offer_ap_id) ->
+        case Objects.get_by_ap_id(offer_ap_id) do
+          %Object{type: "Offer", actor: actor} when is_binary(actor) ->
+            Users.get_by_ap_id(actor)
+
+          _ ->
+            nil
         end
 
       _ ->

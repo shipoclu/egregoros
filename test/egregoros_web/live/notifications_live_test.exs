@@ -10,6 +10,7 @@ defmodule EgregorosWeb.NotificationsLiveTest do
   alias Egregoros.Pipeline
   alias Egregoros.Publish
   alias Egregoros.Relationships
+  alias Egregoros.TestSupport.Fixtures
   alias Egregoros.Users
   alias EgregorosWeb.URL
 
@@ -259,6 +260,74 @@ defmodule EgregorosWeb.NotificationsLiveTest do
 
     assert Relationships.get_by_type_actor_object("FollowRequest", actor.ap_id, user.ap_id) == nil
     assert Relationships.get_by_type_actor_object("Follow", actor.ap_id, user.ap_id) == nil
+  end
+
+  test "offer notifications can be accepted from the notifications screen", %{
+    conn: conn,
+    user: user
+  } do
+    credential =
+      Fixtures.json!("openbadge_vc.json")
+      |> Map.put("issuer", "https://example.com/users/issuer")
+      |> Map.put("to", [user.ap_id])
+      |> put_in(["credentialSubject", "id"], user.ap_id)
+
+    offer = %{
+      "id" => "https://example.com/activities/offer/live-accept",
+      "type" => "Offer",
+      "actor" => "https://example.com/users/issuer",
+      "to" => [user.ap_id],
+      "object" => credential,
+      "published" => "2026-01-29T00:00:00Z"
+    }
+
+    assert {:ok, offer_object} =
+             Pipeline.ingest(offer, local: false, inbox_user_ap_id: user.ap_id)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/notifications")
+
+    assert has_element?(view, "#notification-#{offer_object.id}")
+
+    view
+    |> element("button[data-role='offer-accept'][phx-value-id='#{offer_object.ap_id}']")
+    |> render_click()
+
+    assert Objects.get_by_type_actor_object("Accept", user.ap_id, offer_object.ap_id)
+  end
+
+  test "offer notifications can be rejected from the notifications screen", %{
+    conn: conn,
+    user: user
+  } do
+    credential =
+      Fixtures.json!("openbadge_vc.json")
+      |> Map.put("issuer", "https://example.com/users/issuer")
+      |> Map.put("to", [user.ap_id])
+      |> put_in(["credentialSubject", "id"], user.ap_id)
+
+    offer = %{
+      "id" => "https://example.com/activities/offer/live-reject",
+      "type" => "Offer",
+      "actor" => "https://example.com/users/issuer",
+      "to" => [user.ap_id],
+      "object" => credential,
+      "published" => "2026-01-29T00:00:00Z"
+    }
+
+    assert {:ok, offer_object} =
+             Pipeline.ingest(offer, local: false, inbox_user_ap_id: user.ap_id)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/notifications")
+
+    assert has_element?(view, "#notification-#{offer_object.id}")
+
+    view
+    |> element("button[data-role='offer-reject'][phx-value-id='#{offer_object.ap_id}']")
+    |> render_click()
+
+    assert Objects.get_by_type_actor_object("Reject", user.ap_id, offer_object.ap_id)
   end
 
   test "notifications filters ignore invalid values", %{conn: conn, user: user} do

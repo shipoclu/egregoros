@@ -312,6 +312,8 @@ defmodule EgregorosWeb.Router do
   scope "/api/v1/pleroma", EgregorosWeb.PleromaAPI do
     pipe_through [:api, :api_auth, :oauth_write]
 
+    post "/offers/:id/accept", OffersController, :accept
+    post "/offers/:id/reject", OffersController, :reject
     put "/statuses/:id/reactions/:emoji", EmojiReactionController, :create
     delete "/statuses/:id/reactions/:emoji", EmojiReactionController, :delete
   end
