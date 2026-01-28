@@ -525,6 +525,8 @@ defmodule EgregorosWeb.NotificationsLive do
           {"hero-bell", "#{actor.display_name} sent activity", actor.emojis, nil}
       end
 
+    {offer_title, offer_description} = offer_details(notification)
+
     %{
       notification: notification,
       type: type,
@@ -535,7 +537,9 @@ defmodule EgregorosWeb.NotificationsLive do
       preview_html: preview_html,
       preview_text: preview_text,
       target_path: target_path,
-      reaction_emoji: reaction_emoji
+      reaction_emoji: reaction_emoji,
+      offer_title: offer_title,
+      offer_description: offer_description
     }
   end
 
@@ -582,6 +586,60 @@ defmodule EgregorosWeb.NotificationsLive do
   end
 
   defp note_for_ap_id(_ap_id), do: nil
+
+  defp offer_details(%Object{type: "Offer"} = offer) do
+    credential =
+      case offer.data do
+        %{"object" => %{} = embedded} -> embedded
+        _ -> credential_from_ap_id(offer.object)
+      end
+
+    achievement =
+      credential
+      |> credential_subject()
+      |> credential_achievement()
+
+    {
+      achievement_field(achievement, "name"),
+      achievement_field(achievement, "description")
+    }
+  end
+
+  defp offer_details(_notification), do: {nil, nil}
+
+  defp credential_from_ap_id(credential_ap_id) when is_binary(credential_ap_id) do
+    case Objects.get_by_ap_id(credential_ap_id) do
+      %Object{data: %{} = data} -> data
+      _ -> nil
+    end
+  end
+
+  defp credential_from_ap_id(_credential_ap_id), do: nil
+
+  defp credential_subject(%{} = credential) do
+    credential
+    |> Map.get("credentialSubject")
+    |> List.wrap()
+    |> Enum.find(&is_map/1)
+  end
+
+  defp credential_subject(_credential), do: nil
+
+  defp credential_achievement(%{} = subject) do
+    Map.get(subject, "achievement") || Map.get(subject, :achievement)
+  end
+
+  defp credential_achievement(_subject), do: nil
+
+  defp achievement_field(%{} = achievement, "name") do
+    Map.get(achievement, "name") || Map.get(achievement, :name)
+  end
+
+  defp achievement_field(%{} = achievement, "description") do
+    Map.get(achievement, "description") || Map.get(achievement, :description)
+  end
+
+  defp achievement_field(_achievement, _field), do: nil
 
   defp fetch_offer(offer_id) when is_binary(offer_id) do
     offer_id = String.trim(offer_id)

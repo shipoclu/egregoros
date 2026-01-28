@@ -32,6 +32,24 @@ defmodule EgregorosWeb.Components.NotificationItems.OfferNotification do
             <p class="mt-1 font-mono text-xs text-[color:var(--text-muted)]">
               {@entry.actor.handle}
             </p>
+
+            <%= if @entry[:offer_title] do %>
+              <p
+                data-role="offer-title"
+                class="mt-3 text-sm font-semibold text-[color:var(--text-primary)]"
+              >
+                {@entry[:offer_title]}
+              </p>
+            <% end %>
+
+            <%= if @entry[:offer_description] do %>
+              <p
+                data-role="offer-description"
+                class="mt-1 text-sm text-[color:var(--text-secondary)]"
+              >
+                {@entry[:offer_description]}
+              </p>
+            <% end %>
           </div>
         </div>
 

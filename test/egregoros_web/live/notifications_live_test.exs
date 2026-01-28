@@ -330,6 +330,46 @@ defmodule EgregorosWeb.NotificationsLiveTest do
     assert Objects.get_by_type_actor_object("Reject", user.ap_id, offer_object.ap_id)
   end
 
+  test "offer notifications include credential details", %{conn: conn, user: user} do
+    credential =
+      Fixtures.json!("openbadge_vc.json")
+      |> Map.put("issuer", "https://example.com/users/issuer")
+      |> Map.put("to", [user.ap_id])
+      |> put_in(["credentialSubject", "id"], user.ap_id)
+      |> put_in(["credentialSubject", "achievement", "name"], "Contributor")
+      |> put_in(
+        ["credentialSubject", "achievement", "description"],
+        "Awarded for supporting the community."
+      )
+
+    offer = %{
+      "id" => "https://example.com/activities/offer/live-details",
+      "type" => "Offer",
+      "actor" => "https://example.com/users/issuer",
+      "to" => [user.ap_id],
+      "object" => credential,
+      "published" => "2026-01-29T00:00:00Z"
+    }
+
+    assert {:ok, offer_object} =
+             Pipeline.ingest(offer, local: false, inbox_user_ap_id: user.ap_id)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/notifications")
+
+    assert has_element?(
+             view,
+             "#notification-#{offer_object.id} [data-role='offer-title']",
+             "Contributor"
+           )
+
+    assert has_element?(
+             view,
+             "#notification-#{offer_object.id} [data-role='offer-description']",
+             "Awarded for supporting the community."
+           )
+  end
+
   test "notifications filters ignore invalid values", %{conn: conn, user: user} do
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     {:ok, view, _html} = live(conn, "/notifications")
