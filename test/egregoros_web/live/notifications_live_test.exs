@@ -369,6 +369,12 @@ defmodule EgregorosWeb.NotificationsLiveTest do
              "#notification-#{offer_object.id} [data-role='offer-description']",
              "Awarded for supporting the community."
            )
+
+    assert has_element?(
+             view,
+             "#notification-#{offer_object.id} [data-role='offer-issuer-ap-id']",
+             "https://example.com/users/issuer"
+           )
   end
 
   test "offer notifications link to the accepted badge", %{conn: conn, user: user} do
