@@ -37,7 +37,8 @@ defmodule Egregoros.PleromaMigration.Source.PostgresTest do
       assert opts[:database] == "pleroma_db"
       {:ok, conn}
     end)
-    |> expect(:query!, fn ^conn, sql, [] ->
+    |> expect(:query!, fn ^conn, sql, [], opts ->
+      assert opts[:timeout] == :infinity
       assert String.contains?(sql, "FROM users")
 
       %{
@@ -91,7 +92,9 @@ defmodule Egregoros.PleromaMigration.Source.PostgresTest do
 
     PostgresClient.Mock
     |> expect(:start_link, fn _opts -> {:ok, conn} end)
-    |> expect(:query!, fn ^conn, _sql, [] ->
+    |> expect(:query!, fn ^conn, _sql, [], opts ->
+      assert opts[:timeout] == :infinity
+
       %{
         rows: [
           [
@@ -164,7 +167,8 @@ defmodule Egregoros.PleromaMigration.Source.PostgresTest do
 
     PostgresClient.Mock
     |> expect(:start_link, fn _opts -> {:ok, conn} end)
-    |> expect(:query!, fn ^conn, sql, [] ->
+    |> expect(:query!, fn ^conn, sql, [], opts ->
+      assert opts[:timeout] == :infinity
       assert String.contains?(sql, "JOIN objects")
 
       %{
@@ -180,7 +184,8 @@ defmodule Egregoros.PleromaMigration.Source.PostgresTest do
         ]
       }
     end)
-    |> expect(:query!, fn ^conn, sql, [] ->
+    |> expect(:query!, fn ^conn, sql, [], opts ->
+      assert opts[:timeout] == :infinity
       assert String.contains?(sql, "WHERE data->>'type' = 'Announce'")
 
       %{
