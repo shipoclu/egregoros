@@ -132,15 +132,16 @@ defmodule Egregoros.Activities.Reject do
 
   defp apply_offer_reject(%Object{} = reject_object) do
     offer_ap_id = offer_ap_id_from_reject(reject_object)
+    recipient_ap_id = normalize_ap_id(reject_object.actor)
 
     with offer_ap_id when is_binary(offer_ap_id) <- offer_ap_id,
-         %User{local: true} = recipient <- Users.get_by_ap_id(reject_object.actor) do
-      _ = Relationships.delete_by_type_actor_object("OfferPending", recipient.ap_id, offer_ap_id)
+         recipient_ap_id when is_binary(recipient_ap_id) <- recipient_ap_id do
+      _ = Relationships.delete_by_type_actor_object("OfferPending", recipient_ap_id, offer_ap_id)
 
       _ =
         Relationships.upsert_relationship(%{
           type: "OfferRejected",
-          actor: recipient.ap_id,
+          actor: recipient_ap_id,
           object: offer_ap_id,
           activity_ap_id: offer_ap_id
         })
@@ -165,7 +166,7 @@ defmodule Egregoros.Activities.Reject do
         nil
       end
 
-    embedded_offer_id || offer_ap_id_from_object(reject_object.object)
+    offer_ap_id_from_object(embedded_offer_id) || offer_ap_id_from_object(reject_object.object)
   end
 
   defp offer_ap_id_from_reject(_reject_object), do: nil

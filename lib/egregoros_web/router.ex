@@ -113,6 +113,7 @@ defmodule EgregorosWeb.Router do
     get "/admin", AdminController, :index
     post "/admin/registrations", AdminController, :update_registrations
     post "/admin/badges/issue", AdminController, :issue_badge
+    post "/admin/badges/offers/:id/rescind", AdminController, :rescind_offer
     post "/admin/relays", AdminController, :create_relay
     delete "/admin/relays/:id", AdminController, :delete_relay
   end

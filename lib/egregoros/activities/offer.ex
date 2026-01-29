@@ -101,12 +101,13 @@ defmodule Egregoros.Activities.Offer do
       case Users.get_by_ap_id(recipient_ap_id) do
         %User{local: true} = user ->
           Notifications.broadcast(user.ap_id, offer_object)
-          _ = upsert_offer_relationship(user.ap_id, offer_object.ap_id)
           :ok
 
         _ ->
           :ok
       end
+
+      _ = upsert_offer_relationship(recipient_ap_id, offer_object.ap_id)
     end)
 
     :ok

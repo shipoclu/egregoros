@@ -117,6 +117,80 @@
           </.form>
         </div>
 
+        <div>
+          <h3 class="text-sm font-semibold uppercase tracking-[0.25em] text-slate-500 dark:text-slate-400">
+            Badge offers
+          </h3>
+          <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">
+            Track pending, accepted, and rejected badge offers.
+          </p>
+
+          <div
+            :if={@badge_offers == []}
+            class="mt-4 rounded-2xl border border-dashed border-slate-200 p-4 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400"
+          >
+            No badge offers yet.
+          </div>
+
+          <div :if={@badge_offers != []} class="mt-4 space-y-3">
+            <div
+              :for={entry <- @badge_offers}
+              data-role="badge-offer-row"
+              class="rounded-2xl border border-slate-200 bg-white/70 p-4 dark:border-slate-700 dark:bg-slate-950/30"
+            >
+              <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div class="min-w-0 space-y-1">
+                  <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500 dark:text-slate-400">
+                    {entry.badge_name || "Badge"}
+                  </p>
+                  <p class="text-sm text-slate-700 dark:text-slate-200">
+                    {entry.badge_description || "Badge offer issued by the instance actor."}
+                  </p>
+                  <p class="text-xs text-slate-500 dark:text-slate-400">
+                    Recipient:
+                    <span class="font-mono">
+                      <%= if entry.recipient do %>
+                        @{entry.recipient.nickname}
+                      <% else %>
+                        {entry.recipient_ap_id}
+                      <% end %>
+                    </span>
+                  </p>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-3">
+                  <span
+                    data-role="badge-offer-status"
+                    class={[
+                      "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wide",
+                      entry.status == "Accepted" &&
+                        "border-emerald-400/60 text-emerald-700 dark:border-emerald-500/60 dark:text-emerald-300",
+                      entry.status == "Rejected" &&
+                        "border-rose-400/60 text-rose-700 dark:border-rose-500/60 dark:text-rose-300",
+                      entry.status == "Pending" &&
+                        "border-amber-400/60 text-amber-700 dark:border-amber-500/60 dark:text-amber-300"
+                    ]}
+                  >
+                    {entry.status}
+                  </span>
+
+                  <.form
+                    :if={entry.status == "Pending"}
+                    for={to_form(%{}, as: :offer_rescind)}
+                    id={"offer-rescind-#{entry.offer.id}-#{:erlang.phash2(entry.recipient_ap_id)}"}
+                    action={~p"/admin/badges/offers/#{entry.offer.id}/rescind"}
+                    method="post"
+                  >
+                    <.button type="submit" variant="destructive" size="sm">
+                      Rescind
+                    </.button>
+                  </.form>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div
           :if={@relays != []}
           class="rounded-2xl border border-slate-200 bg-white/70 p-4 dark:border-slate-700 dark:bg-slate-950/30"

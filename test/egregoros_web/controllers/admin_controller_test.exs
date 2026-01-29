@@ -167,6 +167,64 @@ defmodule EgregorosWeb.AdminControllerTest do
     assert DateTime.to_time(valid_until_dt) == ~T[23:59:59]
   end
 
+  test "POST /admin/badges/offers/:id/rescind rescinds a badge offer", %{conn: conn} do
+    {:ok, admin} = Users.create_local_user("badge_offer_admin")
+    {:ok, admin} = Users.set_admin(admin, true)
+    {:ok, recipient} = Users.create_local_user("badge_offer_recipient")
+
+    badge_type =
+      case Egregoros.Repo.get_by(Egregoros.BadgeDefinition, badge_type: "Donator") do
+        %Egregoros.BadgeDefinition{} -> "Donator"
+        _ -> "AdminOfferDonator"
+      end
+
+    if badge_type != "Donator" do
+      {:ok, _badge} =
+        %Egregoros.BadgeDefinition{}
+        |> Egregoros.BadgeDefinition.changeset(%{
+          badge_type: badge_type,
+          name: "Donator",
+          description: "Supporter badge.",
+          narrative: "Granted for support.",
+          disabled: false
+        })
+        |> Egregoros.Repo.insert()
+    end
+
+    {:ok, %{offer: offer}} = Egregoros.Badges.issue_badge(badge_type, recipient.ap_id)
+
+    assert Egregoros.Relationships.get_by_type_actor_object(
+             "OfferPending",
+             recipient.ap_id,
+             offer.ap_id
+           )
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: admin.id})
+    csrf_token = Phoenix.Controller.get_csrf_token()
+
+    conn =
+      post(conn, "/admin/badges/offers/#{offer.id}/rescind", %{
+        "_csrf_token" => csrf_token
+      })
+
+    assert redirected_to(conn) == "/admin"
+    assert is_nil(Egregoros.Objects.get(offer.id))
+    assert is_nil(Egregoros.Objects.get_by_ap_id(offer.ap_id))
+
+    refute Egregoros.Relationships.get_by_type_actor_object(
+             "OfferPending",
+             recipient.ap_id,
+             offer.ap_id
+           )
+
+    assert %Egregoros.Object{} =
+             Egregoros.Objects.get_by_type_actor_object(
+               "Undo",
+               InstanceActor.ap_id(),
+               offer.ap_id
+             )
+  end
+
   test "DELETE /admin/relays/:id unsubscribes the internal actor from the relay", %{conn: conn} do
     {:ok, user} = Users.create_local_user("alice")
     {:ok, user} = Users.set_admin(user, true)

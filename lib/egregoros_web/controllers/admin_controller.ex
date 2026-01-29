@@ -1,11 +1,16 @@
 defmodule EgregorosWeb.AdminController do
   use EgregorosWeb, :controller
 
+  alias Egregoros.Activities.Undo
   alias Egregoros.Badges
   alias Egregoros.InstanceSettings
+  alias Egregoros.Object
+  alias Egregoros.Objects
   alias Egregoros.Relays
   alias Egregoros.User
   alias EgregorosWeb.Param
+  alias Egregoros.Federation.InstanceActor
+  alias Egregoros.Pipeline
 
   def index(conn, _params) do
     form = Phoenix.Component.to_form(%{"ap_id" => ""}, as: :relay)
@@ -33,6 +38,7 @@ defmodule EgregorosWeb.AdminController do
       registrations_form: registrations_form,
       badge_form: badge_form,
       badge_options: badge_options,
+      badge_offers: Badges.list_offers(limit: 50),
       notifications_count: notifications_count(conn.assigns.current_user)
     )
   end
@@ -122,12 +128,47 @@ defmodule EgregorosWeb.AdminController do
     end
   end
 
+  def rescind_offer(conn, %{"id" => id}) do
+    with %Object{type: "Offer"} = offer <- fetch_offer(id),
+         {:ok, %User{} = issuer} <- InstanceActor.get_actor(),
+         {:ok, _undo_object} <- Pipeline.ingest(Undo.build(issuer, offer), local: true) do
+      conn
+      |> put_flash(:info, "Offer rescinded.")
+      |> redirect(to: ~p"/admin")
+    else
+      _ ->
+        conn
+        |> put_flash(:error, "Could not rescind offer.")
+        |> redirect(to: ~p"/admin")
+    end
+  end
+
+  def rescind_offer(conn, _params) do
+    conn
+    |> put_status(:unprocessable_entity)
+    |> text("Unprocessable Entity")
+  end
+
   defp notifications_count(%User{} = user) do
     Egregoros.Notifications.list_for_user(user, limit: 20, include_offers?: true)
     |> length()
   end
 
   defp notifications_count(_), do: 0
+
+  defp fetch_offer(id) when is_binary(id) do
+    id = String.trim(id)
+
+    cond do
+      id == "" ->
+        nil
+
+      true ->
+        Objects.get(id) || Objects.get_by_ap_id(id)
+    end
+  end
+
+  defp fetch_offer(_id), do: nil
 
   defp badge_issue_opts(""), do: []
 

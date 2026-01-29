@@ -8,8 +8,10 @@ defmodule Egregoros.Badges do
   alias Egregoros.Federation.Delivery
   alias Egregoros.Federation.InstanceActor
   alias Egregoros.Object
+  alias Egregoros.Objects
   alias Egregoros.Pipeline
   alias Egregoros.Repo
+  alias Egregoros.Relationships
   alias Egregoros.User
   alias Egregoros.Users
 
@@ -21,6 +23,23 @@ defmodule Egregoros.Badges do
     |> then(fn query -> from(b in query, order_by: [asc: b.name]) end)
     |> Repo.all()
   end
+
+  def list_offers(opts \\ [])
+
+  def list_offers(opts) when is_list(opts) do
+    limit = opts |> Keyword.get(:limit, 50) |> normalize_limit()
+
+    case InstanceActor.get_actor() do
+      {:ok, %User{} = issuer} ->
+        Objects.list_by_type_actor("Offer", issuer.ap_id, limit: limit)
+        |> Enum.flat_map(&offer_entries/1)
+
+      _ ->
+        []
+    end
+  end
+
+  def list_offers(_opts), do: []
 
   def issue_badge(badge_type, recipient_ap_id, opts \\ [])
 
@@ -50,6 +69,9 @@ defmodule Egregoros.Badges do
   defp maybe_filter_disabled(query, false) do
     from(b in query, where: b.disabled == false)
   end
+
+  defp normalize_limit(limit) when is_integer(limit), do: limit |> max(1) |> min(100)
+  defp normalize_limit(_limit), do: 50
 
   defp ensure_enabled(%BadgeDefinition{disabled: true}), do: {:error, :disabled_badge}
   defp ensure_enabled(%BadgeDefinition{}), do: :ok
@@ -98,6 +120,93 @@ defmodule Egregoros.Badges do
       {:ok, offer_object}
     end
   end
+
+  defp offer_entries(%Object{} = offer) do
+    recipients =
+      offer
+      |> Offer.recipient_ap_ids()
+      |> Enum.filter(&is_binary/1)
+      |> Enum.map(&String.trim/1)
+      |> Enum.reject(&(&1 == ""))
+
+    credential = credential_from_offer(offer)
+    {badge_name, badge_description} = badge_details(credential)
+    issued_at = offer.published || offer.inserted_at
+
+    Enum.map(recipients, fn recipient_ap_id ->
+      %{
+        offer: offer,
+        recipient_ap_id: recipient_ap_id,
+        recipient: Users.get_by_ap_id(recipient_ap_id),
+        status: offer_status(recipient_ap_id, offer.ap_id),
+        badge_name: badge_name,
+        badge_description: badge_description,
+        issued_at: issued_at
+      }
+    end)
+  end
+
+  defp offer_entries(_offer), do: []
+
+  defp offer_status(recipient_ap_id, offer_ap_id)
+       when is_binary(recipient_ap_id) and is_binary(offer_ap_id) do
+    cond do
+      Relationships.get_by_type_actor_object("OfferAccepted", recipient_ap_id, offer_ap_id) ->
+        "Accepted"
+
+      Relationships.get_by_type_actor_object("OfferRejected", recipient_ap_id, offer_ap_id) ->
+        "Rejected"
+
+      Relationships.get_by_type_actor_object("OfferPending", recipient_ap_id, offer_ap_id) ->
+        "Pending"
+
+      true ->
+        "Pending"
+    end
+  end
+
+  defp offer_status(_recipient_ap_id, _offer_ap_id), do: "Pending"
+
+  defp credential_from_offer(%Object{data: %{"object" => %{} = credential}}), do: credential
+
+  defp credential_from_offer(%Object{object: credential_ap_id})
+       when is_binary(credential_ap_id) do
+    case Objects.get_by_ap_id(credential_ap_id) do
+      %Object{data: %{} = data} -> data
+      _ -> nil
+    end
+  end
+
+  defp credential_from_offer(_offer), do: nil
+
+  defp badge_details(%{} = credential) do
+    achievement =
+      credential
+      |> Map.get("credentialSubject")
+      |> List.wrap()
+      |> Enum.find(&is_map/1)
+      |> case do
+        %{} = subject -> Map.get(subject, "achievement") || Map.get(subject, :achievement)
+        _ -> nil
+      end
+
+    {
+      achievement_field(achievement, "name"),
+      achievement_field(achievement, "description")
+    }
+  end
+
+  defp badge_details(_credential), do: {nil, nil}
+
+  defp achievement_field(%{} = achievement, "name") do
+    Map.get(achievement, "name") || Map.get(achievement, :name)
+  end
+
+  defp achievement_field(%{} = achievement, "description") do
+    Map.get(achievement, "description") || Map.get(achievement, :description)
+  end
+
+  defp achievement_field(_achievement, _key), do: nil
 
   defp maybe_deliver_offer(%User{}, %User{local: true}, _offer, _credential, _opts), do: :ok
 
