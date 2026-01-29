@@ -1,5 +1,5 @@
 defmodule EgregorosWeb.InboxControllerTest do
-  use EgregorosWeb.ConnCase, async: true
+  use EgregorosWeb.ConnCase, async: false
 
   alias Egregoros.Objects
   alias Egregoros.Relationships
