@@ -2,15 +2,17 @@ defmodule EgregorosWeb.AdminController do
   use EgregorosWeb, :controller
 
   alias Egregoros.Activities.Undo
+  alias Egregoros.BadgeDefinition
   alias Egregoros.Badges
+  alias Egregoros.Federation.InstanceActor
   alias Egregoros.InstanceSettings
   alias Egregoros.Object
   alias Egregoros.Objects
+  alias Egregoros.Pipeline
   alias Egregoros.Relays
+  alias Egregoros.Repo
   alias Egregoros.User
   alias EgregorosWeb.Param
-  alias Egregoros.Federation.InstanceActor
-  alias Egregoros.Pipeline
 
   def index(conn, _params) do
     form = Phoenix.Component.to_form(%{"ap_id" => ""}, as: :relay)
@@ -28,8 +30,14 @@ defmodule EgregorosWeb.AdminController do
         as: :registrations
       )
 
-    badge_definitions = Badges.list_definitions(include_disabled?: false)
+    badge_definitions = Badges.list_definitions(include_disabled?: true)
     badge_options = Enum.map(badge_definitions, &{&1.name, &1.badge_type})
+
+    badge_definition_forms =
+      Enum.map(badge_definitions, fn badge ->
+        {badge,
+         Phoenix.Component.to_form(BadgeDefinition.changeset(badge, %{}), as: :badge_definition)}
+      end)
 
     render(conn, :index,
       relays: Relays.list_relays(),
@@ -38,6 +46,7 @@ defmodule EgregorosWeb.AdminController do
       registrations_form: registrations_form,
       badge_form: badge_form,
       badge_options: badge_options,
+      badge_definition_forms: badge_definition_forms,
       badge_offers: Badges.list_offers(limit: 50),
       notifications_count: notifications_count(conn.assigns.current_user)
     )
@@ -108,6 +117,27 @@ defmodule EgregorosWeb.AdminController do
   end
 
   def issue_badge(conn, _params) do
+    conn
+    |> put_status(:unprocessable_entity)
+    |> text("Unprocessable Entity")
+  end
+
+  def update_badge_definition(conn, %{"id" => id, "badge_definition" => %{} = params}) do
+    with <<_::128>> <- FlakeId.from_string(id),
+         %BadgeDefinition{} = badge <- Repo.get(BadgeDefinition, id),
+         {:ok, _badge} <- Badges.update_definition(badge, params) do
+      conn
+      |> put_flash(:info, "Badge updated.")
+      |> redirect(to: ~p"/admin")
+    else
+      _ ->
+        conn
+        |> put_flash(:error, "Could not update badge.")
+        |> redirect(to: ~p"/admin")
+    end
+  end
+
+  def update_badge_definition(conn, _params) do
     conn
     |> put_status(:unprocessable_entity)
     |> text("Unprocessable Entity")

@@ -3,10 +3,12 @@ defmodule EgregorosWeb.AdminControllerTest do
 
   import Mox
 
+  alias Egregoros.BadgeDefinition
   alias Egregoros.Federation.InstanceActor
   alias Egregoros.InstanceSettings
   alias Egregoros.Relationships
   alias Egregoros.Relays
+  alias Egregoros.Repo
   alias Egregoros.Users
   alias Egregoros.Workers.DeliverActivity
 
@@ -297,5 +299,64 @@ defmodule EgregorosWeb.AdminControllerTest do
         "activity" => %{"type" => "Undo", "object" => follow_ap_id}
       }
     )
+  end
+
+  test "POST /admin/badges/:id updates badge definition images via instance actor storage", %{
+    conn: conn
+  } do
+    {:ok, admin} = Users.create_local_user("badge_admin")
+    {:ok, admin} = Users.set_admin(admin, true)
+    {:ok, instance_actor} = InstanceActor.get_actor()
+
+    badge =
+      case Repo.get_by(BadgeDefinition, badge_type: "Donator") do
+        %BadgeDefinition{} = badge ->
+          badge
+
+        _ ->
+          {:ok, badge} =
+            %BadgeDefinition{}
+            |> BadgeDefinition.changeset(%{
+              badge_type: "AdminDonatorImage",
+              name: "Donator",
+              description: "Supporter badge.",
+              narrative: "Granted for support.",
+              disabled: false
+            })
+            |> Repo.insert()
+
+          badge
+      end
+
+    upload = %Plug.Upload{
+      path: fixture_path("DSCN0010.png"),
+      filename: "badge.png",
+      content_type: "image/png"
+    }
+
+    expect(Egregoros.MediaStorage.Mock, :store_media, fn ^instance_actor,
+                                                         %Plug.Upload{filename: "badge.png"} ->
+      {:ok, "/uploads/media/#{instance_actor.id}/badge.png"}
+    end)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: admin.id})
+    csrf_token = Phoenix.Controller.get_csrf_token()
+
+    conn =
+      post(conn, "/admin/badges/#{badge.id}", %{
+        "_csrf_token" => csrf_token,
+        "badge_definition" => %{"image" => upload}
+      })
+
+    assert redirected_to(conn) == "/admin"
+
+    assert %BadgeDefinition{image_url: image_url} = Repo.get(BadgeDefinition, badge.id)
+
+    assert image_url ==
+             EgregorosWeb.Endpoint.url() <> "/uploads/media/#{instance_actor.id}/badge.png"
+  end
+
+  defp fixture_path(filename) do
+    Path.expand(Path.join(["test", "fixtures", filename]), File.cwd!())
   end
 end

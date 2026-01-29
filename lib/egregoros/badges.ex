@@ -12,8 +12,10 @@ defmodule Egregoros.Badges do
   alias Egregoros.Pipeline
   alias Egregoros.Repo
   alias Egregoros.Relationships
+  alias Egregoros.MediaStorage
   alias Egregoros.User
   alias Egregoros.Users
+  alias EgregorosWeb.URL
 
   def list_definitions(opts \\ []) when is_list(opts) do
     include_disabled? = Keyword.get(opts, :include_disabled?, true)
@@ -64,6 +66,20 @@ defmodule Egregoros.Badges do
 
   def issue_badge(_badge_type, _recipient_ap_id, _opts), do: {:error, :invalid_badge}
 
+  def update_definition(%BadgeDefinition{} = badge, params) when is_map(params) do
+    {upload, params} = Map.pop(params, "image")
+    {upload, params} = if is_nil(upload), do: Map.pop(params, :image), else: {upload, params}
+
+    with {:ok, params} <- maybe_put_badge_image(params, upload),
+         params <- normalize_image_url(params),
+         changeset <- BadgeDefinition.changeset(badge, params),
+         {:ok, %BadgeDefinition{} = badge} <- Repo.update(changeset) do
+      {:ok, badge}
+    end
+  end
+
+  def update_definition(_badge, _params), do: {:error, :invalid_badge}
+
   defp maybe_filter_disabled(query, true), do: query
 
   defp maybe_filter_disabled(query, false) do
@@ -75,6 +91,36 @@ defmodule Egregoros.Badges do
 
   defp ensure_enabled(%BadgeDefinition{disabled: true}), do: {:error, :disabled_badge}
   defp ensure_enabled(%BadgeDefinition{}), do: :ok
+
+  defp maybe_put_badge_image(params, %Plug.Upload{} = upload) do
+    with {:ok, %User{} = instance_actor} <- InstanceActor.get_actor(),
+         {:ok, url_path} <- MediaStorage.store_media(instance_actor, upload) do
+      {:ok, Map.put(params, "image_url", URL.absolute(url_path))}
+    else
+      {:error, _} = error -> error
+      _ -> {:error, :badge_image_upload_failed}
+    end
+  end
+
+  defp maybe_put_badge_image(params, _upload), do: {:ok, params}
+
+  defp normalize_image_url(params) when is_map(params) do
+    image_url =
+      Map.get(params, "image_url") ||
+        Map.get(params, :image_url)
+
+    if is_binary(image_url) do
+      trimmed = String.trim(image_url)
+
+      if trimmed == "" do
+        Map.put(params, "image_url", "")
+      else
+        Map.put(params, "image_url", URL.absolute(trimmed))
+      end
+    else
+      params
+    end
+  end
 
   defp resolve_recipient(ap_id) when is_binary(ap_id) do
     ap_id = String.trim(ap_id)
