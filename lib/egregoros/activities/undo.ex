@@ -285,7 +285,7 @@ defmodule Egregoros.Activities.Undo do
 
   defp maybe_broadcast_post_update(object_ap_id) when is_binary(object_ap_id) do
     with %Object{} = object <- Objects.get_by_ap_id(object_ap_id),
-         "Note" <- object.type do
+         type when type in ["Note", "VerifiableCredential"] <- object.type do
       Timeline.broadcast_post_updated(object)
     else
       _ -> :ok

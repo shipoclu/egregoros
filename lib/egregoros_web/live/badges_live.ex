@@ -3,6 +3,7 @@ defmodule EgregorosWeb.BadgesLive do
 
   alias Egregoros.ActivityPub.TypeNormalizer
   alias Egregoros.Activities.Helpers, as: ActivityHelpers
+  alias Egregoros.Interactions
   alias Egregoros.Notifications
   alias Egregoros.Object
   alias Egregoros.Objects
@@ -61,6 +62,18 @@ defmodule EgregorosWeb.BadgesLive do
   end
 
   @impl true
+  def handle_event("toggle_repost", %{"id" => id}, socket) do
+    case socket.assigns.current_user do
+      %User{} = user ->
+        _ = Interactions.toggle_repost(user, id)
+        {:noreply, socket}
+
+      _ ->
+        {:noreply, put_flash(socket, :error, "Register to share badges.")}
+    end
+  end
+
+  @impl true
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_user={@current_user}>
@@ -99,7 +112,11 @@ defmodule EgregorosWeb.BadgesLive do
 
             <%= if @live_action == :show do %>
               <%= if @badge do %>
-                <.badge_detail badge={@badge} profile_user={@profile_user} />
+                <.badge_detail
+                  badge={@badge}
+                  profile_user={@profile_user}
+                  current_user={@current_user}
+                />
               <% else %>
                 <.card class="p-6">
                   <p class="text-sm text-[color:var(--text-secondary)]">
@@ -135,6 +152,7 @@ defmodule EgregorosWeb.BadgesLive do
                   :for={{id, badge} <- @streams.badges}
                   id={id}
                   badge={badge}
+                  current_user={@current_user}
                 />
               </div>
             <% end %>
@@ -158,6 +176,7 @@ defmodule EgregorosWeb.BadgesLive do
 
   attr :id, :string, required: true
   attr :badge, :map, required: true
+  attr :current_user, :any, default: nil
 
   defp badge_card(assigns) do
     ~H"""
@@ -222,6 +241,15 @@ defmodule EgregorosWeb.BadgesLive do
           >
             View badge
           </.button>
+          <button
+            :if={@current_user && is_binary(@badge.credential_id)}
+            type="button"
+            data-role="badge-share"
+            phx-click={JS.push("toggle_repost", value: %{"id" => @badge.credential_id})}
+            class="inline-flex cursor-pointer items-center gap-2 border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-[color:var(--text-primary)] transition hover:bg-[color:var(--bg-muted)]"
+          >
+            <.icon name="hero-arrow-path" class="size-4" /> Share badge
+          </button>
         </div>
       </div>
     </article>
@@ -230,6 +258,7 @@ defmodule EgregorosWeb.BadgesLive do
 
   attr :badge, :map, required: true
   attr :profile_user, :any, required: true
+  attr :current_user, :any, default: nil
 
   defp badge_detail(assigns) do
     ~H"""
@@ -288,6 +317,15 @@ defmodule EgregorosWeb.BadgesLive do
             >
               All badges
             </.button>
+            <button
+              :if={@current_user && is_binary(@badge.credential_id)}
+              type="button"
+              data-role="badge-share"
+              phx-click={JS.push("toggle_repost", value: %{"id" => @badge.credential_id})}
+              class="inline-flex cursor-pointer items-center gap-2 border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-[color:var(--text-primary)] transition hover:bg-[color:var(--bg-muted)]"
+            >
+              <.icon name="hero-arrow-path" class="size-4" /> Share badge
+            </button>
             <.button
               :if={ProfilePaths.profile_path(@profile_user)}
               navigate={ProfilePaths.profile_path(@profile_user)}
@@ -381,6 +419,8 @@ defmodule EgregorosWeb.BadgesLive do
 
       valid_from = ActivityHelpers.parse_datetime(Map.get(credential, "validFrom"))
       valid_until = ActivityHelpers.parse_datetime(Map.get(credential, "validUntil"))
+      credential_ap_id = credential_ap_id(credential)
+      credential_id = credential_object_id(credential_ap_id)
 
       %{
         accept: accept,
@@ -391,7 +431,9 @@ defmodule EgregorosWeb.BadgesLive do
         valid_until: valid_until,
         valid_range: validity_range(valid_from, valid_until),
         validity: validity_label(valid_from, valid_until),
-        badge_path: badge_path(user, accept)
+        badge_path: badge_path(user, accept),
+        credential_id: credential_id,
+        credential_ap_id: credential_ap_id
       }
     else
       nil
@@ -399,6 +441,43 @@ defmodule EgregorosWeb.BadgesLive do
   end
 
   defp badge_entry(_accept, _user), do: nil
+
+  defp badge_entry_from_credential(%Object{data: %{} = data} = credential, %User{} = user) do
+    recipient_ap_id = credential_subject_id(data)
+
+    if TypeNormalizer.primary_type(data) == "VerifiableCredential" and
+         recipient_ap_id == user.ap_id do
+      achievement =
+        data
+        |> credential_subject()
+        |> credential_achievement()
+
+      title = achievement_field(achievement, "name")
+      description = achievement_field(achievement, "description")
+      image = achievement_image(achievement)
+
+      valid_from = ActivityHelpers.parse_datetime(Map.get(data, "validFrom"))
+      valid_until = ActivityHelpers.parse_datetime(Map.get(data, "validUntil"))
+
+      %{
+        accept: credential,
+        title: title,
+        description: description,
+        image_url: absolute_image_url(image, credential.actor),
+        valid_from: valid_from,
+        valid_until: valid_until,
+        valid_range: validity_range(valid_from, valid_until),
+        validity: validity_label(valid_from, valid_until),
+        badge_path: badge_path(user, credential),
+        credential_id: credential.id,
+        credential_ap_id: credential.ap_id
+      }
+    else
+      nil
+    end
+  end
+
+  defp badge_entry_from_credential(_credential, _user), do: nil
 
   defp offer_data_from_accept(%Object{} = accept) do
     cond do
@@ -469,6 +548,21 @@ defmodule EgregorosWeb.BadgesLive do
 
   defp credential_from_ap_id(_credential_ap_id), do: nil
 
+  defp credential_ap_id(%{} = credential) do
+    Map.get(credential, "id") || Map.get(credential, :id)
+  end
+
+  defp credential_ap_id(_credential), do: nil
+
+  defp credential_object_id(credential_ap_id) when is_binary(credential_ap_id) do
+    case Objects.get_by_ap_id(credential_ap_id) do
+      %Object{id: id} -> id
+      _ -> nil
+    end
+  end
+
+  defp credential_object_id(_credential_ap_id), do: nil
+
   defp credential_subject(%{} = credential) do
     credential
     |> Map.get("credentialSubject")
@@ -477,6 +571,16 @@ defmodule EgregorosWeb.BadgesLive do
   end
 
   defp credential_subject(_credential), do: nil
+
+  defp credential_subject_id(%{} = credential) do
+    case credential_subject(credential) do
+      %{"id" => id} when is_binary(id) -> id
+      %{id: id} when is_binary(id) -> id
+      _ -> nil
+    end
+  end
+
+  defp credential_subject_id(_credential), do: nil
 
   defp credential_achievement(%{} = subject) do
     Map.get(subject, "achievement") || Map.get(subject, :achievement)
@@ -617,6 +721,9 @@ defmodule EgregorosWeb.BadgesLive do
     case accept do
       %Object{type: "Accept", actor: actor} = accept when actor == user.ap_id ->
         badge_entry(accept, user)
+
+      %Object{type: "VerifiableCredential"} = credential ->
+        badge_entry_from_credential(credential, user)
 
       _ ->
         nil

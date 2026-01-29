@@ -729,7 +729,7 @@ defmodule EgregorosWeb.SearchLive do
     current_user = socket.assigns.current_user
 
     case Objects.get(post_id) do
-      %{type: type} = object when type in ["Note", "Question"] ->
+      %{type: type} = object when type in ["Note", "Question", "VerifiableCredential"] ->
         if Objects.visible_to?(object, current_user) do
           entry = StatusVM.decorate(object, current_user)
 

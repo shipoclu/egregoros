@@ -116,6 +116,46 @@ defmodule EgregorosWeb.StatusCardTest do
              ~r/id="reaction-picker-post-1".*shadow-\[4px_4px_0_var\(--border-default\)\]/s
   end
 
+  test "renders badge cards for verifiable credentials with a share button" do
+    html =
+      render_component(&StatusCard.status_card/1, %{
+        id: "post-badge-1",
+        current_user: %{id: "1"},
+        entry: %{
+          object: %{
+            id: "badge-1",
+            type: "VerifiableCredential",
+            inserted_at: ~U[2025-01-01 00:00:00Z],
+            local: true,
+            data: %{"id" => "badge-1", "type" => "VerifiableCredential"}
+          },
+          actor: %{
+            display_name: "Issuer",
+            handle: "@issuer",
+            avatar_url: nil
+          },
+          badge: %{
+            title: "Donator",
+            description: "Awarded for supporting.",
+            image_url: "https://cdn.example/badges/donator.png",
+            validity: "Valid",
+            valid_range: "Jan 1, 2025 - Jan 1, 2026",
+            recipient: %{display_name: "Recipient", handle: "@recipient"},
+            badge_path: "/@recipient/badges/badge-1"
+          },
+          liked?: false,
+          likes_count: 0,
+          reposted?: false,
+          reposts_count: 0,
+          reactions: %{}
+        }
+      })
+
+    assert html =~ ~s(data-item="badge-card")
+    assert html =~ ~s(data-role="badge-share")
+    assert html =~ "Donator"
+  end
+
   test "renders a reply link when permalinks are available" do
     html =
       render_component(&StatusCard.status_card/1, %{
