@@ -112,6 +112,7 @@ defmodule EgregorosWeb.Router do
 
     get "/admin", AdminController, :index
     post "/admin/registrations", AdminController, :update_registrations
+    post "/admin/badges/issue", AdminController, :issue_badge
     post "/admin/relays", AdminController, :create_relay
     delete "/admin/relays/:id", AdminController, :delete_relay
   end
@@ -315,6 +316,7 @@ defmodule EgregorosWeb.Router do
   scope "/api/v1/pleroma", EgregorosWeb.PleromaAPI do
     pipe_through [:api, :api_auth, :oauth_write]
 
+    post "/badges/issue", BadgesController, :issue
     post "/offers/:id/accept", OffersController, :accept
     post "/offers/:id/reject", OffersController, :reject
     put "/statuses/:id/reactions/:emoji", EmojiReactionController, :create

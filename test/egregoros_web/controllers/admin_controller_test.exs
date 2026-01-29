@@ -110,6 +110,63 @@ defmodule EgregorosWeb.AdminControllerTest do
     )
   end
 
+  test "POST /admin/badges/issue issues a badge offer", %{conn: conn} do
+    {:ok, admin} = Users.create_local_user("admin")
+    {:ok, admin} = Users.set_admin(admin, true)
+    {:ok, recipient} = Users.create_local_user("badge_admin_recipient")
+
+    badge_type =
+      case Egregoros.Repo.get_by(Egregoros.BadgeDefinition, badge_type: "Donator") do
+        %Egregoros.BadgeDefinition{} -> "Donator"
+        _ -> "AdminDonator"
+      end
+
+    if badge_type != "Donator" do
+      {:ok, _badge} =
+        %Egregoros.BadgeDefinition{}
+        |> Egregoros.BadgeDefinition.changeset(%{
+          badge_type: badge_type,
+          name: "Donator",
+          description: "Supporter badge.",
+          narrative: "Granted for support.",
+          disabled: false
+        })
+        |> Egregoros.Repo.insert()
+    end
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: admin.id})
+    csrf_token = Phoenix.Controller.get_csrf_token()
+
+    conn =
+      post(conn, "/admin/badges/issue", %{
+        "_csrf_token" => csrf_token,
+        "badge_issue" => %{
+          "badge_type" => badge_type,
+          "recipient_ap_id" => recipient.ap_id,
+          "expires_on" => "2026-02-01"
+        }
+      })
+
+    assert redirected_to(conn) == "/admin"
+
+    [offer_object | _] =
+      Egregoros.Objects.list_by_type_actor("Offer", InstanceActor.ap_id(), limit: 1)
+
+    assert %Egregoros.Object{} = offer_object
+
+    credential_object = Egregoros.Objects.get_by_ap_id(offer_object.object)
+    assert %Egregoros.Object{} = credential_object
+
+    assert %{"validFrom" => valid_from, "validUntil" => valid_until} = credential_object.data
+
+    {:ok, valid_from_dt, _} = DateTime.from_iso8601(valid_from)
+    {:ok, valid_until_dt, _} = DateTime.from_iso8601(valid_until)
+
+    assert DateTime.to_date(valid_from_dt) == Date.utc_today()
+    assert DateTime.to_date(valid_until_dt) == ~D[2026-02-01]
+    assert DateTime.to_time(valid_until_dt) == ~T[23:59:59]
+  end
+
   test "DELETE /admin/relays/:id unsubscribes the internal actor from the relay", %{conn: conn} do
     {:ok, user} = Users.create_local_user("alice")
     {:ok, user} = Users.set_admin(user, true)

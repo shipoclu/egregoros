@@ -57,6 +57,7 @@ defmodule Egregoros.Activities.Accept do
 
   def side_effects(object, opts) do
     _ = apply_follow_accept(object)
+    _ = apply_offer_accept(object)
 
     if Keyword.get(opts, :local, true) do
       deliver_accept(object)
@@ -120,6 +121,61 @@ defmodule Egregoros.Activities.Accept do
         :ok
     end
   end
+
+  defp apply_offer_accept(%Object{} = accept_object) do
+    offer_ap_id = offer_ap_id_from_accept(accept_object)
+
+    with offer_ap_id when is_binary(offer_ap_id) <- offer_ap_id,
+         %User{local: true} = recipient <- Users.get_by_ap_id(accept_object.actor) do
+      _ = Relationships.delete_by_type_actor_object("OfferPending", recipient.ap_id, offer_ap_id)
+
+      _ =
+        Relationships.upsert_relationship(%{
+          type: "OfferAccepted",
+          actor: recipient.ap_id,
+          object: offer_ap_id,
+          activity_ap_id: offer_ap_id
+        })
+
+      :ok
+    else
+      _ -> :ok
+    end
+  end
+
+  defp offer_ap_id_from_accept(%Object{} = accept_object) do
+    embedded_offer =
+      case accept_object.data do
+        %{"object" => %{} = offer} -> offer
+        _ -> nil
+      end
+
+    embedded_offer_id =
+      if is_map(embedded_offer) and TypeNormalizer.primary_type(embedded_offer) == "Offer" do
+        extract_id(embedded_offer)
+      else
+        nil
+      end
+
+    embedded_offer_id || offer_ap_id_from_object(accept_object.object)
+  end
+
+  defp offer_ap_id_from_accept(_accept_object), do: nil
+
+  defp offer_ap_id_from_object(offer_ap_id) when is_binary(offer_ap_id) do
+    offer_ap_id = String.trim(offer_ap_id)
+
+    if offer_ap_id == "" do
+      nil
+    else
+      case Objects.get_by_ap_id(offer_ap_id) do
+        %Object{type: "Offer"} -> offer_ap_id
+        _ -> nil
+      end
+    end
+  end
+
+  defp offer_ap_id_from_object(_offer_ap_id), do: nil
 
   defp extract_id(%{"id" => id}) when is_binary(id), do: id
   defp extract_id(id) when is_binary(id), do: id

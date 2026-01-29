@@ -78,6 +78,45 @@
           </.form>
         </div>
 
+        <div>
+          <h3 class="text-sm font-semibold uppercase tracking-[0.25em] text-slate-500 dark:text-slate-400">
+            Badges
+          </h3>
+          <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">
+            Issue badges to users by selecting a badge type and recipient actor ID.
+          </p>
+
+          <.form
+            for={@badge_form}
+            action={~p"/admin/badges/issue"}
+            id="badge-issue-form"
+            class="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1fr)_auto] sm:items-end"
+          >
+            <.input
+              type="select"
+              field={@badge_form[:badge_type]}
+              label="Badge type"
+              prompt="Select badge"
+              options={@badge_options}
+            />
+
+            <.input
+              type="text"
+              field={@badge_form[:recipient_ap_id]}
+              label="Recipient actor ID"
+              placeholder="https://example.com/users/alice"
+            />
+
+            <.input
+              type="date"
+              field={@badge_form[:expires_on]}
+              label="Expires on (optional)"
+            />
+
+            <.button type="submit" class="sm:w-44">Issue</.button>
+          </.form>
+        </div>
+
         <div
           :if={@relays != []}
           class="rounded-2xl border border-slate-200 bg-white/70 p-4 dark:border-slate-700 dark:bg-slate-950/30"

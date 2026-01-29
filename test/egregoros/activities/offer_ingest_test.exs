@@ -4,6 +4,7 @@ defmodule Egregoros.Activities.OfferIngestTest do
   alias Egregoros.Object
   alias Egregoros.Objects
   alias Egregoros.Pipeline
+  alias Egregoros.Relationships
   alias Egregoros.TestSupport.Fixtures
   alias Egregoros.Users
 
@@ -36,6 +37,21 @@ defmodule Egregoros.Activities.OfferIngestTest do
     assert stored_credential.type == "VerifiableCredential"
     assert stored_credential.data["type"] == ["VerifiableCredential", "OpenBadgeCredential"]
     assert stored_credential.internal["auxiliary_types"] == ["OpenBadgeCredential"]
+
+    offer_ap_id = offer_object.ap_id
+    recipient_ap_id = inbox_user.ap_id
+
+    assert %Egregoros.Relationship{
+             type: "OfferPending",
+             actor: ^recipient_ap_id,
+             object: ^offer_ap_id,
+             activity_ap_id: ^offer_ap_id
+           } =
+             Relationships.get_by_type_actor_object(
+               "OfferPending",
+               recipient_ap_id,
+               offer_ap_id
+             )
   end
 
   test "rejects Offer when credential domain differs from offer domain" do

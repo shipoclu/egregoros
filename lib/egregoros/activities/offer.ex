@@ -15,6 +15,7 @@ defmodule Egregoros.Activities.Offer do
   alias Egregoros.Objects
   alias Egregoros.Pipeline
   alias Egregoros.Recipients, as: RecipientHelpers
+  alias Egregoros.Relationships
   alias Egregoros.User
   alias Egregoros.Users
   alias EgregorosWeb.Endpoint
@@ -100,6 +101,8 @@ defmodule Egregoros.Activities.Offer do
       case Users.get_by_ap_id(recipient_ap_id) do
         %User{local: true} = user ->
           Notifications.broadcast(user.ap_id, offer_object)
+          _ = upsert_offer_relationship(user.ap_id, offer_object.ap_id)
+          :ok
 
         _ ->
           :ok
@@ -110,6 +113,27 @@ defmodule Egregoros.Activities.Offer do
   end
 
   def side_effects(_object, _opts), do: :ok
+
+  defp upsert_offer_relationship(recipient_ap_id, offer_ap_id)
+       when is_binary(recipient_ap_id) and is_binary(offer_ap_id) do
+    recipient_ap_id = String.trim(recipient_ap_id)
+    offer_ap_id = String.trim(offer_ap_id)
+
+    if recipient_ap_id == "" or offer_ap_id == "" do
+      :ok
+    else
+      Relationships.upsert_relationship(%{
+        type: "OfferPending",
+        actor: recipient_ap_id,
+        object: offer_ap_id,
+        activity_ap_id: offer_ap_id
+      })
+
+      :ok
+    end
+  end
+
+  defp upsert_offer_relationship(_recipient_ap_id, _offer_ap_id), do: :ok
 
   def recipient_ap_ids(%Object{} = offer_object, opts \\ []) when is_list(opts) do
     activity_recipients = offer_recipients_from_activity(offer_object)
@@ -122,12 +146,16 @@ defmodule Egregoros.Activities.Offer do
   end
 
   defp validate_inbox_target(%{} = activity, opts) when is_list(opts) do
-    InboxTargeting.validate_addressed_or_followed_or_addressed_to_object(
-      opts,
-      activity,
-      Map.get(activity, "actor"),
-      Map.get(activity, "object")
-    )
+    if Keyword.get(opts, :skip_inbox_target, false) do
+      :ok
+    else
+      InboxTargeting.validate_addressed_or_followed_or_addressed_to_object(
+        opts,
+        activity,
+        Map.get(activity, "actor"),
+        Map.get(activity, "object")
+      )
+    end
   end
 
   defp validate_inbox_target(_activity, _opts), do: :ok

@@ -7,11 +7,14 @@ defmodule Egregoros.Activities.VerifiableCredential do
   alias Egregoros.ActivityPub.ObjectValidators.Types.DateTime, as: APDateTime
   alias Egregoros.ActivityPub.ObjectValidators.Types.ObjectID
   alias Egregoros.ActivityPub.ObjectValidators.Types.Recipients
+  alias Egregoros.BadgeDefinition
   alias Egregoros.InboxTargeting
   alias Egregoros.Objects
   alias Egregoros.SafeURL
   alias Egregoros.User
   alias Egregoros.Users
+  alias EgregorosWeb.Endpoint
+  alias EgregorosWeb.URL
 
   def type, do: "VerifiableCredential"
 
@@ -27,13 +30,17 @@ defmodule Egregoros.Activities.VerifiableCredential do
   end
 
   def cast_and_validate(object) when is_map(object) do
+    cast_and_validate(object, [])
+  end
+
+  def cast_and_validate(object, opts) when is_map(object) and is_list(opts) do
     changeset =
       %__MODULE__{}
       |> cast(object, __schema__(:fields))
       |> validate_required([:id, :type, :issuer])
       |> validate_inclusion(:type, [type()])
       |> validate_issuer()
-      |> validate_recipient(object)
+      |> validate_recipient(object, opts)
 
     # TODO: Verify the embedded proof; we skip it for now because we do not yet support
     # elliptic curve instance actor keys.
@@ -54,11 +61,15 @@ defmodule Egregoros.Activities.VerifiableCredential do
   def side_effects(_object, _opts), do: :ok
 
   defp validate_inbox_target(%{} = object, opts) when is_list(opts) do
-    InboxTargeting.validate_addressed_or_followed(
-      opts,
-      object,
-      issuer_ap_id(object)
-    )
+    if Keyword.get(opts, :skip_inbox_target, false) do
+      :ok
+    else
+      InboxTargeting.validate_addressed_or_followed(
+        opts,
+        object,
+        issuer_ap_id(object)
+      )
+    end
   end
 
   defp validate_inbox_target(_object, _opts), do: :ok
@@ -126,16 +137,20 @@ defmodule Egregoros.Activities.VerifiableCredential do
     end
   end
 
-  defp validate_recipient(changeset, object) do
+  defp validate_recipient(changeset, object, opts) do
     recipient = recipient_ap_id(object)
     recipient = if is_binary(recipient), do: String.trim(recipient), else: recipient
     user = Users.get_by_ap_id(recipient)
+    allow_remote? = Keyword.get(opts, :allow_remote_recipient, false)
 
     cond do
       not is_binary(recipient) or recipient == "" ->
         add_error(changeset, :credentialSubject, "must include a recipient id")
 
       match?(%User{local: true}, user) ->
+        changeset
+
+      allow_remote? and SafeURL.validate_http_url_federation(recipient) == :ok ->
         changeset
 
       match?(%User{}, user) ->
@@ -148,4 +163,69 @@ defmodule Egregoros.Activities.VerifiableCredential do
         add_error(changeset, :credentialSubject, "recipient must be a valid actor id")
     end
   end
+
+  def build_for_badge(badge, issuer_ap_id, recipient_ap_id, opts \\ [])
+
+  def build_for_badge(%BadgeDefinition{} = badge, issuer_ap_id, recipient_ap_id, opts)
+      when is_binary(issuer_ap_id) and is_binary(recipient_ap_id) do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+    valid_from = Keyword.get(opts, :valid_from, now)
+    valid_until = Keyword.get(opts, :valid_until)
+
+    credential = %{
+      "@context" => [
+        "https://www.w3.org/ns/credentials/v2",
+        "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json",
+        "https://www.w3.org/ns/activitystreams"
+      ],
+      "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
+      "type" => ["VerifiableCredential", "OpenBadgeCredential"],
+      "issuer" => issuer_ap_id,
+      "to" => [recipient_ap_id, "https://www.w3.org/ns/activitystreams#Public"],
+      "validFrom" => datetime_to_iso8601(valid_from),
+      "credentialSubject" => %{
+        "id" => recipient_ap_id,
+        "type" => "AchievementSubject",
+        "achievement" => achievement_payload(badge)
+      }
+    }
+
+    credential
+    |> maybe_put_valid_until(valid_until)
+  end
+
+  def build_for_badge(_badge, _issuer_ap_id, _recipient_ap_id, _opts), do: %{}
+
+  defp achievement_payload(%BadgeDefinition{} = badge) do
+    %{
+      "id" => Endpoint.url() <> "/badges/" <> badge.id,
+      "type" => "Achievement",
+      "name" => badge.name,
+      "description" => badge.description,
+      "criteria" => %{"narrative" => badge.narrative}
+    }
+    |> maybe_put_image(badge)
+  end
+
+  defp maybe_put_image(payload, %BadgeDefinition{image_url: image_url})
+       when is_binary(image_url) and image_url != "" do
+    Map.put(payload, "image", %{
+      "id" => URL.absolute(image_url),
+      "type" => "Image"
+    })
+  end
+
+  defp maybe_put_image(payload, _badge), do: payload
+
+  defp maybe_put_valid_until(credential, %DateTime{} = valid_until) do
+    Map.put(credential, "validUntil", datetime_to_iso8601(valid_until))
+  end
+
+  defp maybe_put_valid_until(credential, valid_until) when is_binary(valid_until) do
+    Map.put(credential, "validUntil", valid_until)
+  end
+
+  defp maybe_put_valid_until(credential, _valid_until), do: credential
+
+  defp datetime_to_iso8601(%DateTime{} = datetime), do: DateTime.to_iso8601(datetime)
 end
