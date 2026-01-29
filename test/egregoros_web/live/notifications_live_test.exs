@@ -295,6 +295,22 @@ defmodule EgregorosWeb.NotificationsLiveTest do
     |> render_click()
 
     assert Objects.get_by_type_actor_object("Accept", user.ap_id, offer_object.ap_id)
+
+    assert has_element?(
+             view,
+             "#notification-#{offer_object.id} [data-role='offer-response-status']",
+             "You accepted this badge."
+           )
+
+    refute has_element?(
+             view,
+             "#notification-#{offer_object.id} button[data-role='offer-accept']"
+           )
+
+    refute has_element?(
+             view,
+             "#notification-#{offer_object.id} button[data-role='offer-reject']"
+           )
   end
 
   test "offer notifications can be rejected from the notifications screen", %{
@@ -329,6 +345,22 @@ defmodule EgregorosWeb.NotificationsLiveTest do
     |> render_click()
 
     assert Objects.get_by_type_actor_object("Reject", user.ap_id, offer_object.ap_id)
+
+    assert has_element?(
+             view,
+             "#notification-#{offer_object.id} [data-role='offer-response-status']",
+             "You rejected this badge."
+           )
+
+    refute has_element?(
+             view,
+             "#notification-#{offer_object.id} button[data-role='offer-accept']"
+           )
+
+    refute has_element?(
+             view,
+             "#notification-#{offer_object.id} button[data-role='offer-reject']"
+           )
   end
 
   test "offer notifications include credential details", %{conn: conn, user: user} do

@@ -200,7 +200,12 @@ defmodule EgregorosWeb.NotificationsLive do
          true <- offer_addressed_to_user?(offer_object, current_user),
          {:ok, _reject_object} <-
            Pipeline.ingest(Reject.build(current_user, offer_object), local: true) do
-      {:noreply, put_flash(socket, :info, "Badge rejected.")}
+      entry = decorate_notification(offer_object, current_user)
+
+      {:noreply,
+       socket
+       |> stream_insert(:notifications, entry)
+       |> put_flash(:info, "Badge rejected.")}
     else
       _ ->
         {:noreply, socket}
@@ -537,6 +542,7 @@ defmodule EgregorosWeb.NotificationsLive do
 
     {offer_title, offer_description} = offer_details(notification)
     offer_badge_path = offer_badge_path(notification, current_user)
+    offer_response = offer_response(notification, current_user)
 
     %{
       notification: notification,
@@ -551,7 +557,8 @@ defmodule EgregorosWeb.NotificationsLive do
       reaction_emoji: reaction_emoji,
       offer_title: offer_title,
       offer_description: offer_description,
-      offer_badge_path: offer_badge_path
+      offer_badge_path: offer_badge_path,
+      offer_response: offer_response
     }
   end
 
@@ -639,6 +646,30 @@ defmodule EgregorosWeb.NotificationsLive do
   end
 
   defp offer_badge_path(_offer, _user), do: nil
+
+  defp offer_response(%Object{type: "Offer"} = offer, %User{} = user) do
+    offer_ap_id =
+      case offer.ap_id do
+        ap_id when is_binary(ap_id) -> String.trim(ap_id)
+        _ -> ""
+      end
+
+    cond do
+      offer_ap_id == "" ->
+        nil
+
+      Relationships.get_by_type_actor_object("OfferAccepted", user.ap_id, offer_ap_id) ->
+        "You accepted this badge."
+
+      Relationships.get_by_type_actor_object("OfferRejected", user.ap_id, offer_ap_id) ->
+        "You rejected this badge."
+
+      true ->
+        nil
+    end
+  end
+
+  defp offer_response(_offer, _user), do: nil
 
   defp badge_path(%User{} = user, badge_id) when is_binary(badge_id) do
     case ProfilePaths.profile_path(user) do
