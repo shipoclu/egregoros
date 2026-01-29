@@ -132,6 +132,24 @@ defmodule Egregoros.Objects do
     |> Repo.one()
   end
 
+  def list_by_type_actor(type, actor_ap_id, opts \\ [])
+
+  def list_by_type_actor(type, actor_ap_id, opts)
+      when is_binary(type) and is_binary(actor_ap_id) and is_list(opts) do
+    limit = opts |> Keyword.get(:limit, 20) |> normalize_limit()
+    max_id = Keyword.get(opts, :max_id)
+
+    from(o in Object,
+      where: o.type == ^type and o.actor == ^actor_ap_id,
+      order_by: [desc: o.id],
+      limit: ^limit
+    )
+    |> maybe_where_max_id(max_id)
+    |> Repo.all()
+  end
+
+  def list_by_type_actor(_type, _actor_ap_id, _opts), do: []
+
   def get_emoji_react(actor, object, emoji)
       when is_binary(actor) and is_binary(object) and is_binary(emoji) do
     from(o in Object,

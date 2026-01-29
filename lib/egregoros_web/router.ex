@@ -96,6 +96,8 @@ defmodule EgregorosWeb.Router do
     live "/@:nickname", ProfileLive
     live "/@:nickname/followers", RelationshipsLive, :followers
     live "/@:nickname/following", RelationshipsLive, :following
+    live "/@:nickname/badges", BadgesLive, :index
+    live "/@:nickname/badges/:id", BadgesLive, :show
     live "/@:nickname/:uuid", StatusLive
   end
 

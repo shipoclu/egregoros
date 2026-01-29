@@ -233,7 +233,7 @@ article[data-role="status-card"]:target {
   display: none;
 }
 
-[data-role="notifications-list"][data-filter="offers"] [data-role="notification"]:not([data-type="Offer"]) {
+[data-role="notifications-list"][data-filter="badges"] [data-role="notification"]:not([data-type="Offer"]) {
   display: none;
 }
 

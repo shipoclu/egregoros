@@ -1,7 +1,7 @@
 defmodule EgregorosWeb.Components.NotificationItems.OfferNotification do
   @moduledoc """
   Component for rendering an Offer notification.
-  Displayed when a user receives a verifiable credential offer.
+  Displayed when a user receives a badge offer.
   Includes accept/reject action buttons.
   """
   use EgregorosWeb, :html
@@ -49,6 +49,16 @@ defmodule EgregorosWeb.Components.NotificationItems.OfferNotification do
               >
                 {@entry[:offer_description]}
               </p>
+            <% end %>
+
+            <%= if is_binary(@entry[:offer_badge_path]) do %>
+              <.link
+                data-role="offer-badge-link"
+                navigate={@entry[:offer_badge_path]}
+                class="mt-3 inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-[color:var(--link)] hover:text-[color:var(--text-primary)] hover:underline underline-offset-4"
+              >
+                <.icon name="hero-trophy" class="size-4" /> View badge
+              </.link>
             <% end %>
           </div>
         </div>

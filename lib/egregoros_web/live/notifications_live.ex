@@ -47,7 +47,7 @@ defmodule EgregorosWeb.NotificationsLive do
        notifications_end?: length(notifications) < @page_size,
        follow_requests: decorate_follow_requests(follow_requests)
      )
-     |> stream(:notifications, decorate_notifications(notifications),
+     |> stream(:notifications, decorate_notifications(notifications, current_user),
        dom_id: &notification_dom_id/1
      )}
   end
@@ -56,7 +56,7 @@ defmodule EgregorosWeb.NotificationsLive do
   def handle_info({:notification_created, activity}, socket) do
     case socket.assigns.current_user do
       %User{} ->
-        entry = decorate_notification(activity)
+        entry = decorate_notification(activity, socket.assigns.current_user)
 
         {:noreply,
          socket
@@ -94,9 +94,13 @@ defmodule EgregorosWeb.NotificationsLive do
             notifications_end? = length(notifications) < @page_size
 
             socket =
-              Enum.reduce(decorate_notifications(notifications), socket, fn entry, socket ->
-                stream_insert(socket, :notifications, entry, at: -1)
-              end)
+              Enum.reduce(
+                decorate_notifications(notifications, socket.assigns.current_user),
+                socket,
+                fn entry, socket ->
+                  stream_insert(socket, :notifications, entry, at: -1)
+                end
+              )
 
             assign(socket,
               notifications_cursor: new_cursor,
@@ -111,7 +115,7 @@ defmodule EgregorosWeb.NotificationsLive do
   def handle_event("set_notifications_filter", %{"filter" => filter}, socket) do
     filter = filter |> to_string() |> String.trim()
 
-    if filter in ~w(all follows requests likes reposts mentions reactions offers) do
+    if filter in ~w(all follows requests likes reposts mentions reactions badges) do
       {:noreply, assign(socket, notifications_filter: filter)}
     else
       {:noreply, socket}
@@ -176,7 +180,12 @@ defmodule EgregorosWeb.NotificationsLive do
          true <- offer_addressed_to_user?(offer_object, current_user),
          {:ok, _accept_object} <-
            Pipeline.ingest(Accept.build(current_user, offer_object), local: true) do
-      {:noreply, put_flash(socket, :info, "Offer accepted.")}
+      entry = decorate_notification(offer_object, current_user)
+
+      {:noreply,
+       socket
+       |> stream_insert(:notifications, entry)
+       |> put_flash(:info, "Badge accepted.")}
     else
       _ ->
         {:noreply, socket}
@@ -191,7 +200,7 @@ defmodule EgregorosWeb.NotificationsLive do
          true <- offer_addressed_to_user?(offer_object, current_user),
          {:ok, _reject_object} <-
            Pipeline.ingest(Reject.build(current_user, offer_object), local: true) do
-      {:noreply, put_flash(socket, :info, "Offer rejected.")}
+      {:noreply, put_flash(socket, :info, "Badge rejected.")}
     else
       _ ->
         {:noreply, socket}
@@ -243,10 +252,10 @@ defmodule EgregorosWeb.NotificationsLive do
                 icon="hero-user-circle"
               />
               <.filter_button
-                filter="offers"
+                filter="badges"
                 current={@notifications_filter}
-                label="Offers"
-                icon="hero-gift"
+                label="Badges"
+                icon="hero-trophy"
               />
               <.filter_button
                 filter="likes"
@@ -421,8 +430,8 @@ defmodule EgregorosWeb.NotificationsLive do
     Relationships.list_by_type_object("FollowRequest", user.ap_id, limit)
   end
 
-  defp decorate_notifications(notifications) when is_list(notifications) do
-    Enum.map(notifications, &decorate_notification/1)
+  defp decorate_notifications(notifications, current_user) when is_list(notifications) do
+    Enum.map(notifications, &decorate_notification(&1, current_user))
   end
 
   defp decorate_follow_requests(relationships) when is_list(relationships) do
@@ -434,7 +443,8 @@ defmodule EgregorosWeb.NotificationsLive do
     end)
   end
 
-  defp decorate_notification(%{type: type} = notification) when is_binary(type) do
+  defp decorate_notification(%{type: type} = notification, current_user)
+       when is_binary(type) do
     actor = ActorVM.card(notification.actor)
 
     note =
@@ -516,7 +526,7 @@ defmodule EgregorosWeb.NotificationsLive do
           {"hero-face-smile", message, message_emojis, reaction_display}
 
         "Offer" ->
-          {"hero-gift", "#{actor.display_name} offered you a credential", actor.emojis, nil}
+          {"hero-gift", "#{actor.display_name} offered you a badge", actor.emojis, nil}
 
         "Note" ->
           {"hero-at-symbol", "#{actor.display_name} mentioned you", actor.emojis, nil}
@@ -526,6 +536,7 @@ defmodule EgregorosWeb.NotificationsLive do
       end
 
     {offer_title, offer_description} = offer_details(notification)
+    offer_badge_path = offer_badge_path(notification, current_user)
 
     %{
       notification: notification,
@@ -539,7 +550,8 @@ defmodule EgregorosWeb.NotificationsLive do
       target_path: target_path,
       reaction_emoji: reaction_emoji,
       offer_title: offer_title,
-      offer_description: offer_description
+      offer_description: offer_description,
+      offer_badge_path: offer_badge_path
     }
   end
 
@@ -606,6 +618,36 @@ defmodule EgregorosWeb.NotificationsLive do
   end
 
   defp offer_details(_notification), do: {nil, nil}
+
+  defp offer_badge_path(%Object{type: "Offer"} = offer, %User{} = user) do
+    offer_ap_id =
+      case offer.ap_id do
+        ap_id when is_binary(ap_id) -> String.trim(ap_id)
+        _ -> ""
+      end
+
+    with true <- offer_ap_id != "",
+         %Object{id: accept_id} <-
+           Objects.get_by_type_actor_object("Accept", user.ap_id, offer_ap_id),
+         badge_id <- accept_id |> to_string() |> String.trim(),
+         true <- badge_id != "",
+         path when is_binary(path) <- badge_path(user, badge_id) do
+      path
+    else
+      _ -> nil
+    end
+  end
+
+  defp offer_badge_path(_offer, _user), do: nil
+
+  defp badge_path(%User{} = user, badge_id) when is_binary(badge_id) do
+    case ProfilePaths.profile_path(user) do
+      path when is_binary(path) and path != "" -> path <> "/badges/" <> badge_id
+      _ -> nil
+    end
+  end
+
+  defp badge_path(_user, _badge_id), do: nil
 
   defp credential_from_ap_id(credential_ap_id) when is_binary(credential_ap_id) do
     case Objects.get_by_ap_id(credential_ap_id) do

@@ -812,6 +812,16 @@ defmodule EgregorosWeb.ProfileLive do
                   </div>
 
                   <div class="flex flex-wrap items-center gap-2">
+                    <.button
+                      :if={badges_path(@profile_user)}
+                      navigate={badges_path(@profile_user)}
+                      size="sm"
+                      variant="secondary"
+                      data-role="profile-badges-link"
+                    >
+                      <.icon name="hero-trophy" class="size-4" /> Badges
+                    </.button>
+
                     <%= if @current_user && @current_user.id != @profile_user.id do %>
                       <%= if @mute_relationship do %>
                         <button
@@ -1025,6 +1035,14 @@ defmodule EgregorosWeb.ProfileLive do
     </div>
     """
   end
+
+  defp badges_path(%User{} = user) do
+    with path when is_binary(path) <- ProfilePaths.profile_path(user) do
+      path <> "/badges"
+    end
+  end
+
+  defp badges_path(_user), do: nil
 
   defp follow_relationship(nil, _profile_user), do: nil
   defp follow_relationship(_current_user, nil), do: nil

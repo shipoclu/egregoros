@@ -26,7 +26,7 @@ defmodule EgregorosWeb.Components.NotificationItems.NotificationItem do
   - `Announce` - Someone reposted your post
   - `EmojiReact` - Someone reacted to your post
   - `Note` - Someone mentioned you
-  - `Offer` - A verifiable credential offer
+  - `Offer` - A badge offer
 
   ## Examples
 
