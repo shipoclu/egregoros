@@ -126,7 +126,7 @@ defmodule EgregorosWeb.Components.TimelineItems.BadgeCard do
         <% end %>
 
         <button
-          :if={@current_user && is_binary(get_in(@entry, [:object, :id]))}
+          :if={@current_user && is_binary(Map.get(@entry.object || %{}, :id))}
           type="button"
           data-role="badge-share"
           aria-pressed={if @reposted?, do: "true", else: "false"}
