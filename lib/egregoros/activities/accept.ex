@@ -4,6 +4,8 @@ defmodule Egregoros.Activities.Accept do
   import Ecto.Changeset
 
   alias Egregoros.Activities.Helpers
+  alias Egregoros.Activities.Update
+  alias Egregoros.Pipeline
   alias Egregoros.ActivityPub.TypeNormalizer
   alias Egregoros.ActivityPub.ObjectValidators.Types.ObjectID
   alias Egregoros.ActivityPub.ObjectValidators.Types.Recipients
@@ -58,6 +60,7 @@ defmodule Egregoros.Activities.Accept do
   def side_effects(object, opts) do
     _ = apply_follow_accept(object)
     _ = apply_offer_accept(object)
+    _ = maybe_publicize_offer_credential(object)
 
     if Keyword.get(opts, :local, true) do
       deliver_accept(object)
@@ -177,6 +180,83 @@ defmodule Egregoros.Activities.Accept do
   end
 
   defp offer_ap_id_from_object(_offer_ap_id), do: nil
+
+  defp maybe_publicize_offer_credential(%Object{} = accept_object) do
+    offer_ap_id = offer_ap_id_from_accept(accept_object)
+
+    with offer_ap_id when is_binary(offer_ap_id) <- offer_ap_id,
+         %Object{type: "Offer"} = offer <- Objects.get_by_ap_id(offer_ap_id),
+         %Object{} = credential <- credential_object_from_offer(offer),
+         "VerifiableCredential" <- TypeNormalizer.primary_type(credential.data),
+         {:ok, updated_to, added_public?} <- publicize_recipients(credential.data),
+         true <- added_public?,
+         %User{local: true} = issuer <- Users.get_by_ap_id(credential.actor) do
+      updated_data = Map.put(credential.data, "to", updated_to)
+
+      attrs = %{
+        ap_id: credential.ap_id,
+        type: credential.type,
+        actor: credential.actor,
+        object: credential.object,
+        data: updated_data,
+        published: credential.published,
+        local: credential.local,
+        internal: credential.internal
+      }
+
+      case Objects.upsert_object(attrs, conflict: :replace) do
+        {:ok, _updated_credential} ->
+          _ = Pipeline.ingest(Update.build(issuer, updated_data), local: true)
+          :ok
+
+        _ ->
+          :ok
+      end
+    else
+      _ -> :ok
+    end
+  end
+
+  defp maybe_publicize_offer_credential(_accept_object), do: :ok
+
+  defp credential_object_from_offer(%Object{data: %{"object" => %{} = embedded}}) do
+    credential_id = Map.get(embedded, "id") || Map.get(embedded, :id)
+
+    if is_binary(credential_id) and credential_id != "" do
+      Objects.get_by_ap_id(credential_id)
+    else
+      nil
+    end
+  end
+
+  defp credential_object_from_offer(%Object{object: credential_ap_id})
+       when is_binary(credential_ap_id) do
+    Objects.get_by_ap_id(credential_ap_id)
+  end
+
+  defp credential_object_from_offer(_offer), do: nil
+
+  defp publicize_recipients(%{} = credential_data) do
+    public = "https://www.w3.org/ns/activitystreams#Public"
+
+    existing_to =
+      credential_data
+      |> Map.get("to", [])
+      |> List.wrap()
+      |> Enum.filter(&is_binary/1)
+      |> Enum.map(&String.trim/1)
+      |> Enum.reject(&(&1 == ""))
+
+    updated_to =
+      (existing_to ++ [public])
+      |> Enum.uniq()
+
+    added_public? = public not in existing_to
+
+    {:ok, updated_to, added_public?}
+  end
+
+  defp publicize_recipients(_credential_data), do: {:error, :invalid}
 
   defp extract_id(%{"id" => id}) when is_binary(id), do: id
   defp extract_id(id) when is_binary(id), do: id

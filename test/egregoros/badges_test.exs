@@ -2,9 +2,12 @@ defmodule Egregoros.BadgesTest do
   use Egregoros.DataCase, async: true
 
   alias Egregoros.BadgeDefinition
+  alias Egregoros.Activities.Accept
   alias Egregoros.Badges
   alias Egregoros.Federation.InstanceActor
   alias Egregoros.Notifications
+  alias Egregoros.Objects
+  alias Egregoros.Pipeline
   alias Egregoros.Repo
   alias Egregoros.Users
   alias Egregoros.Workers.DeliverActivity
@@ -36,6 +39,32 @@ defmodule Egregoros.BadgesTest do
            )
 
     refute_enqueued(worker: DeliverActivity)
+  end
+
+  test "accepting a badge offer publicizes the credential and emits an Update" do
+    {:ok, recipient} = Users.create_local_user("badge_issue_accept")
+    {:ok, _badge} = insert_badge_definition("TestPublicize")
+    {:ok, instance_actor} = InstanceActor.get_actor()
+
+    assert {:ok, %{offer: offer, credential: credential}} =
+             Badges.issue_badge("TestPublicize", recipient.ap_id)
+
+    assert credential.data["to"] == [recipient.ap_id]
+
+    assert {:ok, _accept_object} =
+             Pipeline.ingest(Accept.build(recipient, offer), local: true)
+
+    updated_credential = Objects.get_by_ap_id(credential.ap_id)
+    assert %Egregoros.Object{} = updated_credential
+
+    assert "https://www.w3.org/ns/activitystreams#Public" in updated_credential.data["to"]
+
+    assert %Egregoros.Object{} =
+             Objects.get_by_type_actor_object(
+               "Update",
+               instance_actor.ap_id,
+               credential.ap_id
+             )
   end
 
   test "issue_badge/2 delivers offers to remote recipients" do

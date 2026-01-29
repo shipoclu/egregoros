@@ -22,6 +22,7 @@ defmodule Egregoros.Activities.Update do
   alias EgregorosWeb.Endpoint
 
   @actor_types ~w(Person Service Organization Group Application)
+  @as_public "https://www.w3.org/ns/activitystreams#Public"
 
   def type, do: "Update"
 
@@ -73,7 +74,8 @@ defmodule Egregoros.Activities.Update do
 
   def ingest(activity, opts) do
     with :ok <- validate_inbox_target(activity, opts),
-         :ok <- validate_object_namespace(activity, opts) do
+         :ok <- validate_object_namespace(activity, opts),
+         :ok <- validate_credential_update(activity) do
       activity
       |> to_object_attrs(opts)
       |> Objects.upsert_object()
@@ -87,6 +89,7 @@ defmodule Egregoros.Activities.Update do
       when is_binary(actor_ap_id) do
     maybe_apply_actor_update(actor_ap_id, embedded_object)
     maybe_apply_note_update(actor_ap_id, embedded_object, opts)
+    maybe_apply_credential_update(actor_ap_id, embedded_object, opts)
 
     if Keyword.get(opts, :local, true) do
       deliver_update(update_object, opts)
@@ -161,6 +164,39 @@ defmodule Egregoros.Activities.Update do
   end
 
   defp maybe_apply_note_update(_actor_ap_id, _object, _opts), do: :ok
+
+  defp maybe_apply_credential_update(actor_ap_id, %{} = object, opts)
+       when is_binary(actor_ap_id) and is_list(opts) do
+    credential_id = Map.get(object, "id") || Map.get(object, :id)
+    issuer_id = credential_issuer_id(object)
+
+    with "VerifiableCredential" <- TypeNormalizer.primary_type(object),
+         credential_id when is_binary(credential_id) <- credential_id,
+         %Object{} = existing <- Objects.get_by_ap_id(credential_id),
+         issuer_id when is_binary(issuer_id) <- issuer_id,
+         true <- issuer_id == actor_ap_id,
+         {:ok, updated_to, _added_public?} <- public_update_allowed?(existing.data, object) do
+      updated_data = Map.put(existing.data, "to", updated_to)
+
+      attrs = %{
+        ap_id: existing.ap_id,
+        type: existing.type,
+        actor: existing.actor,
+        object: existing.object,
+        data: updated_data,
+        published: existing.published,
+        local: existing.local,
+        internal: existing.internal
+      }
+
+      _ = Objects.upsert_object(attrs, conflict: :replace)
+      :ok
+    else
+      _ -> :ok
+    end
+  end
+
+  defp maybe_apply_credential_update(_actor_ap_id, _object, _opts), do: :ok
 
   defp deliver_update(%Object{} = update_object, _opts) do
     with %User{} = actor <- Users.get_by_ap_id(update_object.actor),
@@ -239,6 +275,27 @@ defmodule Egregoros.Activities.Update do
 
   defp validate_object_namespace_id(_id, _opts), do: :ok
 
+  defp validate_credential_update(%{"object" => %{} = object}) do
+    if TypeNormalizer.primary_type(object) == "VerifiableCredential" do
+      credential_id = Map.get(object, "id") || Map.get(object, :id)
+
+      case Objects.get_by_ap_id(credential_id) do
+        %Object{data: %{} = existing_data} ->
+          case public_update_allowed?(existing_data, object) do
+            {:ok, _updated_to, _added_public?} -> :ok
+            _ -> {:error, :invalid}
+          end
+
+        _ ->
+          {:error, :invalid}
+      end
+    else
+      :ok
+    end
+  end
+
+  defp validate_credential_update(_activity), do: :ok
+
   defp local_ap_id?(id) when is_binary(id) do
     local_domain =
       Endpoint.url()
@@ -314,6 +371,15 @@ defmodule Egregoros.Activities.Update do
           not is_binary(update_actor) or String.trim(update_actor) == "" ->
             errors
 
+          object_type == "VerifiableCredential" ->
+            issuer_id = credential_issuer_id(object_value)
+
+            if is_binary(issuer_id) and issuer_id == update_actor do
+              errors
+            else
+              errors ++ [object: "actor does not match Update actor"]
+            end
+
           object_type in @actor_types and object_id != update_actor ->
             errors ++ [object: "actor does not match Update actor"]
 
@@ -352,6 +418,55 @@ defmodule Egregoros.Activities.Update do
   defp extract_actor_id(%{id: id}) when is_binary(id), do: id
   defp extract_actor_id(id) when is_binary(id), do: id
   defp extract_actor_id(_), do: nil
+
+  defp credential_issuer_id(%{} = object) do
+    case Map.get(object, "issuer") || Map.get(object, :issuer) do
+      %{"id" => id} when is_binary(id) -> id
+      %{id: id} when is_binary(id) -> id
+      id when is_binary(id) -> id
+      _ -> nil
+    end
+  end
+
+  defp credential_issuer_id(_object), do: nil
+
+  defp public_update_allowed?(%{} = existing, %{} = updated) do
+    existing_without_to = Map.drop(existing, ["to", :to])
+    updated_without_to = Map.drop(updated, ["to", :to])
+
+    if existing_without_to != updated_without_to do
+      {:error, :invalid}
+    else
+      existing_to = normalize_recipients(Map.get(existing, "to") || Map.get(existing, :to))
+      updated_to = normalize_recipients(Map.get(updated, "to") || Map.get(updated, :to))
+
+      existing_set = MapSet.new(existing_to)
+      updated_set = MapSet.new(updated_to)
+
+      if MapSet.subset?(existing_set, updated_set) do
+        added = MapSet.difference(updated_set, existing_set) |> MapSet.to_list()
+
+        if added == [] or added == [@as_public] do
+          {:ok, updated_to, @as_public in added}
+        else
+          {:error, :invalid}
+        end
+      else
+        {:error, :invalid}
+      end
+    end
+  end
+
+  defp public_update_allowed?(_existing, _updated), do: {:error, :invalid}
+
+  defp normalize_recipients(recipients) do
+    recipients
+    |> List.wrap()
+    |> Enum.filter(&is_binary/1)
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.uniq()
+  end
 
   defp maybe_put_recipients(activity, _field, []), do: activity
 

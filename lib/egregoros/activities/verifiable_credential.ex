@@ -181,7 +181,7 @@ defmodule Egregoros.Activities.VerifiableCredential do
       "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
       "type" => ["VerifiableCredential", "OpenBadgeCredential"],
       "issuer" => issuer_ap_id,
-      "to" => [recipient_ap_id, "https://www.w3.org/ns/activitystreams#Public"],
+      "to" => [recipient_ap_id],
       "validFrom" => datetime_to_iso8601(valid_from),
       "credentialSubject" => %{
         "id" => recipient_ap_id,
