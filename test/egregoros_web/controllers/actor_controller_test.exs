@@ -19,6 +19,14 @@ defmodule EgregorosWeb.ActorControllerTest do
     assert decoded["followers"] == user.ap_id <> "/followers"
     assert decoded["following"] == user.ap_id <> "/following"
     assert decoded["publicKey"]["publicKeyPem"] == user.public_key
+    assert is_list(decoded["assertionMethod"])
+
+    assert Enum.any?(decoded["assertionMethod"], fn method ->
+             method["id"] == user.ap_id <> "#ed25519-key" and
+               method["type"] == "Multikey" and
+               method["controller"] == user.ap_id and
+               is_binary(method["publicKeyMultibase"])
+           end)
   end
 
   test "GET /users/:nickname includes profile metadata when available", %{conn: conn} do

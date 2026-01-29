@@ -29,6 +29,7 @@ defmodule Egregoros.Users do
   def create_local_user(nickname) when is_binary(nickname) do
     base = Endpoint.url() <> "/users/" <> nickname
     {public_key, private_key} = Keys.generate_rsa_keypair()
+    {ed25519_public_key, ed25519_private_key} = Keys.generate_ed25519_keypair()
 
     create_user(%{
       nickname: nickname,
@@ -37,6 +38,8 @@ defmodule Egregoros.Users do
       outbox: base <> "/outbox",
       public_key: public_key,
       private_key: private_key,
+      ed25519_public_key: ed25519_public_key,
+      ed25519_private_key: ed25519_private_key,
       local: true
     })
   end
@@ -64,6 +67,7 @@ defmodule Egregoros.Users do
       true ->
         base = Endpoint.url() <> "/users/" <> nickname
         {public_key, private_key} = Keys.generate_rsa_keypair()
+        {ed25519_public_key, ed25519_private_key} = Keys.generate_ed25519_keypair()
 
         create_user(%{
           nickname: nickname,
@@ -72,6 +76,8 @@ defmodule Egregoros.Users do
           outbox: base <> "/outbox",
           public_key: public_key,
           private_key: private_key,
+          ed25519_public_key: ed25519_public_key,
+          ed25519_private_key: ed25519_private_key,
           local: true,
           email: email,
           password_hash: Password.hash(password),
@@ -97,6 +103,7 @@ defmodule Egregoros.Users do
       true ->
         base = Endpoint.url() <> "/users/" <> nickname
         {public_key, private_key} = Keys.generate_rsa_keypair()
+        {ed25519_public_key, ed25519_private_key} = Keys.generate_ed25519_keypair()
 
         create_user(%{
           nickname: nickname,
@@ -105,6 +112,8 @@ defmodule Egregoros.Users do
           outbox: base <> "/outbox",
           public_key: public_key,
           private_key: private_key,
+          ed25519_public_key: ed25519_public_key,
+          ed25519_private_key: ed25519_private_key,
           local: true,
           email: email,
           password_hash: nil,
@@ -154,46 +163,52 @@ defmodule Egregoros.Users do
     if nickname == "" or ap_id == "" do
       {:error, :invalid_actor}
     else
-      case get_by_ap_id(ap_id) do
-        %User{} = user ->
-          {:ok, user}
+      result =
+        case get_by_ap_id(ap_id) do
+          %User{} = user ->
+            {:ok, user}
 
-        nil ->
-          Repo.transaction(fn ->
-            lock_key = :erlang.phash2({__MODULE__, :instance_actor, nickname})
-            _ = Repo.query!("SELECT pg_advisory_xact_lock($1)", [lock_key])
+          nil ->
+            Repo.transaction(fn ->
+              lock_key = :erlang.phash2({__MODULE__, :instance_actor, nickname})
+              _ = Repo.query!("SELECT pg_advisory_xact_lock($1)", [lock_key])
 
-            case get_by_ap_id(ap_id) do
-              %User{} = user ->
-                user
+              case get_by_ap_id(ap_id) do
+                %User{} = user ->
+                  user
 
-              nil ->
-                case get_by_nickname(nickname) do
-                  %User{} = user ->
-                    case user
-                         |> User.changeset(%{
-                           ap_id: ap_id,
-                           inbox: ap_id <> "/inbox",
-                           outbox: ap_id <> "/outbox"
-                         })
-                         |> Repo.update() do
-                      {:ok, %User{} = user} -> user
-                      {:error, %Ecto.Changeset{} = changeset} -> Repo.rollback(changeset)
-                    end
+                nil ->
+                  case get_by_nickname(nickname) do
+                    %User{} = user ->
+                      case user
+                           |> User.changeset(%{
+                             ap_id: ap_id,
+                             inbox: ap_id <> "/inbox",
+                             outbox: ap_id <> "/outbox"
+                           })
+                           |> Repo.update() do
+                        {:ok, %User{} = user} -> user
+                        {:error, %Ecto.Changeset{} = changeset} -> Repo.rollback(changeset)
+                      end
 
-                  nil ->
-                    case create_instance_actor(nickname, ap_id) do
-                      {:ok, %User{} = user} -> user
-                      {:error, %Ecto.Changeset{} = changeset} -> Repo.rollback(changeset)
-                    end
-                end
+                    nil ->
+                      case create_instance_actor(nickname, ap_id) do
+                        {:ok, %User{} = user} -> user
+                        {:error, %Ecto.Changeset{} = changeset} -> Repo.rollback(changeset)
+                      end
+                  end
+              end
+            end)
+            |> case do
+              {:ok, %User{} = user} -> {:ok, user}
+              {:error, %Ecto.Changeset{} = changeset} -> {:error, changeset}
+              {:error, reason} -> {:error, reason}
             end
-          end)
-          |> case do
-            {:ok, %User{} = user} -> {:ok, user}
-            {:error, %Ecto.Changeset{} = changeset} -> {:error, changeset}
-            {:error, reason} -> {:error, reason}
-          end
+        end
+
+      case result do
+        {:ok, %User{} = user} -> ensure_instance_ed25519_key(user)
+        other -> other
       end
     end
   end
@@ -202,6 +217,7 @@ defmodule Egregoros.Users do
 
   defp create_instance_actor(nickname, ap_id) when is_binary(nickname) and is_binary(ap_id) do
     {public_key, private_key} = Keys.generate_rsa_keypair()
+    {ed25519_public_key, ed25519_private_key} = Keys.generate_ed25519_keypair()
 
     create_user(%{
       nickname: nickname,
@@ -210,8 +226,25 @@ defmodule Egregoros.Users do
       outbox: ap_id <> "/outbox",
       public_key: public_key,
       private_key: private_key,
+      ed25519_public_key: ed25519_public_key,
+      ed25519_private_key: ed25519_private_key,
       local: true
     })
+  end
+
+  defp ensure_instance_ed25519_key(%User{} = user) do
+    if is_binary(user.ed25519_public_key) and is_binary(user.ed25519_private_key) do
+      {:ok, user}
+    else
+      {ed25519_public_key, ed25519_private_key} = Keys.generate_ed25519_keypair()
+
+      user
+      |> User.changeset(%{
+        ed25519_public_key: ed25519_public_key,
+        ed25519_private_key: ed25519_private_key
+      })
+      |> Repo.update()
+    end
   end
 
   def get_by_ap_id(nil), do: nil

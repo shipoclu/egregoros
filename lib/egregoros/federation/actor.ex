@@ -3,6 +3,7 @@ defmodule Egregoros.Federation.Actor do
   alias Egregoros.Domain
   alias Egregoros.HTTP
   alias Egregoros.Federation.SignedFetch
+  alias Egregoros.Keys
   alias Egregoros.SafeURL
   alias Egregoros.UserEvents
   alias Egregoros.Users
@@ -308,6 +309,7 @@ defmodule Egregoros.Federation.Actor do
           |> maybe_put_emojis(actor, id)
           |> maybe_put_moved_to(actor, id)
           |> maybe_put_also_known_as(actor, id)
+          |> maybe_put_ed25519_public_key(actor)
 
         {:ok, attrs}
       end
@@ -455,6 +457,49 @@ defmodule Egregoros.Federation.Actor do
   end
 
   defp maybe_put_also_known_as(attrs, _actor, _actor_id), do: attrs
+
+  defp maybe_put_ed25519_public_key(attrs, actor) when is_map(attrs) and is_map(actor) do
+    case ed25519_public_key_from_actor(actor) do
+      {:ok, public_key} -> Map.put(attrs, :ed25519_public_key, public_key)
+      _ -> attrs
+    end
+  end
+
+  defp maybe_put_ed25519_public_key(attrs, _actor), do: attrs
+
+  defp ed25519_public_key_from_actor(actor) when is_map(actor) do
+    actor
+    |> actor_assertion_methods()
+    |> Enum.find_value(fn method ->
+      case ed25519_public_key_from_method(method) do
+        {:ok, public_key} -> public_key
+        _ -> nil
+      end
+    end)
+    |> case do
+      public_key when is_binary(public_key) -> {:ok, public_key}
+      _ -> {:error, :missing_ed25519_key}
+    end
+  end
+
+  defp ed25519_public_key_from_actor(_), do: {:error, :missing_ed25519_key}
+
+  defp actor_assertion_methods(%{} = actor) do
+    assertion_method = Map.get(actor, "assertionMethod") || Map.get(actor, "verificationMethod")
+    List.wrap(assertion_method)
+  end
+
+  defp ed25519_public_key_from_method(%{} = method) do
+    with "Multikey" <- Map.get(method, "type"),
+         multibase when is_binary(multibase) <- Map.get(method, "publicKeyMultibase"),
+         {:ok, public_key} <- Keys.ed25519_public_key_from_multibase(multibase) do
+      {:ok, public_key}
+    else
+      _ -> {:error, :invalid_ed25519_key}
+    end
+  end
+
+  defp ed25519_public_key_from_method(_), do: {:error, :invalid_ed25519_key}
 
   defp locked?(actor) when is_map(actor) do
     case Map.get(actor, "manuallyApprovesFollowers") do

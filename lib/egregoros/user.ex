@@ -16,6 +16,8 @@ defmodule Egregoros.User do
     outbox
     public_key
     private_key
+    ed25519_public_key
+    ed25519_private_key
     local
     admin
     locked
@@ -43,6 +45,8 @@ defmodule Egregoros.User do
     field :outbox, :string
     field :public_key, :string
     field :private_key, :string
+    field :ed25519_public_key, :binary
+    field :ed25519_private_key, :binary
     field :local, :boolean, default: true
     field :admin, :boolean, default: false
     field :locked, :boolean, default: false

@@ -20,5 +20,13 @@ defmodule EgregorosWeb.RootActorTest do
 
     assert body["publicKey"]["id"] == Endpoint.url() <> "#main-key"
     assert body["publicKey"]["owner"] == Endpoint.url()
+    assert is_list(body["assertionMethod"])
+
+    assert Enum.any?(body["assertionMethod"], fn method ->
+             method["id"] == Endpoint.url() <> "#ed25519-key" and
+               method["type"] == "Multikey" and
+               method["controller"] == Endpoint.url() and
+               is_binary(method["publicKeyMultibase"])
+           end)
   end
 end

@@ -2,6 +2,7 @@ defmodule EgregorosWeb.Plugs.ServeInstanceActor do
   import Plug.Conn
 
   alias Egregoros.Federation.InstanceActor
+  alias Egregoros.Keys
 
   def init(opts), do: opts
 
@@ -54,5 +55,28 @@ defmodule EgregorosWeb.Plugs.ServeInstanceActor do
         "publicKeyPem" => actor.public_key
       }
     }
+    |> maybe_put_assertion_method(actor)
   end
+
+  defp maybe_put_assertion_method(actor, %{ed25519_public_key: public_key})
+       when is_binary(public_key) do
+    base_url = InstanceActor.ap_id()
+
+    case Keys.ed25519_public_key_multibase(public_key) do
+      multibase when is_binary(multibase) ->
+        Map.put(actor, "assertionMethod", [
+          %{
+            "id" => base_url <> "#ed25519-key",
+            "type" => "Multikey",
+            "controller" => base_url,
+            "publicKeyMultibase" => multibase
+          }
+        ])
+
+      _ ->
+        actor
+    end
+  end
+
+  defp maybe_put_assertion_method(actor, _user), do: actor
 end
