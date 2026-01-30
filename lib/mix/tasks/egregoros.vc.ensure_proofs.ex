@@ -1,17 +1,19 @@
 defmodule Mix.Tasks.Egregoros.Vc.EnsureProofs do
   use Mix.Task
 
-  @shortdoc "Add proofs to local VCs and remove ActivityStreams context"
+  @shortdoc "Add proofs to local VCs and normalize audience context"
 
   @moduledoc """
   Add Data Integrity proofs to locally issued verifiable credentials that are
-  missing proofs, removing the ActivityStreams context first if present.
+  missing proofs, removing the ActivityStreams context first if present and
+  inserting the audience context mappings if missing.
 
   Usage:
 
       mix egregoros.vc.ensure_proofs
       mix egregoros.vc.ensure_proofs --dry-run
       mix egregoros.vc.ensure_proofs --limit 100
+      mix egregoros.vc.ensure_proofs --force
   """
 
   @impl true
@@ -20,7 +22,7 @@ defmodule Mix.Tasks.Egregoros.Vc.EnsureProofs do
 
     {opts, args, _invalid} =
       OptionParser.parse(argv,
-        strict: [dry_run: :boolean, limit: :integer, batch_size: :integer]
+        strict: [dry_run: :boolean, limit: :integer, batch_size: :integer, force: :boolean]
       )
 
     if args != [] do
@@ -28,7 +30,7 @@ defmodule Mix.Tasks.Egregoros.Vc.EnsureProofs do
       invalid arguments
 
       Usage:
-        mix egregoros.vc.ensure_proofs [--dry-run] [--limit N] [--batch-size N]
+        mix egregoros.vc.ensure_proofs [--dry-run] [--force] [--limit N] [--batch-size N]
       """)
     end
 

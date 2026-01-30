@@ -20,6 +20,11 @@ defmodule Egregoros.Activities.VerifiableCredentialTest do
     assert "https://www.w3.org/ns/credentials/v2" in contexts
     assert "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json" in contexts
     refute "https://www.w3.org/ns/activitystreams" in contexts
+
+    assert Enum.any?(contexts, fn
+             %{"to" => %{"@id" => "https://www.w3.org/ns/activitystreams#to"}} -> true
+             _ -> false
+           end)
   end
 
   defp insert_badge_definition(badge_type) do

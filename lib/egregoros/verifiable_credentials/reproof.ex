@@ -1,7 +1,8 @@
 defmodule Egregoros.VerifiableCredentials.Reproof do
   @moduledoc """
   Utilities for removing the ActivityStreams context from local verifiable
-  credentials and regenerating their Data Integrity proofs.
+  credentials, ensuring audience term mappings are present, and regenerating
+  their Data Integrity proofs.
   """
 
   import Ecto.Query, only: [from: 2]
@@ -14,6 +15,13 @@ defmodule Egregoros.VerifiableCredentials.Reproof do
   alias Egregoros.VerifiableCredentials.DataIntegrity
 
   @activitystreams_context "https://www.w3.org/ns/activitystreams"
+  @audience_context %{
+    "to" => %{"@id" => "https://www.w3.org/ns/activitystreams#to", "@type" => "@id"},
+    "cc" => %{"@id" => "https://www.w3.org/ns/activitystreams#cc", "@type" => "@id"},
+    "audience" => %{"@id" => "https://www.w3.org/ns/activitystreams#audience", "@type" => "@id"},
+    "bto" => %{"@id" => "https://www.w3.org/ns/activitystreams#bto", "@type" => "@id"},
+    "bcc" => %{"@id" => "https://www.w3.org/ns/activitystreams#bcc", "@type" => "@id"}
+  }
 
   @type summary :: %{
           updated: non_neg_integer(),
@@ -58,6 +66,7 @@ defmodule Egregoros.VerifiableCredentials.Reproof do
     dry_run = Keyword.get(opts, :dry_run, false)
     limit = Keyword.get(opts, :limit)
     batch_size = Keyword.get(opts, :batch_size, 100)
+    force = Keyword.get(opts, :force, false)
 
     query =
       from(o in Object, where: o.type == "VerifiableCredential" and o.local == true)
@@ -69,7 +78,7 @@ defmodule Egregoros.VerifiableCredentials.Reproof do
         |> Stream.chunk_every(batch_size)
         |> Enum.reduce(%{updated: 0, skipped: 0, errors: 0}, fn chunk, acc ->
           Enum.reduce(chunk, acc, fn object, acc ->
-            case ensure_object(object, dry_run: dry_run) do
+            case ensure_object(object, dry_run: dry_run, force: force) do
               {:ok, _} -> %{acc | updated: acc.updated + 1}
               {:skip, _} -> %{acc | skipped: acc.skipped + 1}
               {:error, _} -> %{acc | errors: acc.errors + 1}
@@ -130,7 +139,7 @@ defmodule Egregoros.VerifiableCredentials.Reproof do
       issuer_ap_id when is_binary(issuer_ap_id) ->
         case Users.get_by_ap_id(issuer_ap_id) do
           %User{local: true, ed25519_private_key: private_key} when is_binary(private_key) ->
-            case ensure_document(data, issuer_ap_id, private_key) do
+            case ensure_document(data, issuer_ap_id, private_key, opts) do
               {:ok, updated_document} ->
                 if Keyword.get(opts, :dry_run, false) do
                   {:ok, updated_document}
@@ -162,7 +171,7 @@ defmodule Egregoros.VerifiableCredentials.Reproof do
   def reproof_document(document, issuer_ap_id, private_key)
       when is_map(document) and is_binary(issuer_ap_id) and is_binary(private_key) do
     if proof_present?(document) do
-      {updated_context, changed?} = remove_activitystreams_context(document["@context"])
+      {updated_context, changed?} = normalize_context(document["@context"])
 
       cond do
         not changed? ->
@@ -187,11 +196,13 @@ defmodule Egregoros.VerifiableCredentials.Reproof do
 
   def reproof_document(_document, _issuer_ap_id, _private_key), do: {:error, :invalid_document}
 
-  @spec ensure_document(map(), binary(), binary()) ::
+  @spec ensure_document(map(), binary(), binary(), keyword()) ::
           {:ok, map()} | {:skip, atom()} | {:error, term()}
-  def ensure_document(document, issuer_ap_id, private_key)
-      when is_map(document) and is_binary(issuer_ap_id) and is_binary(private_key) do
-    {updated_context, changed?} = remove_activitystreams_context(document["@context"])
+  def ensure_document(document, issuer_ap_id, private_key, opts \\ [])
+      when is_map(document) and is_binary(issuer_ap_id) and is_binary(private_key) and
+             is_list(opts) do
+    {updated_context, changed?} = normalize_context(document["@context"])
+    force = Keyword.get(opts, :force, false)
 
     if changed? and updated_context == [] do
       {:error, :invalid_context}
@@ -206,7 +217,7 @@ defmodule Egregoros.VerifiableCredentials.Reproof do
       proof_opts = build_proof_opts(document, issuer_ap_id)
 
       cond do
-        proof_present?(document) and not changed? ->
+        proof_present?(document) and not changed? and not force ->
           {:skip, :proof_present}
 
         true ->
@@ -217,7 +228,8 @@ defmodule Egregoros.VerifiableCredentials.Reproof do
     end
   end
 
-  def ensure_document(_document, _issuer_ap_id, _private_key), do: {:error, :invalid_document}
+  def ensure_document(_document, _issuer_ap_id, _private_key, _opts),
+    do: {:error, :invalid_document}
 
   defp maybe_limit(query, limit) when is_integer(limit) and limit > 0 do
     from(o in query, limit: ^limit)
@@ -237,6 +249,23 @@ defmodule Egregoros.VerifiableCredentials.Reproof do
     updated = Enum.reject(contexts, &(&1 == @activitystreams_context))
     {updated, updated != contexts}
   end
+
+  defp normalize_context(context) do
+    {contexts, removed?} = remove_activitystreams_context(context)
+    has_mapping? = Enum.any?(List.wrap(contexts), &audience_context?/1)
+
+    if has_mapping? do
+      {contexts, removed?}
+    else
+      {contexts ++ [@audience_context], true}
+    end
+  end
+
+  defp audience_context?(%{} = context) do
+    Map.has_key?(context, "to")
+  end
+
+  defp audience_context?(_context), do: false
 
   defp drop_proof(%{} = document) do
     Map.drop(document, ["proof", :proof])

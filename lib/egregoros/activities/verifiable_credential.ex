@@ -175,7 +175,8 @@ defmodule Egregoros.Activities.VerifiableCredential do
     credential = %{
       "@context" => [
         "https://www.w3.org/ns/credentials/v2",
-        "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json"
+        "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json",
+        audience_context()
       ],
       "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
       "type" => ["VerifiableCredential", "OpenBadgeCredential"],
@@ -194,6 +195,16 @@ defmodule Egregoros.Activities.VerifiableCredential do
   end
 
   def build_for_badge(_badge, _issuer_ap_id, _recipient_ap_id, _opts), do: %{}
+
+  defp audience_context do
+    %{
+      "to" => %{"@id" => "https://www.w3.org/ns/activitystreams#to", "@type" => "@id"},
+      "cc" => %{"@id" => "https://www.w3.org/ns/activitystreams#cc", "@type" => "@id"},
+      "audience" => %{"@id" => "https://www.w3.org/ns/activitystreams#audience", "@type" => "@id"},
+      "bto" => %{"@id" => "https://www.w3.org/ns/activitystreams#bto", "@type" => "@id"},
+      "bcc" => %{"@id" => "https://www.w3.org/ns/activitystreams#bcc", "@type" => "@id"}
+    }
+  end
 
   defp achievement_payload(%BadgeDefinition{} = badge) do
     %{

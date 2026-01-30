@@ -40,6 +40,12 @@ defmodule Egregoros.VerifiableCredentials.ReproofTest do
     refute @as_context in contexts
     assert "https://www.w3.org/ns/credentials/v2" in contexts
     assert "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json" in contexts
+
+    assert Enum.any?(contexts, fn
+             %{"to" => %{"@id" => "https://www.w3.org/ns/activitystreams#to"}} -> true
+             _ -> false
+           end)
+
     assert updated["to"] == signed["to"]
 
     {:ok, public_key} = Keys.ed25519_public_key_from_private_key(issuer.ed25519_private_key)
@@ -67,6 +73,12 @@ defmodule Egregoros.VerifiableCredentials.ReproofTest do
     refute @as_context in contexts
     assert "https://www.w3.org/ns/credentials/v2" in contexts
     assert "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json" in contexts
+
+    assert Enum.any?(contexts, fn
+             %{"to" => %{"@id" => "https://www.w3.org/ns/activitystreams#to"}} -> true
+             _ -> false
+           end)
+
     assert updated["to"] == credential["to"]
     assert is_map(updated["proof"])
 
@@ -83,6 +95,9 @@ defmodule Egregoros.VerifiableCredentials.ReproofTest do
       |> Map.get("@context")
       |> List.wrap()
       |> Enum.reject(&(&1 == @as_context))
+      |> Kernel.++([
+        %{"to" => %{"@id" => "https://www.w3.org/ns/activitystreams#to", "@type" => "@id"}}
+      ])
 
     credential =
       Fixtures.json!("openbadge_vc.json")
