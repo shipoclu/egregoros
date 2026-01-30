@@ -56,7 +56,15 @@ defmodule Egregoros.Federation.ActorTest do
     assert user.local == false
     assert user.private_key == nil
     assert user.public_key == public_key
-    assert user.ed25519_public_key == ed25519_public_key
+    assert is_list(user.assertion_method)
+
+    assert Enum.any?(user.assertion_method, fn method ->
+             method["id"] == actor_url <> "#ed25519-key" and
+               method["type"] == "Multikey" and
+               method["controller"] == actor_url and
+               method["publicKeyMultibase"] == ed25519_multibase
+           end)
+
     assert user.name == "Alice"
     assert user.bio == "bio"
     assert user.avatar_url == "https://remote.example/media/avatar.png"

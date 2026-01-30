@@ -2,7 +2,6 @@ defmodule EgregorosWeb.ActorController do
   use EgregorosWeb, :controller
 
   alias Egregoros.E2EE
-  alias Egregoros.Keys
   alias Egregoros.Users
   alias EgregorosWeb.URL
 
@@ -55,22 +54,9 @@ defmodule EgregorosWeb.ActorController do
 
   defp maybe_put_icon(actor, _user), do: actor
 
-  defp maybe_put_assertion_method(actor, %{ap_id: ap_id, ed25519_public_key: public_key})
-       when is_binary(ap_id) and is_binary(public_key) do
-    case Keys.ed25519_public_key_multibase(public_key) do
-      multibase when is_binary(multibase) ->
-        Map.put(actor, "assertionMethod", [
-          %{
-            "id" => ap_id <> "#ed25519-key",
-            "type" => "Multikey",
-            "controller" => ap_id,
-            "publicKeyMultibase" => multibase
-          }
-        ])
-
-      _ ->
-        actor
-    end
+  defp maybe_put_assertion_method(actor, %{assertion_method: assertion_method})
+       when is_list(assertion_method) or is_map(assertion_method) do
+    Map.put(actor, "assertionMethod", assertion_method)
   end
 
   defp maybe_put_assertion_method(actor, _user), do: actor

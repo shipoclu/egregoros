@@ -6,6 +6,7 @@ defmodule Egregoros.Users do
   alias Egregoros.Relationship
   alias Egregoros.Repo
   alias Egregoros.User
+  alias Egregoros.VerifiableCredentials.AssertionMethod
   alias EgregorosWeb.Endpoint
 
   def create_user(attrs) do
@@ -30,6 +31,7 @@ defmodule Egregoros.Users do
     base = Endpoint.url() <> "/users/" <> nickname
     {public_key, private_key} = Keys.generate_rsa_keypair()
     {ed25519_public_key, ed25519_private_key} = Keys.generate_ed25519_keypair()
+    assertion_method = assertion_method_from_public_key(base, ed25519_public_key)
 
     create_user(%{
       nickname: nickname,
@@ -38,8 +40,8 @@ defmodule Egregoros.Users do
       outbox: base <> "/outbox",
       public_key: public_key,
       private_key: private_key,
-      ed25519_public_key: ed25519_public_key,
       ed25519_private_key: ed25519_private_key,
+      assertion_method: assertion_method,
       local: true
     })
   end
@@ -68,6 +70,7 @@ defmodule Egregoros.Users do
         base = Endpoint.url() <> "/users/" <> nickname
         {public_key, private_key} = Keys.generate_rsa_keypair()
         {ed25519_public_key, ed25519_private_key} = Keys.generate_ed25519_keypair()
+        assertion_method = assertion_method_from_public_key(base, ed25519_public_key)
 
         create_user(%{
           nickname: nickname,
@@ -76,8 +79,8 @@ defmodule Egregoros.Users do
           outbox: base <> "/outbox",
           public_key: public_key,
           private_key: private_key,
-          ed25519_public_key: ed25519_public_key,
           ed25519_private_key: ed25519_private_key,
+          assertion_method: assertion_method,
           local: true,
           email: email,
           password_hash: Password.hash(password),
@@ -104,6 +107,7 @@ defmodule Egregoros.Users do
         base = Endpoint.url() <> "/users/" <> nickname
         {public_key, private_key} = Keys.generate_rsa_keypair()
         {ed25519_public_key, ed25519_private_key} = Keys.generate_ed25519_keypair()
+        assertion_method = assertion_method_from_public_key(base, ed25519_public_key)
 
         create_user(%{
           nickname: nickname,
@@ -112,8 +116,8 @@ defmodule Egregoros.Users do
           outbox: base <> "/outbox",
           public_key: public_key,
           private_key: private_key,
-          ed25519_public_key: ed25519_public_key,
           ed25519_private_key: ed25519_private_key,
+          assertion_method: assertion_method,
           local: true,
           email: email,
           password_hash: nil,
@@ -218,6 +222,7 @@ defmodule Egregoros.Users do
   defp create_instance_actor(nickname, ap_id) when is_binary(nickname) and is_binary(ap_id) do
     {public_key, private_key} = Keys.generate_rsa_keypair()
     {ed25519_public_key, ed25519_private_key} = Keys.generate_ed25519_keypair()
+    assertion_method = assertion_method_from_public_key(ap_id, ed25519_public_key)
 
     create_user(%{
       nickname: nickname,
@@ -226,24 +231,48 @@ defmodule Egregoros.Users do
       outbox: ap_id <> "/outbox",
       public_key: public_key,
       private_key: private_key,
-      ed25519_public_key: ed25519_public_key,
       ed25519_private_key: ed25519_private_key,
+      assertion_method: assertion_method,
       local: true
     })
   end
 
   defp ensure_instance_ed25519_key(%User{} = user) do
-    if is_binary(user.ed25519_public_key) and is_binary(user.ed25519_private_key) do
-      {:ok, user}
-    else
-      {ed25519_public_key, ed25519_private_key} = Keys.generate_ed25519_keypair()
+    cond do
+      is_binary(user.ed25519_private_key) and not is_nil(user.assertion_method) ->
+        {:ok, user}
 
-      user
-      |> User.changeset(%{
-        ed25519_public_key: ed25519_public_key,
-        ed25519_private_key: ed25519_private_key
-      })
-      |> Repo.update()
+      is_binary(user.ed25519_private_key) ->
+        assertion_method = assertion_method_from_private_key(user.ap_id, user.ed25519_private_key)
+
+        user
+        |> User.changeset(%{assertion_method: assertion_method})
+        |> Repo.update()
+
+      true ->
+        {ed25519_public_key, ed25519_private_key} = Keys.generate_ed25519_keypair()
+        assertion_method = assertion_method_from_public_key(user.ap_id, ed25519_public_key)
+
+        user
+        |> User.changeset(%{
+          ed25519_private_key: ed25519_private_key,
+          assertion_method: assertion_method
+        })
+        |> Repo.update()
+    end
+  end
+
+  defp assertion_method_from_public_key(ap_id, public_key) do
+    case AssertionMethod.from_ed25519_public_key(ap_id, public_key) do
+      {:ok, assertion_method} -> assertion_method
+      _ -> nil
+    end
+  end
+
+  defp assertion_method_from_private_key(ap_id, private_key) do
+    case AssertionMethod.from_ed25519_private_key(ap_id, private_key) do
+      {:ok, assertion_method} -> assertion_method
+      _ -> nil
     end
   end
 

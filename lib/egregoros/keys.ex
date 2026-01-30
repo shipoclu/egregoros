@@ -25,6 +25,14 @@ defmodule Egregoros.Keys do
     :crypto.generate_key(:eddsa, :ed25519)
   end
 
+  def ed25519_public_key_from_private_key(private_key)
+      when is_binary(private_key) and byte_size(private_key) == 32 do
+    {public_key, _private_key} = :crypto.generate_key(:eddsa, :ed25519, private_key)
+    {:ok, public_key}
+  end
+
+  def ed25519_public_key_from_private_key(_private_key), do: {:error, :invalid_ed25519_key}
+
   def ed25519_public_key_multibase(public_key)
       when is_binary(public_key) and byte_size(public_key) == 32 do
     "z" <> base58btc_encode(<<0xED, 0x01>> <> public_key)

@@ -75,10 +75,16 @@ defmodule Egregoros.UsersTest do
     assert user.outbox == user.ap_id <> "/outbox"
     assert String.starts_with?(user.public_key, "-----BEGIN PUBLIC KEY-----")
     assert String.starts_with?(user.private_key, "-----BEGIN PRIVATE KEY-----")
-    assert is_binary(user.ed25519_public_key)
     assert is_binary(user.ed25519_private_key)
-    assert byte_size(user.ed25519_public_key) == 32
     assert byte_size(user.ed25519_private_key) == 32
+    assert is_list(user.assertion_method)
+
+    assert Enum.any?(user.assertion_method, fn method ->
+             method["id"] == user.ap_id <> "#ed25519-key" and
+               method["type"] == "Multikey" and
+               method["controller"] == user.ap_id and
+               is_binary(method["publicKeyMultibase"])
+           end)
   end
 
   test "create_local_user does not grant admin based on nickname" do
@@ -135,8 +141,8 @@ defmodule Egregoros.UsersTest do
       })
 
     assert {:ok, %User{} = updated} = Users.get_or_create_instance_actor(nickname, ap_id)
-    assert is_binary(updated.ed25519_public_key)
     assert is_binary(updated.ed25519_private_key)
+    assert is_list(updated.assertion_method)
   end
 
   test "ap_id is unique" do

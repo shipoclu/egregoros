@@ -12,8 +12,8 @@ defmodule Egregoros.Activities.Update do
   alias Egregoros.ActivityPub.ObjectValidators.Types.Recipients
   alias Egregoros.ActivityPub.TypeNormalizer
   alias Egregoros.Domain
-  alias Egregoros.Federation.Delivery
   alias Egregoros.Federation.Actor
+  alias Egregoros.Federation.Delivery
   alias Egregoros.InboxTargeting
   alias Egregoros.Object
   alias Egregoros.Objects
@@ -21,6 +21,7 @@ defmodule Egregoros.Activities.Update do
   alias Egregoros.Timeline
   alias Egregoros.User
   alias Egregoros.Users
+  alias Egregoros.VerifiableCredentials.AssertionMethod
   alias Egregoros.VerifiableCredentials.DataIntegrity
   alias EgregorosWeb.Endpoint
 
@@ -211,31 +212,86 @@ defmodule Egregoros.Activities.Update do
     if Keyword.get(opts, :local, true) do
       :ok
     else
-      case Users.get_by_ap_id(actor_ap_id) do
-        %User{ed25519_public_key: public_key} when is_binary(public_key) ->
-          case DataIntegrity.verify_proof(object, public_key) do
-            {:ok, true} ->
-              Logger.debug("verified VC proof for Update #{inspect(actor_ap_id)}")
+      verification_method = extract_verification_method(object)
 
-            {:ok, false} ->
-              Logger.warning("failed VC proof verification for Update #{inspect(actor_ap_id)}")
+      if is_binary(verification_method) and String.trim(verification_method) != "" do
+        actor_ap_id
+        |> Users.get_by_ap_id()
+        |> maybe_refresh_assertion_method(actor_ap_id)
+        |> case do
+          %User{assertion_method: assertion_method} when not is_nil(assertion_method) ->
+            case AssertionMethod.find_ed25519_public_key(
+                   assertion_method,
+                   verification_method,
+                   actor_ap_id
+                 ) do
+              {:ok, public_key} ->
+                case DataIntegrity.verify_proof(object, public_key) do
+                  {:ok, true} ->
+                    Logger.debug("verified VC proof for Update #{inspect(actor_ap_id)}")
 
-            {:error, reason} ->
-              Logger.warning(
-                "failed VC proof verification for Update #{inspect(actor_ap_id)}: #{inspect(reason)}"
-              )
-          end
+                  {:ok, false} ->
+                    Logger.warning(
+                      "failed VC proof verification for Update #{inspect(actor_ap_id)}"
+                    )
 
-        %User{} ->
-          Logger.warning("missing ed25519 key for VC proof verification: #{inspect(actor_ap_id)}")
+                  {:error, reason} ->
+                    Logger.warning(
+                      "failed VC proof verification for Update #{inspect(actor_ap_id)}: #{inspect(reason)}"
+                    )
+                end
 
-        _ ->
-          Logger.warning("unknown actor for VC proof verification: #{inspect(actor_ap_id)}")
+              {:error, reason} ->
+                Logger.warning(
+                  "unable to resolve VC verification key for #{inspect(actor_ap_id)}: #{inspect(reason)}"
+                )
+            end
+
+          %User{} ->
+            Logger.warning(
+              "missing assertionMethod for VC proof verification: #{inspect(actor_ap_id)}"
+            )
+
+          _ ->
+            Logger.warning("unknown actor for VC proof verification: #{inspect(actor_ap_id)}")
+        end
+      else
+        if proof_present?(object) do
+          Logger.warning(
+            "missing verificationMethod for VC proof verification: #{inspect(actor_ap_id)}"
+          )
+        end
       end
     end
   end
 
   defp maybe_log_credential_proof(_actor_ap_id, _object, _opts), do: :ok
+
+  defp extract_verification_method(%{"proof" => %{} = proof}) do
+    Map.get(proof, "verificationMethod") || Map.get(proof, :verificationMethod)
+  end
+
+  defp extract_verification_method(%{proof: %{} = proof}) do
+    Map.get(proof, "verificationMethod") || Map.get(proof, :verificationMethod)
+  end
+
+  defp extract_verification_method(_object), do: nil
+
+  defp proof_present?(%{"proof" => _}), do: true
+  defp proof_present?(%{proof: _}), do: true
+  defp proof_present?(_object), do: false
+
+  defp maybe_refresh_assertion_method(%User{assertion_method: nil}, actor_ap_id)
+       when is_binary(actor_ap_id) do
+    case Actor.fetch_and_store(actor_ap_id) do
+      {:ok, %User{} = refreshed} -> refreshed
+      _ -> Users.get_by_ap_id(actor_ap_id)
+    end
+  end
+
+  defp maybe_refresh_assertion_method(%User{} = user, _actor_ap_id), do: user
+
+  defp maybe_refresh_assertion_method(_user, _actor_ap_id), do: nil
 
   defp apply_proof_change(%{} = data, :keep), do: data
   defp apply_proof_change(%{} = data, {:add, proof}), do: Map.put(data, "proof", proof)
