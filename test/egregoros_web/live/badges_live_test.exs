@@ -57,6 +57,14 @@ defmodule EgregorosWeb.BadgesLiveTest do
     assert has_element?(view, "#badge-#{accept.id} [data-role='badge-share']")
   end
 
+  test "badges list shows a copy url button", %{conn: conn, recipient: recipient} do
+    {_offer, accept} = accept_badge_offer(recipient)
+
+    {:ok, view, _html} = live(conn, "/@#{recipient.nickname}/badges")
+
+    assert has_element?(view, "#badge-#{accept.id} [data-role='badge-copy-url']")
+  end
+
   test "sharing a badge shows a toast message", %{conn: conn, recipient: recipient} do
     {_offer, accept} = accept_badge_offer(recipient)
 
@@ -69,6 +77,14 @@ defmodule EgregorosWeb.BadgesLiveTest do
     |> render_click()
 
     assert has_element?(view, "[data-role='toast']", "Badge shared.")
+  end
+
+  test "badge detail shows a copy url button", %{conn: conn, recipient: recipient} do
+    {_offer, accept} = accept_badge_offer(recipient)
+
+    {:ok, view, _html} = live(conn, "/@#{recipient.nickname}/badges/#{accept.id}")
+
+    assert has_element?(view, "[data-role='badge-detail'] [data-role='badge-copy-url']")
   end
 
   defp accept_badge_offer(recipient) do

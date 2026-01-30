@@ -187,6 +187,41 @@ defmodule EgregorosWeb.BadgesLive do
           </section>
         <% end %>
       </AppShell.app_shell>
+      <script :type={Phoenix.LiveView.ColocatedHook} name=".CopyToClipboard">
+        const copyText = (text) => {
+          if (!text) return;
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text);
+            return;
+          }
+          const textarea = document.createElement("textarea");
+          textarea.value = text;
+          textarea.setAttribute("readonly", "");
+          textarea.style.position = "absolute";
+          textarea.style.left = "-9999px";
+          document.body.appendChild(textarea);
+          textarea.select();
+          document.execCommand("copy");
+          document.body.removeChild(textarea);
+        };
+
+        export default {
+          mounted() {
+            this.handleClick = () => {
+              const text = this.el.dataset.copyText || "";
+              if (text) {
+                copyText(text);
+              }
+            };
+            this.el.addEventListener("click", this.handleClick);
+          },
+          destroyed() {
+            if (this.handleClick) {
+              this.el.removeEventListener("click", this.handleClick);
+            }
+          }
+        };
+      </script>
     </Layouts.app>
     """
   end
@@ -258,6 +293,19 @@ defmodule EgregorosWeb.BadgesLive do
           >
             View badge
           </.button>
+          <button
+            :if={is_binary(@badge.credential_ap_id) and @badge.credential_ap_id != ""}
+            id={"#{@id}-copy-url"}
+            type="button"
+            data-role="badge-copy-url"
+            data-copy-text={@badge.credential_ap_id}
+            phx-hook=".CopyToClipboard"
+            class="inline-flex cursor-pointer items-center gap-2 border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-[color:var(--text-primary)] transition hover:bg-[color:var(--bg-muted)]"
+            title="Copy badge URL"
+            aria-label="Copy badge URL"
+          >
+            📋 Copy URL
+          </button>
           <button
             :if={@current_user && is_binary(@badge.credential_id)}
             type="button"
@@ -334,6 +382,19 @@ defmodule EgregorosWeb.BadgesLive do
             >
               All badges
             </.button>
+            <button
+              :if={is_binary(@badge.credential_ap_id) and @badge.credential_ap_id != ""}
+              id={"badge-copy-url-#{@badge.accept.id}"}
+              type="button"
+              data-role="badge-copy-url"
+              data-copy-text={@badge.credential_ap_id}
+              phx-hook=".CopyToClipboard"
+              class="inline-flex cursor-pointer items-center gap-2 border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-[color:var(--text-primary)] transition hover:bg-[color:var(--bg-muted)]"
+              title="Copy badge URL"
+              aria-label="Copy badge URL"
+            >
+              📋 Copy URL
+            </button>
             <button
               :if={@current_user && is_binary(@badge.credential_id)}
               type="button"
