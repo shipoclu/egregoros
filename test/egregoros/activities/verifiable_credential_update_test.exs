@@ -5,11 +5,14 @@ defmodule Egregoros.Activities.VerifiableCredentialUpdateTest do
   alias Egregoros.BadgeDefinition
   alias Egregoros.Badges
   alias Egregoros.Federation.InstanceActor
+  alias Egregoros.Keys
   alias Egregoros.Objects
   alias Egregoros.Pipeline
   alias Egregoros.Repo
   alias Egregoros.Users
+  alias Egregoros.VerifiableCredentials.AssertionMethod
   alias Egregoros.VerifiableCredentials.DataIntegrity
+  alias Egregoros.Activities.VerifiableCredential
 
   @public "https://www.w3.org/ns/activitystreams#Public"
 
@@ -86,6 +89,73 @@ defmodule Egregoros.Activities.VerifiableCredentialUpdateTest do
     refute @public in stored_credential.data["to"]
   end
 
+  test "accepts a remote Update when the embedded proof is valid" do
+    {:ok, recipient} = Users.create_local_user("vc_update_remote_recipient_valid")
+    {:ok, badge} = insert_badge_definition("RemoteUpdateValid")
+
+    {public_key, private_key} = Keys.generate_ed25519_keypair()
+    {:ok, remote_user} = create_remote_user("remote_issuer_valid", public_key)
+
+    {:ok, %Egregoros.Object{} = credential} =
+      insert_remote_credential(badge, remote_user.ap_id, recipient.ap_id)
+
+    updated_credential =
+      credential.data
+      |> Map.put("to", [recipient.ap_id, @public])
+
+    verification_method = remote_user.ap_id <> "#ed25519-key"
+
+    assert {:ok, signed_credential} =
+             DataIntegrity.attach_proof(updated_credential, private_key, %{
+               "verificationMethod" => verification_method,
+               "proofPurpose" => "assertionMethod"
+             })
+
+    update_activity =
+      Update.build(remote_user.ap_id, signed_credential)
+      |> Map.put("id", remote_activity_id(remote_user.ap_id))
+
+    assert {:ok, _update_object} = Pipeline.ingest(update_activity, local: false)
+
+    stored_credential = Objects.get_by_ap_id(credential.ap_id)
+    assert @public in stored_credential.data["to"]
+    assert stored_credential.data["proof"] == signed_credential["proof"]
+  end
+
+  test "rejects a remote Update when the embedded proof is invalid" do
+    {:ok, recipient} = Users.create_local_user("vc_update_remote_recipient_invalid")
+    {:ok, badge} = insert_badge_definition("RemoteUpdateInvalid")
+
+    {public_key, _private_key} = Keys.generate_ed25519_keypair()
+    {:ok, remote_user} = create_remote_user("remote_issuer_invalid", public_key)
+
+    {:ok, %Egregoros.Object{} = credential} =
+      insert_remote_credential(badge, remote_user.ap_id, recipient.ap_id)
+
+    updated_credential =
+      credential.data
+      |> Map.put("to", [recipient.ap_id, @public])
+
+    {_wrong_public, wrong_private} = Keys.generate_ed25519_keypair()
+    verification_method = remote_user.ap_id <> "#ed25519-key"
+
+    assert {:ok, signed_credential} =
+             DataIntegrity.attach_proof(updated_credential, wrong_private, %{
+               "verificationMethod" => verification_method,
+               "proofPurpose" => "assertionMethod"
+             })
+
+    update_activity =
+      Update.build(remote_user.ap_id, signed_credential)
+      |> Map.put("id", remote_activity_id(remote_user.ap_id))
+
+    assert {:error, :invalid} = Pipeline.ingest(update_activity, local: false)
+
+    stored_credential = Objects.get_by_ap_id(credential.ap_id)
+    refute @public in stored_credential.data["to"]
+    refute Map.has_key?(stored_credential.data, "proof")
+  end
+
   defp insert_badge_definition(badge_type) do
     %BadgeDefinition{}
     |> BadgeDefinition.changeset(%{
@@ -96,5 +166,46 @@ defmodule Egregoros.Activities.VerifiableCredentialUpdateTest do
       disabled: false
     })
     |> Repo.insert()
+  end
+
+  defp create_remote_user(nickname, ed25519_public_key)
+       when is_binary(nickname) and is_binary(ed25519_public_key) do
+    {public_key, _private_key} = Keys.generate_rsa_keypair()
+    ap_id = "https://remote.example/users/" <> nickname
+
+    with {:ok, assertion_method} <-
+           AssertionMethod.from_ed25519_public_key(ap_id, ed25519_public_key) do
+      Users.create_user(%{
+        nickname: nickname,
+        ap_id: ap_id,
+        inbox: ap_id <> "/inbox",
+        outbox: ap_id <> "/outbox",
+        public_key: public_key,
+        local: false,
+        assertion_method: assertion_method
+      })
+    end
+  end
+
+  defp insert_remote_credential(%BadgeDefinition{} = badge, issuer_ap_id, recipient_ap_id)
+       when is_binary(issuer_ap_id) and is_binary(recipient_ap_id) do
+    credential_id = "https://remote.example/objects/" <> Ecto.UUID.generate()
+
+    credential =
+      badge
+      |> VerifiableCredential.build_for_badge(issuer_ap_id, recipient_ap_id)
+      |> Map.put("id", credential_id)
+      |> Map.put("issuer", issuer_ap_id)
+
+    Pipeline.ingest(credential, local: false, skip_inbox_target: true)
+  end
+
+  defp remote_activity_id(actor_ap_id) when is_binary(actor_ap_id) do
+    base =
+      actor_ap_id
+      |> String.split("/users/", parts: 2)
+      |> List.first()
+
+    base <> "/activities/update/" <> Ecto.UUID.generate()
   end
 end

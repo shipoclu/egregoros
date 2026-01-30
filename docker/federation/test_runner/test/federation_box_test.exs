@@ -37,7 +37,8 @@ defmodule FederationBoxTest do
     pleroma_base_url = "#{scheme}://#{bob_domain}"
     mastodon_base_url = "#{scheme}://#{carol_domain}"
 
-    session = register_user!(egregoros_base_url, egregoros_domain, alice_nickname, password)
+    _ = register_user!(egregoros_base_url, egregoros_domain, alice_nickname, password)
+    session = login_user!(egregoros_base_url, alice_nickname, password)
 
     redirect_uri = "urn:ietf:wg:oauth:2.0:oob"
     scopes = "read write follow"
@@ -241,6 +242,7 @@ defmodule FederationBoxTest do
     )
   end
 
+  @tag :vc
   test "badge issuance across egregoros instances can be accepted", ctx do
     %{"offer_id" => offer_id, "credential_id" => credential_id} =
       issue_badge!(
@@ -261,6 +263,7 @@ defmodule FederationBoxTest do
     )
   end
 
+  @tag :vc
   test "badge issuance across egregoros instances can be rejected", ctx do
     %{"offer_id" => offer_id, "credential_id" => credential_id} =
       issue_badge!(
@@ -2045,37 +2048,74 @@ defmodule FederationBoxTest do
   defp register_user!(base_url, domain, nickname, password)
        when is_binary(base_url) and is_binary(domain) and is_binary(nickname) and
               is_binary(password) do
+    wait_until!(
+      fn ->
+        case register_user_once(base_url, domain, nickname, password) do
+          {:ok, _jar} -> {:ok, :ok}
+          :already_registered -> {:ok, :ok}
+          _ -> false
+        end
+      end,
+      "register ready #{nickname}@#{base_url}"
+    )
+  end
+
+  defp register_user_once(base_url, domain, nickname, password)
+       when is_binary(base_url) and is_binary(domain) and is_binary(nickname) and
+              is_binary(password) do
     {html, jar} = get_html!(base_url, "/register", %{})
-    csrf_token = extract_csrf_token!(html)
 
-    {_, jar} =
-      post_form!(base_url, "/register", jar, csrf_token, [
-        {"registration[nickname]", nickname},
-        {"registration[email]", "#{nickname}@#{domain}"},
-        {"registration[password]", password},
-        {"registration[return_to]", "/"}
-      ])
-
-    %{cookie_jar: jar}
+    with {:ok, csrf_token} <- extract_csrf_token(html),
+         {resp, jar} <-
+           post_form_response!(base_url, "/register", jar, csrf_token, [
+             {"registration[nickname]", nickname},
+             {"registration[email]", "#{nickname}@#{domain}"},
+             {"registration[password]", password},
+             {"registration[return_to]", "/"}
+           ]) do
+      cond do
+        resp.status in 200..399 -> {:ok, jar}
+        resp.status == 422 -> :already_registered
+        true -> {:error, :registration_failed}
+      end
+    else
+      _ -> {:error, :registration_failed}
+    end
+  rescue
+    _ -> {:error, :registration_failed}
   end
 
   defp login_user!(base_url, nickname, password)
        when is_binary(base_url) and is_binary(nickname) and is_binary(password) do
+    wait_until!(
+      fn ->
+        case login_user_once(base_url, nickname, password) do
+          {:ok, session} -> {:ok, session}
+          _ -> false
+        end
+      end,
+      "login ready #{nickname}@#{base_url}"
+    )
+  end
+
+  defp login_user_once(base_url, nickname, password)
+       when is_binary(base_url) and is_binary(nickname) and is_binary(password) do
     {html, jar} = get_html!(base_url, "/login", %{})
-    csrf_token = extract_csrf_token!(html)
 
-    {resp, jar} =
-      post_form_response!(base_url, "/login", jar, csrf_token, [
-        {"session[nickname]", nickname},
-        {"session[password]", password},
-        {"session[return_to]", "/"}
-      ])
-
-    if resp.status not in 300..399 do
-      raise("login failed for #{nickname} (status #{resp.status})")
+    with {:ok, csrf_token} <- extract_csrf_token(html),
+         {resp, jar} <-
+           post_form_response!(base_url, "/login", jar, csrf_token, [
+             {"session[nickname]", nickname},
+             {"session[password]", password},
+             {"session[return_to]", "/"}
+           ]),
+         true <- resp.status in 300..399 do
+      {:ok, %{cookie_jar: jar}}
+    else
+      _ -> {:error, :login_failed}
     end
-
-    %{cookie_jar: jar}
+  rescue
+    _ -> {:error, :login_failed}
   end
 
   defp create_oauth_app!(base_url, scopes) when is_binary(base_url) and is_binary(scopes) do
@@ -2101,6 +2141,20 @@ defmodule FederationBoxTest do
   defp authorize_oauth_app!(base_url, %{cookie_jar: jar}, client_id, redirect_uri, scopes)
        when is_binary(base_url) and is_binary(client_id) and is_binary(redirect_uri) and
               is_binary(scopes) do
+    wait_until!(
+      fn ->
+        case authorize_oauth_app_once(base_url, jar, client_id, redirect_uri, scopes) do
+          {:ok, code} -> {:ok, code}
+          _ -> false
+        end
+      end,
+      "oauth authorize ready #{base_url}"
+    )
+  end
+
+  defp authorize_oauth_app_once(base_url, jar, client_id, redirect_uri, scopes)
+       when is_binary(base_url) and is_map(jar) and is_binary(client_id) and
+              is_binary(redirect_uri) and is_binary(scopes) do
     query =
       URI.encode_query(%{
         "client_id" => client_id,
@@ -2111,18 +2165,22 @@ defmodule FederationBoxTest do
       })
 
     {html, jar} = get_html!(base_url, "/oauth/authorize?" <> query, jar)
-    csrf_token = extract_csrf_token!(html)
 
-    {authorized_html, _jar} =
-      post_form!(base_url, "/oauth/authorize", jar, csrf_token, [
-        {"oauth[client_id]", client_id},
-        {"oauth[redirect_uri]", redirect_uri},
-        {"oauth[response_type]", "code"},
-        {"oauth[scope]", scopes},
-        {"oauth[state]", ""}
-      ])
-
-    extract_oauth_code!(authorized_html)
+    with {:ok, csrf_token} <- extract_csrf_token(html),
+         {authorized_html, _jar} <-
+           post_form!(base_url, "/oauth/authorize", jar, csrf_token, [
+             {"oauth[client_id]", client_id},
+             {"oauth[redirect_uri]", redirect_uri},
+             {"oauth[response_type]", "code"},
+             {"oauth[scope]", scopes},
+             {"oauth[state]", ""}
+           ]) do
+      {:ok, extract_oauth_code!(authorized_html)}
+    else
+      _ -> {:error, :oauth_failed}
+    end
+  rescue
+    _ -> {:error, :oauth_failed}
   end
 
   defp authorize_rails_oauth_app!(base_url, %{cookie_jar: jar}, client_id, redirect_uri, scopes)
@@ -2606,6 +2664,13 @@ defmodule FederationBoxTest do
     case Regex.run(~r/<meta\s+name=\"csrf-token\"\s+content=\"([^\"]+)\"/i, html) do
       [_, token] -> token
       _ -> raise("csrf token not found")
+    end
+  end
+
+  defp extract_csrf_token(html) when is_binary(html) do
+    case Regex.run(~r/<meta\s+name=\"csrf-token\"\s+content=\"([^\"]+)\"/i, html) do
+      [_, token] -> {:ok, token}
+      _ -> :error
     end
   end
 

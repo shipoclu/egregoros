@@ -14,14 +14,14 @@ https://egregoros.test {
 }
 
 http://egregoros2.test {
-  reverse_proxy egregoros_web_2:4000 {
+  reverse_proxy egregoros2_web:4000 {
     header_up X-Forwarded-Proto https
   }
 }
 
 https://egregoros2.test {
   tls internal
-  reverse_proxy egregoros_web_2:4000
+  reverse_proxy egregoros2_web:4000
 }
 
 http://pleroma.test {

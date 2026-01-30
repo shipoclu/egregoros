@@ -116,7 +116,7 @@ services:
   egregoros2_web:
     build:
       context: ../..
-    image: egregoros-fedbox
+    image: egregoros-fedbox-2
     restart: unless-stopped
     depends_on:
       egregoros2_db:

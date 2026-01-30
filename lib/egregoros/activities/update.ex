@@ -79,7 +79,7 @@ defmodule Egregoros.Activities.Update do
   def ingest(activity, opts) do
     with :ok <- validate_inbox_target(activity, opts),
          :ok <- validate_object_namespace(activity, opts),
-         :ok <- validate_credential_update(activity) do
+         :ok <- validate_credential_update(activity, opts) do
       activity
       |> to_object_attrs(opts)
       |> Objects.upsert_object()
@@ -181,8 +181,6 @@ defmodule Egregoros.Activities.Update do
          true <- issuer_id == actor_ap_id,
          {:ok, updated_to, _added_public?, proof_change} <-
            public_update_allowed?(existing.data, object) do
-      _ = maybe_log_credential_proof(actor_ap_id, object, opts)
-
       updated_data =
         existing.data
         |> Map.put("to", updated_to)
@@ -208,64 +206,89 @@ defmodule Egregoros.Activities.Update do
 
   defp maybe_apply_credential_update(_actor_ap_id, _object, _opts), do: :ok
 
-  defp maybe_log_credential_proof(actor_ap_id, %{} = object, opts) when is_list(opts) do
+  defp verify_credential_proof(activity, %{} = object, opts) when is_list(opts) do
     if Keyword.get(opts, :local, true) do
       :ok
     else
-      verification_method = extract_verification_method(object)
+      if proof_present?(object) do
+        actor_ap_id =
+          Map.get(activity, "actor") || Map.get(activity, :actor) || credential_issuer_id(object)
 
-      if is_binary(verification_method) and String.trim(verification_method) != "" do
-        actor_ap_id
-        |> Users.get_by_ap_id()
-        |> maybe_refresh_assertion_method(actor_ap_id)
-        |> case do
-          %User{assertion_method: assertion_method} when not is_nil(assertion_method) ->
-            case AssertionMethod.find_ed25519_public_key(
-                   assertion_method,
-                   verification_method,
-                   actor_ap_id
-                 ) do
-              {:ok, public_key} ->
-                case DataIntegrity.verify_proof(object, public_key) do
-                  {:ok, true} ->
-                    Logger.debug("verified VC proof for Update #{inspect(actor_ap_id)}")
+        verification_method = extract_verification_method(object)
 
-                  {:ok, false} ->
-                    Logger.warning(
-                      "failed VC proof verification for Update #{inspect(actor_ap_id)}"
-                    )
+        cond do
+          not is_binary(actor_ap_id) or String.trim(actor_ap_id) == "" ->
+            Logger.warning("missing actor for VC proof verification")
+            {:error, :invalid}
+
+          not is_binary(verification_method) or String.trim(verification_method) == "" ->
+            Logger.warning(
+              "missing verificationMethod for VC proof verification: #{inspect(actor_ap_id)}"
+            )
+
+            {:error, :invalid}
+
+          true ->
+            actor_ap_id = String.trim(actor_ap_id)
+
+            actor_ap_id
+            |> Users.get_by_ap_id()
+            |> maybe_refresh_assertion_method(actor_ap_id)
+            |> case do
+              %User{assertion_method: assertion_method} when not is_nil(assertion_method) ->
+                case AssertionMethod.find_ed25519_public_key(
+                       assertion_method,
+                       verification_method,
+                       actor_ap_id
+                     ) do
+                  {:ok, public_key} ->
+                    case DataIntegrity.verify_proof(object, public_key) do
+                      {:ok, true} ->
+                        Logger.debug("verified VC proof for Update #{inspect(actor_ap_id)}")
+                        :ok
+
+                      {:ok, false} ->
+                        Logger.warning(
+                          "failed VC proof verification for Update #{inspect(actor_ap_id)}"
+                        )
+
+                        {:error, :invalid}
+
+                      {:error, reason} ->
+                        Logger.warning(
+                          "failed VC proof verification for Update #{inspect(actor_ap_id)}: #{inspect(reason)}"
+                        )
+
+                        {:error, :invalid}
+                    end
 
                   {:error, reason} ->
                     Logger.warning(
-                      "failed VC proof verification for Update #{inspect(actor_ap_id)}: #{inspect(reason)}"
+                      "unable to resolve VC verification key for #{inspect(actor_ap_id)}: #{inspect(reason)}"
                     )
+
+                    {:error, :invalid}
                 end
 
-              {:error, reason} ->
+              %User{} ->
                 Logger.warning(
-                  "unable to resolve VC verification key for #{inspect(actor_ap_id)}: #{inspect(reason)}"
+                  "missing assertionMethod for VC proof verification: #{inspect(actor_ap_id)}"
                 )
+
+                {:error, :invalid}
+
+              _ ->
+                Logger.warning("unknown actor for VC proof verification: #{inspect(actor_ap_id)}")
+                {:error, :invalid}
             end
-
-          %User{} ->
-            Logger.warning(
-              "missing assertionMethod for VC proof verification: #{inspect(actor_ap_id)}"
-            )
-
-          _ ->
-            Logger.warning("unknown actor for VC proof verification: #{inspect(actor_ap_id)}")
         end
       else
-        if proof_present?(object) do
-          Logger.warning(
-            "missing verificationMethod for VC proof verification: #{inspect(actor_ap_id)}"
-          )
-        end
+        :ok
       end
     end
   end
 
-  defp maybe_log_credential_proof(_actor_ap_id, _object, _opts), do: :ok
+  defp verify_credential_proof(_activity, _object, _opts), do: :ok
 
   defp extract_verification_method(%{"proof" => %{} = proof}) do
     Map.get(proof, "verificationMethod") || Map.get(proof, :verificationMethod)
@@ -290,6 +313,13 @@ defmodule Egregoros.Activities.Update do
   end
 
   defp maybe_refresh_assertion_method(%User{} = user, _actor_ap_id), do: user
+
+  defp maybe_refresh_assertion_method(nil, actor_ap_id) when is_binary(actor_ap_id) do
+    case Actor.fetch_and_store(actor_ap_id) do
+      {:ok, %User{} = refreshed} -> refreshed
+      _ -> Users.get_by_ap_id(actor_ap_id)
+    end
+  end
 
   defp maybe_refresh_assertion_method(_user, _actor_ap_id), do: nil
 
@@ -375,26 +405,25 @@ defmodule Egregoros.Activities.Update do
 
   defp validate_object_namespace_id(_id, _opts), do: :ok
 
-  defp validate_credential_update(%{"object" => %{} = object}) do
+  defp validate_credential_update(%{"object" => %{} = object} = activity, opts)
+       when is_list(opts) do
     if TypeNormalizer.primary_type(object) == "VerifiableCredential" do
       credential_id = Map.get(object, "id") || Map.get(object, :id)
 
-      case Objects.get_by_ap_id(credential_id) do
-        %Object{data: %{} = existing_data} ->
-          case public_update_allowed?(existing_data, object) do
-            {:ok, _updated_to, _added_public?, _proof_change} -> :ok
-            _ -> {:error, :invalid}
-          end
-
-        _ ->
-          {:error, :invalid}
+      with %Object{data: %{} = existing_data} <- Objects.get_by_ap_id(credential_id),
+           {:ok, _updated_to, _added_public?, _proof_change} <-
+             public_update_allowed?(existing_data, object),
+           :ok <- verify_credential_proof(activity, object, opts) do
+        :ok
+      else
+        _ -> {:error, :invalid}
       end
     else
       :ok
     end
   end
 
-  defp validate_credential_update(_activity), do: :ok
+  defp validate_credential_update(_activity, _opts), do: :ok
 
   defp local_ap_id?(id) when is_binary(id) do
     local_domain =
