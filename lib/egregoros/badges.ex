@@ -66,6 +66,19 @@ defmodule Egregoros.Badges do
 
   def issue_badge(_badge_type, _recipient_ap_id, _opts), do: {:error, :invalid_badge}
 
+  def badge_share_flash_message(%User{} = user, post_id) when is_binary(post_id) do
+    with %Object{type: "VerifiableCredential", ap_id: ap_id} <- Objects.get(post_id) do
+      case Relationships.get_by_type_actor_object("Announce", user.ap_id, ap_id) do
+        %{} -> "Badge shared."
+        _ -> "Badge unshared."
+      end
+    else
+      _ -> nil
+    end
+  end
+
+  def badge_share_flash_message(_user, _post_id), do: nil
+
   def update_definition(%BadgeDefinition{} = badge, params) when is_map(params) do
     {upload, params} = Map.pop(params, "image")
     {upload, params} = if is_nil(upload), do: Map.pop(params, :image), else: {upload, params}

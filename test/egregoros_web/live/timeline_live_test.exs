@@ -1179,6 +1179,32 @@ defmodule EgregorosWeb.TimelineLiveTest do
     assert has_element?(view, "#post-#{note.id} button[data-role='repost']", "Unrepost")
   end
 
+  test "sharing a badge from the timeline shows a toast message", %{conn: conn, user: user} do
+    {:ok, issuer} = Users.create_local_user("badge_issuer")
+
+    credential =
+      Fixtures.json!("openbadge_vc.json")
+      |> Map.put("issuer", issuer.ap_id)
+      |> Map.put("to", ["https://www.w3.org/ns/activitystreams#Public"])
+      |> put_in(["credentialSubject", "id"], user.ap_id)
+
+    assert {:ok, credential_object} = Pipeline.ingest(credential, local: true)
+
+    assert {:ok, announce} =
+             Pipeline.ingest(Announce.build(issuer, credential_object), local: true)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/?timeline=public")
+
+    assert has_element?(view, "#post-#{announce.id} [data-role='badge-share']")
+
+    view
+    |> element("#post-#{announce.id} [data-role='badge-share']")
+    |> render_click()
+
+    assert has_element?(view, "[data-role='toast']", "Badge shared.")
+  end
+
   test "reacting to a post creates an EmojiReact activity", %{conn: conn, user: user} do
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     {:ok, view, _html} = live(conn, "/")

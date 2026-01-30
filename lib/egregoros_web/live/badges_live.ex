@@ -3,11 +3,11 @@ defmodule EgregorosWeb.BadgesLive do
 
   alias Egregoros.ActivityPub.TypeNormalizer
   alias Egregoros.Activities.Helpers, as: ActivityHelpers
+  alias Egregoros.Badges
   alias Egregoros.Interactions
   alias Egregoros.Notifications
   alias Egregoros.Object
   alias Egregoros.Objects
-  alias Egregoros.Relationships
   alias Egregoros.User
   alias Egregoros.Users
   alias EgregorosWeb.ProfilePaths
@@ -71,7 +71,7 @@ defmodule EgregorosWeb.BadgesLive do
         case Interactions.toggle_repost(user, post_id) do
           {:ok, _} ->
             socket =
-              case badge_share_flash_message(user, post_id) do
+              case Badges.badge_share_flash_message(user, post_id) do
                 message when is_binary(message) and message != "" ->
                   put_flash(socket, :info, message)
 
@@ -495,19 +495,6 @@ defmodule EgregorosWeb.BadgesLive do
   end
 
   defp badge_entry_from_credential(_credential, _user), do: nil
-
-  defp badge_share_flash_message(%User{} = user, post_id) when is_binary(post_id) do
-    with %Object{type: "VerifiableCredential", ap_id: ap_id} <- Objects.get(post_id) do
-      case Relationships.get_by_type_actor_object("Announce", user.ap_id, ap_id) do
-        %{} -> "Badge shared."
-        _ -> "Badge unshared."
-      end
-    else
-      _ -> nil
-    end
-  end
-
-  defp badge_share_flash_message(_user, _post_id), do: nil
 
   defp offer_data_from_accept(%Object{} = accept) do
     cond do

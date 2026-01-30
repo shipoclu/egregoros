@@ -5,6 +5,7 @@ defmodule EgregorosWeb.StatusLive do
   alias Egregoros.Domain
   alias Egregoros.Federation.ThreadDiscovery
   alias Egregoros.Workers.RefreshPoll
+  alias Egregoros.Badges
   alias Egregoros.Interactions
   alias Egregoros.Media
   alias Egregoros.MediaStorage
@@ -350,7 +351,22 @@ defmodule EgregorosWeb.StatusLive do
 
     with %User{} = user <- socket.assigns.current_user,
          true <- flake_id?(post_id) do
-      _ = Interactions.toggle_repost(user, post_id)
+      result = Interactions.toggle_repost(user, post_id)
+
+      socket =
+        case result do
+          {:ok, _} ->
+            case Badges.badge_share_flash_message(user, post_id) do
+              message when is_binary(message) and message != "" ->
+                put_flash(socket, :info, message)
+
+              _ ->
+                socket
+            end
+
+          _ ->
+            socket
+        end
 
       {:noreply, refresh_thread(socket)}
     else

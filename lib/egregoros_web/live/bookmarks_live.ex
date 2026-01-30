@@ -3,6 +3,7 @@ defmodule EgregorosWeb.BookmarksLive do
 
   import Ecto.Query, only: [from: 2]
 
+  alias Egregoros.Badges
   alias Egregoros.Interactions
   alias Egregoros.Media
   alias Egregoros.MediaStorage
@@ -313,7 +314,23 @@ defmodule EgregorosWeb.BookmarksLive do
 
     with %User{} = user <- socket.assigns.current_user,
          true <- flake_id?(post_id) do
-      _ = Interactions.toggle_repost(user, post_id)
+      result = Interactions.toggle_repost(user, post_id)
+
+      socket =
+        case result do
+          {:ok, _} ->
+            case Badges.badge_share_flash_message(user, post_id) do
+              message when is_binary(message) and message != "" ->
+                put_flash(socket, :info, message)
+
+              _ ->
+                socket
+            end
+
+          _ ->
+            socket
+        end
+
       {:noreply, refresh_post(socket, post_id)}
     else
       nil ->
