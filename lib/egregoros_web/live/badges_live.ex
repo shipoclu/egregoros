@@ -210,7 +210,7 @@ defmodule EgregorosWeb.BadgesLive do
                 data-role="badge-image"
                 src={@badge.image_url}
                 alt={@badge.title || "Badge"}
-                class="h-full w-full object-cover"
+                class="h-full w-full object-contain"
                 loading="lazy"
               />
             <% else %>
@@ -287,7 +287,7 @@ defmodule EgregorosWeb.BadgesLive do
               data-role="badge-image"
               src={@badge.image_url}
               alt={@badge.title || "Badge"}
-              class="h-full w-full object-cover"
+              class="h-full w-full object-contain"
               loading="lazy"
             />
           <% else %>
