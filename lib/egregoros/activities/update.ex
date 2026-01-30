@@ -3,6 +3,8 @@ defmodule Egregoros.Activities.Update do
 
   import Ecto.Changeset
 
+  require Logger
+
   alias Egregoros.Activities.Helpers
   alias Egregoros.Activities.Note
   alias Egregoros.ActivityPub.ObjectValidators.Types.DateTime, as: APDateTime
@@ -19,6 +21,7 @@ defmodule Egregoros.Activities.Update do
   alias Egregoros.Timeline
   alias Egregoros.User
   alias Egregoros.Users
+  alias Egregoros.VerifiableCredentials.DataIntegrity
   alias EgregorosWeb.Endpoint
 
   @actor_types ~w(Person Service Organization Group Application)
@@ -175,8 +178,14 @@ defmodule Egregoros.Activities.Update do
          %Object{} = existing <- Objects.get_by_ap_id(credential_id),
          issuer_id when is_binary(issuer_id) <- issuer_id,
          true <- issuer_id == actor_ap_id,
-         {:ok, updated_to, _added_public?} <- public_update_allowed?(existing.data, object) do
-      updated_data = Map.put(existing.data, "to", updated_to)
+         {:ok, updated_to, _added_public?, proof_change} <-
+           public_update_allowed?(existing.data, object) do
+      _ = maybe_log_credential_proof(actor_ap_id, object, opts)
+
+      updated_data =
+        existing.data
+        |> Map.put("to", updated_to)
+        |> apply_proof_change(proof_change)
 
       attrs = %{
         ap_id: existing.ap_id,
@@ -197,6 +206,41 @@ defmodule Egregoros.Activities.Update do
   end
 
   defp maybe_apply_credential_update(_actor_ap_id, _object, _opts), do: :ok
+
+  defp maybe_log_credential_proof(actor_ap_id, %{} = object, opts) when is_list(opts) do
+    if Keyword.get(opts, :local, true) do
+      :ok
+    else
+      case Users.get_by_ap_id(actor_ap_id) do
+        %User{ed25519_public_key: public_key} when is_binary(public_key) ->
+          case DataIntegrity.verify_proof(object, public_key) do
+            {:ok, true} ->
+              Logger.debug("verified VC proof for Update #{inspect(actor_ap_id)}")
+
+            {:ok, false} ->
+              Logger.warning("failed VC proof verification for Update #{inspect(actor_ap_id)}")
+
+            {:error, reason} ->
+              Logger.warning(
+                "failed VC proof verification for Update #{inspect(actor_ap_id)}: #{inspect(reason)}"
+              )
+          end
+
+        %User{} ->
+          Logger.warning("missing ed25519 key for VC proof verification: #{inspect(actor_ap_id)}")
+
+        _ ->
+          Logger.warning("unknown actor for VC proof verification: #{inspect(actor_ap_id)}")
+      end
+    end
+  end
+
+  defp maybe_log_credential_proof(_actor_ap_id, _object, _opts), do: :ok
+
+  defp apply_proof_change(%{} = data, :keep), do: data
+  defp apply_proof_change(%{} = data, {:add, proof}), do: Map.put(data, "proof", proof)
+  defp apply_proof_change(%{} = data, {:replace, proof}), do: Map.put(data, "proof", proof)
+  defp apply_proof_change(data, _), do: data
 
   defp deliver_update(%Object{} = update_object, _opts) do
     with %User{} = actor <- Users.get_by_ap_id(update_object.actor),
@@ -282,7 +326,7 @@ defmodule Egregoros.Activities.Update do
       case Objects.get_by_ap_id(credential_id) do
         %Object{data: %{} = existing_data} ->
           case public_update_allowed?(existing_data, object) do
-            {:ok, _updated_to, _added_public?} -> :ok
+            {:ok, _updated_to, _added_public?, _proof_change} -> :ok
             _ -> {:error, :invalid}
           end
 
@@ -430,11 +474,39 @@ defmodule Egregoros.Activities.Update do
 
   defp credential_issuer_id(_object), do: nil
 
+  defp pop_proof(%{} = data) do
+    proof = Map.get(data, "proof") || Map.get(data, :proof)
+    {proof, Map.drop(data, ["proof", :proof])}
+  end
+
+  defp pop_proof(data), do: {nil, data}
+
   defp public_update_allowed?(%{} = existing, %{} = updated) do
     existing_without_to = Map.drop(existing, ["to", :to])
     updated_without_to = Map.drop(updated, ["to", :to])
 
-    if existing_without_to != updated_without_to do
+    {existing_proof, existing_payload} = pop_proof(existing_without_to)
+    {updated_proof, updated_payload} = pop_proof(updated_without_to)
+
+    proof_change =
+      cond do
+        existing_proof == updated_proof ->
+          :keep
+
+        is_nil(existing_proof) and is_map(updated_proof) ->
+          {:add, updated_proof}
+
+        is_map(existing_proof) and is_map(updated_proof) ->
+          :invalid
+
+        is_map(existing_proof) and is_nil(updated_proof) ->
+          :invalid
+
+        true ->
+          :invalid
+      end
+
+    if existing_payload != updated_payload or proof_change == :invalid do
       {:error, :invalid}
     else
       existing_to = normalize_recipients(Map.get(existing, "to") || Map.get(existing, :to))
@@ -447,7 +519,7 @@ defmodule Egregoros.Activities.Update do
         added = MapSet.difference(updated_set, existing_set) |> MapSet.to_list()
 
         if added == [] or added == [@as_public] do
-          {:ok, updated_to, @as_public in added}
+          {:ok, updated_to, @as_public in added, proof_change}
         else
           {:error, :invalid}
         end

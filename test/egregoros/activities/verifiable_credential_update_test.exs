@@ -9,6 +9,7 @@ defmodule Egregoros.Activities.VerifiableCredentialUpdateTest do
   alias Egregoros.Pipeline
   alias Egregoros.Repo
   alias Egregoros.Users
+  alias Egregoros.VerifiableCredentials.DataIntegrity
 
   @public "https://www.w3.org/ns/activitystreams#Public"
 
@@ -32,6 +33,35 @@ defmodule Egregoros.Activities.VerifiableCredentialUpdateTest do
 
     stored_credential = Objects.get_by_ap_id(credential.ap_id)
     assert @public in stored_credential.data["to"]
+  end
+
+  test "accepts an Update that adds a cryptographic proof alongside Public" do
+    {:ok, recipient} = Users.create_local_user("vc_update_proof_recipient")
+    {:ok, _badge} = insert_badge_definition("UpdateWithProof")
+    {:ok, instance_actor} = InstanceActor.get_actor()
+
+    assert {:ok, %{credential: credential}} =
+             Badges.issue_badge("UpdateWithProof", recipient.ap_id)
+
+    updated_credential =
+      credential.data
+      |> Map.put("to", [recipient.ap_id, @public])
+
+    verification_method = instance_actor.ap_id <> "#ed25519-key"
+
+    assert {:ok, signed_credential} =
+             DataIntegrity.attach_proof(updated_credential, instance_actor.ed25519_private_key, %{
+               "verificationMethod" => verification_method,
+               "proofPurpose" => "assertionMethod"
+             })
+
+    update_activity = Update.build(instance_actor, signed_credential)
+
+    assert {:ok, _update_object} = Pipeline.ingest(update_activity, local: true)
+
+    stored_credential = Objects.get_by_ap_id(credential.ap_id)
+    assert @public in stored_credential.data["to"]
+    assert stored_credential.data["proof"] == signed_credential["proof"]
   end
 
   test "rejects an Update that changes credential content beyond adding Public" do

@@ -3,6 +3,8 @@ defmodule Egregoros.Activities.Accept do
 
   import Ecto.Changeset
 
+  require Logger
+
   alias Egregoros.Activities.Helpers
   alias Egregoros.Activities.Update
   alias Egregoros.Pipeline
@@ -17,6 +19,7 @@ defmodule Egregoros.Activities.Accept do
   alias Egregoros.Relationships
   alias Egregoros.User
   alias Egregoros.Users
+  alias Egregoros.VerifiableCredentials.DataIntegrity
   alias Egregoros.Workers.RefreshRemoteFollowingGraph
   alias EgregorosWeb.Endpoint
 
@@ -191,7 +194,10 @@ defmodule Egregoros.Activities.Accept do
          {:ok, updated_to, added_public?} <- publicize_recipients(credential.data),
          true <- added_public?,
          %User{local: true} = issuer <- Users.get_by_ap_id(credential.actor) do
-      updated_data = Map.put(credential.data, "to", updated_to)
+      updated_data =
+        credential.data
+        |> Map.put("to", updated_to)
+        |> maybe_attach_credential_proof(issuer)
 
       attrs = %{
         ap_id: credential.ap_id,
@@ -218,6 +224,29 @@ defmodule Egregoros.Activities.Accept do
   end
 
   defp maybe_publicize_offer_credential(_accept_object), do: :ok
+
+  defp maybe_attach_credential_proof(%{} = credential_data, %User{} = issuer) do
+    if Map.has_key?(credential_data, "proof") or Map.has_key?(credential_data, :proof) do
+      credential_data
+    else
+      verification_method = issuer.ap_id <> "#ed25519-key"
+
+      case DataIntegrity.attach_proof(credential_data, issuer.ed25519_private_key, %{
+             "verificationMethod" => verification_method,
+             "proofPurpose" => "assertionMethod"
+           }) do
+        {:ok, signed} ->
+          signed
+
+        {:error, reason} ->
+          Logger.warning("failed to attach VC proof for #{issuer.ap_id}: #{inspect(reason)}")
+
+          credential_data
+      end
+    end
+  end
+
+  defp maybe_attach_credential_proof(credential_data, _issuer), do: credential_data
 
   defp credential_object_from_offer(%Object{data: %{"object" => %{} = embedded}}) do
     credential_id = Map.get(embedded, "id") || Map.get(embedded, :id)

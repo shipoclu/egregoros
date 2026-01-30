@@ -29,6 +29,7 @@ defmodule Egregoros.BadgesTest do
     assert credential.actor == instance_actor.ap_id
     assert credential.data["issuer"] == instance_actor.ap_id
     assert credential.data["credentialSubject"]["id"] == recipient.ap_id
+    refute Map.has_key?(credential.data, "proof")
 
     assert credential.data["credentialSubject"]["achievement"]["id"] ==
              Endpoint.url() <> "/badges/" <> badge.id
@@ -58,6 +59,11 @@ defmodule Egregoros.BadgesTest do
     assert %Egregoros.Object{} = updated_credential
 
     assert "https://www.w3.org/ns/activitystreams#Public" in updated_credential.data["to"]
+
+    assert %{"proofValue" => proof_value, "cryptosuite" => "eddsa-jcs-2022"} =
+             updated_credential.data["proof"]
+
+    assert is_binary(proof_value)
 
     assert %Egregoros.Object{} =
              Objects.get_by_type_actor_object(
