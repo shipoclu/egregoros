@@ -106,6 +106,54 @@ defmodule EgregorosWeb.MastodonAPI.StatusRendererTest do
            ] = rendered["emojis"]
   end
 
+  test "renders verifiable credentials with a badge message and image" do
+    {:ok, issuer} = Users.create_local_user("badge_issuer")
+    {:ok, recipient} = Users.create_local_user("badge_recipient")
+
+    badge_image = "https://cdn.example/badges/test.png"
+
+    {:ok, credential} =
+      Objects.create_object(%{
+        ap_id: Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
+        type: "VerifiableCredential",
+        actor: issuer.ap_id,
+        local: true,
+        data: %{
+          "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
+          "type" => ["VerifiableCredential", "OpenBadgeCredential"],
+          "issuer" => issuer.ap_id,
+          "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+          "validFrom" => "2026-01-29T00:00:00Z",
+          "credentialSubject" => %{
+            "id" => recipient.ap_id,
+            "type" => "AchievementSubject",
+            "achievement" => %{
+              "id" => Endpoint.url() <> "/badges/test",
+              "type" => "Achievement",
+              "name" => "Contributor",
+              "description" => "Awarded for supporting the community.",
+              "criteria" => %{"narrative" => "Contributed to the project."},
+              "image" => %{"id" => badge_image, "type" => "Image"}
+            }
+          }
+        }
+      })
+
+    rendered = StatusRenderer.render_status(credential, issuer)
+
+    assert rendered["content"] =~ "badge_issuer"
+    assert rendered["content"] =~ "badge_recipient"
+    assert rendered["content"] =~ "Contributor"
+
+    assert [
+             %{
+               "type" => "image",
+               "url" => ^badge_image
+             }
+             | _rest
+           ] = rendered["media_attachments"]
+  end
+
   test "renders announces as reblogs" do
     {:ok, alice} = Users.create_local_user("alice")
     {:ok, bob} = Users.create_local_user("bob")
