@@ -57,6 +57,20 @@ defmodule EgregorosWeb.BadgesLiveTest do
     assert has_element?(view, "#badge-#{accept.id} [data-role='badge-share']")
   end
 
+  test "sharing a badge shows a toast message", %{conn: conn, recipient: recipient} do
+    {_offer, accept} = accept_badge_offer(recipient)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: recipient.id})
+
+    {:ok, view, _html} = live(conn, "/@#{recipient.nickname}/badges")
+
+    view
+    |> element("#badge-#{accept.id} [data-role='badge-share']")
+    |> render_click()
+
+    assert has_element?(view, "[data-role='toast']", "Badge shared.")
+  end
+
   defp accept_badge_offer(recipient) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
