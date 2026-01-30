@@ -10,6 +10,11 @@ defmodule EgregorosWeb.Components.NotificationItems.OfferNotification do
   attr :entry, :map, required: true
 
   def offer_notification(assigns) do
+    assigns =
+      assign_new(assigns, :actor_ap_id, fn ->
+        Map.get(assigns.entry.actor || %{}, :ap_id)
+      end)
+
     ~H"""
     <article
       id={@id}
@@ -33,12 +38,12 @@ defmodule EgregorosWeb.Components.NotificationItems.OfferNotification do
               {@entry.actor.handle}
             </p>
 
-            <%= if is_binary(@entry.actor.ap_id) and @entry.actor.ap_id != "" do %>
+            <%= if is_binary(@actor_ap_id) and @actor_ap_id != "" do %>
               <p
                 data-role="offer-issuer-ap-id"
                 class="mt-0.5 font-mono text-xs text-[color:var(--text-muted)]"
               >
-                {@entry.actor.ap_id}
+                {@actor_ap_id}
               </p>
             <% end %>
 
