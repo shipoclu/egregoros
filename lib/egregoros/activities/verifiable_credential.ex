@@ -175,8 +175,7 @@ defmodule Egregoros.Activities.VerifiableCredential do
     credential = %{
       "@context" => [
         "https://www.w3.org/ns/credentials/v2",
-        "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json",
-        "https://www.w3.org/ns/activitystreams"
+        "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json"
       ],
       "id" => Endpoint.url() <> "/objects/" <> Ecto.UUID.generate(),
       "type" => ["VerifiableCredential", "OpenBadgeCredential"],
