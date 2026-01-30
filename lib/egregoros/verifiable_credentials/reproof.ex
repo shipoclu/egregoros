@@ -53,6 +53,38 @@ defmodule Egregoros.VerifiableCredentials.Reproof do
     end
   end
 
+  @spec ensure_local_credentials(keyword()) :: {:ok, summary()} | {:error, term()}
+  def ensure_local_credentials(opts \\ []) when is_list(opts) do
+    dry_run = Keyword.get(opts, :dry_run, false)
+    limit = Keyword.get(opts, :limit)
+    batch_size = Keyword.get(opts, :batch_size, 100)
+
+    query =
+      from(o in Object, where: o.type == "VerifiableCredential" and o.local == true)
+      |> maybe_limit(limit)
+
+    Repo.transaction(
+      fn ->
+        Repo.stream(query)
+        |> Stream.chunk_every(batch_size)
+        |> Enum.reduce(%{updated: 0, skipped: 0, errors: 0}, fn chunk, acc ->
+          Enum.reduce(chunk, acc, fn object, acc ->
+            case ensure_object(object, dry_run: dry_run) do
+              {:ok, _} -> %{acc | updated: acc.updated + 1}
+              {:skip, _} -> %{acc | skipped: acc.skipped + 1}
+              {:error, _} -> %{acc | errors: acc.errors + 1}
+            end
+          end)
+        end)
+      end,
+      timeout: :infinity
+    )
+    |> case do
+      {:ok, summary} -> {:ok, summary}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
   @spec reproof_object(Object.t(), keyword()) ::
           {:ok, Object.t() | map()} | {:skip, atom()} | {:error, term()}
   def reproof_object(%Object{} = object, opts \\ []) when is_list(opts) do
@@ -63,6 +95,42 @@ defmodule Egregoros.VerifiableCredentials.Reproof do
         case Users.get_by_ap_id(issuer_ap_id) do
           %User{local: true, ed25519_private_key: private_key} when is_binary(private_key) ->
             case reproof_document(data, issuer_ap_id, private_key) do
+              {:ok, updated_document} ->
+                if Keyword.get(opts, :dry_run, false) do
+                  {:ok, updated_document}
+                else
+                  Objects.update_object(object, %{data: updated_document})
+                end
+
+              {:skip, reason} ->
+                {:skip, reason}
+
+              {:error, reason} ->
+                {:error, reason}
+            end
+
+          %User{} ->
+            {:skip, :missing_private_key}
+
+          _ ->
+            {:skip, :missing_issuer}
+        end
+
+      _ ->
+        {:skip, :missing_issuer}
+    end
+  end
+
+  @spec ensure_object(Object.t(), keyword()) ::
+          {:ok, Object.t() | map()} | {:skip, atom()} | {:error, term()}
+  def ensure_object(%Object{} = object, opts \\ []) when is_list(opts) do
+    data = object.data || %{}
+
+    case issuer_ap_id(data, object.actor) do
+      issuer_ap_id when is_binary(issuer_ap_id) ->
+        case Users.get_by_ap_id(issuer_ap_id) do
+          %User{local: true, ed25519_private_key: private_key} when is_binary(private_key) ->
+            case ensure_document(data, issuer_ap_id, private_key) do
               {:ok, updated_document} ->
                 if Keyword.get(opts, :dry_run, false) do
                   {:ok, updated_document}
@@ -118,6 +186,38 @@ defmodule Egregoros.VerifiableCredentials.Reproof do
   end
 
   def reproof_document(_document, _issuer_ap_id, _private_key), do: {:error, :invalid_document}
+
+  @spec ensure_document(map(), binary(), binary()) ::
+          {:ok, map()} | {:skip, atom()} | {:error, term()}
+  def ensure_document(document, issuer_ap_id, private_key)
+      when is_map(document) and is_binary(issuer_ap_id) and is_binary(private_key) do
+    {updated_context, changed?} = remove_activitystreams_context(document["@context"])
+
+    if changed? and updated_context == [] do
+      {:error, :invalid_context}
+    else
+      document =
+        if changed? do
+          Map.put(document, "@context", updated_context)
+        else
+          document
+        end
+
+      proof_opts = build_proof_opts(document, issuer_ap_id)
+
+      cond do
+        proof_present?(document) and not changed? ->
+          {:skip, :proof_present}
+
+        true ->
+          document
+          |> drop_proof()
+          |> DataIntegrity.attach_proof(private_key, proof_opts)
+      end
+    end
+  end
+
+  def ensure_document(_document, _issuer_ap_id, _private_key), do: {:error, :invalid_document}
 
   defp maybe_limit(query, limit) when is_integer(limit) and limit > 0 do
     from(o in query, limit: ^limit)
