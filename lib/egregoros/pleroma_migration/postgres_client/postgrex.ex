@@ -10,8 +10,8 @@ defmodule Egregoros.PleromaMigration.PostgresClient.Postgrex do
   end
 
   @impl true
-  def query!(conn, sql, params) when is_list(params) do
-    Postgrex.query!(conn, sql, params)
+  def query!(conn, sql, params, opts) when is_list(params) and is_list(opts) do
+    Postgrex.query!(conn, sql, params, opts)
   end
 
   @impl true

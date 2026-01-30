@@ -57,7 +57,7 @@ defmodule Egregoros.PleromaMigration.Source.Postgres do
   @impl true
   def list_users(opts) when is_list(opts) do
     with_conn(opts, fn conn ->
-      result = PostgresClient.query!(conn, @user_sql, [])
+      result = PostgresClient.query!(conn, @user_sql, [], timeout: :infinity)
 
       users =
         Enum.map(result.rows, fn [
@@ -109,7 +109,7 @@ defmodule Egregoros.PleromaMigration.Source.Postgres do
   @impl true
   def list_statuses(opts) when is_list(opts) do
     with_conn(opts, fn conn ->
-      create_result = PostgresClient.query!(conn, @create_sql, [])
+      create_result = PostgresClient.query!(conn, @create_sql, [], timeout: :infinity)
 
       creates =
         Enum.map(create_result.rows, fn [id, data, local, inserted_at, updated_at, object] ->
@@ -123,7 +123,7 @@ defmodule Egregoros.PleromaMigration.Source.Postgres do
           }
         end)
 
-      announce_result = PostgresClient.query!(conn, @announce_sql, [])
+      announce_result = PostgresClient.query!(conn, @announce_sql, [], timeout: :infinity)
 
       announces =
         Enum.map(announce_result.rows, fn [id, data, local, inserted_at, updated_at] ->

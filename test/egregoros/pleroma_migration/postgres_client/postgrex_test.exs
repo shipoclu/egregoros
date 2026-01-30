@@ -10,7 +10,7 @@ defmodule Egregoros.PleromaMigration.PostgresClient.PostgrexTest do
       |> Keyword.put_new(:pool_size, 1)
 
     {:ok, conn} = Client.start_link(opts)
-    result = Client.query!(conn, "SELECT 1", [])
+    result = Client.query!(conn, "SELECT 1", [], [])
 
     assert %Postgrex.Result{rows: [[1]]} = result
 
