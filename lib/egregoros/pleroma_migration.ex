@@ -7,6 +7,8 @@ defmodule Egregoros.PleromaMigration do
   alias Egregoros.Repo
   alias Egregoros.User
 
+  @insert_all_batch_size 1_000
+
   def run(opts \\ []) when is_list(opts) do
     with {:ok, users} <- Source.list_users(opts),
          {:ok, statuses} <- Source.list_statuses(opts) do
@@ -28,17 +30,7 @@ defmodule Egregoros.PleromaMigration do
         |> Map.put_new(:updated_at, now)
       end)
 
-    inserted =
-      case rows do
-        [] ->
-          0
-
-        rows ->
-          {count, _} =
-            Repo.insert_all(User, rows, on_conflict: :nothing, conflict_target: [:ap_id])
-
-          count
-      end
+    inserted = insert_all_batched(User, rows, on_conflict: :nothing, conflict_target: [:ap_id])
 
     %{inserted: inserted, attempted: length(rows)}
   end
@@ -52,8 +44,8 @@ defmodule Egregoros.PleromaMigration do
       Enum.reduce(rows, {[], []}, fn row, {status_rows, activity_rows} ->
         activity = Map.get(row, :activity) || Map.get(row, "activity")
         activity_id = Map.get(row, :activity_id) || Map.get(row, "activity_id")
-        inserted_at = Map.get(row, :inserted_at, now)
-        updated_at = Map.get(row, :updated_at, inserted_at)
+        inserted_at = row |> Map.get(:inserted_at, now) |> force_utc_datetime_usec()
+        updated_at = row |> Map.get(:updated_at, inserted_at) |> force_utc_datetime_usec()
         local = Map.get(row, :local, true) == true
 
         case activity do
@@ -69,7 +61,13 @@ defmodule Egregoros.PleromaMigration do
                    local
                  ) do
               {:ok, status_row, create_row} ->
-                {[status_row | status_rows], [create_row | activity_rows]}
+                activity_rows =
+                  case create_row do
+                    %{} = create_row -> [create_row | activity_rows]
+                    _ -> activity_rows
+                  end
+
+                {[status_row | status_rows], activity_rows}
 
               _ ->
                 {status_rows, activity_rows}
@@ -106,16 +104,16 @@ defmodule Egregoros.PleromaMigration do
         |> Map.put_new(:updated_at, now)
       end)
 
-    case rows do
-      [] ->
-        0
+    insert_all_batched(Object, rows, on_conflict: :nothing, conflict_target: [:ap_id])
+  end
 
-      rows ->
-        {count, _} =
-          Repo.insert_all(Object, rows, on_conflict: :nothing, conflict_target: [:ap_id])
-
-        count
-    end
+  defp insert_all_batched(schema, rows, opts) when is_list(rows) and is_list(opts) do
+    rows
+    |> Enum.chunk_every(@insert_all_batch_size)
+    |> Enum.reduce(0, fn batch, inserted ->
+      {count, _} = Repo.insert_all(schema, batch, opts)
+      inserted + count
+    end)
   end
 
   defp build_create_status_rows(activity_id, activity, object, inserted_at, updated_at, local)
@@ -132,7 +130,9 @@ defmodule Egregoros.PleromaMigration do
         end
 
       published =
-        Helpers.parse_datetime(Map.get(object, "published") || Map.get(activity, "published"))
+        (Map.get(object, "published") || Map.get(activity, "published"))
+        |> Helpers.parse_datetime()
+        |> force_utc_datetime_usec()
 
       status_row = %{
         id: status_id,
@@ -150,19 +150,30 @@ defmodule Egregoros.PleromaMigration do
         updated_at: updated_at
       }
 
-      create_row = %{
-        id: FlakeId.get(),
-        ap_id: Map.get(activity, "id"),
-        type: "Create",
-        actor: Map.get(activity, "actor"),
-        object: ap_id,
-        data: activity,
-        internal: %{},
-        published: Helpers.parse_datetime(Map.get(activity, "published")),
-        local: local,
-        inserted_at: inserted_at,
-        updated_at: updated_at
-      }
+      create_row =
+        case Map.get(activity, "id") do
+          create_ap_id when is_binary(create_ap_id) and create_ap_id != "" ->
+            %{
+              id: FlakeId.get(),
+              ap_id: create_ap_id,
+              type: "Create",
+              actor: Map.get(activity, "actor"),
+              object: ap_id,
+              data: activity,
+              internal: %{},
+              published:
+                activity
+                |> Map.get("published")
+                |> Helpers.parse_datetime()
+                |> force_utc_datetime_usec(),
+              local: local,
+              inserted_at: inserted_at,
+              updated_at: updated_at
+            }
+
+          _ ->
+            nil
+        end
 
       {:ok, status_row, create_row}
     else
@@ -195,7 +206,11 @@ defmodule Egregoros.PleromaMigration do
         object: object,
         data: activity,
         internal: %{},
-        published: Helpers.parse_datetime(Map.get(activity, "published")),
+        published:
+          activity
+          |> Map.get("published")
+          |> Helpers.parse_datetime()
+          |> force_utc_datetime_usec(),
         local: local,
         inserted_at: inserted_at,
         updated_at: updated_at
@@ -213,6 +228,18 @@ defmodule Egregoros.PleromaMigration do
   defp normalize_flake_id(<<_::binary-size(16)>> = id), do: FlakeId.to_string(id)
   defp normalize_flake_id(id) when is_binary(id), do: String.trim(id)
   defp normalize_flake_id(_id), do: nil
+
+  defp force_utc_datetime_usec(%NaiveDateTime{} = datetime) do
+    datetime
+    |> DateTime.from_naive!("Etc/UTC")
+    |> force_utc_datetime_usec()
+  end
+
+  defp force_utc_datetime_usec(%DateTime{microsecond: {value, _precision}} = datetime) do
+    %{datetime | microsecond: {value, 6}}
+  end
+
+  defp force_utc_datetime_usec(nil), do: nil
 
   defp in_reply_to_ap_id("Note", %{} = object) do
     case Map.get(object, "inReplyTo") do
