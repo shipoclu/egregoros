@@ -464,6 +464,11 @@ defmodule EgregorosWeb.NotificationsLiveTest do
 
     assert has_element?(
              view,
+             "#notification-#{offer_object.id} [data-role='offer-response-status'] + [data-role='offer-badge-link']"
+           )
+
+    assert has_element?(
+             view,
              "#notification-#{offer_object.id} [data-role='offer-badge-link'][href='/@#{user.nickname}/badges/#{accept_object.id}']"
            )
   end

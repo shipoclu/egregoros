@@ -65,6 +65,15 @@ defmodule EgregorosWeb.Components.NotificationItems.OfferNotification do
               </p>
             <% end %>
 
+            <%= if is_binary(@entry[:offer_response]) and @entry[:offer_response] != "" do %>
+              <p
+                data-role="offer-response-status"
+                class="mt-3 text-xs font-semibold uppercase tracking-wide text-[color:var(--text-muted)]"
+              >
+                {@entry[:offer_response]}
+              </p>
+            <% end %>
+
             <%= if is_binary(@entry[:offer_badge_path]) do %>
               <.link
                 data-role="offer-badge-link"
@@ -92,12 +101,7 @@ defmodule EgregorosWeb.Components.NotificationItems.OfferNotification do
             <.time_ago at={@entry.notification.inserted_at} />
           </span>
           <%= if is_binary(@entry[:offer_response]) and @entry[:offer_response] != "" do %>
-            <span
-              data-role="offer-response-status"
-              class="text-xs font-semibold uppercase tracking-wide text-[color:var(--text-muted)]"
-            >
-              {@entry[:offer_response]}
-            </span>
+            <%!-- no action buttons when response is present --%>
           <% else %>
             <.button
               type="button"
