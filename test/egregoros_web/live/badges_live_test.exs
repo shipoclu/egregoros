@@ -235,6 +235,7 @@ defmodule EgregorosWeb.BadgesLiveTest do
 
     assert has_element?(view, "[data-role='badge-detail']")
   end
+
   defp accept_badge_offer(recipient) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 

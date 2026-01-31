@@ -116,7 +116,7 @@ defmodule EgregorosWeb.StatusCardTest do
              ~r/id="reaction-picker-post-1".*shadow-\[4px_4px_0_var\(--border-default\)\]/s
   end
 
-  test "renders badge cards for verifiable credentials with a share button" do
+  test "renders badge cards for verifiable credentials with interactions" do
     html =
       render_component(&StatusCard.status_card/1, %{
         id: "post-badge-1",
@@ -152,7 +152,9 @@ defmodule EgregorosWeb.StatusCardTest do
       })
 
     assert html =~ ~s(data-item="badge-card")
-    assert html =~ ~s(data-role="badge-share")
+    assert html =~ ~s(data-role="like")
+    assert html =~ ~s(data-role="repost")
+    assert html =~ ~s(data-role="reaction")
     assert html =~ "Donator"
   end
 

@@ -1455,10 +1455,10 @@ defmodule EgregorosWeb.TimelineLiveTest do
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     {:ok, view, _html} = live(conn, "/?timeline=public")
 
-    assert has_element?(view, "#post-#{announce.id} [data-role='badge-share']")
+    assert has_element?(view, "#post-#{announce.id} button[data-role='repost']")
 
     view
-    |> element("#post-#{announce.id} [data-role='badge-share']")
+    |> element("#post-#{announce.id} button[data-role='repost']")
     |> render_click()
 
     assert has_element?(view, "[data-role='toast']", "Badge shared.")

@@ -5,6 +5,7 @@ defmodule EgregorosWeb.Components.TimelineItems.BadgeCard do
   use EgregorosWeb, :html
 
   alias EgregorosWeb.Components.Shared.ActorHeader
+  alias EgregorosWeb.Components.Shared.InteractionBar
   alias EgregorosWeb.ProfilePaths
 
   attr :id, :string, required: true
@@ -126,33 +127,14 @@ defmodule EgregorosWeb.Components.TimelineItems.BadgeCard do
             View badge
           </.link>
         <% end %>
-
-        <button
-          :if={@current_user && is_binary(Map.get(@entry.object || %{}, :id))}
-          type="button"
-          data-role="badge-share"
-          aria-pressed={if @reposted?, do: "true", else: "false"}
-          data-pressed={if @reposted?, do: "true", else: "false"}
-          phx-click={
-            JS.dispatch("egregoros:optimistic-toggle", detail: %{kind: "repost"})
-            |> JS.push("toggle_repost", value: %{"id" => @entry.object.id, "feed_id" => @feed_id})
-          }
-          class={[
-            "inline-flex cursor-pointer items-center gap-2 border px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition focus-visible:outline-none focus-brutal",
-            "data-[pressed=true]:border-[color:var(--success)] data-[pressed=true]:bg-[color:var(--success-subtle)] data-[pressed=true]:text-[color:var(--success)]",
-            "data-[pressed=false]:border-[color:var(--border-muted)] data-[pressed=false]:bg-[color:var(--bg-base)] data-[pressed=false]:text-[color:var(--text-secondary)] data-[pressed=false]:hover:border-[color:var(--border-default)] data-[pressed=false]:hover:text-[color:var(--text-primary)]"
-          ]}
-        >
-          <.icon
-            name={if @reposted?, do: "hero-arrow-path-solid", else: "hero-arrow-path"}
-            class="size-4"
-          />
-          <span class="sr-only">{if @reposted?, do: "Unshare badge", else: "Share badge"}</span>
-          <span class="font-mono text-xs font-bold tabular-nums">
-            {@reposts_count}
-          </span>
-        </button>
       </div>
+
+      <InteractionBar.interaction_bar
+        id={@id}
+        entry={@entry}
+        current_user={@current_user}
+        reply_mode={@reply_mode}
+      />
     </article>
     """
   end

@@ -48,7 +48,7 @@ defmodule Egregoros.Interactions do
   def toggle_reaction(%User{} = user, post_id, emoji)
       when is_binary(post_id) and is_binary(emoji) do
     with %{} = post <- Objects.get(post_id),
-         true <- post.type in ["Note", "Question"],
+         true <- post.type in ["Note", "Question", "VerifiableCredential"],
          true <- Objects.visible_to?(post, user) do
       relationship_type = "EmojiReact:" <> emoji
 
@@ -66,7 +66,7 @@ defmodule Egregoros.Interactions do
 
   def toggle_bookmark(%User{} = user, post_id) when is_binary(post_id) do
     with %{} = post <- Objects.get(post_id),
-         true <- post.type in ["Note", "Question"],
+         true <- post.type in ["Note", "Question", "VerifiableCredential"],
          true <- Objects.visible_to?(post, user) do
       case Relationships.get_by_type_actor_object("Bookmark", user.ap_id, post.ap_id) do
         %Relationship{} ->
