@@ -5,7 +5,9 @@ defmodule Egregoros.VerifiableCredentials.ReproofTest do
   alias Egregoros.TestSupport.Fixtures
   alias Egregoros.Users
   alias Egregoros.VerifiableCredentials.DataIntegrity
+  alias Egregoros.VerifiableCredentials.DidWeb
   alias Egregoros.VerifiableCredentials.Reproof
+  alias Egregoros.Federation.InstanceActor
   alias EgregorosWeb.Endpoint
 
   @as_context "https://www.w3.org/ns/activitystreams"
@@ -157,5 +159,42 @@ defmodule Egregoros.VerifiableCredentials.ReproofTest do
              %{"to" => %{"@id" => "https://www.w3.org/ns/activitystreams#to"}} -> true
              _ -> false
            end)
+  end
+
+  test "migrate_document_to_did updates issuer and re-signs the proof" do
+    {:ok, issuer} = InstanceActor.get_actor()
+    {:ok, recipient} = Users.create_local_user("reproof_did_recipient")
+
+    credential =
+      Fixtures.json!("openbadge_vc.json")
+      |> Map.put("issuer", issuer.ap_id)
+      |> Map.put("id", Endpoint.url() <> "/objects/" <> Ecto.UUID.generate())
+      |> Map.put("to", [recipient.ap_id, @as_public])
+      |> put_in(["credentialSubject", "id"], recipient.ap_id)
+      |> Map.delete("proof")
+
+    verification_method = issuer.ap_id <> "#ed25519-key"
+
+    {:ok, signed} =
+      DataIntegrity.attach_proof(credential, issuer.ed25519_private_key, %{
+        "verificationMethod" => verification_method,
+        "proofPurpose" => "assertionMethod"
+      })
+
+    did = DidWeb.instance_did()
+
+    assert {:ok, updated} =
+             Reproof.migrate_document_to_did(
+               signed,
+               issuer.ap_id,
+               issuer.ed25519_private_key,
+               did
+             )
+
+    assert updated["issuer"] == did
+    assert updated["proof"]["verificationMethod"] == did <> "#ed25519-key"
+
+    {:ok, public_key} = Keys.ed25519_public_key_from_private_key(issuer.ed25519_private_key)
+    assert {:ok, true} = DataIntegrity.verify_proof(updated, public_key)
   end
 end

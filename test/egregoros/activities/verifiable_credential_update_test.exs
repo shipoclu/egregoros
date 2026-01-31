@@ -12,6 +12,7 @@ defmodule Egregoros.Activities.VerifiableCredentialUpdateTest do
   alias Egregoros.Users
   alias Egregoros.VerifiableCredentials.AssertionMethod
   alias Egregoros.VerifiableCredentials.DataIntegrity
+  alias Egregoros.VerifiableCredentials.DidWeb
   alias Egregoros.Activities.VerifiableCredential
 
   @public "https://www.w3.org/ns/activitystreams#Public"
@@ -50,7 +51,7 @@ defmodule Egregoros.Activities.VerifiableCredentialUpdateTest do
       credential.data
       |> Map.put("to", [recipient.ap_id, @public])
 
-    verification_method = instance_actor.ap_id <> "#ed25519-key"
+    verification_method = DidWeb.instance_did() <> "#ed25519-key"
 
     assert {:ok, signed_credential} =
              DataIntegrity.attach_proof(updated_credential, instance_actor.ed25519_private_key, %{
@@ -114,6 +115,73 @@ defmodule Egregoros.Activities.VerifiableCredentialUpdateTest do
     update_activity =
       Update.build(remote_user.ap_id, signed_credential)
       |> Map.put("id", remote_activity_id(remote_user.ap_id))
+
+    assert {:ok, _update_object} = Pipeline.ingest(update_activity, local: false)
+
+    stored_credential = Objects.get_by_ap_id(credential.ap_id)
+    assert @public in stored_credential.data["to"]
+    assert stored_credential.data["proof"] == signed_credential["proof"]
+  end
+
+  test "accepts a remote Update when the embedded proof uses did:web verification" do
+    {:ok, recipient} = Users.create_local_user("vc_update_remote_recipient_did")
+    {:ok, badge} = insert_badge_definition("RemoteUpdateDid")
+
+    did = "did:web:remote.example"
+
+    {public_key, private_key} = Keys.generate_ed25519_keypair()
+
+    {:ok, remote_user} = create_remote_user("did_issuer", public_key)
+    actor_ap_id = remote_user.ap_id
+
+    {:ok, %Egregoros.Object{} = credential} =
+      insert_remote_credential(badge, did, recipient.ap_id)
+
+    updated_credential =
+      credential.data
+      |> Map.put("to", [recipient.ap_id, @public])
+      |> Map.put("issuer", did)
+
+    verification_method = did <> "#ed25519-key"
+
+    assert {:ok, signed_credential} =
+             DataIntegrity.attach_proof(updated_credential, private_key, %{
+               "verificationMethod" => verification_method,
+               "proofPurpose" => "assertionMethod"
+             })
+
+    did_document = %{
+      "@context" => [
+        "https://www.w3.org/ns/did/v1",
+        "https://w3id.org/security/data-integrity/v2"
+      ],
+      "id" => did,
+      "alsoKnownAs" => [actor_ap_id],
+      "verificationMethod" => [
+        %{
+          "id" => verification_method,
+          "type" => "Multikey",
+          "controller" => did,
+          "publicKeyMultibase" => DidWeb.public_key_multibase(public_key)
+        }
+      ],
+      "assertionMethod" => [verification_method]
+    }
+
+    expect(Egregoros.HTTP.Mock, :get, 3, fn url, _headers ->
+      assert url == "https://remote.example/.well-known/did.json"
+
+      {:ok,
+       %{
+         status: 200,
+         body: did_document,
+         headers: []
+       }}
+    end)
+
+    update_activity =
+      Update.build(actor_ap_id, signed_credential)
+      |> Map.put("id", remote_activity_id(actor_ap_id))
 
     assert {:ok, _update_object} = Pipeline.ingest(update_activity, local: false)
 

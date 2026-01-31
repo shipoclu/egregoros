@@ -10,6 +10,7 @@ defmodule Egregoros.BadgesTest do
   alias Egregoros.Pipeline
   alias Egregoros.Repo
   alias Egregoros.Users
+  alias Egregoros.VerifiableCredentials.DidWeb
   alias Egregoros.Workers.DeliverActivity
   alias EgregorosWeb.Endpoint
 
@@ -27,7 +28,7 @@ defmodule Egregoros.BadgesTest do
 
     assert credential.type == "VerifiableCredential"
     assert credential.actor == instance_actor.ap_id
-    assert credential.data["issuer"] == instance_actor.ap_id
+    assert credential.data["issuer"] == DidWeb.instance_did()
     assert credential.data["credentialSubject"]["id"] == recipient.ap_id
     refute Map.has_key?(credential.data, "proof")
 
@@ -60,10 +61,15 @@ defmodule Egregoros.BadgesTest do
 
     assert "https://www.w3.org/ns/activitystreams#Public" in updated_credential.data["to"]
 
-    assert %{"proofValue" => proof_value, "cryptosuite" => "eddsa-jcs-2022"} =
+    assert %{
+             "proofValue" => proof_value,
+             "cryptosuite" => "eddsa-jcs-2022",
+             "verificationMethod" => verification_method
+           } =
              updated_credential.data["proof"]
 
     assert is_binary(proof_value)
+    assert verification_method == DidWeb.instance_did() <> "#ed25519-key"
 
     assert %Egregoros.Object{} =
              Objects.get_by_type_actor_object(

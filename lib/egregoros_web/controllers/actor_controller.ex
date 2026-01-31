@@ -3,6 +3,7 @@ defmodule EgregorosWeb.ActorController do
 
   alias Egregoros.E2EE
   alias Egregoros.Users
+  alias Egregoros.VerifiableCredentials.DidWeb
   alias EgregorosWeb.URL
 
   def show(conn, %{"nickname" => nickname}) do
@@ -40,6 +41,7 @@ defmodule EgregorosWeb.ActorController do
         "publicKeyPem" => user.public_key
       }
     }
+    |> maybe_put_also_known_as(user)
     |> maybe_put_icon(user)
     |> maybe_put_assertion_method(user)
     |> maybe_put_e2ee(user)
@@ -61,6 +63,19 @@ defmodule EgregorosWeb.ActorController do
   end
 
   defp maybe_put_assertion_method(actor, _user), do: actor
+
+  defp maybe_put_also_known_as(actor, %{ap_id: ap_id}) when is_binary(ap_id) do
+    if ap_id == EgregorosWeb.Endpoint.url() do
+      case DidWeb.instance_did() do
+        did when is_binary(did) and did != "" -> Map.put(actor, "alsoKnownAs", [did])
+        _ -> actor
+      end
+    else
+      actor
+    end
+  end
+
+  defp maybe_put_also_known_as(actor, _user), do: actor
 
   defp maybe_put_e2ee(actor, user) do
     keys = E2EE.public_keys_for_actor(user)

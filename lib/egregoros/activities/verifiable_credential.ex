@@ -8,11 +8,13 @@ defmodule Egregoros.Activities.VerifiableCredential do
   alias Egregoros.ActivityPub.ObjectValidators.Types.ObjectID
   alias Egregoros.ActivityPub.ObjectValidators.Types.Recipients
   alias Egregoros.BadgeDefinition
+  alias Egregoros.Federation.InstanceActor
   alias Egregoros.InboxTargeting
   alias Egregoros.Objects
   alias Egregoros.SafeURL
   alias Egregoros.User
   alias Egregoros.Users
+  alias Egregoros.VerifiableCredentials.DidWeb
   alias EgregorosWeb.Endpoint
   alias EgregorosWeb.URL
 
@@ -75,10 +77,12 @@ defmodule Egregoros.Activities.VerifiableCredential do
   defp validate_inbox_target(_object, _opts), do: :ok
 
   defp to_object_attrs(object, opts) do
+    actor_id = actor_ap_id(object, opts)
+
     %{
       ap_id: object["id"],
       type: object["type"],
-      actor: issuer_ap_id(object),
+      actor: actor_id,
       object: nil,
       data: object,
       published: Helpers.parse_datetime(object["validFrom"]),
@@ -104,6 +108,18 @@ defmodule Egregoros.Activities.VerifiableCredential do
   defp issuer_ap_id(%{"issuer" => id}) when is_binary(id), do: id
   defp issuer_ap_id(_object), do: nil
 
+  defp actor_ap_id(object, opts) when is_map(object) and is_list(opts) do
+    issuer_id = issuer_ap_id(object)
+
+    if Keyword.get(opts, :local, true) and DidWeb.instance_did?(issuer_id) do
+      InstanceActor.ap_id()
+    else
+      issuer_id
+    end
+  end
+
+  defp actor_ap_id(_object, _opts), do: nil
+
   defp recipient_ap_id(%{"credentialSubject" => subject}) do
     subject
     |> List.wrap()
@@ -125,6 +141,9 @@ defmodule Egregoros.Activities.VerifiableCredential do
     cond do
       not is_binary(issuer) or issuer == "" ->
         add_error(changeset, :issuer, "must be a valid actor id")
+
+      DidWeb.did_web?(issuer) ->
+        changeset
 
       match?(%User{}, user) ->
         changeset

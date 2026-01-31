@@ -20,6 +20,7 @@ defmodule Egregoros.Activities.Accept do
   alias Egregoros.User
   alias Egregoros.Users
   alias Egregoros.VerifiableCredentials.DataIntegrity
+  alias Egregoros.VerifiableCredentials.DidWeb
   alias Egregoros.Workers.RefreshRemoteFollowingGraph
   alias EgregorosWeb.Endpoint
 
@@ -229,7 +230,17 @@ defmodule Egregoros.Activities.Accept do
     if Map.has_key?(credential_data, "proof") or Map.has_key?(credential_data, :proof) do
       credential_data
     else
-      verification_method = issuer.ap_id <> "#ed25519-key"
+      issuer_id =
+        case credential_data do
+          %{"issuer" => %{"id" => id}} when is_binary(id) -> id
+          %{"issuer" => id} when is_binary(id) -> id
+          %{issuer: %{id: id}} when is_binary(id) -> id
+          %{issuer: id} when is_binary(id) -> id
+          _ -> issuer.ap_id
+        end
+
+      verification_method =
+        DidWeb.verification_method_id(issuer_id) || issuer.ap_id <> "#ed25519-key"
 
       case DataIntegrity.attach_proof(credential_data, issuer.ed25519_private_key, %{
              "verificationMethod" => verification_method,

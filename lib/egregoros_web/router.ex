@@ -160,6 +160,7 @@ defmodule EgregorosWeb.Router do
     get "/activities/:type/:uuid", ActivityController, :show_typed
     get "/poco", PocoController, :index
     get "/.well-known/webfinger", WebFingerController, :webfinger
+    get "/.well-known/did.json", DidController, :show
     get "/.well-known/nodeinfo", NodeinfoController, :nodeinfo_index
     get "/nodeinfo/2.0.json", NodeinfoController, :nodeinfo
     get "/nodeinfo/2.1.json", NodeinfoController, :nodeinfo_2_1

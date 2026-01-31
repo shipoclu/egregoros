@@ -13,6 +13,8 @@ defmodule Egregoros.VerifiableCredentials.Reproof do
   alias Egregoros.User
   alias Egregoros.Users
   alias Egregoros.VerifiableCredentials.DataIntegrity
+  alias Egregoros.VerifiableCredentials.DidWeb
+  alias Egregoros.Federation.InstanceActor
 
   @activitystreams_context "https://www.w3.org/ns/activitystreams"
   @audience_context %{
@@ -101,8 +103,9 @@ defmodule Egregoros.VerifiableCredentials.Reproof do
 
     case issuer_ap_id(data, object.actor) do
       issuer_ap_id when is_binary(issuer_ap_id) ->
-        case Users.get_by_ap_id(issuer_ap_id) do
-          %User{local: true, ed25519_private_key: private_key} when is_binary(private_key) ->
+        case issuer_user(issuer_ap_id) do
+          {:ok, %User{local: true, ed25519_private_key: private_key} = _issuer}
+          when is_binary(private_key) ->
             case reproof_document(data, issuer_ap_id, private_key) do
               {:ok, updated_document} ->
                 if Keyword.get(opts, :dry_run, false) do
@@ -118,7 +121,7 @@ defmodule Egregoros.VerifiableCredentials.Reproof do
                 {:error, reason}
             end
 
-          %User{} ->
+          {:ok, %User{}} ->
             {:skip, :missing_private_key}
 
           _ ->
@@ -137,8 +140,9 @@ defmodule Egregoros.VerifiableCredentials.Reproof do
 
     case issuer_ap_id(data, object.actor) do
       issuer_ap_id when is_binary(issuer_ap_id) ->
-        case Users.get_by_ap_id(issuer_ap_id) do
-          %User{local: true, ed25519_private_key: private_key} when is_binary(private_key) ->
+        case issuer_user(issuer_ap_id) do
+          {:ok, %User{local: true, ed25519_private_key: private_key} = _issuer}
+          when is_binary(private_key) ->
             case ensure_document(data, issuer_ap_id, private_key, opts) do
               {:ok, updated_document} ->
                 if Keyword.get(opts, :dry_run, false) do
@@ -154,7 +158,7 @@ defmodule Egregoros.VerifiableCredentials.Reproof do
                 {:error, reason}
             end
 
-          %User{} ->
+          {:ok, %User{}} ->
             {:skip, :missing_private_key}
 
           _ ->
@@ -233,6 +237,114 @@ defmodule Egregoros.VerifiableCredentials.Reproof do
   def ensure_document(_document, _issuer_ap_id, _private_key, _opts),
     do: {:error, :invalid_document}
 
+  @spec migrate_local_credentials_to_did(keyword()) :: {:ok, summary()} | {:error, term()}
+  def migrate_local_credentials_to_did(opts \\ []) when is_list(opts) do
+    dry_run = Keyword.get(opts, :dry_run, false)
+    limit = Keyword.get(opts, :limit)
+    batch_size = Keyword.get(opts, :batch_size, 100)
+
+    query =
+      from(o in Object, where: o.type == "VerifiableCredential" and o.local == true)
+      |> maybe_limit(limit)
+
+    Repo.transaction(
+      fn ->
+        Repo.stream(query)
+        |> Stream.chunk_every(batch_size)
+        |> Enum.reduce(%{updated: 0, skipped: 0, errors: 0}, fn chunk, acc ->
+          Enum.reduce(chunk, acc, fn object, acc ->
+            case migrate_object_to_did(object, dry_run: dry_run) do
+              {:ok, _} -> %{acc | updated: acc.updated + 1}
+              {:skip, _} -> %{acc | skipped: acc.skipped + 1}
+              {:error, _} -> %{acc | errors: acc.errors + 1}
+            end
+          end)
+        end)
+      end,
+      timeout: :infinity
+    )
+    |> case do
+      {:ok, summary} -> {:ok, summary}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @spec migrate_object_to_did(Object.t(), keyword()) ::
+          {:ok, Object.t() | map()} | {:skip, atom()} | {:error, term()}
+  def migrate_object_to_did(%Object{} = object, opts \\ []) when is_list(opts) do
+    data = object.data || %{}
+
+    with {:ok, %User{} = issuer} <- InstanceActor.get_actor(),
+         did when is_binary(did) <- DidWeb.instance_did(),
+         true <- did != "" do
+      issuer_id = issuer_ap_id(data, object.actor)
+
+      cond do
+        not is_binary(issuer_id) ->
+          {:skip, :missing_issuer}
+
+        issuer_id != issuer.ap_id and issuer_id != did ->
+          {:skip, :issuer_mismatch}
+
+        true ->
+          case migrate_document_to_did(data, issuer.ap_id, issuer.ed25519_private_key, did) do
+            {:ok, updated_document} ->
+              if Keyword.get(opts, :dry_run, false) do
+                {:ok, updated_document}
+              else
+                Objects.update_object(object, %{data: updated_document})
+              end
+
+            {:skip, reason} ->
+              {:skip, reason}
+
+            {:error, reason} ->
+              {:error, reason}
+          end
+      end
+    else
+      _ -> {:error, :missing_issuer}
+    end
+  end
+
+  @spec migrate_document_to_did(map(), binary(), binary(), binary()) ::
+          {:ok, map()} | {:skip, atom()} | {:error, term()}
+  def migrate_document_to_did(document, issuer_ap_id, private_key, did)
+      when is_map(document) and is_binary(issuer_ap_id) and is_binary(private_key) and
+             is_binary(did) do
+    {updated_context, changed?} = normalize_context(document["@context"])
+
+    if changed? and updated_context == [] do
+      {:error, :invalid_context}
+    else
+      issuer_id = issuer_ap_id(document, issuer_ap_id)
+
+      cond do
+        not is_binary(issuer_id) ->
+          {:error, :missing_issuer}
+
+        issuer_id != issuer_ap_id and issuer_id != did ->
+          {:skip, :issuer_mismatch}
+
+        true ->
+          document =
+            document
+            |> Map.put("@context", updated_context)
+            |> Map.put("issuer", did)
+            |> drop_proof()
+
+          proof_opts =
+            build_proof_opts(document, did)
+            |> Map.put("verificationMethod", did <> "#ed25519-key")
+
+          DataIntegrity.attach_proof(document, private_key, proof_opts)
+      end
+    end
+  end
+
+  def migrate_document_to_did(_document, _issuer_ap_id, _private_key, _did),
+    do: {:error, :invalid_document}
+
   defp maybe_limit(query, limit) when is_integer(limit) and limit > 0 do
     from(o in query, limit: ^limit)
   end
@@ -245,6 +357,22 @@ defmodule Egregoros.VerifiableCredentials.Reproof do
   defp issuer_ap_id(%{issuer: id}, _actor) when is_binary(id), do: id
   defp issuer_ap_id(_data, actor) when is_binary(actor), do: actor
   defp issuer_ap_id(_data, _actor), do: nil
+
+  defp issuer_user(issuer_ap_id) when is_binary(issuer_ap_id) do
+    case Users.get_by_ap_id(issuer_ap_id) do
+      %User{} = user ->
+        {:ok, user}
+
+      _ ->
+        if DidWeb.instance_did?(issuer_ap_id) do
+          InstanceActor.get_actor()
+        else
+          {:error, :missing_issuer}
+        end
+    end
+  end
+
+  defp issuer_user(_issuer_ap_id), do: {:error, :missing_issuer}
 
   defp remove_activitystreams_context(context) do
     contexts = List.wrap(context)
@@ -282,6 +410,7 @@ defmodule Egregoros.VerifiableCredentials.Reproof do
 
     verification_method =
       proof_string(proof, "verificationMethod") ||
+        DidWeb.verification_method_id(issuer_ap_id) ||
         String.trim(issuer_ap_id) <> "#ed25519-key"
 
     proof_purpose = proof_string(proof, "proofPurpose") || "assertionMethod"

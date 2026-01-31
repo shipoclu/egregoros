@@ -15,6 +15,7 @@ defmodule Egregoros.Badges do
   alias Egregoros.MediaStorage
   alias Egregoros.User
   alias Egregoros.Users
+  alias Egregoros.VerifiableCredentials.DidWeb
   alias EgregorosWeb.URL
 
   def list_definitions(opts \\ []) when is_list(opts) do
@@ -153,10 +154,12 @@ defmodule Egregoros.Badges do
   defp resolve_recipient(_ap_id), do: {:error, :invalid_recipient}
 
   defp create_credential(%BadgeDefinition{} = badge, %User{} = issuer, %User{} = recipient, opts) do
+    issuer_id = DidWeb.instance_did() || issuer.ap_id
+
     credential =
       VerifiableCredential.build_for_badge(
         badge,
-        issuer.ap_id,
+        issuer_id,
         recipient.ap_id,
         opts
       )
