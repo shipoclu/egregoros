@@ -24,7 +24,7 @@ defmodule EgregorosWeb.Components.NotificationItems.OfferNotification do
       class="relative border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] p-5 transition hover:bg-[color:var(--bg-subtle)]"
     >
       <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div class="flex items-start gap-4">
+        <div class="flex min-w-0 flex-1 items-start gap-4">
           <.avatar size="sm" name={@entry.actor.display_name} src={@entry.actor.avatar_url} />
 
           <div class="min-w-0">
@@ -54,11 +54,11 @@ defmodule EgregorosWeb.Components.NotificationItems.OfferNotification do
                   src={@entry[:offer_image_url]}
                   alt={@entry[:offer_title] || "Badge image"}
                   loading="lazy"
-                  class="size-16 shrink-0 rounded-lg border border-[color:var(--border-default)] bg-[color:var(--bg-subtle)] object-contain p-1"
+                  class="h-12 w-12 shrink-0 rounded-lg border border-[color:var(--border-default)] bg-[color:var(--bg-subtle)] object-contain p-1"
                 />
               <% end %>
 
-              <div class="min-w-0">
+              <div class="min-w-0 flex-1">
                 <%= if @entry[:offer_title] do %>
                   <p
                     data-role="offer-title"
