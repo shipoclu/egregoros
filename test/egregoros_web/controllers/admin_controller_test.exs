@@ -3,6 +3,7 @@ defmodule EgregorosWeb.AdminControllerTest do
 
   import Mox
 
+  alias LazyHTML
   alias Egregoros.BadgeDefinition
   alias Egregoros.Federation.InstanceActor
   alias Egregoros.InstanceSettings
@@ -37,6 +38,18 @@ defmodule EgregorosWeb.AdminControllerTest do
     assert html =~ "Oban dashboard"
     assert html =~ "Live dashboard"
     assert html =~ "/admin/dashboard"
+  end
+
+  test "GET /admin disables badge issue button by default", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("badge_admin_ui")
+    {:ok, user} = Users.set_admin(user, true)
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+
+    conn = get(conn, "/admin")
+    html = html_response(conn, 200)
+
+    document = LazyHTML.from_fragment(html)
+    assert LazyHTML.filter(document, "#badge-issue-submit[disabled]") != []
   end
 
   test "POST /admin/registrations updates registration settings", %{conn: conn} do

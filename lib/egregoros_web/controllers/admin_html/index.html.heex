@@ -98,6 +98,8 @@
               label="Badge type"
               prompt="Select badge"
               options={@badge_options}
+              id="badge-issue-badge-type"
+              data-role="badge-issue-badge-type"
             />
 
             <.input
@@ -105,6 +107,8 @@
               field={@badge_form[:recipient_ap_id]}
               label="Recipient actor ID"
               placeholder="https://example.com/users/alice"
+              id="badge-issue-recipient"
+              data-role="badge-issue-recipient"
             />
 
             <.input
@@ -113,7 +117,15 @@
               label="Expires on (optional)"
             />
 
-            <.button type="submit" class="sm:w-44">Issue</.button>
+            <.button
+              type="submit"
+              id="badge-issue-submit"
+              data-role="badge-issue-submit"
+              class="sm:w-44"
+              disabled
+            >
+              Issue
+            </.button>
           </.form>
 
           <div class="mt-6 space-y-3">
