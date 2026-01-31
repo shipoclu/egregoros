@@ -37,7 +37,7 @@ defmodule EgregorosWeb.Plugs.ServeInstanceActor do
     %{
       "@context" => [
         "https://www.w3.org/ns/activitystreams",
-        "https://w3id.org/security/v1",
+        "https://w3id.org/security/v2",
         "https://w3id.org/security/data-integrity/v2"
       ],
       "id" => base_url,

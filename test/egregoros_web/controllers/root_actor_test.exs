@@ -21,6 +21,7 @@ defmodule EgregorosWeb.RootActorTest do
     assert body["publicKey"]["id"] == Endpoint.url() <> "#main-key"
     assert body["publicKey"]["owner"] == Endpoint.url()
     assert is_list(body["assertionMethod"])
+    assert "https://w3id.org/security/v2" in body["@context"]
     assert "https://w3id.org/security/data-integrity/v2" in body["@context"]
 
     assert Enum.any?(body["assertionMethod"], fn method ->
