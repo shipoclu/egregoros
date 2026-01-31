@@ -120,7 +120,7 @@ defmodule Egregoros.VerifiableCredentials.ReproofTest do
              Reproof.ensure_document(signed, issuer.ap_id, issuer.ed25519_private_key)
   end
 
-  test "reproof_document skips when ActivityStreams context is absent" do
+  test "reproof_document adds audience context when ActivityStreams context is absent" do
     {:ok, issuer} = Users.create_local_user("reproof_issuer_skip")
     {:ok, recipient} = Users.create_local_user("reproof_recipient_skip")
 
@@ -147,7 +147,15 @@ defmodule Egregoros.VerifiableCredentials.ReproofTest do
         "proofPurpose" => "assertionMethod"
       })
 
-    assert {:skip, :context_unchanged} =
+    assert {:ok, updated} =
              Reproof.reproof_document(signed, issuer.ap_id, issuer.ed25519_private_key)
+
+    contexts = List.wrap(updated["@context"])
+    refute @as_context in contexts
+
+    assert Enum.any?(contexts, fn
+             %{"to" => %{"@id" => "https://www.w3.org/ns/activitystreams#to"}} -> true
+             _ -> false
+           end)
   end
 end
