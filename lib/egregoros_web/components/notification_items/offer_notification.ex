@@ -49,13 +49,15 @@ defmodule EgregorosWeb.Components.NotificationItems.OfferNotification do
 
             <div class="mt-3 flex items-start gap-3">
               <%= if is_binary(@entry[:offer_image_url]) and @entry[:offer_image_url] != "" do %>
-                <img
-                  data-role="offer-badge-image"
-                  src={@entry[:offer_image_url]}
-                  alt={@entry[:offer_title] || "Badge image"}
-                  loading="lazy"
-                  class="h-12 w-12 shrink-0 rounded-lg border border-[color:var(--border-default)] bg-[color:var(--bg-subtle)] object-contain p-1"
-                />
+                <div class="h-12 w-12 shrink-0 rounded-lg border border-[color:var(--border-default)] bg-[color:var(--bg-subtle)] p-1">
+                  <img
+                    data-role="offer-badge-image"
+                    src={@entry[:offer_image_url]}
+                    alt={@entry[:offer_title] || "Badge image"}
+                    loading="lazy"
+                    class="h-full w-full object-contain"
+                  />
+                </div>
               <% end %>
 
               <div class="min-w-0 flex-1">
@@ -84,6 +86,41 @@ defmodule EgregorosWeb.Components.NotificationItems.OfferNotification do
                   >
                     {@entry[:offer_response]}
                   </p>
+                <% else %>
+                  <div class="mt-3 flex flex-wrap items-center gap-2">
+                    <.button
+                      type="button"
+                      size="sm"
+                      data-role="offer-accept"
+                      phx-click="offer_accept"
+                      phx-value-id={
+                        if(@entry.notification.ap_id,
+                          do: @entry.notification.ap_id,
+                          else: @entry.notification.id
+                        )
+                      }
+                      phx-disable-with="Accepting..."
+                    >
+                      Accept
+                    </.button>
+
+                    <.button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      data-role="offer-reject"
+                      phx-click="offer_reject"
+                      phx-value-id={
+                        if(@entry.notification.ap_id,
+                          do: @entry.notification.ap_id,
+                          else: @entry.notification.id
+                        )
+                      }
+                      phx-disable-with="Rejecting..."
+                    >
+                      Reject
+                    </.button>
+                  </div>
                 <% end %>
 
                 <%= if is_binary(@entry[:offer_badge_path]) do %>
@@ -104,42 +141,6 @@ defmodule EgregorosWeb.Components.NotificationItems.OfferNotification do
           <span class="shrink-0 text-xs text-[color:var(--text-muted)]">
             <.time_ago at={@entry.notification.inserted_at} />
           </span>
-          <%= if is_binary(@entry[:offer_response]) and @entry[:offer_response] != "" do %>
-            <%!-- no action buttons when response is present --%>
-          <% else %>
-            <.button
-              type="button"
-              size="sm"
-              data-role="offer-accept"
-              phx-click="offer_accept"
-              phx-value-id={
-                if(@entry.notification.ap_id,
-                  do: @entry.notification.ap_id,
-                  else: @entry.notification.id
-                )
-              }
-              phx-disable-with="Accepting..."
-            >
-              Accept
-            </.button>
-
-            <.button
-              type="button"
-              size="sm"
-              variant="secondary"
-              data-role="offer-reject"
-              phx-click="offer_reject"
-              phx-value-id={
-                if(@entry.notification.ap_id,
-                  do: @entry.notification.ap_id,
-                  else: @entry.notification.id
-                )
-              }
-              phx-disable-with="Rejecting..."
-            >
-              Reject
-            </.button>
-          <% end %>
         </div>
       </div>
     </article>
