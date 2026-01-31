@@ -199,6 +199,8 @@ defmodule Egregoros.VerifiableCredentials.Reproof do
   @spec ensure_document(map(), binary(), binary(), keyword()) ::
           {:ok, map()} | {:skip, atom()} | {:error, term()}
   def ensure_document(document, issuer_ap_id, private_key, opts \\ [])
+
+  def ensure_document(document, issuer_ap_id, private_key, opts)
       when is_map(document) and is_binary(issuer_ap_id) and is_binary(private_key) and
              is_list(opts) do
     {updated_context, changed?} = normalize_context(document["@context"])
