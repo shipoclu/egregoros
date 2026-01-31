@@ -24,6 +24,7 @@ defmodule EgregorosWeb.Components.TimelineItems.BadgeCard do
         recipient: Map.get(badge, :recipient),
         badge_path: Map.get(badge, :badge_path),
         recipient_path: recipient_path(badge),
+        badge_actor: badge_actor(Map.get(assigns.entry, :actor), badge),
         reposted?: Map.get(assigns.entry, :reposted?, false),
         reposts_count: Map.get(assigns.entry, :reposts_count, 0)
       )
@@ -43,8 +44,9 @@ defmodule EgregorosWeb.Components.TimelineItems.BadgeCard do
 
       <div class="flex items-start justify-between gap-3">
         <ActorHeader.actor_header
-          actor={@entry.actor}
+          actor={@badge_actor}
           object={@entry.object}
+          link={false}
         />
 
         <div class="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-[color:var(--text-muted)]">
@@ -190,6 +192,14 @@ defmodule EgregorosWeb.Components.TimelineItems.BadgeCard do
   end
 
   defp actor_profile_path(actor), do: ProfilePaths.profile_path(actor)
+
+  defp badge_actor(actor, %{issuer_ap_id: issuer_ap_id})
+       when is_map(actor) and is_binary(issuer_ap_id) and issuer_ap_id != "" do
+    Map.put(actor, :handle, issuer_ap_id)
+  end
+
+  defp badge_actor(actor, _badge) when is_map(actor), do: actor
+  defp badge_actor(_actor, _badge), do: %{}
 
   defp reposter_short_name(%{display_name: name}) when is_binary(name) and name != "", do: name
 

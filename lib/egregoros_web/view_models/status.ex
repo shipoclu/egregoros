@@ -6,6 +6,7 @@ defmodule EgregorosWeb.ViewModels.Status do
   alias Egregoros.Relationships
   alias Egregoros.User
   alias Egregoros.Activities.Helpers, as: ActivityHelpers
+  alias Egregoros.VerifiableCredentials.DidWeb
   alias EgregorosWeb.ProfilePaths
   alias EgregorosWeb.SafeMediaURL
   alias EgregorosWeb.URL
@@ -453,11 +454,50 @@ defmodule EgregorosWeb.ViewModels.Status do
       valid_range: validity_range(valid_from, valid_until),
       validity: validity_label(valid_from, valid_until),
       recipient: recipient,
-      badge_path: badge_path(object, recipient)
+      badge_path: badge_path(object, recipient),
+      issuer_ap_id: issuer_ap_id(issuer)
     }
   end
 
   defp badge_view_model(_object, _ctx), do: %{}
+
+  defp issuer_ap_id(issuer) when is_binary(issuer) do
+    issuer = String.trim(issuer)
+
+    cond do
+      issuer == "" ->
+        nil
+
+      DidWeb.did_web?(issuer) ->
+        issuer
+        |> DidWeb.did_document_url()
+        |> did_document_base_url()
+        |> case do
+          base when is_binary(base) and base != "" -> base
+          _ -> issuer
+        end
+
+      true ->
+        issuer
+    end
+  end
+
+  defp issuer_ap_id(_issuer), do: nil
+
+  defp did_document_base_url(url) when is_binary(url) do
+    cond do
+      String.ends_with?(url, "/.well-known/did.json") ->
+        String.replace_suffix(url, "/.well-known/did.json", "")
+
+      String.ends_with?(url, "/did.json") ->
+        String.replace_suffix(url, "/did.json", "")
+
+      true ->
+        url
+    end
+  end
+
+  defp did_document_base_url(_url), do: nil
 
   defp poll_view_model(%{data: %{} = _data, actor: actor_ap_id} = object, current_user) do
     options = object |> Polls.options() |> Enum.map(&poll_option_view_model/1)
