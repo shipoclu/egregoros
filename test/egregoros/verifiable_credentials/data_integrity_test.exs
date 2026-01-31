@@ -208,6 +208,29 @@ defmodule Egregoros.VerifiableCredentials.DataIntegrityTest do
              })
   end
 
+  test "attach_proof supports keyword and atom option keys" do
+    {public_key, private_key} = :crypto.generate_key(:eddsa, :ed25519)
+    unsigned = fixture!("vc_di_eddsa_unsigned.json")
+
+    assert {:ok, signed} =
+             DataIntegrity.attach_proof(unsigned, private_key,
+               verification_method: @verification_method,
+               proof_purpose: @proof_purpose,
+               created: @created
+             )
+
+    assert {:ok, true} = DataIntegrity.verify_proof(signed, public_key)
+
+    assert {:ok, signed2} =
+             DataIntegrity.attach_proof(unsigned, private_key, %{
+               verification_method: @verification_method,
+               proof_purpose: @proof_purpose
+             })
+
+    assert is_binary(signed2["proof"]["created"])
+    assert {:ok, true} = DataIntegrity.verify_proof(signed2, public_key)
+  end
+
   defp fixture!(name) do
     "test/fixtures"
     |> Path.join(name)

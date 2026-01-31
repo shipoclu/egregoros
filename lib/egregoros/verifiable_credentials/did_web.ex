@@ -196,6 +196,35 @@ defmodule Egregoros.VerifiableCredentials.DidWeb do
 
   def did_document_url(_did), do: nil
 
+  @spec did_base_url(binary()) :: binary() | nil
+  def did_base_url(did) when is_binary(did) do
+    did
+    |> did_document_url()
+    |> document_base_url()
+  end
+
+  def did_base_url(_did), do: nil
+
+  defp document_base_url(url) when is_binary(url) do
+    url = String.trim(url)
+
+    cond do
+      url == "" ->
+        nil
+
+      String.ends_with?(url, "/.well-known/did.json") ->
+        String.replace_suffix(url, "/.well-known/did.json", "")
+
+      String.ends_with?(url, "/did.json") ->
+        String.replace_suffix(url, "/did.json", "")
+
+      true ->
+        url
+    end
+  end
+
+  defp document_base_url(_url), do: nil
+
   defp fetch_document(did) when is_binary(did) do
     cond do
       instance_did?(did) ->
@@ -299,7 +328,8 @@ defmodule Egregoros.VerifiableCredentials.DidWeb do
     end
   end
 
-  defp extract_ed25519_public_key(document, verification_method, did) do
+  defp extract_ed25519_public_key(%{} = document, verification_method, did)
+       when is_binary(verification_method) and is_binary(did) do
     verification_methods =
       Map.get(document, "verificationMethod") || Map.get(document, :verificationMethod)
 

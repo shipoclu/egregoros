@@ -25,6 +25,9 @@ defmodule Egregoros.MixProject do
           Mix.Tasks.Egregoros.Bench.Seed,
           Mix.Tasks.Egregoros.Bench.Run,
           Mix.Tasks.Egregoros.Bench.Explain,
+          Mix.Tasks.Egregoros.Vc.EnsureProofs,
+          Mix.Tasks.Egregoros.Vc.MigrateDidIssuer,
+          Mix.Tasks.Egregoros.Vc.Reproof,
           Egregoros.Bench.Seed
         ]
       ],

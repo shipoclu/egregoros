@@ -439,7 +439,8 @@ defmodule EgregorosWeb.ViewModels.Status do
     description = achievement_field(achievement, "description")
     image = achievement_image(achievement)
     issuer = Map.get(data, "issuer")
-    image_url = absolute_image_url(image, issuer)
+    issuer_ap_id = issuer_ap_id(issuer)
+    image_url = absolute_image_url(image, issuer_ap_id)
     valid_from = ActivityHelpers.parse_datetime(Map.get(data, "validFrom"))
     valid_until = ActivityHelpers.parse_datetime(Map.get(data, "validUntil"))
     recipient_ap_id = credential_subject_id(subject)
@@ -455,11 +456,14 @@ defmodule EgregorosWeb.ViewModels.Status do
       validity: validity_label(valid_from, valid_until),
       recipient: recipient,
       badge_path: badge_path(object, recipient),
-      issuer_ap_id: issuer_ap_id(issuer)
+      issuer_ap_id: issuer_ap_id
     }
   end
 
   defp badge_view_model(_object, _ctx), do: %{}
+
+  defp issuer_ap_id(%{"id" => id}), do: issuer_ap_id(id)
+  defp issuer_ap_id(%{id: id}), do: issuer_ap_id(id)
 
   defp issuer_ap_id(issuer) when is_binary(issuer) do
     issuer = String.trim(issuer)
@@ -469,10 +473,7 @@ defmodule EgregorosWeb.ViewModels.Status do
         nil
 
       DidWeb.did_web?(issuer) ->
-        issuer
-        |> DidWeb.did_document_url()
-        |> did_document_base_url()
-        |> case do
+        case DidWeb.did_base_url(issuer) do
           base when is_binary(base) and base != "" -> base
           _ -> issuer
         end
@@ -483,21 +484,6 @@ defmodule EgregorosWeb.ViewModels.Status do
   end
 
   defp issuer_ap_id(_issuer), do: nil
-
-  defp did_document_base_url(url) when is_binary(url) do
-    cond do
-      String.ends_with?(url, "/.well-known/did.json") ->
-        String.replace_suffix(url, "/.well-known/did.json", "")
-
-      String.ends_with?(url, "/did.json") ->
-        String.replace_suffix(url, "/did.json", "")
-
-      true ->
-        url
-    end
-  end
-
-  defp did_document_base_url(_url), do: nil
 
   defp poll_view_model(%{data: %{} = _data, actor: actor_ap_id} = object, current_user) do
     options = object |> Polls.options() |> Enum.map(&poll_option_view_model/1)

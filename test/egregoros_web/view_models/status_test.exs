@@ -214,6 +214,74 @@ defmodule EgregorosWeb.ViewModels.StatusTest do
     assert entry.badge.recipient.handle == "@#{recipient.nickname}"
   end
 
+  test "badge view model resolves issuer ids from issuer objects and did:web identifiers" do
+    uniq = System.unique_integer([:positive])
+    {:ok, issuer} = Users.create_local_user("badge-issuer-object-#{uniq}")
+    {:ok, recipient} = Users.create_local_user("badge-recipient-object-#{uniq}")
+    {:ok, viewer} = Users.create_local_user("badge-viewer-object-#{uniq}")
+
+    credential_ap_id = EgregorosWeb.Endpoint.url() <> "/objects/" <> Ecto.UUID.generate()
+
+    {:ok, credential} =
+      Objects.create_object(%{
+        ap_id: credential_ap_id,
+        type: "VerifiableCredential",
+        actor: issuer.ap_id,
+        object: nil,
+        local: true,
+        data: %{
+          "id" => credential_ap_id,
+          "type" => ["VerifiableCredential", "OpenBadgeCredential"],
+          "issuer" => %{"id" => issuer.ap_id},
+          "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+          "credentialSubject" => %{
+            "id" => recipient.ap_id,
+            "type" => "AchievementSubject",
+            "achievement" => %{
+              "id" => "https://example.com/badges/donator",
+              "type" => "Achievement",
+              "name" => "Donator",
+              "image" => %{"id" => "/badges/donator.png", "type" => "Image"}
+            }
+          }
+        }
+      })
+
+    entry = Status.decorate(credential, viewer)
+    assert entry.badge.issuer_ap_id == issuer.ap_id
+
+    did_credential_ap_id = EgregorosWeb.Endpoint.url() <> "/objects/" <> Ecto.UUID.generate()
+
+    {:ok, did_credential} =
+      Objects.create_object(%{
+        ap_id: did_credential_ap_id,
+        type: "VerifiableCredential",
+        actor: issuer.ap_id,
+        object: nil,
+        local: true,
+        data: %{
+          "id" => did_credential_ap_id,
+          "type" => ["VerifiableCredential", "OpenBadgeCredential"],
+          "issuer" => "did:web:remote.example",
+          "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+          "credentialSubject" => %{
+            "id" => recipient.ap_id,
+            "type" => "AchievementSubject",
+            "achievement" => %{
+              "id" => "https://example.com/badges/donator2",
+              "type" => "Achievement",
+              "name" => "Donator2",
+              "image" => %{"id" => "/badges/donator2.png", "type" => "Image"}
+            }
+          }
+        }
+      })
+
+    did_entry = Status.decorate(did_credential, viewer)
+    assert did_entry.badge.issuer_ap_id == "https://remote.example"
+    assert did_entry.badge.image_url == "https://remote.example/badges/donator2.png"
+  end
+
   test "decorates announces of verifiable credentials" do
     uniq = System.unique_integer([:positive])
     {:ok, issuer} = Users.create_local_user("badge-announce-issuer-#{uniq}")
