@@ -369,6 +369,52 @@ defmodule EgregorosWeb.AdminControllerTest do
              EgregorosWeb.Endpoint.url() <> "/uploads/media/#{instance_actor.id}/badge.png"
   end
 
+  test "POST /admin/badges/:id handles malformed badge ids without crashing", %{conn: conn} do
+    {:ok, admin} = Users.create_local_user("badge_admin_invalid_id")
+    {:ok, admin} = Users.set_admin(admin, true)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: admin.id})
+    csrf_token = Phoenix.Controller.get_csrf_token()
+
+    conn =
+      post(conn, "/admin/badges/not_a_flake_id__xx", %{
+        "_csrf_token" => csrf_token,
+        "badge_definition" => %{}
+      })
+
+    assert redirected_to(conn) == "/admin"
+    assert Phoenix.Flash.get(conn.assigns.flash, :error) == "Could not update badge."
+  end
+
+  test "admin endpoints return 422 for malformed params", %{conn: conn} do
+    {:ok, admin} = Users.create_local_user("admin_unprocessable")
+    {:ok, admin} = Users.set_admin(admin, true)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: admin.id})
+    csrf_token = Phoenix.Controller.get_csrf_token()
+
+    conn =
+      post(conn, "/admin/registrations", %{
+        "_csrf_token" => csrf_token
+      })
+
+    assert response(conn, 422) =~ "Unprocessable Entity"
+
+    conn =
+      post(conn, "/admin/relays", %{
+        "_csrf_token" => csrf_token
+      })
+
+    assert response(conn, 422) =~ "Unprocessable Entity"
+
+    conn =
+      post(conn, "/admin/badges/invalid", %{
+        "_csrf_token" => csrf_token
+      })
+
+    assert response(conn, 422) =~ "Unprocessable Entity"
+  end
+
   defp fixture_path(filename) do
     Path.expand(Path.join(["test", "fixtures", filename]), File.cwd!())
   end

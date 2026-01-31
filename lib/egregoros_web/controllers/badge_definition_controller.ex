@@ -7,22 +7,17 @@ defmodule EgregorosWeb.BadgeDefinitionController do
   alias EgregorosWeb.URL
 
   def show(conn, %{"id" => id}) do
-    case FlakeId.from_string(id) do
-      <<_::128>> ->
-        case Repo.get(BadgeDefinition, id) do
-          %BadgeDefinition{} = badge ->
-            payload = badge_payload(badge)
+    id = id |> to_string() |> String.trim()
 
-            conn
-            |> put_resp_content_type("application/ld+json")
-            |> send_resp(200, Jason.encode!(payload))
+    with true <- flake_id?(id),
+         %BadgeDefinition{} = badge <- Repo.get(BadgeDefinition, id) do
+      payload = badge_payload(badge)
 
-          _ ->
-            send_resp(conn, 404, "Not found")
-        end
-
-      _ ->
-        send_resp(conn, 404, "Not found")
+      conn
+      |> put_resp_content_type("application/ld+json")
+      |> send_resp(200, Jason.encode!(payload))
+    else
+      _ -> send_resp(conn, 404, "Not found")
     end
   end
 
@@ -52,4 +47,11 @@ defmodule EgregorosWeb.BadgeDefinitionController do
   end
 
   defp maybe_put_image(payload, _badge), do: payload
+
+  defp flake_id?(id) when is_binary(id) do
+    id = String.trim(id)
+    byte_size(id) == 18 and FlakeId.flake_id?(id)
+  end
+
+  defp flake_id?(_id), do: false
 end

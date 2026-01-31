@@ -123,7 +123,9 @@ defmodule EgregorosWeb.AdminController do
   end
 
   def update_badge_definition(conn, %{"id" => id, "badge_definition" => %{} = params}) do
-    with <<_::128>> <- FlakeId.from_string(id),
+    id = id |> to_string() |> String.trim()
+
+    with true <- flake_id?(id),
          %BadgeDefinition{} = badge <- Repo.get(BadgeDefinition, id),
          {:ok, _badge} <- Badges.update_definition(badge, params) do
       conn
@@ -221,4 +223,12 @@ defmodule EgregorosWeb.AdminController do
   end
 
   defp badge_issue_opts(_expires_on), do: []
+
+  defp flake_id?(id) when is_binary(id) do
+    id = String.trim(id)
+
+    byte_size(id) == 18 and FlakeId.flake_id?(id)
+  end
+
+  defp flake_id?(_id), do: false
 end

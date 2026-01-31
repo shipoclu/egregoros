@@ -1783,14 +1783,21 @@ defmodule EgregorosWeb.TimelineLive do
   defp parse_choices(_choices), do: []
 
   defp flake_id?(id) when is_binary(id) do
-    match?(<<_::128>>, FlakeId.from_string(id))
+    id = String.trim(id)
+    byte_size(id) == 18 and FlakeId.flake_id?(id)
   end
 
   defp flake_id?(_id), do: false
 
   defp min_flake_id(left, right) when is_binary(left) and is_binary(right) do
-    with <<_::128>> = left_bin <- FlakeId.from_string(left),
-         <<_::128>> = right_bin <- FlakeId.from_string(right) do
+    left = String.trim(left)
+    right = String.trim(right)
+
+    with true <- flake_id?(left),
+         true <- flake_id?(right) do
+      <<_::128>> = left_bin = FlakeId.from_string(left)
+      <<_::128>> = right_bin = FlakeId.from_string(right)
+
       if left_bin <= right_bin, do: left, else: right
     else
       _ -> left

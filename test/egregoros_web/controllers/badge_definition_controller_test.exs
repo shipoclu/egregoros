@@ -44,4 +44,9 @@ defmodule EgregorosWeb.BadgeDefinitionControllerTest do
     conn = get(conn, "/badges/invalid")
     assert conn.status == 404
   end
+
+  test "GET /badges/:id returns 404 for malformed badge ids", %{conn: conn} do
+    conn = get(conn, "/badges/not_a_flake_id__xx")
+    assert conn.status == 404
+  end
 end
