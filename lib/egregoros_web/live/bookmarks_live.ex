@@ -719,7 +719,8 @@ defmodule EgregorosWeb.BookmarksLive do
   defp normalize_id(_), do: nil
 
   defp flake_id?(id) when is_binary(id) do
-    match?(<<_::128>>, FlakeId.from_string(id))
+    id = String.trim(id)
+    byte_size(id) == 18 and FlakeId.flake_id?(id)
   end
 
   defp flake_id?(_id), do: false
