@@ -409,6 +409,34 @@ defmodule EgregorosWeb.NotificationsLiveTest do
            )
   end
 
+  test "offer notifications include badge images when available", %{conn: conn, user: user} do
+    credential =
+      Fixtures.json!("openbadge_vc.json")
+      |> Map.put("issuer", "https://example.com/users/issuer")
+      |> Map.put("to", [user.ap_id])
+      |> put_in(["credentialSubject", "id"], user.ap_id)
+
+    offer = %{
+      "id" => "https://example.com/activities/offer/live-image",
+      "type" => "Offer",
+      "actor" => "https://example.com/users/issuer",
+      "to" => [user.ap_id],
+      "object" => credential,
+      "published" => "2026-01-29T00:00:00Z"
+    }
+
+    assert {:ok, offer_object} =
+             Pipeline.ingest(offer, local: false, inbox_user_ap_id: user.ap_id)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/notifications")
+
+    assert has_element?(
+             view,
+             "#notification-#{offer_object.id} img[data-role='offer-badge-image'][src='https://example.com/badges/donator.png']"
+           )
+  end
+
   test "offer notifications link to the accepted badge", %{conn: conn, user: user} do
     credential =
       Fixtures.json!("openbadge_vc.json")

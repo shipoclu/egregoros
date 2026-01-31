@@ -541,6 +541,7 @@ defmodule EgregorosWeb.NotificationsLive do
       end
 
     {offer_title, offer_description} = offer_details(notification)
+    offer_image_url = offer_image_url(notification)
     offer_badge_path = offer_badge_path(notification, current_user)
     offer_response = offer_response(notification, current_user)
 
@@ -557,6 +558,7 @@ defmodule EgregorosWeb.NotificationsLive do
       reaction_emoji: reaction_emoji,
       offer_title: offer_title,
       offer_description: offer_description,
+      offer_image_url: offer_image_url,
       offer_badge_path: offer_badge_path,
       offer_response: offer_response
     }
@@ -607,14 +609,9 @@ defmodule EgregorosWeb.NotificationsLive do
   defp note_for_ap_id(_ap_id), do: nil
 
   defp offer_details(%Object{type: "Offer"} = offer) do
-    credential =
-      case offer.data do
-        %{"object" => %{} = embedded} -> embedded
-        _ -> credential_from_ap_id(offer.object)
-      end
-
     achievement =
-      credential
+      offer
+      |> offer_credential()
       |> credential_subject()
       |> credential_achievement()
 
@@ -625,6 +622,26 @@ defmodule EgregorosWeb.NotificationsLive do
   end
 
   defp offer_details(_notification), do: {nil, nil}
+
+  defp offer_image_url(%Object{type: "Offer"} = offer) do
+    offer
+    |> offer_credential()
+    |> credential_subject()
+    |> credential_achievement()
+    |> achievement_image()
+    |> absolute_image_url()
+  end
+
+  defp offer_image_url(_notification), do: nil
+
+  defp offer_credential(%Object{type: "Offer"} = offer) do
+    case offer.data do
+      %{"object" => %{} = embedded} -> embedded
+      _ -> credential_from_ap_id(offer.object)
+    end
+  end
+
+  defp offer_credential(_offer), do: nil
 
   defp offer_badge_path(%Object{type: "Offer"} = offer, %User{} = user) do
     offer_ap_id =
@@ -713,6 +730,24 @@ defmodule EgregorosWeb.NotificationsLive do
   end
 
   defp achievement_field(_achievement, _field), do: nil
+
+  defp achievement_image(%{} = achievement) do
+    Map.get(achievement, "image") || Map.get(achievement, :image)
+  end
+
+  defp achievement_image(_achievement), do: nil
+
+  defp absolute_image_url(nil), do: nil
+
+  defp absolute_image_url(url) when is_binary(url) do
+    URL.absolute(url)
+  end
+
+  defp absolute_image_url(%{"id" => id}) when is_binary(id), do: absolute_image_url(id)
+  defp absolute_image_url(%{"url" => url}) when is_binary(url), do: absolute_image_url(url)
+  defp absolute_image_url(%{id: id}) when is_binary(id), do: absolute_image_url(id)
+  defp absolute_image_url(%{url: url}) when is_binary(url), do: absolute_image_url(url)
+  defp absolute_image_url(_image), do: nil
 
   defp fetch_offer(offer_id) when is_binary(offer_id) do
     offer_id = String.trim(offer_id)

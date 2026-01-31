@@ -75,6 +75,16 @@ defmodule EgregorosWeb.Components.NotificationItems.OfferNotification do
               </.link>
             <% end %>
           </div>
+
+          <%= if is_binary(@entry[:offer_image_url]) and @entry[:offer_image_url] != "" do %>
+            <img
+              data-role="offer-badge-image"
+              src={@entry[:offer_image_url]}
+              alt={@entry[:offer_title] || "Badge image"}
+              loading="lazy"
+              class="size-16 shrink-0 rounded-lg border border-[color:var(--border-default)] object-cover"
+            />
+          <% end %>
         </div>
 
         <div class="flex flex-wrap items-center justify-end gap-2">
