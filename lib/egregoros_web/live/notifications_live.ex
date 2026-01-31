@@ -531,7 +531,13 @@ defmodule EgregorosWeb.NotificationsLive do
           {"hero-face-smile", message, message_emojis, reaction_display}
 
         "Offer" ->
-          {"hero-gift", "#{actor.display_name} offered you a badge", actor.emojis, nil}
+          offer_label =
+            case actor.ap_id do
+              ap_id when is_binary(ap_id) and ap_id != "" -> ap_id
+              _ -> actor.display_name
+            end
+
+          {"hero-gift", "#{offer_label} offered you a badge", actor.emojis, nil}
 
         "Note" ->
           {"hero-at-symbol", "#{actor.display_name} mentioned you", actor.emojis, nil}

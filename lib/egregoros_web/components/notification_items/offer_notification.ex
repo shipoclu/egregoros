@@ -47,53 +47,57 @@ defmodule EgregorosWeb.Components.NotificationItems.OfferNotification do
               </p>
             <% end %>
 
-            <%= if @entry[:offer_title] do %>
-              <p
-                data-role="offer-title"
-                class="mt-3 text-sm font-semibold text-[color:var(--text-primary)]"
-              >
-                {@entry[:offer_title]}
-              </p>
-            <% end %>
+            <div class="mt-3 flex items-start gap-3">
+              <%= if is_binary(@entry[:offer_image_url]) and @entry[:offer_image_url] != "" do %>
+                <img
+                  data-role="offer-badge-image"
+                  src={@entry[:offer_image_url]}
+                  alt={@entry[:offer_title] || "Badge image"}
+                  loading="lazy"
+                  class="size-16 shrink-0 rounded-lg border border-[color:var(--border-default)] bg-[color:var(--bg-subtle)] object-contain p-1"
+                />
+              <% end %>
 
-            <%= if @entry[:offer_description] do %>
-              <p
-                data-role="offer-description"
-                class="mt-1 text-sm text-[color:var(--text-secondary)]"
-              >
-                {@entry[:offer_description]}
-              </p>
-            <% end %>
+              <div class="min-w-0">
+                <%= if @entry[:offer_title] do %>
+                  <p
+                    data-role="offer-title"
+                    class="text-sm font-semibold text-[color:var(--text-primary)]"
+                  >
+                    {@entry[:offer_title]}
+                  </p>
+                <% end %>
 
-            <%= if is_binary(@entry[:offer_response]) and @entry[:offer_response] != "" do %>
-              <p
-                data-role="offer-response-status"
-                class="mt-3 text-xs font-semibold uppercase tracking-wide text-[color:var(--text-muted)]"
-              >
-                {@entry[:offer_response]}
-              </p>
-            <% end %>
+                <%= if @entry[:offer_description] do %>
+                  <p
+                    data-role="offer-description"
+                    class="mt-1 text-sm text-[color:var(--text-secondary)]"
+                  >
+                    {@entry[:offer_description]}
+                  </p>
+                <% end %>
 
-            <%= if is_binary(@entry[:offer_badge_path]) do %>
-              <.link
-                data-role="offer-badge-link"
-                navigate={@entry[:offer_badge_path]}
-                class="mt-3 inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-[color:var(--link)] hover:text-[color:var(--text-primary)] hover:underline underline-offset-4"
-              >
-                <.icon name="hero-trophy" class="size-4" /> View badge
-              </.link>
-            <% end %>
+                <%= if is_binary(@entry[:offer_response]) and @entry[:offer_response] != "" do %>
+                  <p
+                    data-role="offer-response-status"
+                    class="mt-3 text-xs font-semibold uppercase tracking-wide text-[color:var(--text-muted)]"
+                  >
+                    {@entry[:offer_response]}
+                  </p>
+                <% end %>
+
+                <%= if is_binary(@entry[:offer_badge_path]) do %>
+                  <.link
+                    data-role="offer-badge-link"
+                    navigate={@entry[:offer_badge_path]}
+                    class="mt-3 inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-[color:var(--link)] hover:text-[color:var(--text-primary)] hover:underline underline-offset-4"
+                  >
+                    <.icon name="hero-trophy" class="size-4" /> View badge
+                  </.link>
+                <% end %>
+              </div>
+            </div>
           </div>
-
-          <%= if is_binary(@entry[:offer_image_url]) and @entry[:offer_image_url] != "" do %>
-            <img
-              data-role="offer-badge-image"
-              src={@entry[:offer_image_url]}
-              alt={@entry[:offer_title] || "Badge image"}
-              loading="lazy"
-              class="size-16 shrink-0 rounded-lg border border-[color:var(--border-default)] object-cover"
-            />
-          <% end %>
         </div>
 
         <div class="flex flex-wrap items-center justify-end gap-2">
