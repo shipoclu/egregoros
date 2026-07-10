@@ -36,11 +36,14 @@ defmodule Egregoros.Signature.HTTPActorFetchTest do
     end)
 
     date = HTTPDate.format_rfc1123(DateTime.utc_now())
+    digest = "SHA-256=" <> Base.encode64(:crypto.hash(:sha256, ""))
 
     signature_string =
       [
         "(request-target): post /users/frank/inbox",
-        "date: " <> date
+        "host: www.example.com",
+        "date: " <> date,
+        "digest: " <> digest
       ]
       |> Enum.join("\n")
 
@@ -52,12 +55,14 @@ defmodule Egregoros.Signature.HTTPActorFetchTest do
       "Signature " <>
         "keyId=\"#{actor_url}#main-key\"," <>
         "algorithm=\"rsa-sha256\"," <>
-        "headers=\"(request-target) date\"," <>
+        "headers=\"(request-target) host date digest\"," <>
         "signature=\"#{signature}\""
 
     conn =
       Plug.Test.conn(:post, "/users/frank/inbox", "")
+      |> Plug.Conn.assign(:raw_body, "")
       |> Plug.Conn.put_req_header("date", date)
+      |> Plug.Conn.put_req_header("digest", digest)
       |> Plug.Conn.put_req_header("authorization", header)
 
     assert {:ok, ^actor_url} = Egregoros.Signature.verify_request(conn)
@@ -93,11 +98,14 @@ defmodule Egregoros.Signature.HTTPActorFetchTest do
     end)
 
     date = HTTPDate.format_rfc1123(DateTime.utc_now())
+    digest = "SHA-256=" <> Base.encode64(:crypto.hash(:sha256, ""))
 
     signature_string =
       [
         "(request-target): post /users/frank/inbox",
-        "date: " <> date
+        "host: www.example.com",
+        "date: " <> date,
+        "digest: " <> digest
       ]
       |> Enum.join("\n")
 
@@ -109,12 +117,14 @@ defmodule Egregoros.Signature.HTTPActorFetchTest do
       "Signature " <>
         "keyId=\"#{actor_url}/main-key\"," <>
         "algorithm=\"rsa-sha256\"," <>
-        "headers=\"(request-target) date\"," <>
+        "headers=\"(request-target) host date digest\"," <>
         "signature=\"#{signature}\""
 
     conn =
       Plug.Test.conn(:post, "/users/frank/inbox", "")
+      |> Plug.Conn.assign(:raw_body, "")
       |> Plug.Conn.put_req_header("date", date)
+      |> Plug.Conn.put_req_header("digest", digest)
       |> Plug.Conn.put_req_header("authorization", header)
 
     assert {:ok, ^actor_url} = Egregoros.Signature.verify_request(conn)

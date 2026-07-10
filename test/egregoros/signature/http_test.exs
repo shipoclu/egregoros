@@ -135,6 +135,31 @@ defmodule Egregoros.Signature.HTTPTest do
       assert {:error, :invalid_method} = HTTP.verify_request(conn)
     end
 
+    test "rejects a valid date-only POST signature by default" do
+      {public_key, private_key} = Keys.generate_rsa_keypair()
+
+      {:ok, user} =
+        create_remote_user(%{
+          public_key: public_key,
+          private_key: private_key
+        })
+
+      body = Jason.encode!(%{"id" => user.ap_id <> "/activities/weak", "type" => "Like"})
+      url = "https://local.example/users/frank/inbox"
+
+      {:ok, signed} = HTTP.sign_request(user, "post", url, body, ["date"])
+
+      conn =
+        Plug.Test.conn(:post, "/users/frank/inbox", body)
+        |> Plug.Conn.assign(:raw_body, body)
+        |> Plug.Conn.put_req_header("date", signed.date)
+        |> Plug.Conn.put_req_header("signature", signed.signature)
+
+      conn = %{conn | host: "local.example", scheme: :https, port: 443}
+
+      assert {:error, :missing_required_signature_headers} = HTTP.verify_request(conn)
+    end
+
     test "verifies signatures when digest uses a lowercase sha-256 prefix" do
       {public_key, private_key} = Keys.generate_rsa_keypair()
 
@@ -283,12 +308,17 @@ defmodule Egregoros.Signature.HTTPTest do
           private_key: nil
         })
 
+      date = HTTPDate.format_rfc1123(DateTime.utc_now())
+      digest = "SHA-256=" <> Base.encode64(:crypto.hash(:sha256, ""))
+
       conn =
         Plug.Test.conn(:post, "/users/frank/inbox", "")
-        |> Plug.Conn.put_req_header("date", HTTPDate.format_rfc1123(DateTime.utc_now()))
+        |> Plug.Conn.assign(:raw_body, "")
+        |> Plug.Conn.put_req_header("date", date)
+        |> Plug.Conn.put_req_header("digest", digest)
         |> Plug.Conn.put_req_header(
           "signature",
-          "Signature foo,keyId=\"#{user.ap_id}#main-key\",headers=\"(request-target) date\",signature=\"AA==\""
+          "Signature foo,keyId=\"#{user.ap_id}#main-key\",headers=\"(request-target) host date digest\",signature=\"AA==\""
         )
 
       assert {:error, :invalid_signature} = HTTP.verify_request(conn)

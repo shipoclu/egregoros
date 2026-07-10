@@ -57,7 +57,7 @@ defmodule Egregoros.Signature.HTTPStrictTest do
     assert {:error, :missing_required_signature_headers} = HTTP.verify_request(conn)
   end
 
-  test "strict mode accepts POST signatures including recommended headers" do
+  test "strict mode accepts a body-bound POST signature without content-length" do
     {public_key, private_key} = Keys.generate_rsa_keypair()
 
     {:ok, user} =
@@ -69,14 +69,14 @@ defmodule Egregoros.Signature.HTTPStrictTest do
     body = Jason.encode!(%{"id" => "https://remote.example/activities/2", "type" => "Like"})
     url = "https://local.example/users/frank/inbox"
 
-    {:ok, signed} = HTTP.sign_request(user, "post", url, body)
+    {:ok, signed} =
+      HTTP.sign_request(user, "post", url, body, ["(request-target)", "host", "date", "digest"])
 
     conn =
       Plug.Test.conn(:post, "/users/frank/inbox", body)
       |> Plug.Conn.assign(:raw_body, body)
       |> Plug.Conn.put_req_header("date", signed.date)
       |> Plug.Conn.put_req_header("digest", signed.digest)
-      |> Plug.Conn.put_req_header("content-length", signed.content_length)
       |> Plug.Conn.put_req_header("signature", signed.signature)
 
     conn = %{conn | host: "local.example", scheme: :https, port: 443}
