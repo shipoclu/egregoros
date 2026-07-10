@@ -4,6 +4,9 @@ defmodule EgregorosWeb.Plugs.Uploads do
   import Plug.Conn
 
   alias Egregoros.RuntimeConfig
+  alias Egregoros.Media
+  alias Egregoros.Signature
+  alias Egregoros.Users
   alias EgregorosWeb.Endpoint
 
   @secure_headers [
@@ -13,39 +16,122 @@ defmodule EgregorosWeb.Plugs.Uploads do
   ]
 
   def init(_opts) do
-    static_opts =
+    public_static_opts =
       Plug.Static.init(
         at: "/uploads",
         from: {__MODULE__, :uploads_root, []},
         gzip: false,
         headers: @secure_headers,
+        cache_control_for_etags: "public, max-age=31536000, immutable",
+        cache_control_for_vsn_requests: "public, max-age=31536000, immutable",
         only_matching: ~w(avatars banners media)
       )
 
-    %{static_opts: static_opts}
+    restricted_static_opts =
+      Plug.Static.init(
+        at: "/uploads",
+        from: {__MODULE__, :uploads_root, []},
+        gzip: false,
+        headers: [{"vary", "authorization, cookie, signature"} | @secure_headers],
+        cache_control_for_etags: "private, no-store",
+        cache_control_for_vsn_requests: "private, no-store",
+        only_matching: ~w(media)
+      )
+
+    %{public_static_opts: public_static_opts, restricted_static_opts: restricted_static_opts}
   end
 
-  def call(%Plug.Conn{request_path: "/uploads" <> _rest} = conn, %{static_opts: static_opts}) do
-    if uploads_host_allowed?(conn) do
-      case conn.request_path do
-        "/uploads/media/" <> _ ->
-          serve_static(conn, static_opts)
+  def call(
+        %Plug.Conn{request_path: "/uploads" <> _rest} = conn,
+        %{public_static_opts: public_opts, restricted_static_opts: restricted_opts}
+      ) do
+    case conn.request_path do
+      "/uploads/media/" <> _ ->
+        serve_media(conn, public_opts, restricted_opts)
 
-        "/uploads/avatars/" <> _ ->
-          serve_static(conn, static_opts)
+      _ ->
+        if uploads_host_allowed?(conn) do
+          case conn.request_path do
+            "/uploads/avatars/" <> _ ->
+              serve_static(conn, public_opts)
 
-        "/uploads/banners/" <> _ ->
-          serve_static(conn, static_opts)
+            "/uploads/banners/" <> _ ->
+              serve_static(conn, public_opts)
 
-        _ ->
+            _ ->
+              not_found(conn)
+          end
+        else
           not_found(conn)
-      end
-    else
-      not_found(conn)
+        end
     end
   end
 
   def call(conn, _opts), do: conn
+
+  defp serve_media(conn, public_opts, restricted_opts) do
+    requester = requester_actor_ap_id(conn)
+
+    case Media.access_for_path(conn.request_path, requester) do
+      :public ->
+        if uploads_host_allowed?(conn),
+          do: serve_static(conn, public_opts),
+          else: not_found(conn)
+
+      :restricted ->
+        if restricted_host_allowed?(conn),
+          do: serve_static(conn, restricted_opts),
+          else: not_found(conn)
+
+      :denied ->
+        not_found(conn)
+    end
+  end
+
+  defp requester_actor_ap_id(conn) do
+    session_actor(conn) || bearer_actor(conn) || signature_actor(conn)
+  end
+
+  defp session_actor(conn) do
+    conn = fetch_session(conn)
+
+    case get_session(conn, :user_id) do
+      user_id when is_binary(user_id) ->
+        case Users.get(user_id) do
+          %{ap_id: ap_id} when is_binary(ap_id) -> ap_id
+          _ -> nil
+        end
+
+      _ ->
+        nil
+    end
+  end
+
+  defp bearer_actor(conn) do
+    case get_req_header(conn, "authorization") do
+      ["Bearer " <> _token | _] ->
+        case Egregoros.Auth.current_user(conn) do
+          {:ok, %{ap_id: ap_id}} when is_binary(ap_id) -> ap_id
+          _ -> nil
+        end
+
+      _ ->
+        nil
+    end
+  end
+
+  defp signature_actor(conn) do
+    case get_req_header(conn, "signature") do
+      [_signature | _] ->
+        case Signature.verify_request(conn) do
+          {:ok, ap_id} when is_binary(ap_id) -> ap_id
+          _ -> nil
+        end
+
+      _ ->
+        nil
+    end
+  end
 
   defp serve_static(conn, static_opts) do
     conn = Plug.Static.call(conn, static_opts)
@@ -85,6 +171,14 @@ defmodule EgregorosWeb.Plugs.Uploads do
   end
 
   defp uploads_host_allowed?(_conn), do: true
+
+  defp restricted_host_allowed?(%Plug.Conn{} = conn) do
+    if uploads_host_restricted?() do
+      is_binary(conn.host) and String.downcase(conn.host) == String.downcase(endpoint_host())
+    else
+      true
+    end
+  end
 
   defp uploads_host_restricted? do
     with uploads_host when is_binary(uploads_host) and uploads_host != "" <- uploads_host(),

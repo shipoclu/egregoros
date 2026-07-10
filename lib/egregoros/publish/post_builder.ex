@@ -7,20 +7,65 @@ defmodule Egregoros.Publish.PostBuilder do
   alias Egregoros.Objects
   alias Egregoros.User
   alias Egregoros.Users
+  alias EgregorosWeb.Endpoint
   alias EgregorosWeb.URL
 
   @as_public "https://www.w3.org/ns/activitystreams#Public"
 
-  def put_attachments(post, attachments)
-      when is_map(post) and is_list(attachments) do
+  def put_attachments(post, attachments, visibility \\ "public")
+
+  def put_attachments(post, attachments, visibility)
+      when is_map(post) and is_list(attachments) and is_binary(visibility) do
     if attachments == [] do
       post
     else
+      attachments =
+        if visibility in ["private", "direct"] do
+          Enum.map(attachments, &localize_private_attachment/1)
+        else
+          attachments
+        end
+
       Map.put(post, "attachment", attachments)
     end
   end
 
-  def put_attachments(post, _attachments), do: post
+  def put_attachments(post, _attachments, _visibility), do: post
+
+  defp localize_private_attachment(%{} = attachment) do
+    attachment
+    |> maybe_update("url", &localize_attachment_url/1)
+    |> maybe_update("icon", &localize_private_attachment/1)
+  end
+
+  defp localize_private_attachment(value), do: value
+
+  defp maybe_update(map, key, fun) do
+    if Map.has_key?(map, key), do: Map.update!(map, key, fun), else: map
+  end
+
+  defp localize_attachment_url(url) when is_binary(url), do: localize_upload_url(url)
+
+  defp localize_attachment_url(urls) when is_list(urls) do
+    Enum.map(urls, fn
+      %{} = link -> maybe_update(link, "href", &localize_upload_url/1)
+      value -> value
+    end)
+  end
+
+  defp localize_attachment_url(value), do: value
+
+  defp localize_upload_url(url) when is_binary(url) do
+    case URI.parse(url) do
+      %URI{path: "/uploads/media/" <> _ = path, query: query} ->
+        URI.to_string(%URI{URI.parse(Endpoint.url()) | path: path, query: query})
+
+      _ ->
+        url
+    end
+  end
+
+  defp localize_upload_url(value), do: value
 
   def put_in_reply_to(post, nil), do: post
 

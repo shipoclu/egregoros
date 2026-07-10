@@ -137,7 +137,7 @@ defmodule Egregoros.Publish.Polls do
           question =
             Question.build(user, content, content_html)
             |> Map.merge(poll_data)
-            |> PostBuilder.put_attachments(attachments)
+            |> PostBuilder.put_attachments(attachments, visibility)
             |> PostBuilder.put_in_reply_to(in_reply_to)
             |> PostBuilder.put_visibility(visibility, user.ap_id, mention_recipient_ids)
             |> PostBuilder.put_tags(mention_tags ++ hashtag_tags)

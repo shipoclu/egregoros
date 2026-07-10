@@ -1,12 +1,14 @@
 defmodule Egregoros.Media do
   import Ecto.Query, only: [from: 2]
 
-  alias Egregoros.Object
-  alias Egregoros.Repo
-  alias Egregoros.User
-  alias Egregoros.Objects
   alias Egregoros.MediaMeta
   alias Egregoros.MediaVariants
+  alias Egregoros.Object
+  alias Egregoros.Objects
+  alias Egregoros.Relationships
+  alias Egregoros.Repo
+  alias Egregoros.User
+  alias Egregoros.Users
   alias EgregorosWeb.Endpoint
   alias EgregorosWeb.URL
 
@@ -31,6 +33,13 @@ defmodule Egregoros.Media do
       actor: user.ap_id,
       local: true,
       published: DateTime.utc_now(),
+      internal: %{
+        "media" => %{
+          "paths" => media_paths(url_path, upload),
+          "public" => false,
+          "post_ap_ids" => []
+        }
+      },
       data: %{
         "id" => ap_id,
         "type" => activity_type(upload.content_type),
@@ -49,6 +58,63 @@ defmodule Egregoros.Media do
       }
     })
   end
+
+  def bind_attachments(%Object{actor: actor, data: %{} = data} = post)
+      when is_binary(actor) do
+    attachment_ids =
+      data
+      |> Map.get("attachment", [])
+      |> List.wrap()
+      |> Enum.flat_map(fn
+        %{"id" => id} when is_binary(id) -> [id]
+        _ -> []
+      end)
+
+    public? = Objects.publicly_visible?(post)
+
+    attachment_ids
+    |> Objects.list_by_ap_ids()
+    |> Enum.filter(&(&1.actor == actor and &1.local))
+    |> Enum.reduce_while(:ok, fn media, :ok ->
+      media_state = get_in(media.internal || %{}, ["media"]) || %{}
+      post_ap_ids = [post.ap_id | List.wrap(media_state["post_ap_ids"])] |> Enum.uniq()
+
+      updated_state =
+        media_state
+        |> Map.put("post_ap_ids", post_ap_ids)
+        |> Map.put("public", media_state["public"] == true or public?)
+
+      internal = Map.put(media.internal || %{}, "media", updated_state)
+
+      case Objects.update_object(media, %{internal: internal}) do
+        {:ok, _media} -> {:cont, :ok}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+  end
+
+  def bind_attachments(_post), do: :ok
+
+  def access_for_path(path, requester_actor_ap_id \\ nil)
+
+  def access_for_path(path, requester_actor_ap_id) when is_binary(path) do
+    case media_by_path(path) do
+      %Object{} = media ->
+        media_state = get_in(media.internal || %{}, ["media"]) || %{}
+
+        cond do
+          media_state["public"] == true -> :public
+          requester_actor_ap_id == media.actor -> :restricted
+          authorized_for_linked_post?(media_state, requester_actor_ap_id) -> :restricted
+          true -> :denied
+        end
+
+      nil ->
+        :denied
+    end
+  end
+
+  def access_for_path(_path, _requester_actor_ap_id), do: :denied
 
   def attachments_from_ids(%User{} = user, ids) do
     ids = List.wrap(ids)
@@ -147,6 +213,66 @@ defmodule Egregoros.Media do
   end
 
   defp activity_type(_), do: "Document"
+
+  defp media_paths(url_path, upload) do
+    paths = [url_path]
+
+    if is_binary(upload.content_type) and String.starts_with?(upload.content_type, "image/") do
+      [MediaVariants.thumbnail_url_path(url_path) | paths]
+    else
+      paths
+    end
+  end
+
+  defp media_by_path("/uploads/media/" <> rest = path) do
+    with [user_id, _filename] <- String.split(rest, "/", parts: 2),
+         %User{} = owner <- Users.get(user_id) do
+      from(o in Object,
+        where: o.actor == ^owner.ap_id and o.type in ^@allowed_types,
+        order_by: [desc: o.inserted_at]
+      )
+      |> Repo.all()
+      |> Enum.find(fn object ->
+        path in List.wrap(get_in(object.internal || %{}, ["media", "paths"]))
+      end)
+    else
+      _ -> nil
+    end
+  end
+
+  defp media_by_path(_path), do: nil
+
+  defp authorized_for_linked_post?(_media_state, requester)
+       when not is_binary(requester) or requester == "",
+       do: false
+
+  defp authorized_for_linked_post?(media_state, requester) do
+    media_state
+    |> Map.get("post_ap_ids", [])
+    |> List.wrap()
+    |> Enum.any?(fn post_ap_id ->
+      case Objects.get_by_ap_id(post_ap_id) do
+        %Object{type: type} = post when type != "Tombstone" ->
+          post_accessible_to?(post, requester)
+
+        _ ->
+          false
+      end
+    end)
+  end
+
+  defp post_accessible_to?(%Object{actor: requester}, requester), do: true
+
+  defp post_accessible_to?(%Object{actor: actor, data: data}, requester)
+       when is_binary(actor) and is_map(data) do
+    recipients = Egregoros.Recipients.recipient_actor_ids(data, fields: ["to", "cc"])
+
+    requester in recipients or
+      ((actor <> "/followers") in recipients and
+         not is_nil(Relationships.get_by_type_actor_object("Follow", requester, actor)))
+  end
+
+  defp post_accessible_to?(_post, _requester), do: false
 
   defp icon(%Plug.Upload{content_type: "image/" <> _}, url_path) when is_binary(url_path) do
     preview_url_path = MediaVariants.thumbnail_url_path(url_path)

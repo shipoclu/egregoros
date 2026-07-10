@@ -10,6 +10,7 @@ defmodule Egregoros.Activities.Note do
   alias Egregoros.ActivityPub.ContentMap
   alias Egregoros.Federation.ThreadDiscovery
   alias Egregoros.InboxTargeting
+  alias Egregoros.Media
   alias Egregoros.Notifications
   alias Egregoros.Objects
   alias Egregoros.Timeline
@@ -127,10 +128,12 @@ defmodule Egregoros.Activities.Note do
   end
 
   def side_effects(object, opts) do
-    Timeline.broadcast_post(object)
-    maybe_broadcast_mentions(object)
-    _ = ThreadDiscovery.enqueue(object, opts)
-    :ok
+    with :ok <- Media.bind_attachments(object) do
+      Timeline.broadcast_post(object)
+      maybe_broadcast_mentions(object)
+      _ = ThreadDiscovery.enqueue(object, opts)
+      :ok
+    end
   end
 
   defp maybe_broadcast_mentions(%{actor: actor_ap_id, data: %{} = data} = object)
