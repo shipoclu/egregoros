@@ -1,0 +1,1023 @@
+# Fediverse Mini Apps — Design Draft
+
+> Status: v1 product and protocol design draft. Security requirements in this
+> document are release gates and require implementation review and adversarial
+> testing before the feature is enabled.
+
+## Goal
+
+Let an external developer publish a small web application on their own HTTPS
+domain. When a user opens a supported link in Egregoros, Egregoros presents the
+app in a user-controllable, lower-right floating iframe. An app can authenticate
+the current Egregoros user through the calling instance's OAuth provider when it
+needs authenticated capabilities; it otherwise uses only non-authenticated
+capabilities the user has authorized.
+
+This is inspired by Farcaster Mini Apps, but is a Fediverse-native protocol,
+not a wire-compatible implementation.
+
+## Lessons adopted from Farcaster Mini Apps
+
+Farcaster separates four concerns:
+
+1. A domain-scoped manifest identifies the app and declares host-facing
+   capabilities.
+2. Page-level embed metadata makes individual app URLs discoverable in social
+   content.
+3. A versioned iframe/WebView SDK provides host-to-app context and app-to-host
+   actions.
+4. A seamless authenticated session is delivered to the app and verified by its
+   backend.
+
+Egregoros should keep this separation. It should *not* trust iframe-provided
+identity/context, give the iframe a bearer token directly, or treat a manifest
+as a blanket permission grant.
+
+## Existing Egregoros foundation
+
+Egregoros already operates an OAuth authorization-code provider with PKCE,
+registered applications, explicit redirect-URI validation, token revocation,
+and scoped bearer-token authorization. The mini-app protocol can build on that
+provider rather than introduce a second identity system.
+
+## V1 architecture
+
+### 1. Manifest
+
+An app domain publishes a versioned JSON manifest at this stable well-known
+URL:
+
+`https://app.example/.well-known/fediverse-miniapp.json`
+
+The initial manifest would declare:
+
+- stable protocol version and app name;
+- optional publisher display name and website, which are informational only;
+- start URL and allowed launch URL/origin boundary;
+- icon, preview image, and optional theme/splash metadata;
+- OAuth client metadata (or an indirection to standard OAuth client
+  registration);
+- requested capabilities/scopes; and
+- optional webhook/notification endpoint, deferred beyond the first release.
+
+The manifest is intentionally domain-scoped: one app identity owns the domain,
+while individual paths identify launch destinations/shareable views within that
+app. See “Domain paths and cards” below.
+
+Egregoros always displays the manifest domain as the primary trust signal.
+Publisher metadata does not prove an affiliation, identity, or safety claim;
+users should treat it as untrusted unless it is independently established by
+the same domain.
+
+All manifest icon/splash URLs and page-card image URLs must use the manifest's
+exact HTTPS origin. Egregoros proxies them without persistent caching;
+third-party CDN asset origins are not accepted in v1.
+
+### 2. Discovery and launch
+
+When a user puts a URL whose domain publishes a valid mini-app manifest in a
+**fully public** note, Egregoros resolves it asynchronously and renders a rich
+mini-app card in the note. The card uses the app's verified preview image/name
+and has an explicit **Open** control. Selecting it launches the declared URL.
+Links in followers-only, direct, private, or otherwise non-public notes remain
+ordinary links in v1 and do not provide mini-app launch context. URLs outside
+the app's verified origin must open externally or require an explicit new
+launch, never silently replace the iframe.
+
+This applies to public local notes and public notes received through federation.
+Remote-link preview failure is isolated from ActivityPub ingest and timeline
+rendering; it leaves the ordinary link intact. Derived mini-app/card state is
+stored outside canonical `Object.data` so it is never accidentally federated.
+At most one card is rendered per note: the first valid mini-app URL in source
+order. Later URLs remain ordinary links, limiting visual clutter and remote
+fetch work.
+
+This mirrors Farcaster's separation of page-level share metadata from the
+domain-level manifest, while retaining a normal link if fetching or validation
+fails. If page-specific metadata is absent, the generic card launches the exact
+linked URL rather than assuming the manifest's home URL; this preserves deep
+links and makes missing metadata visible during development.
+
+### 3. Host surface
+
+On desktop, Egregoros renders a fixed, lower-right panel with a visible app
+identity header and controls to collapse, close, expand, and open externally.
+Following Farcaster's documented web surface, the expanded desktop panel starts
+at 424×695px and may adapt down for smaller viewports. The panel's
+open/collapsed state is server-authoritative per user and app, so it survives
+LiveView re-renders.
+
+On mobile/PWA, the same app is presented in a vertical, full-screen modal/sheet
+with safe-area-aware layout, a branded loading screen, and a visible close/back
+route. This follows Farcaster's modal model rather than attempting to squeeze a
+desktop floating panel into a phone viewport. The iframe is sandboxed,
+constrained to a validated origin, and given a restrictive permissions
+policy/CSP on both surfaces. It needs `allow-scripts`, `allow-forms`, and
+`allow-same-origin` so a real external web app can preserve its own cookies and
+session. Because the iframe is cross-origin from Egregoros, this does not let it
+read or modify Egregoros. It must not receive top-navigation, downloads,
+pointer-lock, or unmediated popup permissions; OAuth is opened by a
+host-controlled top-level surface instead.
+
+`openExternal` is allowed only after an app-originating user gesture. For a
+cross-origin destination, Egregoros displays a host-owned confirmation naming
+the destination domain before opening it. The iframe receives no device or
+browser permissions in v1: camera, microphone, geolocation, clipboard read,
+downloads, and notifications are denied until each has a dedicated capability,
+consent, and threat-model design.
+
+If the app blocks framing with `X-Frame-Options` or CSP `frame-ancestors`, the
+host displays a clear framed-app error with an **Open externally** action. It
+does not silently replace the Egregoros surface with a browser navigation.
+
+Only one mini app may be active at a time. Launching another app explicitly
+closes/replaces the active panel or sheet; v1 has no background/minimized app
+strip or app launcher. Collapsing the active app retains its live iframe and
+session while the user navigates Egregoros; closing or replacing it tears down
+the iframe.
+
+Cards never launch an app merely from an image/title click: the user must select
+the explicit **Open** button. There is no v1 app directory, saved-app surface,
+or other launcher. Direct, explicit app URLs remain valid entry points, while
+`homeUrl` establishes the app's canonical base and supports future surfaces.
+
+### 4. OAuth sign-in
+
+The app uses OAuth 2.1 authorization code + PKCE against the **local calling
+Egregoros instance**. Egregoros is the authorization server. The app receives
+an authorization code via its registered HTTPS callback, exchanges it server to
+server, and stores its own session. Tokens are never injected into the iframe
+or exposed through `postMessage`. Apps may request the normal Egregoros/
+Mastodon-compatible scopes (including read, write, and follow), subject to the
+user's explicit consent and the instance's existing scope policy.
+
+The host SDK may provide a `requestAuth` action that begins this flow in a
+top-level, host-controlled authorization window/sheet. It must not use a
+third-party iframe for consent or rely on third-party cookies.
+
+Authentication is optional and app-initiated. A newly launched iframe may call
+`ready`, receive the non-user `bootstrap` object, use `openExternal` after a
+user gesture, discover host capabilities, and use any separately authorized
+non-OAuth capability such as the EVM wallet. It may also request disclosed
+public-note launch context before OAuth. It must request OAuth before
+`composeNote` or any future capability explicitly marked auth-gated. This lets
+read-only public mini apps work without a consent prompt, while ensuring that
+actions affecting the user's Egregoros account remain authenticated.
+
+The authorization handoff is as follows:
+
+1. The app backend obtains/reuses its dynamic registration for the calling
+   Egregoros issuer and creates an authorization request with PKCE.
+2. The iframe calls `requestAuth` with the client ID, exact registered callback
+   URL, requested manifest-declared scopes, PKCE challenge, opaque state, and a
+   host-generated request correlation ID.
+3. Egregoros validates that those values match its registered client and the
+   app's current manifest, then opens its own authorization/consent surface.
+4. The authorization response goes only to the app's exact-origin callback,
+   where the backend exchanges the code and establishes the app's own session.
+   The callback sends the host only a success/failure signal correlated to the
+   request plus an opaque app-session handoff code—never the OAuth code,
+   Egregoros tokens, or app session data. It uses a `postMessage` targeted to
+   the exact Egregoros origin, and Egregoros accepts it only from the registered
+   exact callback origin and active request ID. The host relays that result to
+   the original iframe.
+
+The app may call `ready` before or after authentication. Failed, cancelled, or
+expired authorization leaves the app able to use only non-authenticated SDK
+features; auth-gated features remain unavailable.
+
+If `ready()` does not arrive by the host deadline, Egregoros keeps the branded
+loading screen and offers **Retry** and **Open externally**. It does not close
+the app automatically.
+
+After a user has approved the immutable client and scope set, Egregoros reuses
+that grant for later sessions when it is still valid. The authorization surface
+still identifies the current Egregoros account and provides a visible
+cancel/account-switch route. Revocation, expiry, changed login, or an invalid
+app session returns the flow to normal authorization. Egregoros issues its
+existing short-lived access token and refresh token; the app backend refreshes
+server-to-server without repeatedly interrupting the user.
+
+#### Mandatory iframe-session handoff
+
+Cross-origin iframe cookies cannot be relied on: browser/user privacy controls
+may block them and the Egregoros instance cannot override those controls. Every
+conforming app therefore implements this one-time handoff after its backend
+exchanges the OAuth code:
+
+1. The iframe generates a cryptographically random `handoff_verifier`; it
+   sends only its SHA-256 `handoff_challenge` to the app backend while preparing
+   `requestAuth`.
+2. The backend records that challenge against the app's authorization state.
+   After a successful OAuth code exchange, it creates a random,
+   single-use `handoff_code`, bound to that challenge, with a short TTL (at
+   most 60 seconds).
+3. The callback sends Egregoros `{requestId, status: "success", handoffCode}`.
+   Egregoros forwards it unchanged to the original exact-origin iframe and
+   does not persist it in logs or app state.
+4. The iframe sends `handoff_code` and `handoff_verifier` directly to its app
+   backend over HTTPS. Only the iframe knows the verifier, so an Egregoros host
+   that can see the code and challenge cannot redeem it. The backend establishes
+   the app's own iframe session by its chosen same-origin mechanism.
+
+Apps may use cookies or the Storage Access API as an optimization, but they
+cannot require them for a functional mini-app session. The handoff carries no
+Egregoros bearer token and is never available to a different app origin.
+
+### Optional EVM wallet capability
+
+Wallet support is an opt-in host capability, independent of OAuth. It follows
+the Farcaster model: the app receives a host-mediated
+[EIP-1193](https://eips.ethereum.org/EIPS/eip-1193) Ethereum Provider through
+the SDK, rather than a private key, seed phrase, wallet cookie, or Egregoros
+OAuth token. The app uses the provider's standard `request()` calls (directly
+or through libraries such as viem, ethers, or wagmi); the host routes them to
+the user's Egregoros wallet UI. The wallet UI, not the iframe, owns account
+connection, chain switching, simulation/preview, warnings, and the final user
+confirmation for every signature or transaction.
+
+The manifest gains an immutable wallet declaration:
+
+```json
+"wallet": {
+  "evm": {
+    "enabled": true,
+    "required": false,
+    "requiredChains": ["eip155:8453"]
+  }
+}
+```
+
+`requiredChains` uses CAIP-2 identifiers and is optional. An app with
+`wallet.evm.enabled: true` receives the `wallet.evm.getProvider` capability
+only when the instance supports a wallet and the user has enabled one. The
+`required` field defaults to `false`: a wallet-enabled app can launch with a
+no-wallet fallback unless it explicitly declares the capability required.
+If `required` is true and no compatible wallet/chain is available, the host
+shows an incompatibility error rather than launching a broken app.
+
+The wallet-connection sheet states that the app may request wallet connection
+and transaction/signature prompts; it does *not* authorize any transaction.
+Every signing, transaction, account exposure, or chain change remains
+individually user-confirmed and requires an iframe user gesture. The SDK exposes
+supported chains/capabilities at runtime so apps can show a compatible fallback.
+
+The v1 bridge supports only account discovery/connection, chain discovery,
+`personal_sign`, `eth_signTypedData_v4`, and one `eth_sendTransaction` per
+user gesture. EIP-5792-style `wallet_sendCalls` batches are deferred: they can
+group requests for one wallet confirmation, but add important simulation,
+partial-failure, and anti-scam requirements. No wallet access is available
+unless the app declared the capability in its immutable manifest.
+
+#### Wallet adapter boundary
+
+The mini-app protocol talks only to an Egregoros `EvmWalletAdapter` behind the
+host's `wallet.evm.getProvider` bridge. The adapter returns supported CAIP-2
+chains and processes the allowlisted EIP-1193 requests; the host binds every
+request to the authenticated user, exact mini-app origin, and user gesture,
+rate-limits it, and renders the confirmation UI. The iframe never reaches
+`window.ethereum` or another wallet SDK directly.
+
+Wallet account exposure is per-app. Until a mini app calls
+`eth_requestAccounts` from a user gesture, its provider returns no accounts.
+The resulting app-origin/account connection is remembered until the user
+revokes it. Egregoros settings include a separate **Disconnect wallet from this
+app** control that clears this wallet permission and leaves the app's OAuth
+grant unchanged.
+
+The wallet UX is seamless without becoming delegated authority: the first
+per-app connection uses one native host sheet, and later calls skip repeated
+wallet/account-picker steps. Every signature or transaction still uses one
+compact host confirmation that identifies the exact app domain and a
+human-readable action/transaction summary. It is not preceded by a redundant
+connection confirmation.
+
+The initial `InjectedWalletAdapter` bridges the user's browser-injected
+Ethereum wallet (for example, an extension) through this host boundary. It is
+available only where an injected provider exists; it does not make a desktop
+extension magically available to a mobile PWA.
+
+A future `JawWalletAdapter` can be selected only by an Egregoros administrator
+in server configuration. JAW publishes an EIP-1193-compatible provider and
+passkey smart-account flow, so it maps to the same adapter methods. Its API
+key, account mode, paymaster/sponsorship policy, and passkey/popup UI belong to
+the Egregoros deployment configuration and host wallet surface—never to a
+mini-app manifest or iframe. JAW's more advanced delegated permissions,
+headless accounts, and batched calls are explicitly outside this protocol until
+separately threat-modeled.
+
+### Consent and controls
+
+For an OAuth-enabled app, the first OAuth approval screen presents the app
+name, hosting/manifest domain, optional publisher metadata, and immutable
+requested OAuth scopes. Normal OAuth consent is sufficient for the declared
+non-write scopes. If the fixed scope set includes `write`, the user must
+complete a separate, plain-language second confirmation explaining that the app
+can perform write actions through the Egregoros API. Neither confirmation lets
+the app silently publish through the host compose action.
+
+The once-per-app disclosure that public-note launch context is sent to the
+app's domain is independent of OAuth. It appears before the app first receives
+that context, including for apps that never declare OAuth; when both disclosures
+are needed in the same launch, the host may present them together.
+
+Egregoros settings provide a per-app revoke/disconnect control. Revocation
+invalidates the app's access and refresh tokens plus its reusable grant, clears
+the once-per-app launch-context approval, and closes any active iframe for that
+app. A future launch starts the approval process again.
+
+Instance operators can configure mini-app domain allow/deny patterns. Policy is
+enforced before manifest/page metadata or asset fetching, card display, iframe
+launch, dynamic registration, and OAuth authorization. A blocked app appears
+as an ordinary link and cannot use a previously issued registration or token.
+Patterns are exact hosts or DNS-suffix wildcards only—for example,
+`example.com` and `*.example.com`; arbitrary regular expressions are not part
+of v1. Deny rules always win. If an allowlist is non-empty, only matching
+domains may operate as mini apps. Rule changes take effect immediately: a newly
+blocked app's iframe closes, future host calls and token use are denied, and its
+links revert to ordinary links.
+
+#### Dynamic registration
+
+Any OAuth-enabled developer may anonymously register their app with a calling
+instance before asking a user to authorize it. Use OAuth Dynamic Client
+Registration (RFC 7591) advertised from the instance's OAuth Authorization
+Server Metadata (RFC 8414), with a mini-app profile that makes the following
+normative:
+
+1. Registration occurs **server-to-server from the mini-app developer's
+   backend**, never from the iframe. The backend safely retains the returned
+   client credentials.
+2. The registration cache key is `(authorization_server_issuer,
+   canonical_manifest_url)`. A conforming app MUST reuse that client
+   registration for every user of that app on that Egregoros instance and MUST
+   not register at launch time when it already has a valid cached registration.
+3. The instance validates that every HTTPS redirect URI is on the manifest's
+   canonical app origin—exact scheme, host, and port—and it stores the
+   canonical manifest URL with the client record. Redirects cannot be widened
+   through a later authorization request.
+4. A registration contains fixed app metadata—canonical manifest URL, name,
+   website, redirect URIs, requested scopes, and OAuth grant/response types.
+   It has no user identity, note context, or per-user fields.
+5. Egregoros deduplicates an equivalent registration for a bounded period,
+   rate-limits/abuse-monitors anonymous registration, and allows instance
+   operators to disable it. It may reject registrations whose manifest cannot
+   be securely fetched and validated.
+
+This prevents an ordinary app launch from producing a client per user. It does
+not make an anonymous registration endpoint cost-free: instances still need
+rate limits and abuse controls, because any public API can be used to create
+junk registrations.
+
+#### Immutable scope declaration
+
+If an app declares OAuth, its requested OAuth scope set is fixed when first
+observed/registered on an instance. Every dynamic registration and authorization
+request MUST exactly equal that set; in v1, changing the declared set (adding,
+removing, or renaming scopes) invalidates the manifest for that app identity
+and is rejected. An OAuth-enabled manifest scope set MUST include the existing
+`read` scope, which provides the minimum authenticated session/identity access.
+Apps that do not declare OAuth need no dynamic registration and can operate
+solely through non-authenticated capabilities. An OAuth-enabled app that needs
+a different permission set must use a new app identity/domain until a future
+version defines a safe migration and re-consent flow.
+
+### 5. Host SDK
+
+Publish a small versioned JavaScript SDK. Its transport uses a nonce-bound,
+origin-checked `postMessage` handshake. Initial candidate methods:
+
+- `ready()` — app declares that its first render is usable;
+- `getContext()` — non-authoritative launch context, app/client protocol
+  versions, locale/theme, the exact launch URL, and (when launched from a
+  note) the author, note identifier, content, mentions, and link URL; and
+- `requestAuth({scopes})`, `close()`, and `openExternal(url)` —
+  host-mediated actions.
+
+| Access class | V1 methods | Prerequisite |
+| --- | --- | --- |
+| Public base | `ready`, `bootstrap`, `getContext`, `close`, `openExternal` | Valid framed app; `getContext` needs context disclosure before note details are sent; `openExternal` needs user gesture. |
+| OAuth initiation | `requestAuth` | Optional `oauth` manifest object and a server-side dynamic registration. |
+| Wallet | `wallet.evm.getProvider` and its allowlisted EIP-1193 calls | Immutable wallet declaration, host wallet availability, and per-app wallet connection/confirmation. No OAuth required. |
+| OAuth-gated | `composeNote` | Immutable `compose_note` declaration plus completed OAuth with its fixed `read`-inclusive scope set. |
+
+#### Compose a note
+
+`composeNote(draft)` is a required v1 host action. It hands a draft to the
+Egregoros composer, which opens in its normal desktop panel or mobile sheet.
+It never creates, queues, or submits a note: the user sees, may edit, and must
+explicitly press Egregoros's normal submit button.
+
+The initial draft schema is deliberately narrow and host-validated:
+
+- `text` (string, optional), `spoilerText` (string, optional), and `language`
+  (BCP 47 tag, optional);
+- `visibility` (optional), always presented to the user as an editable
+  selection and defaulting to Egregoros's normal composer default; and
+- `inReplyTo` only when the target is the public note from which this app was
+  launched, plus a bounded list of HTTPS links to include as ordinary text.
+
+No media upload, poll creation, arbitrary reply target, silent publication, or
+host API token is included in v1. These boundaries make the action useful for
+sharing a result, challenge, or invite without letting a remote app post on a
+user's behalf.
+
+`compose_note` is an explicit immutable manifest capability. When an app
+declares OAuth, its first approval screen shows every requested non-base host
+capability; Egregoros enables only declared capabilities. Lifecycle/
+authentication methods and `openExternal` are base SDK methods, not manifest
+capabilities. `compose_note` is auth-gated and therefore unavailable until a
+declared OAuth flow completes; wallet capabilities use their own per-app wallet
+approval and do not require OAuth.
+
+Each successful `composeNote` call is assigned a host-generated `requestId`.
+After—and only after—the user submits successfully, the SDK emits a
+`composeNotePublished` event to the initiating iframe containing that
+`requestId`, the canonical ActivityPub object ID/URL of the new note, and its
+visibility scope (`public`, `unlisted`, `followers`, or `direct`). No content,
+author, mentions, attachments, OAuth token, or delivery state is included. An
+app can fetch a public or unlisted note at that URL to independently verify its
+existence and contents; a private note may not be fetchable, but the receipt
+does not disclose anything beyond its identifier and visibility. This is a
+receipt, not authority: it does not claim that federation delivery succeeded
+and is never emitted before local publication succeeds. Cancellation and failed
+submission produce no event in v1.
+
+The app must validate the host origin and handshake nonce; Egregoros must
+validate the iframe origin against the installed manifest before accepting every
+message. Context contains no access token or current-user identity. It is
+available without OAuth after the separately consented launch-context
+permission; note data is not implied by an OAuth API scope.
+
+The handshake always exposes a `bootstrap` object with the exact Egregoros host
+origin and SDK protocol version. For OAuth-enabled apps it also includes the
+authorization-server issuer/metadata URL, letting the app backend reuse or
+create its dynamic registration and form a PKCE request. Bootstrap contains no
+current-user identity. Apps may obtain locale/theme and public launch context
+through `getContext()` after the separate context disclosure, whether or not
+they authenticate with OAuth.
+
+Launch context is useful but is untrusted input—it can be malformed, stale, or
+controlled by the note author. More importantly, opening an app shares it with
+the app's external domain. In v1, mini apps are launched only from fully public
+notes, which removes the limited-audience-note case. The host must still make
+that disclosure clear before the first contextual launch and treat it as a
+separately consented `miniapp:launch_context` permission.
+
+## Hostile mini-app security boundary
+
+### Threat model and protected assets
+
+A mini app is arbitrary hostile Internet code. Its operator controls its DNS,
+TLS endpoint, redirects, HTTP headers, manifest, page metadata, HTML,
+JavaScript, iframe navigations, `postMessage` payloads, OAuth parameters,
+external URLs, and wallet RPC requests. The app may attempt phishing, UI
+redressing, data exfiltration, CSRF, SSRF, DNS rebinding, OAuth mix-up/code
+injection, capability escalation, wallet theft, denial of service, and browser
+sandbox escape. Publisher labels and a valid HTTPS certificate prove control of
+the domain only; they do not make the app trustworthy.
+
+The boundary MUST protect:
+
+- Egregoros's process, filesystem, database, internal network, cloud metadata,
+  secrets, and availability;
+- host DOM, LiveView socket, session/CSRF cookies, local storage, OAuth codes and
+  tokens, and other apps' state;
+- user identity and note context until the applicable disclosure/authorization;
+- wallet accounts, signing keys, signatures, transactions, chain state, and
+  provider configuration; and
+- canonical ActivityPub data. Derived mini-app state MUST remain in
+  `Egregoros.Object.internal` or dedicated tables and MUST NOT enter
+  `Egregoros.Object.data`.
+
+The trusted computing base is limited to Egregoros server code, the small host
+SDK/broker, browser same-origin/sandbox enforcement, and the selected wallet
+adapter. The mini app, its backend, all remote bytes, and every value received
+from them are untrusted.
+
+### Non-negotiable invariants
+
+1. App JavaScript MUST never execute in the Egregoros origin or receive direct
+   references to host DOM, LiveView, cookies, storage, CSRF values, OAuth
+   tokens, wallet implementations, or server internals.
+2. Every privilege crosses a typed, versioned host broker. The server or wallet
+   adapter MUST independently authorize each privileged request; a manifest,
+   disabled button, prior UI check, or well-formed SDK message is never proof of
+   authority.
+3. An app receives only the minimum data required for the specific operation.
+   Data from one app session, user, note, iframe, origin, or OAuth client MUST
+   never be reusable in another.
+4. Exact origin means normalized scheme, ASCII/Punycode host, and effective
+   port. Production origins MUST be HTTPS. Userinfo, fragments, IP-literal
+   hosts, opaque origins, `localhost`, non-HTTPS schemes, and parser-ambiguous
+   URLs MUST be rejected.
+5. Egregoros MUST NOT frame an app at its own origin. Host authentication
+   cookies MUST be host-only (`__Host-` prefix where supported), `Secure`,
+   `HttpOnly`, `Path=/`, have no `Domain` attribute, and use an appropriate
+   `SameSite` policy. State-changing host endpoints MUST additionally enforce
+   CSRF tokens and exact `Origin` checks; cookie policy alone is not CSRF
+   protection.
+6. Failure is closed: invalid, stale, oversized, unsupported, blocked, or
+   ambiguous input loses the requested capability. Discovery failure falls back
+   to an ordinary link; it never weakens sandbox, origin, consent, OAuth, or
+   wallet checks.
+
+### Server-side remote fetching and SSRF containment
+
+Manifest, page, and image fetching MUST use a dedicated outbound client with no
+Egregoros cookies, authorization headers, client certificates, proxy
+credentials, ambient cloud credentials, or shared cookie jar. Remote bytes are
+parsed as data only; Egregoros MUST NOT execute remote JavaScript, CSS, SVG,
+templates, or use a general headless browser for discovery.
+
+For every outbound request Egregoros MUST:
+
+- canonicalize the URL once with one strict parser, require HTTPS, and validate
+  the exact origin before resolving DNS;
+- resolve all A and AAAA answers and reject the request if any answer is
+  loopback, private, link-local, multicast, documentation/reserved,
+  carrier-grade NAT, or otherwise non-global;
+- pin the validated address for the connection while still validating the TLS
+  certificate and SNI against the original hostname, preventing a DNS
+  rebinding/TOCTOU change between validation and connection;
+- disable redirects for manifests, pages, images, and proxy requests in v1.
+  Apps must serve the canonical resource directly;
+- apply an egress firewall that independently blocks internal networks, Unix
+  sockets, and cloud metadata endpoints even if application validation fails;
+- enforce connection, first-byte, and total timeouts; decompressed response-size
+  limits; per-origin concurrency/rate limits; and a global worker queue so an
+  attacker cannot exhaust schedulers, sockets, memory, or database connections;
+  and
+- require the expected MIME type with `X-Content-Type-Options: nosniff`
+  semantics. Suggested hard limits are 64 KiB manifest JSON, 1 MiB page HTML,
+  5 MiB compressed image input, and 10 megapixels after decode.
+
+JSON parsing MUST reject duplicate keys, invalid Unicode, excessive nesting,
+non-integer/out-of-range numbers, unknown security-sensitive fields, and values
+outside explicit length/count bounds. HTML parsing extracts only the one
+declared meta element; it never evaluates markup. The image proxy MUST accept a
+small raster allowlist (for example PNG, JPEG, WebP, and AVIF), decode in a
+resource-limited worker, reject SVG and animated/decompression bombs, and serve
+safe output with `Cache-Control: no-store`, no cookies, no referrer, and a fixed
+image content type. It MUST re-run URL/DNS policy on every view because assets
+are intentionally not persistently cached.
+
+### Iframe and browser containment
+
+The remote app MUST NOT be framed directly by the privileged LiveView document.
+The panel/sheet frames a small trusted same-origin broker document created for
+one launch session; that broker alone frames the external app. The main
+Egregoros CSP can therefore use `frame-src 'self'`. The broker response is
+generated server-side with a per-launch CSP whose `frame-src` contains exactly
+the validated app origin and whose remaining policy is approximately
+`default-src 'none'; script-src <trusted hashed/nonced broker>; connect-src
+'none'; img-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none';
+frame-ancestors 'self'`. The broker contains no timeline/user HTML, no OAuth or
+wallet secrets, and no general application code; it only enforces the channel
+and forwards typed requests to the privileged host.
+
+The external app iframe MUST be created by that broker only after the manifest,
+page launch URL, operator policy, and user action have passed server-side
+validation. Its security attributes are fixed by trusted broker code and cannot
+be relaxed by manifest or SDK input:
+
+```html
+<iframe
+  sandbox="allow-scripts allow-forms allow-same-origin"
+  referrerpolicy="no-referrer"
+  allow="camera 'none'; microphone 'none'; geolocation 'none'; clipboard-read 'none'; clipboard-write 'none'; payment 'none'; usb 'none'; serial 'none'; bluetooth 'none'; hid 'none'; midi 'none'; display-capture 'none'; fullscreen 'none'"
+>
+```
+
+`allow-same-origin` is necessary for a normal external web app to use its own
+origin and session, but it is safe only while the app is never same-origin with
+the Egregoros parent. The host MUST NOT add `allow-top-navigation`,
+`allow-top-navigation-by-user-activation`, `allow-popups`,
+`allow-popups-to-escape-sandbox`, `allow-downloads`, `allow-modals`,
+`allow-pointer-lock`, `allow-presentation`, or
+`allow-storage-access-by-user-activation` in v1.
+
+Neither the main document nor broker CSP may broadly allow `https:` frames.
+The broker MUST retain sole control of the external iframe `src`; same-origin
+path navigation is permitted, but an observed cross-origin navigation
+invalidates the channel and tears down the iframe.
+External navigation goes only through the host's gesture-bound confirmation.
+The app cannot hide or draw over the host-owned header, domain label, close,
+collapse, permission, OAuth, compose, external-navigation, or wallet surfaces.
+All host text derived from the app is inserted as text, never raw HTML.
+
+Egregoros API routes MUST NOT enable credentialed CORS for mini-app origins.
+Ambient Egregoros browser sessions are not an app API: authenticated API access
+requires the app's explicit OAuth bearer token, and state-changing browser
+routes retain normal CSRF/Origin protection.
+
+### Message-channel authentication and validation
+
+The host generates at least 256 bits of randomness for a new channel/session ID
+on every iframe creation. The trusted parent↔broker channel and broker↔app
+channel are distinct; a request is never forwarded by copying arbitrary
+messages between windows. The initial broker↔app window message MUST use the
+exact `targetOrigin`; the broker accepts it only when `event.origin` is the exact
+app origin and `event.source === iframe.contentWindow`. `"*"` MUST never be used
+as a target origin. After this check, the broker SHOULD transfer a dedicated
+`MessageChannel` port and close both ports on iframe navigation, replacement,
+policy change, logout, revocation, timeout, or origin mismatch.
+
+Every message envelope MUST include protocol version, channel ID, unique
+request ID, method/event name, and bounded payload. The broker MUST apply a
+closed method allowlist; strict per-method schemas; string, array, nesting, and
+total-message limits; duplicate/replay detection; request deadlines; and
+per-channel/user/origin rate limits. Unknown methods, extra security-sensitive
+fields, malformed structured-clone values, prototype-pollution keys, unsolicited
+responses, and IDs from another channel are rejected without side effects.
+Errors returned to the app are stable codes without stack traces, database
+identifiers, network topology, or secret-bearing details.
+
+`ready`, `getContext`, wallet, compose, and OAuth messages all pass through the
+same broker. The host MUST re-check the current manifest identity,
+capabilities, user state, disclosure state, OAuth state, and domain policy at
+the moment of each privileged operation; handshake success is not a durable
+authorization grant.
+
+### Data-release boundary
+
+Before the once-per-app launch-context disclosure, `getContext` returns no note
+details. After disclosure it returns only the documented fields from a fully
+public note, normalized into a bounded DTO. It MUST NOT serialize database
+structs, internal metadata, recipient lists beyond public fields, moderation
+state, viewer identity, IP address, session IDs, or inferred relationships.
+OAuth is the only path to Egregoros user identity/API data. Wallet account
+addresses are exposed only by the separately approved wallet provider.
+
+Closing an iframe clears ephemeral channel state. Revoking context permission,
+OAuth, wallet permission, or operator policy takes effect immediately and
+invalidates relevant server-side state; a stale iframe cannot continue using a
+previous channel.
+
+### OAuth and app-session security
+
+OAuth-enabled apps MUST follow the authorization-code flow with transaction-
+specific S256 PKCE, high-entropy `state`, exact registered HTTPS redirect URI,
+authorization-server issuer validation, single-use short-lived codes, and no
+implicit/password grants. Authorization and callback responses MUST use
+`Cache-Control: no-store` and a restrictive `Referrer-Policy`; codes, state,
+handoff values, access tokens, and refresh tokens MUST be redacted from logs,
+error reporting, analytics, URLs shown to other origins, and browser history
+where possible.
+
+Dynamic registration occurs only from the app backend. Client secrets and
+refresh/access tokens MUST never enter the iframe or host message channel.
+Registration, authorization, token exchange, refresh, revocation, and every
+bearer-token API request MUST re-check the current exact app origin, immutable
+scope set, and operator domain policy. Refresh tokens require rotation/replay
+detection or equivalent family invalidation. Revocation and a newly matching
+deny rule invalidate the whole token family immediately.
+
+The callback completion message uses the same exact-origin/source/channel
+rules. Its one-time handoff code is bound to the iframe's secret verifier,
+single-use, non-loggable, and expires within 60 seconds. Egregoros may relay it
+but cannot redeem it because it never receives the verifier. OAuth consent is
+not permission to compose through the host; conversely, a granted `write`
+scope allows the app backend to use the documented API and must be presented to
+the user as such.
+
+### Compose boundary
+
+`composeNote` requires a currently authenticated OAuth grant, declared
+`compose_note` capability, active exact-origin channel, current domain-policy
+allowance, and a fresh broker request. All draft fields are untrusted and pass
+through the same length, URL, visibility, reply-target, and content validation
+as user-entered composer data. The app can only open and prefill the host-owned
+composer; it cannot trigger its submit event, manufacture LiveView events,
+select a hidden visibility, attach files, or bypass normal posting validation.
+
+The final submit is a direct user action on Egregoros UI. The publication
+receipt is generated only after the database transaction succeeds and contains
+only the request ID, canonical ActivityPub ID/URL, and final visibility. The
+app never receives draft edits, cancellation reason, failure internals, or a
+promise of federation delivery.
+
+### Wallet boundary
+
+The iframe receives an EIP-1193 proxy object, never `window.ethereum`, a JAW
+instance, private key, seed, passkey material, wallet cookie, API key, paymaster
+credential, or unrestricted JSON-RPC transport. The host wallet adapter accepts
+only the v1 RPC allowlist and applies strict method-specific schemas, supported-
+chain checks, connected-account checks, payload/value/gas bounds, rate limits,
+and user-gesture requirements. At minimum v1 MUST reject raw-key/export methods,
+`eth_sign`, raw transaction submission, arbitrary chain addition, batch calls,
+delegated/session permissions, and unknown RPC methods.
+
+`eth_accounts` returns `[]` until that exact app origin has a remembered wallet
+connection. Each signature or transaction is presented in host-owned UI with
+the exact app domain, account, chain, destination, value, fees, and decoded
+action when available. Simulation/scam screening is advisory defense-in-depth,
+not a substitute for confirmation. The exact request bytes/semantic hash shown
+to the user MUST be the request sent; any account, chain, payload, or policy
+change between review and send cancels and requires a new confirmation.
+
+The injected-wallet and future JAW implementations remain behind the same
+adapter. JAW configuration and API keys are administrator-owned and never
+accepted from a manifest. Wallet disconnect, OAuth revoke, app close, logout,
+and domain deny rules cancel pending prompts and invalidate the applicable
+connection state.
+
+### Operator policy, availability, and observability
+
+One central policy service MUST decide domain allow/deny status. Every fetch,
+card render, iframe creation, broker message, OAuth registration/authorization/
+token use, compose request, wallet request, and asset proxy request calls that
+service. Deny wins, changes are immediate, and Egregoros also provides a global
+mini-app kill switch that closes active frames and disables all mini-app
+network, broker, OAuth-profile, compose, and wallet entry points.
+
+Apply quotas per source IP, app origin, OAuth client, user, and instance, with
+bounded queues and circuit breakers. Mini-app failures MUST never block
+ActivityPub ingest, timeline rendering, login, normal OAuth clients, or the
+composer. Background workers handling remote input are supervised and run with
+the least filesystem/network privileges available.
+
+Audit security decisions—registration, consent, revoke, policy changes,
+blocked fetches, channel violations, compose receipts, and wallet approvals or
+rejections—with app origin, user/account identifier as appropriate, action,
+result, and correlation ID. Logs MUST exclude note content unless explicitly
+needed, URL query secrets, OAuth credentials, handoff codes/verifiers, wallet
+payload secrets, cookies, and private keys. Repeated origin/schema/rate
+violations should terminate the channel and feed operator abuse controls.
+
+### Required adversarial tests
+
+Before release, automated tests MUST cover at least:
+
+- private/loopback/link-local/IPv6/encoded-IP SSRF, DNS rebinding, redirect,
+  cloud-metadata, decompression bomb, oversized HTML/JSON, duplicate JSON key,
+  malformed Unicode, hostile SVG, slow-response, and fetch-flood cases;
+- same-origin iframe rejection, top-navigation/popup/download attempts,
+  framing-header failure, CSP and Permissions-Policy enforcement, host-overlay
+  attempts, cross-origin iframe navigation, and browser cookie-blocking modes;
+- spoofed `postMessage` origin/source, wildcard-origin regression, stale or
+  replayed channel/request IDs, cross-app messages, unknown methods, oversized
+  and prototype-polluting payloads, navigation during a request, logout/revoke/
+  deny during a request, and message floods;
+- OAuth redirect confusion, state/PKCE/issuer mismatch, code reuse, mix-up,
+  scope/capability mutation, refresh replay, callback spoofing, handoff theft,
+  registration floods, token use after revoke/deny, and secret-redaction tests;
+- context access before disclosure, non-public-note context, viewer/internal
+  field leakage, compose without OAuth/capability, synthetic submit attempts,
+  invalid reply/visibility/URL, and receipt-before-commit cases; and
+- wallet account access before connection, RPC allowlist bypass, chain/account
+  substitution, transaction mutation after preview, signing without gesture,
+  concurrent prompt races, disconnect/deny during confirmation, provider
+  object escape, and attempts to obtain injected/JAW secrets.
+
+Security controls are release gates. Tests MUST assert outcomes and absence of
+side effects, not merely that an error was rendered.
+
+### Normative security references
+
+- [OAuth 2.0 Security Best Current Practice (RFC 9700)](https://www.rfc-editor.org/info/rfc9700/)
+- [OAuth Authorization Server Metadata (RFC 8414)](https://www.rfc-editor.org/info/rfc8414/)
+- [OAuth Dynamic Client Registration (RFC 7591)](https://www.rfc-editor.org/info/rfc7591/)
+- [WHATWG HTML iframe sandbox](https://html.spec.whatwg.org/multipage/iframe-embed-object.html)
+- [W3C Content Security Policy Level 3](https://www.w3.org/TR/CSP/)
+- [OWASP SSRF Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html)
+- [EIP-1193 Ethereum Provider API](https://eips.ethereum.org/EIPS/eip-1193)
+
+## Launch-context disclosure
+
+OAuth consent answers: “May this app access Egregoros APIs with these scopes?”
+Launch-context disclosure answers a different question: “May Egregoros send
+this public note's launch details directly to this external app?” An app can
+use launch context without ever asking for OAuth, so the OAuth screen alone is
+not a reliable disclosure point.
+
+For a link opened from a public note, the context may include the exact linked
+URL, the note's canonical URL/ID and public text, its author and public
+mentions, plus the client theme/locale. It is untrusted application input, but
+it is still data Egregoros is intentionally sending to the app's domain.
+
+The choices are:
+
+| Timing | User experience | Privacy trade-off |
+| --- | --- | --- |
+| Once per app | The first contextual launch says that this domain will receive public-note launch details; later launches proceed without repeating it. | Clear, low friction; recommended baseline. |
+| Once per note | The user sees the same disclosure each time a different note launches the app. | Maximum reminder, but repetitive for normal use. |
+| Only in OAuth consent | No separate message; data sharing is mentioned only if/when the app asks for OAuth. | Inadequate for apps that never request OAuth; not recommended. |
+
+## Deferred from v1 unless explicitly selected
+
+- app directory/search, user-installed/pinned apps, and notifications/webhooks;
+- payments, non-EVM wallets, EIP-5792 batching, and device permissions;
+- host-side profile-navigation actions beyond `openExternal`;
+- cross-instance app reputation/discovery federation; and
+- mobile-native presentation.
+
+## Decisions log
+
+| Topic | Decision | Rationale |
+| --- | --- | --- |
+| Protocol relationship | Fediverse-native; inspired by Farcaster, not compatible | OAuth and ActivityPub provide different primitives. |
+| Identity transport | OAuth authorization code + PKCE | Reuses Egregoros's existing provider and keeps bearer tokens out of the iframe. |
+| Initial presentation | Desktop lower-right collapsible iframe | Required target behavior. |
+| Discovery | Rich card when a note includes a valid mini-app URL | The app must still be explicitly opened by the viewer. |
+| OAuth scopes | Existing scopes may be requested | Supports applications beyond Farcaster's identity-only model. |
+| Publishing | Anybody may publish a manifest-bearing HTTPS mini app | No directory/admin approval is required to publish. |
+| Platforms | Desktop and mobile/PWA | Desktop floating panel; mobile full-screen sheet. |
+| App installation | Not in v1 | No saved/pinned-app launcher or app notifications. |
+| Registration | Anonymous dynamic registration | One registration per mini-app manifest and Egregoros issuer, cached by the app backend. |
+| Launch context | Available through SDK after once-per-app disclosure | It is untrusted; the user approves sending public-note details to the app domain. |
+| Context source visibility | Fully public notes only | Non-public notes retain ordinary links in v1. |
+| OAuth callback origin | Exact manifest origin | Prevents callback widening to sibling/subdomains. |
+| Card model | Required domain manifest + optional page metadata | Exact-page cards when available; generic app card otherwise. |
+| Scope changes | Forbidden in v1 | A changed permission set requires a new app identity/domain. |
+| Compose action | Required, prefill-only | The app opens an editable host draft; only the user can submit it. |
+| Compose receipt | Public post URL after successful submission | Correlated to the request; lets the app independently verify public publication. |
+| Protocol names | `fediverse-miniapp` | Uses `/.well-known/fediverse-miniapp.json` and `fediverse:miniapp` metadata. |
+| Concurrent apps | One active app | A new launch replaces the existing panel/sheet. |
+| Generic-card launch URL | Exact linked URL | Preserves deep links; missing page metadata does not silently fall back home. |
+| In-app navigation | Any exact-origin path | Cross-origin destinations are opened externally only after a user gesture. |
+| Collapse behavior | Retain live iframe | Navigation around Egregoros does not reset the active app session. |
+| Launcher | None in v1 | Apps open from an explicit card action or direct explicit URL. |
+| Card activation | Explicit **Open** button only | Incidental image/title clicks do not launch remote code. |
+| Mobile surface | Full-height safe-area-aware sheet | Provides clear close/back control rather than desktop floating UI. |
+| External navigation | User gesture + host confirmation | Cross-origin destination domain is shown before opening. |
+| Iframe permissions | Deny by default | Device/browser privileges require future capability-specific design. |
+| Framing failure | Explicit error + external-open action | Never silently navigates the Egregoros surface away. |
+| Federated cards | Supported for public incoming notes | Resolution failure leaves the source link intact. |
+| Card assets | Proxied, not persistently cached | Protects viewer IP privacy without retaining remote assets. |
+| Metadata refresh | One-hour default; shorter explicit TTL honored | User can manually refresh app details. |
+| Pre-auth SDK data | Bootstrap issuer/origin only | Enables dynamic registration without exposing user or note context. |
+| Authentication trigger | App calls `requestAuth` | No automatic prompt merely from card display or launch. |
+| Authentication requirement | On demand | OAuth is required for compose/auth-gated capabilities, not for public/read-only apps. |
+| OAuth callback completion | Exact-origin `postMessage` with opaque handoff code | OAuth code/tokens stay with app backend; code needs iframe verifier. |
+| Repeat consent | Reuse valid immutable grant | Authorization UI still provides account identity, switch, and cancel. |
+| Token renewal | Short-lived access + refresh token | Backend refreshes server-to-server. |
+| Iframe session establishment | Mandatory verifier-bound one-time handoff | Works when third-party cookies/storage are unavailable. |
+| `ready()` timeout | Keep branded loading UI | Retry and external-open are offered; app is not auto-closed. |
+| EVM wallet declaration | Immutable `wallet.evm.enabled` manifest capability | Provider is available only when host/user support it. |
+| EVM app interface | Host-mediated EIP-1193 provider | Private keys and OAuth tokens never enter the iframe. |
+| Wallet availability | Optional by default | `required: true` fails with a compatible-wallet error; otherwise app falls back. |
+| Initial wallet methods | Discovery/connect, message/typed signing, one transaction | Batch/delegation/headless wallet operations wait. |
+| Wallet implementation seam | Host `EvmWalletAdapter` | Injected wallet now; admin-configured JAW adapter later. |
+| Wallet account exposure | Per app after gesture-based connection | `eth_accounts` is empty before approval. |
+| Wallet revocation | Separate from OAuth disconnect | User can remove account access without removing API authorization. |
+| Wallet UX | One connection sheet, one compact approval per sign/transaction | No repeated picker or redundant connection confirmation. |
+| Cards per note | One, first valid URL in source order | Limits remote fetches and visual clutter. |
+| Publisher metadata | Optional, informational | Hosting domain remains the only built-in trust signal. |
+| Page metadata authority | Presentation/launch only | It cannot change app identity, OAuth, scopes, or capabilities. |
+| Visual asset origins | Exact app origin | Prevents third-party CDN identity ambiguity; assets are proxied. |
+| Baseline OAuth scope | `read` required when OAuth is declared | Supplies minimum authenticated session/identity access. |
+| Scope request | Exact immutable manifest set | No per-session scope variation or escalation. |
+| Host capabilities | Immutable manifest declaration | Consent visibly covers non-base actions such as `compose_note`. |
+| Context disclosure | Once per app, independent of OAuth | Required before public note context is sent; may be combined with OAuth consent. |
+| `write` scope | Separate second confirmation | Makes high-impact API authority unmistakable. |
+| User revocation | Settings disconnect revokes grants/tokens/context approval | A later launch must gain fresh approval. |
+| Instance domain policy | Operator allow/deny patterns | Gate applies to every mini-app lifecycle stage. |
+| Domain-policy syntax | Exact host + `*.` DNS suffix wildcard | Predictable matching; no arbitrary regex. |
+| Domain-policy precedence | Deny wins; non-empty allowlist is restrictive | Operators can enforce a trusted-domain set. |
+| Policy updates | Immediate | Existing iframe/token access is blocked and iframe closed. |
+
+## Delivery plan and acceptance criteria
+
+1. **Protocol and data model.** Define manifest/card schemas, validation,
+   stable app identity, app-policy records, user context-consent records, and
+   derived card/manifest cache records outside `Object.data`.
+2. **Safe discovery.** Implement asynchronous public-note URL extraction,
+   operator policy checks, SSRF-safe well-known/page fetches, exact-origin
+   validation, one-card selection, proxied non-persistent assets, and graceful
+   ordinary-link fallback.
+3. **OAuth profile.** Publish authorization-server metadata plus the
+   mini-app dynamic-registration profile; enforce one app–issuer registration
+   for OAuth-enabled apps, immutable `read`-inclusive scopes/capabilities,
+   exact callbacks, grants, write confirmation, token refresh/revocation, and
+   instance policy on token use.
+4. **Host UI and SDK.** Deliver desktop floating panel and mobile full-height
+   sheet, splash/`ready`, nonce/origin handshake, bootstrap/auth/session-handoff
+   flow, context disclosure, same-origin navigation, and capability-gated host
+   actions.
+5. **Composition, wallet, and controls.** Implement prefill-only `composeNote`,
+   correlated minimal receipts, the injected-wallet adapter/EIP-1193 bridge,
+   per-app wallet confirmations, user disconnect controls, operator policy UI,
+   explicit external-navigation confirmation, and framing-error UX. Keep the
+   JAW adapter behind the same interface and out of this implementation phase.
+6. **Hardening and interoperability.** Test a reference mini app across
+   desktop and installed PWA/mobile browsers, including cookie-blocking modes,
+   all OAuth and `postMessage` failure paths, public federation cards, scope
+   revocation, domain-policy changes, and no leakage of derived data into
+   ActivityPub objects.
+
+The feature is ready for implementation only when tests demonstrate that an
+untrusted app cannot obtain user identity or auth-gated actions without OAuth,
+cannot obtain note context before the separate context disclosure, cannot
+increase scopes or capabilities, redeem a host-visible handoff code without the
+iframe verifier, navigate Egregoros, escape exact-origin restrictions, bypass
+instance policy, or cause a note to be submitted without the user's normal
+composer action.
+Wallet tests must additionally prove that an iframe cannot obtain an account
+without per-app connection approval, sign/send without a fresh user gesture and
+host confirmation, access a non-allowlisted RPC method, or receive a private
+key or host OAuth token.
+
+## V1 design status
+
+All currently identified v1 product and protocol decisions have been resolved.
+Future work should treat wallet delegation, transaction batching, other wallet
+types, notifications, device permissions, an app directory, and non-public
+note launches as new design efforts rather than implicit extensions.
+
+## Domain paths and cards
+
+## Proposed v1 wire format
+
+The following is the proposed strict JSON shape. V1 rejects unknown fields,
+duplicate keys, and ambiguous encodings rather than allowing different host
+implementations to interpret the same manifest differently. Additions require a
+documented protocol revision. Fields that influence identity, OAuth, scopes,
+wallet declarations, or capabilities remain immutable for a registered app
+identity.
+
+### Domain manifest
+
+Published as `https://{app-origin}/.well-known/fediverse-miniapp.json`:
+
+```json
+{
+  "version": "1",
+  "name": "Budget Polls",
+  "publisher": {"name": "Example Studio", "url": "https://app.example/about"},
+  "homeUrl": "https://app.example/",
+  "iconUrl": "https://app.example/icon.png",
+  "splash": {
+    "imageUrl": "https://app.example/splash.png",
+    "backgroundColor": "#152238"
+  },
+  "oauth": {
+    "redirectUris": ["https://app.example/oauth/callback"],
+    "scopes": ["read", "write"]
+  },
+  "wallet": {
+    "evm": {
+      "enabled": true,
+      "required": false,
+      "requiredChains": ["eip155:8453"]
+    }
+  },
+  "capabilities": ["compose_note"],
+  "cacheTtlSeconds": 3600
+}
+```
+
+Required fields are `version`, `name`, `homeUrl`, and `capabilities`. The
+`oauth` object is optional; when present, `oauth.redirectUris` and
+`oauth.scopes` are required. `homeUrl` and every OAuth redirect URI must use
+the manifest's exact HTTPS origin. An OAuth-enabled manifest's `oauth.scopes`
+must include `read`. Its `scopes` and all manifests' `capabilities` arrays are
+de-duplicated, bounded, and immutable after first registration/observation. The
+`wallet` object is optional and immutable when present. The current one-hour
+cache default applies when `cacheTtlSeconds` is absent; an explicit shorter TTL
+is honored.
+
+### Page card metadata
+
+A shareable app page may include one HTML element:
+
+```html
+<meta name="fediverse:miniapp" content='{
+  "version":"1",
+  "title":"Vote: 2026 budget",
+  "imageUrl":"https://app.example/cards/budget-2026.png",
+  "buttonTitle":"Vote",
+  "launchUrl":"https://app.example/polls/2026-budget"
+}'>
+```
+
+The host validates the JSON and all URLs, proxies images, and treats invalid
+metadata as absent. `launchUrl` must be on the exact app origin. Without this
+tag, a valid linked URL on the app origin gets the generic manifest card and
+launches the exact linked URL.
+
+There are two useful levels of mini-app metadata:
+
+| Level | Example | Purpose | Trade-off |
+| --- | --- | --- | --- |
+| Domain manifest | `https://polls.example/.well-known/fediverse-miniapp.json` | Establishes that `polls.example` is an app; declares stable name/icon, canonical start URL, OAuth/SDK configuration, and origin boundary. | One generic card for every URL if used alone. |
+| Page/card metadata | `https://polls.example/polls/2026-budget` | Makes this particular URL launch a particular in-app view and gives it a title, image, and button label. | The app developer must emit metadata for each shareable page. |
+
+For example, a domain may host both `/new` and `/polls/2026-budget`:
+
+- With only a domain manifest, links to both render as “Polls — Open app” and
+  open their exact linked paths. This preserves deep links and makes missing
+  page metadata visible instead of silently redirecting to `homeUrl`.
+- With page/card metadata, `/polls/2026-budget` can render “Vote: 2026 budget”
+  with its own preview image, and **Open** starts the iframe at that exact URL.
+  This is the Farcaster-style rich-link experience and enables individual
+  polls, games, auctions, documents, and profiles to spread through notes.
+
+Recommended v1: require the domain manifest, allow an optional
+mini-app-specific JSON `<meta>` tag on any linked page, and fall back to the
+generic manifest card when page metadata is absent. The card payload must be
+strictly schema-validated and its launch URL must remain inside the manifest's
+permitted origin/path boundary. Page metadata may override only card title,
+image, button label, and launch URL; it cannot override the domain app name,
+icon, publisher metadata, OAuth client registration, scopes, or host
+capabilities.
