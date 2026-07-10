@@ -2,6 +2,7 @@ defmodule EgregorosWeb.PrivacyLive do
   use EgregorosWeb, :live_view
 
   alias Egregoros.Notifications
+  alias Egregoros.MiniApps.WalletConnections
   alias Egregoros.Relationship
   alias Egregoros.Relationships
   alias Egregoros.Repo
@@ -21,6 +22,12 @@ defmodule EgregorosWeb.PrivacyLive do
     mutes = list_relationships("Mute", current_user)
     blocks = list_relationships("Block", current_user)
 
+    wallet_connections =
+      case current_user do
+        %User{id: user_id} -> WalletConnections.list_for_user(user_id)
+        _ -> []
+      end
+
     {:ok,
      socket
      |> assign(
@@ -29,7 +36,8 @@ defmodule EgregorosWeb.PrivacyLive do
        mutes: mutes,
        blocks: blocks,
        targets_by_ap_id: target_cards(mutes ++ blocks)
-     )}
+     )
+     |> stream(:wallet_connections, wallet_connections, dom_id: &"wallet-connection-#{&1.id}")}
   end
 
   @impl true
@@ -39,6 +47,22 @@ defmodule EgregorosWeb.PrivacyLive do
 
   def handle_event("privacy-unblock", %{"id" => id}, socket) do
     {:noreply, delete_relationship(socket, id, "Block", :blocks)}
+  end
+
+  def handle_event("privacy-disconnect-wallet", %{"origin" => origin}, socket) do
+    case socket.assigns.current_user do
+      %User{id: user_id} ->
+        :ok = WalletConnections.revoke(user_id, origin)
+
+        {:noreply,
+         stream(socket, :wallet_connections, WalletConnections.list_for_user(user_id),
+           reset: true,
+           dom_id: &"wallet-connection-#{&1.id}"
+         )}
+
+      _ ->
+        {:noreply, socket}
+    end
   end
 
   defp delete_relationship(socket, id, type, key) do
@@ -253,6 +277,57 @@ defmodule EgregorosWeb.PrivacyLive do
                 </div>
               </.card>
             </div>
+
+            <.card class="p-6">
+              <div class="flex items-center justify-between gap-4">
+                <div>
+                  <h3 class="text-xl font-bold text-[color:var(--text-primary)]">
+                    Mini-app wallet connections
+                  </h3>
+                  <p class="mt-1 text-sm text-[color:var(--text-secondary)]">
+                    Disconnecting an account does not revoke the app’s OAuth access.
+                  </p>
+                </div>
+                <.icon name="hero-wallet" class="size-6 text-[color:var(--accent)]" />
+              </div>
+
+              <div id="wallet-connections" phx-update="stream" class="mt-4 space-y-3">
+                <p
+                  id="wallet-connections-empty"
+                  class="hidden only:block text-sm text-[color:var(--text-secondary)]"
+                >
+                  No mini apps are connected to a wallet.
+                </p>
+
+                <div
+                  :for={{id, connection} <- @streams.wallet_connections}
+                  id={id}
+                  class="flex flex-col gap-3 border border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div class="min-w-0">
+                    <p class="truncate font-mono text-sm font-bold text-[color:var(--text-primary)]">
+                      {connection.app_origin}
+                    </p>
+                    <p
+                      :for={account <- connection.accounts}
+                      data-role="wallet-account"
+                      class="mt-1 truncate font-mono text-xs text-[color:var(--text-muted)]"
+                    >
+                      {account}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    data-role="privacy-disconnect-wallet"
+                    phx-click="privacy-disconnect-wallet"
+                    phx-value-origin={connection.app_origin}
+                    class="shrink-0 border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-3 py-2 text-xs font-bold uppercase tracking-wide text-[color:var(--text-secondary)] transition hover:border-[color:var(--danger)] hover:text-[color:var(--danger)]"
+                  >
+                    Disconnect
+                  </button>
+                </div>
+              </div>
+            </.card>
           <% else %>
             <.card class="p-6">
               <p data-role="privacy-auth-required" class="text-sm text-[color:var(--text-secondary)]">

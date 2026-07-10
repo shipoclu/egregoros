@@ -4,9 +4,19 @@ defmodule EgregorosWeb.PrivacyLiveTest do
   import Phoenix.LiveViewTest
 
   alias Egregoros.Relationships
+  alias Egregoros.MiniApps.Declarations
+  alias Egregoros.MiniApps.Manifest
+  alias Egregoros.MiniApps.WalletConnections
   alias Egregoros.Users
 
   setup do
+    stub(Egregoros.Config.Mock, :get, fn
+      :mini_apps_enabled, false -> true
+      :mini_apps_domain_allowlist, [] -> []
+      :mini_apps_domain_denylist, [] -> []
+      key, default -> Egregoros.Config.Stub.get(key, default)
+    end)
+
     {:ok, alice} = Users.create_local_user("alice")
     {:ok, bob} = Users.create_local_user("bob")
     {:ok, carol} = Users.create_local_user("carol")
@@ -28,6 +38,38 @@ defmodule EgregorosWeb.PrivacyLiveTest do
       })
 
     %{alice: alice, bob: bob, carol: carol, mute: mute, block: block}
+  end
+
+  test "lists and disconnects mini-app wallet connections independently", %{
+    conn: conn,
+    alice: alice
+  } do
+    assert {:ok, _declaration, :created} = Declarations.ensure(wallet_manifest())
+
+    assert {:ok, connection} =
+             WalletConnections.connect(alice.id, "https://wallet.example", [
+               "0x1111111111111111111111111111111111111111"
+             ])
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: alice.id})
+    {:ok, view, _html} = live(conn, "/settings/privacy")
+
+    assert has_element?(view, "#wallet-connection-#{connection.id}")
+
+    assert has_element?(
+             view,
+             "#wallet-connection-#{connection.id} [data-role='wallet-account']",
+             "0x1111111111111111111111111111111111111111"
+           )
+
+    view
+    |> element(
+      "button[data-role='privacy-disconnect-wallet'][phx-value-origin='https://wallet.example']"
+    )
+    |> render_click()
+
+    assert WalletConnections.list_for_user(alice.id) == []
+    refute has_element?(view, "#wallet-connection-#{connection.id}")
   end
 
   test "lists blocks and mutes for the current user", %{
@@ -76,5 +118,25 @@ defmodule EgregorosWeb.PrivacyLiveTest do
   test "signed-out users are prompted to sign in", %{conn: conn} do
     {:ok, view, _html} = live(conn, "/settings/privacy")
     assert has_element?(view, "[data-role='privacy-auth-required']")
+  end
+
+  defp wallet_manifest do
+    attrs = %{
+      "version" => "1",
+      "name" => "Wallet App",
+      "homeUrl" => "https://wallet.example/",
+      "wallet" => %{
+        "evm" => %{"enabled" => true, "required" => false, "requiredChains" => []}
+      },
+      "capabilities" => []
+    }
+
+    assert {:ok, manifest} =
+             Manifest.decode(
+               Jason.encode!(attrs),
+               "https://wallet.example/.well-known/fediverse-miniapp.json"
+             )
+
+    manifest
   end
 end
