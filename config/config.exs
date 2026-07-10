@@ -32,6 +32,7 @@ config :egregoros, Egregoros.Auth, Egregoros.Auth.BearerToken
 config :egregoros, Egregoros.AuthZ, Egregoros.AuthZ.OAuthScopes
 config :egregoros, Egregoros.Discovery, Egregoros.Discovery.DNS
 config :egregoros, Egregoros.HTTP, Egregoros.HTTP.Req
+config :egregoros, Egregoros.MiniApps.Fetcher, Egregoros.MiniApps.Fetcher.Req
 config :egregoros, Egregoros.DNS, Egregoros.DNS.Cached
 config :egregoros, Egregoros.AvatarStorage, Egregoros.AvatarStorage.Local
 config :egregoros, Egregoros.MediaStorage, Egregoros.MediaStorage.Local
@@ -41,6 +42,9 @@ config :egregoros, Egregoros.DNS.Cached,
   ttl_ms: 60_000
 
 config :egregoros, :password_iterations, 200_000
+config :egregoros, :mini_apps_enabled, false
+config :egregoros, :mini_apps_domain_allowlist, []
+config :egregoros, :mini_apps_domain_denylist, []
 
 # Configure the endpoint
 config :egregoros, EgregorosWeb.Endpoint,

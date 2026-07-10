@@ -4,6 +4,7 @@ defmodule Egregoros.SafeURL do
   import Bitwise
 
   alias Egregoros.Config
+  alias Egregoros.MiniApps.DomainPolicy
 
   @http_schemes ~w(http https)
 
@@ -15,6 +16,28 @@ defmodule Egregoros.SafeURL do
   end
 
   def validate_http_url(_), do: {:error, :unsafe_url}
+
+  def resolve_https_domain_url(url) when is_binary(url) do
+    uri = URI.parse(url)
+
+    with "https" <- uri.scheme,
+         host when is_binary(host) and host != "" <- uri.host,
+         true <- uri.userinfo in [nil, ""],
+         true <- uri.fragment in [nil, ""],
+         {:ok, host} <- DomainPolicy.normalize_domain(host),
+         {:ok, ip} <- resolve_public_ip(host) do
+      {:ok,
+       %{
+         connect_url: connect_url(%URI{uri | host: host, fragment: nil}, ip),
+         hostname: host,
+         ip: ip
+       }}
+    else
+      _ -> {:error, :unsafe_url}
+    end
+  end
+
+  def resolve_https_domain_url(_url), do: {:error, :unsafe_url}
 
   def resolve_http_url_federation(url) when is_binary(url) do
     if allow_private_federation?() do

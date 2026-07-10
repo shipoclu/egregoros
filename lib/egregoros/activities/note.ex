@@ -16,6 +16,7 @@ defmodule Egregoros.Activities.Note do
   alias Egregoros.Timeline
   alias Egregoros.User
   alias Egregoros.Users
+  alias Egregoros.Workers.ResolveMiniAppCard
   alias EgregorosWeb.Endpoint
 
   def type, do: "Note"
@@ -132,6 +133,7 @@ defmodule Egregoros.Activities.Note do
       Timeline.broadcast_post(object)
       maybe_broadcast_mentions(object)
       _ = ThreadDiscovery.enqueue(object, opts)
+      _ = ResolveMiniAppCard.maybe_enqueue(object)
       :ok
     end
   end

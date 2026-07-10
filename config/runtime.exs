@@ -32,6 +32,35 @@ if allow_private_federation in ~w(true 1) do
   config :egregoros, :allow_private_federation, true
 end
 
+mini_apps_enabled =
+  System.get_env("EGREGOROS_MINI_APPS_ENABLED", "")
+  |> String.trim()
+  |> String.downcase()
+
+if mini_apps_enabled in ~w(true 1) do
+  config :egregoros, :mini_apps_enabled, true
+end
+
+mini_apps_domain_allowlist =
+  System.get_env("EGREGOROS_MINI_APPS_DOMAIN_ALLOWLIST", "")
+  |> String.split(",", trim: true)
+  |> Enum.map(&String.trim/1)
+  |> Enum.reject(&(&1 == ""))
+
+if mini_apps_domain_allowlist != [] do
+  config :egregoros, :mini_apps_domain_allowlist, mini_apps_domain_allowlist
+end
+
+mini_apps_domain_denylist =
+  System.get_env("EGREGOROS_MINI_APPS_DOMAIN_DENYLIST", "")
+  |> String.split(",", trim: true)
+  |> Enum.map(&String.trim/1)
+  |> Enum.reject(&(&1 == ""))
+
+if mini_apps_domain_denylist != [] do
+  config :egregoros, :mini_apps_domain_denylist, mini_apps_domain_denylist
+end
+
 trusted_proxies =
   System.get_env("EGREGOROS_TRUSTED_PROXIES", "")
   |> String.split(",", trim: true)

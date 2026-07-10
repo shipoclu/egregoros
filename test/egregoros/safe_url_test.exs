@@ -20,6 +20,38 @@ defmodule Egregoros.SafeURLTest do
     assert :ok == SafeURL.validate_http_url("https://remote.example/users/alice")
   end
 
+  test "mini-app resolution requires an https domain and pins its public address" do
+    expect(Egregoros.DNS.Mock, :lookup_ips, fn "app.example" ->
+      {:ok, [{93, 184, 216, 34}]}
+    end)
+
+    assert {:ok, resolved} =
+             SafeURL.resolve_https_domain_url("https://app.example:8443/path?x=1")
+
+    assert resolved.hostname == "app.example"
+    assert resolved.ip == {93, 184, 216, 34}
+    assert resolved.connect_url == "https://93.184.216.34:8443/path?x=1"
+
+    for url <- [
+          "http://app.example/path",
+          "https://127.0.0.1/path",
+          "https://93.184.216.34/path",
+          "https://app.example/path#fragment",
+          "https://user@app.example/path"
+        ] do
+      assert {:error, :unsafe_url} = SafeURL.resolve_https_domain_url(url)
+    end
+  end
+
+  test "mini-app resolution rejects a domain when any dns answer is not global" do
+    expect(Egregoros.DNS.Mock, :lookup_ips, fn "rebind.example" ->
+      {:ok, [{93, 184, 216, 34}, {127, 0, 0, 1}]}
+    end)
+
+    assert {:error, :unsafe_url} =
+             SafeURL.resolve_https_domain_url("https://rebind.example/manifest")
+  end
+
   test "allows http urls" do
     assert :ok == SafeURL.validate_http_url("http://remote.example/users/alice")
   end

@@ -65,6 +65,7 @@ config :phoenix,
 config :egregoros, Egregoros.Auth, Egregoros.Auth.Mock
 config :egregoros, Egregoros.Discovery, Egregoros.Discovery.Mock
 config :egregoros, Egregoros.HTTP, Egregoros.HTTP.Mock
+config :egregoros, Egregoros.MiniApps.Fetcher, Egregoros.MiniApps.Fetcher.Mock
 config :egregoros, Egregoros.DNS, Egregoros.DNS.Mock
 config :egregoros, Egregoros.AuthZ, Egregoros.AuthZ.Mock
 config :egregoros, Egregoros.AvatarStorage, Egregoros.AvatarStorage.Mock
@@ -76,6 +77,7 @@ config :egregoros, EgregorosWeb.WebSock, EgregorosWeb.WebSock.Mock
 config :egregoros, :password_iterations, 1_000
 
 config :egregoros, :req_options, plug: {Req.Test, Egregoros.HTTP.Req}
+config :egregoros, :mini_apps_req_options, plug: {Req.Test, Egregoros.MiniApps.Fetcher.Req}
 
 config :egregoros, Oban, testing: :manual
 

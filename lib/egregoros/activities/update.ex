@@ -21,6 +21,7 @@ defmodule Egregoros.Activities.Update do
   alias Egregoros.Timeline
   alias Egregoros.User
   alias Egregoros.Users
+  alias Egregoros.Workers.ResolveMiniAppCard
   alias Egregoros.VerifiableCredentials.AssertionMethod
   alias Egregoros.VerifiableCredentials.DataIntegrity
   alias Egregoros.VerifiableCredentials.DidWeb
@@ -162,6 +163,7 @@ defmodule Egregoros.Activities.Update do
             Timeline.broadcast_post(note_object)
           end
 
+          _ = ResolveMiniAppCard.maybe_enqueue(note_object)
           :ok
 
         _ ->
