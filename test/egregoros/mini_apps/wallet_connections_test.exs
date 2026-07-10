@@ -45,6 +45,27 @@ defmodule Egregoros.MiniApps.WalletConnectionsTest do
              WalletConnections.connect(user.id, "https://other.example", [
                "0x1111111111111111111111111111111111111111"
              ])
+
+    assert {:error, :invalid_connection} = WalletConnections.connect(nil, nil, nil)
+    assert WalletConnections.accounts(nil, nil) == []
+    refute WalletConnections.connected?(nil, nil)
+    assert WalletConnections.list_for_user(nil) == []
+    assert :ok = WalletConnections.revoke(nil, nil)
+  end
+
+  test "replaces the remembered account set without creating another connection", %{user: user} do
+    assert {:ok, first} =
+             WalletConnections.connect(user.id, "https://wallet.example", [
+               "0x1111111111111111111111111111111111111111"
+             ])
+
+    assert {:ok, second} =
+             WalletConnections.connect(user.id, "https://wallet.example", [
+               "0x2222222222222222222222222222222222222222"
+             ])
+
+    assert first.id == second.id
+    assert WalletConnections.accounts(user.id, "https://wallet.example") == second.accounts
   end
 
   test "policy changes hide account access immediately but do not prevent revocation", %{

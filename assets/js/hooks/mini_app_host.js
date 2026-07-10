@@ -1,11 +1,16 @@
 import {createMiniAppBroker} from "../lib/mini_app_broker.mjs"
 import {createMiniAppAuthRelay} from "../lib/mini_app_auth_relay.mjs"
+import {selectEvmWalletAdapter} from "../wallet/evm_wallet_adapter.mjs"
 
 const MiniAppHost = {
   mounted() {
     this.broker = null
     this.frame = null
     this.brokerKey = null
+    this.walletAdapter = selectEvmWalletAdapter({ethereum: window.ethereum})
+    this.walletCheckPending = false
+    this.walletCompatible = null
+    this.walletConfigKey = null
     this.authRelay = createMiniAppAuthRelay({
       windowObject: window,
       sendResult: result =>
@@ -132,11 +137,49 @@ const MiniAppHost = {
         status: payload.status,
       })
     })
-    this.bindFrame()
+    this.handleEvent("mini_app_wallet_execute", async payload => {
+      if (payload?.launch_id !== this.el.dataset.launchId) return
+
+      try {
+        const result = await this.walletAdapter.request({
+          method: payload.method,
+          params: payload.params,
+        })
+        this.pushEvent("mini_app_wallet_execution_result", {
+          launch_id: payload.launch_id,
+          request_id: payload.request_id,
+          status: "ok",
+          result,
+        })
+      } catch (error) {
+        this.pushEvent("mini_app_wallet_execution_result", {
+          launch_id: payload.launch_id,
+          request_id: payload.request_id,
+          status: "error",
+          code: Number.isInteger(error?.code) ? error.code : 4001,
+        })
+      }
+    })
+    this.handleEvent("mini_app_wallet_response", payload => {
+      if (payload?.launch_id !== this.el.dataset.launchId) return
+
+      this.broker?.send({
+        type: "walletResult",
+        version: "1",
+        launchId: payload.launch_id,
+        requestId: payload.request_id,
+        ...(payload.error ? {error: payload.error} : {result: payload.result}),
+      })
+    })
+    this.initializeWallet()
   },
 
   updated() {
-    this.bindFrame()
+    if (this.walletConfigurationKey() !== this.walletConfigKey) {
+      this.initializeWallet()
+    } else {
+      this.bindFrame()
+    }
   },
 
   destroyed() {
@@ -152,11 +195,61 @@ const MiniAppHost = {
     this.brokerKey = null
   },
 
+  initializeWallet() {
+    this.walletConfigKey = this.walletConfigurationKey()
+    const configKey = this.walletConfigKey
+    const required = this.el.dataset.walletRequired === "true"
+    if (!required) {
+      this.walletCompatible = this.walletAdapter.available()
+      this.bindFrame()
+      return
+    }
+
+    this.walletCheckPending = true
+    const launchId = this.el.dataset.launchId
+    const requiredChains = JSON.parse(this.el.dataset.walletRequiredChains || "[]")
+    const finish = compatible => {
+      if (this.walletConfigKey !== configKey) return
+      this.walletCompatible = compatible
+      this.walletCheckPending = false
+      this.pushEvent("mini_app_wallet_availability", {launch_id: launchId, compatible})
+      this.bindFrame()
+    }
+
+    if (!this.walletAdapter.available()) {
+      finish(false)
+      return
+    }
+
+    this.walletAdapter
+      .request({method: "eth_chainId", params: []})
+      .then(chainId => {
+        const caip2 = `eip155:${BigInt(chainId).toString(10)}`
+        finish(requiredChains.length === 0 || requiredChains.includes(caip2))
+      })
+      .catch(() => finish(false))
+  },
+
+  walletConfigurationKey() {
+    return [
+      this.el.dataset.launchId || "",
+      this.el.dataset.walletEnabled || "false",
+      this.el.dataset.walletRequired || "false",
+      this.el.dataset.walletRequiredChains || "[]",
+    ].join("\n")
+  },
+
   bindFrame() {
+    if (this.walletCheckPending) return
     const frame = this.el.querySelector("#mini-app-frame")
     const appOrigin = this.el.dataset.appOrigin || ""
     const launchId = this.el.dataset.launchId || ""
     const brokerKey = `${appOrigin}\n${launchId}`
+    const walletEnabled = this.el.dataset.walletEnabled === "true"
+    const capabilities =
+      walletEnabled && this.walletAdapter.available() && this.walletCompatible !== false
+        ? ["wallet.evm"]
+        : []
 
     if (!frame || !appOrigin || !launchId) {
       this.destroyBroker()
@@ -173,6 +266,7 @@ const MiniAppHost = {
       iframe: frame,
       appOrigin,
       launchId,
+      capabilities,
       onLoading: () => {
         this.authRelay.cancel()
         this.pushEvent("mini_app_loading", {launch_id: launchId})
@@ -211,6 +305,13 @@ const MiniAppHost = {
           launch_id: launchId,
           request_id: request.requestId,
           url: request.url,
+        }),
+      onWalletRequest: request =>
+        this.pushEvent("mini_app_wallet_request", {
+          launch_id: launchId,
+          request_id: request.requestId,
+          method: request.method,
+          params: request.params,
         }),
     })
   },

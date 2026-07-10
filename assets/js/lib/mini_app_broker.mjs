@@ -134,10 +134,29 @@ const validExternalRequest = (message, launchId) =>
   validHttpsUrl(message.url) &&
   message.userActivation === true
 
+const validWalletRequest = (message, launchId) =>
+  !!message &&
+  typeof message === "object" &&
+  !Array.isArray(message) &&
+  Object.keys(message).length === 7 &&
+  Object.keys(message).every(key =>
+    ["type", "version", "launchId", "requestId", "method", "params", "userActivation"].includes(key)
+  ) &&
+  message.type === "walletRequest" &&
+  message.version === protocolVersion &&
+  message.launchId === launchId &&
+  validRequestId(message.requestId) &&
+  ["eth_accounts", "eth_chainId", "eth_requestAccounts"].includes(message.method) &&
+  Array.isArray(message.params) &&
+  message.params.length === 0 &&
+  (message.method !== "eth_requestAccounts" || message.userActivation === true) &&
+  typeof message.userActivation === "boolean"
+
 export const createMiniAppBroker = ({
   iframe,
   appOrigin,
   launchId,
+  capabilities = [],
   onLoading,
   onReady,
   onContextRequest,
@@ -145,6 +164,7 @@ export const createMiniAppBroker = ({
   onComposeRequest,
   onCloseRequest,
   onExternalRequest,
+  onWalletRequest,
 }) => {
   let hostPort = null
   let ready = false
@@ -220,6 +240,19 @@ export const createMiniAppBroker = ({
 
       if (validExternalRequest(message, launchId) && acceptOnce(`external:${message.requestId}`)) {
         onExternalRequest?.({requestId: message.requestId, url: message.url})
+        return
+      }
+
+      if (
+        capabilities.includes("wallet.evm") &&
+        validWalletRequest(message, launchId) &&
+        acceptOnce(`wallet:${message.requestId}`)
+      ) {
+        onWalletRequest?.({
+          requestId: message.requestId,
+          method: message.method,
+          params: [],
+        })
       }
     }
 
@@ -230,7 +263,7 @@ export const createMiniAppBroker = ({
         type: "fediverse-miniapp:bootstrap",
         version: protocolVersion,
         launchId,
-        capabilities: [],
+        capabilities: [...capabilities],
       },
       appOrigin,
       [channel.port2]

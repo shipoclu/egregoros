@@ -7,6 +7,7 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
   alias Egregoros.MiniApps.Cards
   alias Egregoros.MiniApps.Manifest
   alias Egregoros.MiniApps.OAuthRegistrations
+  alias Egregoros.MiniApps.WalletConnections
   alias Egregoros.MiniApps.ResolvedCard
   alias Egregoros.Objects
   alias Egregoros.Pipeline
@@ -220,6 +221,7 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
 
     launch_id = :sys.get_state(view.pid).socket.assigns.mini_app_host.launch_id
     render_hook(view, "mini_app_ready", %{"launch_id" => launch_id})
+
     object_count_before_compose = Egregoros.Repo.aggregate(Egregoros.Object, :count)
 
     compose_params = %{
@@ -389,8 +391,216 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
     assert has_element?(view, "#mini-app-host[data-state='closed']")
   end
 
+  test "wallet accounts remain private until the host confirms connection", %{
+    conn: conn,
+    user: user
+  } do
+    {:ok, note} =
+      Pipeline.ingest(
+        Note.build(user, ~s(<a href="https://app.example/shared/wallet">wallet</a>)),
+        local: true
+      )
+
+    assert {:ok, _card} = Cards.put(note, resolved_card(wallet?: true))
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/?timeline=public")
+    view |> element("[data-role='open-mini-app']") |> render_click()
+
+    assert has_element?(
+             view,
+             "#mini-app-host[data-wallet-enabled='true'][data-wallet-required='false']"
+           )
+
+    launch_id = :sys.get_state(view.pid).socket.assigns.mini_app_host.launch_id
+    render_hook(view, "mini_app_ready", %{"launch_id" => launch_id})
+
+    render_hook(view, "mini_app_wallet_request", %{
+      "launch_id" => launch_id,
+      "request_id" => "wallet-chain",
+      "method" => "eth_chainId",
+      "params" => []
+    })
+
+    assert_push_event(view, "mini_app_wallet_execute", %{
+      launch_id: ^launch_id,
+      request_id: "wallet-chain",
+      method: "eth_chainId",
+      params: []
+    })
+
+    render_hook(view, "mini_app_wallet_execution_result", %{
+      "launch_id" => launch_id,
+      "request_id" => "wallet-chain",
+      "status" => "ok",
+      "result" => "0x2105"
+    })
+
+    assert_push_event(view, "mini_app_wallet_response", %{
+      launch_id: ^launch_id,
+      request_id: "wallet-chain",
+      result: "0x2105"
+    })
+
+    render_hook(view, "mini_app_wallet_request", %{
+      "launch_id" => launch_id,
+      "request_id" => "wallet-chain-error",
+      "method" => "eth_chainId",
+      "params" => []
+    })
+
+    render_hook(view, "mini_app_wallet_execution_result", %{
+      "launch_id" => launch_id,
+      "request_id" => "wallet-chain-error",
+      "status" => "error",
+      "code" => 4900
+    })
+
+    assert_push_event(view, "mini_app_wallet_response", %{
+      launch_id: ^launch_id,
+      request_id: "wallet-chain-error",
+      error: %{code: 4900, message: "Wallet request failed"}
+    })
+
+    render_hook(view, "mini_app_wallet_request", %{
+      "launch_id" => launch_id,
+      "request_id" => "wallet-chain-invalid",
+      "method" => "eth_chainId",
+      "params" => []
+    })
+
+    render_hook(view, "mini_app_wallet_execution_result", %{
+      "launch_id" => launch_id,
+      "request_id" => "wallet-chain-invalid",
+      "status" => "ok",
+      "result" => "not-a-chain"
+    })
+
+    assert_push_event(view, "mini_app_wallet_response", %{
+      launch_id: ^launch_id,
+      request_id: "wallet-chain-invalid",
+      error: %{code: -32603, message: "Invalid wallet response"}
+    })
+
+    render_hook(view, "mini_app_wallet_request", %{
+      "launch_id" => launch_id,
+      "request_id" => "wallet-accounts",
+      "method" => "eth_accounts",
+      "params" => []
+    })
+
+    assert_push_event(view, "mini_app_wallet_response", %{
+      launch_id: ^launch_id,
+      request_id: "wallet-accounts",
+      result: []
+    })
+
+    render_hook(view, "mini_app_wallet_request", %{
+      "launch_id" => launch_id,
+      "request_id" => "wallet-connect",
+      "method" => "eth_requestAccounts",
+      "params" => []
+    })
+
+    assert has_element?(view, "#mini-app-wallet-connection")
+    view |> element("#mini-app-wallet-deny") |> render_click()
+
+    assert_push_event(view, "mini_app_wallet_response", %{
+      launch_id: ^launch_id,
+      request_id: "wallet-connect",
+      error: %{code: 4001, message: "User rejected wallet connection"}
+    })
+
+    refute WalletConnections.connected?(user.id, "https://app.example")
+
+    render_hook(view, "mini_app_wallet_request", %{
+      "launch_id" => launch_id,
+      "request_id" => "wallet-connect-2",
+      "method" => "eth_requestAccounts",
+      "params" => []
+    })
+
+    view |> element("#mini-app-wallet-connect") |> render_click()
+
+    assert_push_event(view, "mini_app_wallet_execute", %{
+      launch_id: ^launch_id,
+      request_id: "wallet-connect-2",
+      method: "eth_requestAccounts",
+      params: []
+    })
+
+    accounts = [
+      "0x1111111111111111111111111111111111111111",
+      "0x2222222222222222222222222222222222222222"
+    ]
+
+    render_hook(view, "mini_app_wallet_execution_result", %{
+      "launch_id" => launch_id,
+      "request_id" => "wallet-connect-2",
+      "status" => "ok",
+      "result" => accounts
+    })
+
+    assert WalletConnections.accounts(user.id, "https://app.example") == accounts
+
+    assert_push_event(view, "mini_app_wallet_response", %{
+      launch_id: ^launch_id,
+      request_id: "wallet-connect-2",
+      result: ^accounts
+    })
+
+    render_hook(view, "mini_app_wallet_request", %{
+      "launch_id" => launch_id,
+      "request_id" => "wallet-accounts-2",
+      "method" => "eth_accounts",
+      "params" => []
+    })
+
+    assert_push_event(view, "mini_app_wallet_execute", %{
+      launch_id: ^launch_id,
+      request_id: "wallet-accounts-2",
+      method: "eth_accounts",
+      params: []
+    })
+
+    render_hook(view, "mini_app_wallet_execution_result", %{
+      "launch_id" => launch_id,
+      "request_id" => "wallet-accounts-2",
+      "status" => "ok",
+      "result" => [List.first(accounts), "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]
+    })
+
+    assert_push_event(view, "mini_app_wallet_response", %{
+      launch_id: ^launch_id,
+      request_id: "wallet-accounts-2",
+      result: ["0x1111111111111111111111111111111111111111"]
+    })
+  end
+
+  test "required wallet incompatibility blocks the framed experience", %{conn: conn, user: user} do
+    {:ok, note} =
+      Pipeline.ingest(
+        Note.build(user, ~s(<a href="https://app.example/shared/wallet">wallet</a>)),
+        local: true
+      )
+
+    assert {:ok, _card} = Cards.put(note, resolved_card(wallet_required?: true))
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/?timeline=public")
+    view |> element("[data-role='open-mini-app']") |> render_click()
+    launch_id = :sys.get_state(view.pid).socket.assigns.mini_app_host.launch_id
+
+    render_hook(view, "mini_app_wallet_availability", %{
+      "launch_id" => launch_id,
+      "compatible" => false
+    })
+
+    assert has_element?(view, "#mini-app-wallet-incompatible")
+  end
+
   defp resolved_card(options \\ []) do
     oauth? = Keyword.get(options, :oauth?, false)
+    wallet? = Keyword.get(options, :wallet?, false)
+    wallet_required? = Keyword.get(options, :wallet_required?, false)
 
     manifest = %Manifest{
       version: "1",
@@ -402,6 +612,17 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
           do: %{
             redirect_uris: ["https://app.example/oauth/callback"],
             scopes: ["read", "write"]
+          },
+          else: nil
+        ),
+      wallet:
+        if(wallet? or wallet_required?,
+          do: %{
+            evm: %{
+              enabled: true,
+              required: wallet_required?,
+              required_chains: ["eip155:8453"]
+            }
           },
           else: nil
         ),

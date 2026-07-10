@@ -289,3 +289,73 @@ test("close and external navigation are launch-bound, replay-safe public actions
   assert.deepEqual(closes, ["close-1"])
   broker.destroy()
 })
+
+test("wallet discovery and connection requests use a strict, replay-safe schema", async () => {
+  const fixture = iframeFixture()
+  const requests = []
+  const broker = createMiniAppBroker({
+    iframe: fixture.iframe,
+    appOrigin: "https://wallet.example",
+    launchId: "launch-wallet",
+    capabilities: ["wallet.evm"],
+    onWalletRequest: request => requests.push(request),
+  })
+
+  fixture.load()
+  assert.deepEqual(fixture.posts[0].message.capabilities, ["wallet.evm"])
+  const appPort = fixture.posts[0].transfer[0]
+
+  appPort.postMessage({
+    type: "walletRequest",
+    version: "1",
+    launchId: "launch-wallet",
+    requestId: "wallet-chain",
+    method: "eth_chainId",
+    params: [],
+    userActivation: false,
+  })
+  appPort.postMessage({
+    type: "walletRequest",
+    version: "1",
+    launchId: "launch-wallet",
+    requestId: "wallet-accounts",
+    method: "eth_accounts",
+    params: [],
+    userActivation: false,
+  })
+  appPort.postMessage({
+    type: "walletRequest",
+    version: "1",
+    launchId: "launch-wallet",
+    requestId: "wallet-connect",
+    method: "eth_requestAccounts",
+    params: [],
+    userActivation: false,
+  })
+  appPort.postMessage({
+    type: "walletRequest",
+    version: "1",
+    launchId: "launch-wallet",
+    requestId: "wallet-connect",
+    method: "eth_requestAccounts",
+    params: [],
+    userActivation: true,
+  })
+  appPort.postMessage({
+    type: "walletRequest",
+    version: "1",
+    launchId: "launch-wallet",
+    requestId: "wallet-sign",
+    method: "personal_sign",
+    params: ["0x12", "0x1111111111111111111111111111111111111111"],
+    userActivation: true,
+  })
+  await tick()
+
+  assert.deepEqual(requests, [
+    {requestId: "wallet-chain", method: "eth_chainId", params: []},
+    {requestId: "wallet-accounts", method: "eth_accounts", params: []},
+    {requestId: "wallet-connect", method: "eth_requestAccounts", params: []},
+  ])
+  broker.destroy()
+})
