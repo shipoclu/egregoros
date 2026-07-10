@@ -81,6 +81,7 @@ defmodule Egregoros.Activities.Update do
   def ingest(activity, opts) do
     with :ok <- validate_inbox_target(activity, opts),
          :ok <- validate_object_namespace(activity, opts),
+         :ok <- validate_stored_object_update(activity, opts),
          :ok <- validate_credential_update(activity, opts) do
       activity
       |> to_object_attrs(opts)
@@ -133,6 +134,7 @@ defmodule Egregoros.Activities.Update do
          # metadata around to restore the canonical type array on persistence.
          {:ok, normalized_object, type_metadata} <- TypeNormalizer.normalize_incoming(object),
          existing_note <- Objects.get_by_ap_id(note_id),
+         :ok <- authorize_existing_note(existing_note, actor_ap_id),
          {:ok, validated_note} <- Note.cast_and_validate(normalized_object),
          note_actor when is_binary(note_actor) <- Map.get(validated_note, "actor"),
          true <- note_actor == actor_ap_id do
@@ -147,6 +149,7 @@ defmodule Egregoros.Activities.Update do
           |> Map.put(:data, merged_data)
           |> Map.put(:published, Map.get(note_attrs, :published) || existing_note.published)
           |> Map.put(:local, existing_note.local)
+          |> Map.put(:actor, existing_note.actor)
         else
           note_attrs
         end
@@ -170,6 +173,14 @@ defmodule Egregoros.Activities.Update do
   end
 
   defp maybe_apply_note_update(_actor_ap_id, _object, _opts), do: :ok
+
+  defp authorize_existing_note(nil, _actor_ap_id), do: :ok
+
+  defp authorize_existing_note(%Object{actor: actor_ap_id}, actor_ap_id)
+       when is_binary(actor_ap_id),
+       do: :ok
+
+  defp authorize_existing_note(%Object{}, _actor_ap_id), do: {:error, :unauthorized_update}
 
   defp maybe_apply_credential_update(actor_ap_id, %{} = object, opts)
        when is_binary(actor_ap_id) and is_list(opts) do
@@ -207,6 +218,73 @@ defmodule Egregoros.Activities.Update do
   end
 
   defp maybe_apply_credential_update(_actor_ap_id, _object, _opts), do: :ok
+
+  defp validate_stored_object_update(activity, opts) when is_list(opts) do
+    cond do
+      Keyword.get(opts, :local, true) -> :ok
+      duplicate_update?(activity) -> :ok
+      true -> validate_remote_stored_object_update(activity)
+    end
+  end
+
+  defp duplicate_update?(%{"id" => update_id} = activity) when is_binary(update_id) do
+    case Objects.get_by_ap_id(update_id) do
+      %Object{type: "Update", data: data} -> data == activity
+      _ -> false
+    end
+  end
+
+  defp duplicate_update?(_activity), do: false
+
+  defp validate_remote_stored_object_update(%{"actor" => actor, "object" => %{} = object})
+       when is_binary(actor) do
+    if TypeNormalizer.primary_type(object) == "Note" do
+      validate_remote_note_update(actor, object)
+    else
+      :ok
+    end
+  end
+
+  defp validate_remote_stored_object_update(_activity), do: {:error, :unauthorized_update}
+
+  defp validate_remote_note_update(actor_ap_id, %{} = object) do
+    note_id = Map.get(object, "id") || Map.get(object, :id)
+
+    case Objects.get_by_ap_id(note_id) do
+      %Object{type: "Note", actor: ^actor_ap_id} = existing_note ->
+        validate_note_update_freshness(existing_note, object)
+
+      %Object{} ->
+        {:error, :unauthorized_update}
+
+      nil ->
+        {:error, :unknown_object}
+    end
+  end
+
+  defp validate_note_update_freshness(%Object{} = existing_note, object) do
+    incoming_updated =
+      Helpers.parse_datetime(Map.get(object, "updated") || Map.get(object, :updated))
+
+    current_updated =
+      existing_note.data
+      |> Map.get("updated", Map.get(existing_note.data, "published"))
+      |> Helpers.parse_datetime()
+
+    cond do
+      is_nil(incoming_updated) ->
+        {:error, :invalid_update_timestamp}
+
+      is_nil(current_updated) ->
+        :ok
+
+      DateTime.after?(incoming_updated, current_updated) ->
+        :ok
+
+      true ->
+        {:error, :stale_update}
+    end
+  end
 
   defp verify_credential_proof(activity, %{} = object, opts) when is_list(opts) do
     if Keyword.get(opts, :local, true) do
