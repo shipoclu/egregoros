@@ -56,12 +56,44 @@ defmodule Egregoros.SafeURLTest do
     assert {:error, :unsafe_url} ==
              SafeURL.validate_http_url("http://[::ffff:10.0.0.1]/users/alice")
 
-    assert :ok == SafeURL.validate_http_url("http://[::ffff:8.8.8.8]/users/alice")
+    assert {:error, :unsafe_url} ==
+             SafeURL.validate_http_url("http://[::ffff:8.8.8.8]/users/alice")
   end
 
   test "rejects private ip literals" do
     assert {:error, :unsafe_url} == SafeURL.validate_http_url("http://10.0.0.1/users/alice")
     assert {:error, :unsafe_url} == SafeURL.validate_http_url("http://192.168.0.1/users/alice")
+  end
+
+  test "rejects URL userinfo and non-global special-use addresses" do
+    assert {:error, :unsafe_url} ==
+             SafeURL.validate_http_url("https://user:password@remote.example/private")
+
+    for url <- [
+          "http://192.0.2.1/object",
+          "http://198.51.100.1/object",
+          "http://203.0.113.1/object",
+          "http://224.0.0.1/object",
+          "http://240.0.0.1/object",
+          "http://[2001:db8::1]/object",
+          "http://[ff02::1]/object",
+          "http://[::ffff:8.8.8.8]/object"
+        ] do
+      assert {:error, :unsafe_url} == SafeURL.validate_http_url(url)
+    end
+  end
+
+  test "resolves once and returns a connection URL pinned to the validated address" do
+    expect(Egregoros.DNS.Mock, :lookup_ips, fn "pinned.example" ->
+      {:ok, [{93, 184, 216, 34}]}
+    end)
+
+    assert {:ok, resolved} =
+             SafeURL.resolve_http_url_federation("https://pinned.example:8443/objects/1?x=1")
+
+    assert resolved.hostname == "pinned.example"
+    assert resolved.ip == {93, 184, 216, 34}
+    assert resolved.connect_url == "https://93.184.216.34:8443/objects/1?x=1"
   end
 
   test "rejects invalid ip literals" do

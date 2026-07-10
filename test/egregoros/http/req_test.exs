@@ -5,6 +5,39 @@ defmodule Egregoros.HTTP.ReqTest do
 
   setup :verify_on_exit!
 
+  setup do
+    stub(Egregoros.DNS.Mock, :lookup_ips, fn _host -> {:ok, [{93, 184, 216, 34}]} end)
+    :ok
+  end
+
+  test "connects to the single validated DNS address" do
+    expect(Egregoros.DNS.Mock, :lookup_ips, fn "pinned.example" ->
+      {:ok, [{93, 184, 216, 34}]}
+    end)
+
+    Req.Test.stub(Egregoros.HTTP.Req, fn conn ->
+      assert conn.host == "93.184.216.34"
+      Req.Test.text(conn, "ok")
+    end)
+
+    assert {:ok, %{status: 200, body: "ok"}} =
+             Egregoros.HTTP.Req.get("https://pinned.example/resource", [])
+  end
+
+  test "does not follow redirects" do
+    test_pid = self()
+
+    Req.Test.stub(Egregoros.HTTP.Req, fn conn ->
+      send(test_pid, {:request_path, conn.request_path})
+      Req.Test.redirect(conn, external: "https://redirected.example/private")
+    end)
+
+    assert {:ok, %{status: status}} = Egregoros.HTTP.Req.get("https://example.com/start", [])
+    assert status in 300..399
+    assert_receive {:request_path, "/start"}
+    refute_receive {:request_path, "/private"}
+  end
+
   test "enforces max response body size" do
     max = Application.get_env(:egregoros, :http_max_response_bytes, 1_000_000)
 
@@ -100,6 +133,9 @@ defmodule Egregoros.HTTP.ReqTest do
 
       :req_https_transport_opts, _default ->
         [verify: :verify_peer, cacertfile: "/nonexistent"]
+
+      :allow_private_federation, _default ->
+        true
 
       key, default ->
         Application.get_env(:egregoros, key, default)

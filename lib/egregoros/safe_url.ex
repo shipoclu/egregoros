@@ -8,18 +8,59 @@ defmodule Egregoros.SafeURL do
   @http_schemes ~w(http https)
 
   def validate_http_url(url) when is_binary(url) do
+    case resolve_http_url(url) do
+      {:ok, _resolved} -> :ok
+      {:error, _} = error -> error
+    end
+  end
+
+  def validate_http_url(_), do: {:error, :unsafe_url}
+
+  def resolve_http_url_federation(url) when is_binary(url) do
+    if allow_private_federation?() do
+      with {:ok, %URI{host: host}} <- validate_http_url_shape(url) do
+        {:ok, %{connect_url: url, hostname: host, ip: nil}}
+      else
+        _ -> {:error, :unsafe_url}
+      end
+    else
+      resolve_http_url(url)
+    end
+  end
+
+  def resolve_http_url_federation(_url), do: {:error, :unsafe_url}
+
+  defp resolve_http_url(url) when is_binary(url) do
     uri = URI.parse(url)
 
     with scheme when scheme in @http_schemes <- uri.scheme,
          host when is_binary(host) and host != "" <- uri.host,
-         :ok <- validate_host(host) do
-      :ok
+         true <- uri.userinfo in [nil, ""],
+         {:ok, ip} <- resolve_public_ip(host) do
+      {:ok,
+       %{
+         connect_url: connect_url(uri, ip),
+         hostname: host,
+         ip: ip
+       }}
     else
       _ -> {:error, :unsafe_url}
     end
   end
 
-  def validate_http_url(_), do: {:error, :unsafe_url}
+  defp resolve_http_url(_url), do: {:error, :unsafe_url}
+
+  defp validate_http_url_shape(url) do
+    case URI.parse(url) do
+      %URI{scheme: scheme, host: host, userinfo: userinfo} = uri
+      when scheme in @http_schemes and is_binary(host) and host != "" and
+             userinfo in [nil, ""] ->
+        {:ok, uri}
+
+      _ ->
+        {:error, :unsafe_url}
+    end
+  end
 
   def validate_http_url_federation(url) when is_binary(url) do
     if allow_private_federation?() do
@@ -36,6 +77,7 @@ defmodule Egregoros.SafeURL do
 
     with scheme when scheme in @http_schemes <- uri.scheme,
          host when is_binary(host) and host != "" <- uri.host,
+         true <- uri.userinfo in [nil, ""],
          :ok <- validate_host_no_dns(host) do
       :ok
     else
@@ -55,29 +97,29 @@ defmodule Egregoros.SafeURL do
     end
   end
 
-  defp validate_host("localhost"), do: {:error, :unsafe_url}
+  defp resolve_public_ip("localhost"), do: {:error, :unsafe_url}
 
-  defp validate_host(host) when is_binary(host) do
-    if ip_literal?(host) do
-      case :inet.parse_address(String.to_charlist(host)) do
-        {:ok, ip} ->
-          if private_ip?(ip), do: {:error, :unsafe_url}, else: :ok
-
-        {:error, _} ->
-          {:error, :unsafe_url}
-      end
+  defp resolve_public_ip(host) when is_binary(host) do
+    with {:ok, ips} <- resolve_ips(host),
+         true <- ips != [] and Enum.all?(ips, &globally_routable?/1) do
+      {:ok, List.first(ips)}
     else
-      case Egregoros.DNS.lookup_ips(host) do
-        {:ok, ips} when is_list(ips) and ips != [] ->
-          if Enum.any?(ips, &private_ip?/1), do: {:error, :unsafe_url}, else: :ok
-
-        _ ->
-          {:error, :unsafe_url}
-      end
+      _ -> {:error, :unsafe_url}
     end
   end
 
-  defp validate_host(_), do: {:error, :unsafe_url}
+  defp resolve_public_ip(_host), do: {:error, :unsafe_url}
+
+  defp resolve_ips(host) do
+    if ip_literal?(host) or numeric_host_like?(host) do
+      case parse_ip_literal_no_dns(host) do
+        {:ok, ip} -> {:ok, [ip]}
+        :error -> {:error, :unsafe_url}
+      end
+    else
+      Egregoros.DNS.lookup_ips(host)
+    end
+  end
 
   defp validate_host_no_dns("localhost"), do: {:error, :unsafe_url}
 
@@ -89,7 +131,7 @@ defmodule Egregoros.SafeURL do
     else
       case parse_ip_literal_no_dns(host) do
         {:ok, ip} ->
-          if private_ip?(ip), do: {:error, :unsafe_url}, else: :ok
+          if globally_routable?(ip), do: :ok, else: {:error, :unsafe_url}
 
         :error ->
           if numeric_host_like?(host), do: {:error, :unsafe_url}, else: :ok
@@ -104,37 +146,32 @@ defmodule Egregoros.SafeURL do
       String.match?(host, ~r/^\d{1,3}(\.\d{1,3}){3}$/)
   end
 
-  defp private_ip?({10, _, _, _}), do: true
-  defp private_ip?({127, _, _, _}), do: true
-  defp private_ip?({0, _, _, _}), do: true
-  defp private_ip?({169, 254, _, _}), do: true
-  defp private_ip?({172, second, _, _}) when second in 16..31, do: true
-  defp private_ip?({192, 168, _, _}), do: true
-  defp private_ip?({100, second, _, _}) when second in 64..127, do: true
-  defp private_ip?({_, _, _, _}), do: false
+  defp globally_routable?({first, _, _, _}) when first in [0, 10, 127], do: false
+  defp globally_routable?({100, second, _, _}) when second in 64..127, do: false
+  defp globally_routable?({169, 254, _, _}), do: false
+  defp globally_routable?({172, second, _, _}) when second in 16..31, do: false
+  defp globally_routable?({192, 0, 0, _}), do: false
+  defp globally_routable?({192, 0, 2, _}), do: false
+  defp globally_routable?({192, 168, _, _}), do: false
+  defp globally_routable?({198, second, _, _}) when second in 18..19, do: false
+  defp globally_routable?({198, 51, 100, _}), do: false
+  defp globally_routable?({203, 0, 113, _}), do: false
+  defp globally_routable?({first, _, _, _}) when first >= 224, do: false
+  defp globally_routable?({_, _, _, _}), do: true
 
-  defp private_ip?({0, 0, 0, 0, 0, 0, 0, 0}), do: true
-  defp private_ip?({0, 0, 0, 0, 0, 0, 0, 1}), do: true
+  defp globally_routable?({0, 0, 0, 0, 0, 65535, _, _}), do: false
+  defp globally_routable?({0, 0, 0, 0, 0, 0, _, _}), do: false
+  defp globally_routable?({0x2001, 0x0DB8, _, _, _, _, _, _}), do: false
 
-  defp private_ip?({0, 0, 0, 0, 0, 65535, a, b}) when is_integer(a) and is_integer(b) do
-    private_ip?(ipv4_from_v6_tail(a, b))
-  end
+  defp globally_routable?({first, _, _, _, _, _, _, _})
+       when (first &&& 0xE000) == 0x2000,
+       do: true
 
-  defp private_ip?({0, 0, 0, 0, 0, 0, a, b}) when is_integer(a) and is_integer(b) do
-    private_ip?(ipv4_from_v6_tail(a, b))
-  end
+  defp globally_routable?({_, _, _, _, _, _, _, _}), do: false
 
-  defp private_ip?({first, _, _, _, _, _, _, _}) when (first &&& 0xFE00) == 0xFC00, do: true
-  defp private_ip?({first, _, _, _, _, _, _, _}) when (first &&& 0xFFC0) == 0xFE80, do: true
-  defp private_ip?({_, _, _, _, _, _, _, _}), do: false
-
-  defp ipv4_from_v6_tail(a, b) when is_integer(a) and is_integer(b) do
-    {
-      a >>> 8 &&& 0xFF,
-      a &&& 0xFF,
-      b >>> 8 &&& 0xFF,
-      b &&& 0xFF
-    }
+  defp connect_url(%URI{} = uri, ip) do
+    host = ip |> :inet.ntoa() |> List.to_string()
+    uri |> Map.put(:host, host) |> Map.put(:userinfo, nil) |> URI.to_string()
   end
 
   defp parse_ip_literal_no_dns(host) when is_binary(host) do
