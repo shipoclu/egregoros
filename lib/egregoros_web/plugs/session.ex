@@ -3,34 +3,28 @@ defmodule EgregorosWeb.Plugs.Session do
 
   @behaviour Plug
 
-  alias Egregoros.RuntimeConfig
-
-  @base_session_options [
-    store: :cookie,
-    key: "_egregoros_key",
-    signing_salt: "4JqvCM51",
-    same_site: "Lax",
-    secure: Application.compile_env(:egregoros, :secure_cookies, false)
-  ]
+  @default_secure Application.compile_env(:egregoros, :secure_cookies, false)
 
   @impl Plug
   def init(opts), do: opts
 
   @impl Plug
   def call(conn, _opts) do
-    Plug.Session.call(conn, Plug.Session.init(session_options()))
+    Plug.Session.call(conn, Plug.Session.init(options()))
   end
 
-  defp session_options do
-    options = @base_session_options
+  @doc false
+  def options(overrides \\ []) when is_list(overrides) do
+    secure = Keyword.get(overrides, :secure, @default_secure)
 
-    case RuntimeConfig.get(:session_cookie_domain) do
-      domain when is_binary(domain) ->
-        domain = String.trim(domain)
-        if domain == "", do: options, else: Keyword.put(options, :domain, domain)
-
-      _ ->
-        options
-    end
+    [
+      store: :cookie,
+      key: if(secure, do: "__Host-egregoros", else: "_egregoros_key"),
+      signing_salt: "4JqvCM51",
+      path: "/",
+      http_only: true,
+      same_site: "Lax",
+      secure: secure
+    ]
   end
 end

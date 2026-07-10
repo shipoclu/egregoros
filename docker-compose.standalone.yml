@@ -8,7 +8,6 @@ services:
 
       # Serve uploads from a dedicated subdomain (defense in depth).
       EGREGOROS_UPLOADS_BASE_URL: https://i.${EGREGOROS_DOMAIN}
-      EGREGOROS_SESSION_COOKIE_DOMAIN: ${EGREGOROS_DOMAIN}
       # The web port is internal-only; Caddy is the sole direct HTTP peer.
       EGREGOROS_TRUSTED_PROXIES: 172.16.0.0/12
 

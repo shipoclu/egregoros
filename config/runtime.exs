@@ -120,13 +120,6 @@ if config_env() != :test do
   if is_binary(uploads_base_url) and uploads_base_url != "" do
     config :egregoros, :uploads_base_url, uploads_base_url
   end
-
-  session_cookie_domain =
-    System.get_env("EGREGOROS_SESSION_COOKIE_DOMAIN") || System.get_env("SESSION_COOKIE_DOMAIN")
-
-  if is_binary(session_cookie_domain) and session_cookie_domain != "" do
-    config :egregoros, :session_cookie_domain, session_cookie_domain
-  end
 end
 
 if config_env() == :prod do

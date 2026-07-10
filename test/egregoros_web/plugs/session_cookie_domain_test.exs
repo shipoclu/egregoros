@@ -4,40 +4,37 @@ defmodule EgregorosWeb.Plugs.SessionCookieDomainTest do
   import Plug.Conn
   import Plug.Test
 
-  alias Egregoros.RuntimeConfig
   alias EgregorosWeb.Plugs.Session
 
-  test "does not set a Domain attribute by default" do
-    RuntimeConfig.with(%{session_cookie_domain: nil}, fn ->
-      secret_key_base = EgregorosWeb.Endpoint.config(:secret_key_base)
+  test "uses a host-only HttpOnly cookie with an explicit root path" do
+    conn = put_session_cookie(Session.options())
 
-      conn =
-        conn(:get, "/")
-        |> Map.put(:secret_key_base, secret_key_base)
-        |> Session.call([])
-        |> fetch_session()
-        |> put_session(:user_id, 1)
-        |> send_resp(200, "ok")
-
-      assert [cookie] = get_resp_header(conn, "set-cookie")
-      refute String.contains?(cookie, "domain=")
-    end)
+    assert [cookie] = get_resp_header(conn, "set-cookie")
+    refute String.contains?(String.downcase(cookie), "domain=")
+    assert String.contains?(String.downcase(cookie), "httponly")
+    assert String.contains?(String.downcase(cookie), "path=/")
+    assert String.contains?(String.downcase(cookie), "samesite=lax")
   end
 
-  test "sets a Domain attribute when configured" do
-    RuntimeConfig.with(%{session_cookie_domain: "example.com"}, fn ->
-      secret_key_base = EgregorosWeb.Endpoint.config(:secret_key_base)
+  test "secure deployments use the __Host- prefix and Secure attribute" do
+    options = Session.options(secure: true)
+    conn = put_session_cookie(options)
 
-      conn =
-        conn(:get, "/")
-        |> Map.put(:secret_key_base, secret_key_base)
-        |> Session.call([])
-        |> fetch_session()
-        |> put_session(:user_id, 1)
-        |> send_resp(200, "ok")
+    assert options[:key] == "__Host-egregoros"
+    assert [cookie] = get_resp_header(conn, "set-cookie")
+    assert String.starts_with?(cookie, "__Host-egregoros=")
+    assert String.contains?(String.downcase(cookie), "secure")
+    refute String.contains?(String.downcase(cookie), "domain=")
+  end
 
-      assert [cookie] = get_resp_header(conn, "set-cookie")
-      assert String.contains?(cookie, "domain=example.com")
-    end)
+  defp put_session_cookie(options) do
+    secret_key_base = EgregorosWeb.Endpoint.config(:secret_key_base)
+
+    conn(:get, "/")
+    |> Map.put(:secret_key_base, secret_key_base)
+    |> Plug.Session.call(Plug.Session.init(options))
+    |> fetch_session()
+    |> put_session(:user_id, 1)
+    |> send_resp(200, "ok")
   end
 end
