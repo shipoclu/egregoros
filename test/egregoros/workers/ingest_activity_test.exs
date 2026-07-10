@@ -90,5 +90,7 @@ defmodule Egregoros.Workers.IngestActivityTest do
 
     assert Error.classify(%DBConnection.ConnectionError{message: "database unavailable"}) ==
              :transient
+
+    assert Error.classify(Ecto.Changeset.change(%Egregoros.Object{})) == :permanent
   end
 end

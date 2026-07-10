@@ -25,6 +25,13 @@ defmodule EgregorosWeb.SessionControllerTest do
     assert html =~ ~s(data-role="app-shell")
     assert html =~ ~s(data-role="nav-login")
     assert html =~ ~s(data-role="passkey-login-button")
+
+    assert [csp] = get_resp_header(conn, "content-security-policy")
+    assert csp =~ "default-src 'self'"
+    assert csp =~ "script-src 'self'"
+    assert csp =~ "object-src 'none'"
+    assert csp =~ "frame-ancestors 'none'"
+    refute html =~ "<script>"
   end
 
   test "POST /login sets session for valid credentials", %{conn: conn} do

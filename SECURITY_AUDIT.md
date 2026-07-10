@@ -12,7 +12,30 @@ Those controls are not yet sufficient for hostile federation. The central proble
 
 The audit found **8 high**, **7 medium**, and **1 low** issue. No issue was classified critical because the reviewed paths do not directly permit takeover of a local account or execution on the server; several high-severity issues do permit remote impersonation, relationship manipulation, SSRF, or forged credentials.
 
-**Release recommendation:** do not describe the federation boundary as hardened until remediation phases 0 through 4 below are complete. In particular, complete F-01 through F-06 before exposing an instance to untrusted federation.
+**Release recommendation:** all findings below were remediated in the commit series recorded in the remediation status. Apply the OAuth migration, review deployment-specific proxy/CSP settings, and pass the full precommit suite before exposing an instance to untrusted federation.
+
+## Remediation status
+
+As of 2026-07-10, every finding in this report has an implemented, test-backed remediation. Detailed finding text below is retained as the audit record of the vulnerable state.
+
+| ID | Status | Remediation commit |
+| --- | --- | --- |
+| F-01 | Remediated | `9fb279f` — contain remote object IDs to owner authority |
+| F-02 | Remediated | `6021df6` — authorize updates against the stored owner and order them |
+| F-03 | Remediated | `d9c6c75` — correlate Accept/Reject with the exact pending Follow |
+| F-04 | Remediated | `055ea40` — require body-bound federation signatures |
+| F-05 | Remediated | `8b0be23` — enforce ActivityStreams response media types |
+| F-06 | Remediated | `cbcccdb` — resolve once and pin outbound requests to validated public IPs |
+| F-07 | Remediated | `18c8f8f` — verify supported remote credential proofs |
+| F-08 | Remediated | `5685aab` — atomic limits, trusted proxy identity, and auth endpoint buckets |
+| F-09 | Remediated | `64da822` — bind WebFinger JRD responses to the requested account |
+| F-10 | Remediated | `7fe469e` — recoverable ingestion effects, transient retries, and tombstones |
+| F-11 | Remediated | `cafcace` — authorize private media and revoke access with the linked post |
+| F-12 | Remediated | `bfe8c9e` — host-only production session cookies |
+| F-13 | Remediated | `8cefe4b` — sniff, bound, isolate, and fail closed on media processing |
+| F-14 | Remediated | `38467ae` — redirect policy, PKCE, finite TTLs, and token-family rotation |
+| F-15 | Remediated | `fdd37ae` — reject excessive ActivityPub structure and discovery fan-out |
+| F-16 | Remediated | Current commit — enforce an explicit CSP with report-only rollout support |
 
 ## Severity model
 

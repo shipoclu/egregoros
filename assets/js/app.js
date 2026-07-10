@@ -43,6 +43,37 @@ import {initImageCropper} from "./hooks/image_cropper"
 import {BIP39_ENGLISH_WORDS} from "./bip39_english_words"
 import {decryptE2EEDM as decryptE2EEDMOffline, encryptE2EEDM} from "./lib/e2ee_dm.mjs"
 
+const initTheme = () => {
+  const themeQuery = window.matchMedia("(prefers-color-scheme: dark)")
+
+  const applyTheme = mode => {
+    const theme = mode === "system" ? (themeQuery.matches ? "dark" : "light") : mode
+
+    if (mode === "system") {
+      localStorage.removeItem("phx:theme")
+    } else {
+      localStorage.setItem("phx:theme", mode)
+    }
+
+    document.documentElement.setAttribute("data-theme", theme)
+    document.documentElement.setAttribute("data-theme-mode", mode)
+  }
+
+  applyTheme(localStorage.getItem("phx:theme") || "system")
+
+  themeQuery.addEventListener("change", () => {
+    if (!localStorage.getItem("phx:theme")) applyTheme("system")
+  })
+
+  window.addEventListener("storage", event => {
+    if (event.key === "phx:theme") applyTheme(event.newValue || "system")
+  })
+
+  window.addEventListener("phx:set-theme", event => applyTheme(event.target.dataset.phxTheme))
+}
+
+initTheme()
+
 const base64UrlEncode = bytes => {
   let binary = ""
   const len = bytes.length

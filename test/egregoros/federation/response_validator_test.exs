@@ -36,4 +36,30 @@ defmodule Egregoros.Federation.ResponseValidatorTest do
   test "does not reinterpret non-success responses" do
     assert :ok = ResponseValidator.validate_activitystreams(%{status: 404, headers: []})
   end
+
+  test "validates WebFinger responses and fails closed on malformed response shapes" do
+    assert :ok =
+             ResponseValidator.validate_webfinger(%{
+               status: 200,
+               headers: [{"Content-Type", "application/jrd+json; charset=utf-8"}]
+             })
+
+    assert :ok = ResponseValidator.validate_webfinger(%{status: 404})
+
+    for response <- [
+          :invalid,
+          %{status: 200, headers: "not-headers"},
+          %{status: 200, headers: [:invalid_header]},
+          %{status: 200, headers: [{"content-type", nil}]},
+          %{status: 200, headers: [{"content-type", 123}]}
+        ] do
+      assert {:error, :invalid_webfinger_content_type} =
+               ResponseValidator.validate_webfinger(response)
+    end
+
+    assert {:error, :invalid_activitystreams_content_type} =
+             ResponseValidator.validate_activitystreams(:invalid)
+
+    refute ResponseValidator.activitystreams_media_type?(nil)
+  end
 end

@@ -50,6 +50,10 @@ case Integer.parse(System.get_env("EGREGOROS_RATE_LIMIT_NODE_COUNT", "1")) do
     :ok
 end
 
+if (System.get_env("EGREGOROS_CSP_REPORT_ONLY", "") |> String.downcase()) in ["true", "1"] do
+  config :egregoros, :csp_report_only, true
+end
+
 scheduled_status_min_offset_seconds =
   System.get_env("EGREGOROS_SCHEDULED_STATUS_MIN_OFFSET_SECONDS", "")
   |> String.trim()

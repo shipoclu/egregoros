@@ -15,6 +15,7 @@ defmodule EgregorosWeb.Router do
     plug :put_root_layout, html: {EgregorosWeb.Layouts, :root}
     plug :protect_from_forgery
     plug :put_secure_browser_headers
+    plug EgregorosWeb.Plugs.ContentSecurityPolicy
   end
 
   pipeline :browser_root do
@@ -26,6 +27,7 @@ defmodule EgregorosWeb.Router do
     plug :put_root_layout, html: {EgregorosWeb.Layouts, :root}
     plug :protect_from_forgery
     plug :put_secure_browser_headers
+    plug EgregorosWeb.Plugs.ContentSecurityPolicy
   end
 
   pipeline :browser_api do
@@ -34,6 +36,7 @@ defmodule EgregorosWeb.Router do
     plug EgregorosWeb.Plugs.FetchCurrentUser
     plug :protect_from_forgery
     plug :put_secure_browser_headers
+    plug EgregorosWeb.Plugs.ContentSecurityPolicy
   end
 
   pipeline :admin do
