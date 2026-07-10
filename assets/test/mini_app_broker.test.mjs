@@ -179,3 +179,44 @@ test("auth requests require the active launch and a strict PKCE handoff schema",
 
   broker.destroy()
 })
+
+test("compose requests accept only the narrow draft schema on the active launch", async () => {
+  const fixture = iframeFixture()
+  const requests = []
+  const broker = createMiniAppBroker({
+    iframe: fixture.iframe,
+    appOrigin: "https://app.example",
+    launchId: "launch-compose",
+    onComposeRequest: request => requests.push(request),
+  })
+
+  fixture.load()
+  const appPort = fixture.posts[0].transfer[0]
+  const valid = {
+    type: "composeNote",
+    version: "1",
+    launchId: "launch-compose",
+    callId: "compose-call-1",
+    draft: {
+      text: "I finished the chapter",
+      spoilerText: "Chapter result",
+      language: "en-GB",
+      visibility: "unlisted",
+      inReplyTo: "https://social.example/notes/launch",
+      links: ["https://app.example/results/1"],
+    },
+  }
+
+  appPort.postMessage({...valid, launchId: "wrong"})
+  appPort.postMessage({...valid, draft: {...valid.draft, media: []}})
+  appPort.postMessage({...valid, draft: {...valid.draft, visibility: "private"}})
+  appPort.postMessage({...valid, draft: {...valid.draft, links: ["javascript:alert(1)"]}})
+  await tick()
+  assert.deepEqual(requests, [])
+
+  appPort.postMessage(valid)
+  appPort.postMessage(valid)
+  await tick()
+  assert.deepEqual(requests, [{callId: "compose-call-1", draft: valid.draft}])
+  broker.destroy()
+})

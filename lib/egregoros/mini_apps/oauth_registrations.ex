@@ -1,12 +1,15 @@
 defmodule Egregoros.MiniApps.OAuthRegistrations do
   @moduledoc false
 
+  import Ecto.Query
+
   alias Egregoros.MiniApps
   alias Egregoros.MiniApps.Manifest
   alias Egregoros.MiniApps.OAuthRegistration
   alias Egregoros.OAuth
   alias Egregoros.OAuth.Application, as: OAuthApplication
   alias Egregoros.OAuth.Scopes
+  alias Egregoros.OAuth.Token
   alias Egregoros.Repo
 
   def register(%Manifest{oauth: nil}), do: {:error, :oauth_not_declared}
@@ -57,6 +60,43 @@ defmodule Egregoros.MiniApps.OAuthRegistrations do
   end
 
   def application_allowed?(_application), do: false
+
+  def capability_allowed?(origin, capability)
+      when is_binary(origin) and is_binary(capability) do
+    with %OAuthRegistration{} = registration <- get_by_origin(origin),
+         true <- capability in registration.capabilities,
+         %OAuthApplication{} = application <-
+           Repo.get(OAuthApplication, registration.oauth_application_id) do
+      application_allowed?(application)
+    else
+      _ -> false
+    end
+  end
+
+  def capability_allowed?(_origin, _capability), do: false
+
+  def active_user_grant?(origin, user_id) when is_binary(origin) and is_binary(user_id) do
+    with %OAuthRegistration{} = registration <- get_by_origin(origin),
+         %OAuthApplication{} = application <-
+           Repo.get(OAuthApplication, registration.oauth_application_id),
+         true <- application_allowed?(application) do
+      now = DateTime.utc_now()
+
+      from(token in Token,
+        where:
+          token.application_id == ^application.id and token.user_id == ^user_id and
+            is_nil(token.revoked_at) and
+            (is_nil(token.expires_at) or token.expires_at > ^now),
+        select: token.scopes
+      )
+      |> Repo.all()
+      |> Enum.any?(&exact_scopes?(&1, registration.scopes))
+    else
+      _ -> false
+    end
+  end
+
+  def active_user_grant?(_origin, _user_id), do: false
 
   def validate_authorization(%OAuthApplication{} = application, redirect_uri, scopes, opts)
       when is_binary(redirect_uri) and is_binary(scopes) and is_list(opts) do

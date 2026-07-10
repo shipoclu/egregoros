@@ -71,6 +71,10 @@ defmodule Egregoros.MiniApps.OAuthRegistrationsTest do
     verifier = String.duplicate("v", 43)
     challenge = :crypto.hash(:sha256, verifier) |> Base.url_encode64(padding: false)
 
+    assert OAuthRegistrations.capability_allowed?("https://app.example", "compose_note")
+    refute OAuthRegistrations.capability_allowed?("https://app.example", "wallet")
+    refute OAuthRegistrations.active_user_grant?("https://app.example", user.id)
+
     assert {:error, :pkce_required} =
              OAuth.create_authorization_code(
                application,
@@ -102,6 +106,7 @@ defmodule Egregoros.MiniApps.OAuthRegistrationsTest do
              })
 
     assert %Token{} = OAuth.get_token(token.token)
+    assert OAuthRegistrations.active_user_grant?("https://app.example", user.id)
 
     stub(Egregoros.Config.Mock, :get, fn
       :mini_apps_enabled, false -> true
@@ -112,6 +117,8 @@ defmodule Egregoros.MiniApps.OAuthRegistrationsTest do
 
     assert OAuth.get_token(token.token) == nil
     assert Repo.get!(Token, token.id).revoked_at
+    refute OAuthRegistrations.capability_allowed?("https://app.example", "compose_note")
+    refute OAuthRegistrations.active_user_grant?("https://app.example", user.id)
   end
 
   defp manifest_fixture(overrides \\ []) do

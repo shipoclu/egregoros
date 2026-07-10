@@ -8,14 +8,39 @@ const MiniAppHost = {
     this.brokerKey = null
     this.authRelay = createMiniAppAuthRelay({
       windowObject: window,
-      sendResult: result => this.broker?.send(result),
-      onComplete: result =>
-        this.pushEvent("mini_app_auth_complete", {
+      sendResult: result =>
+        this.pushEvent(
+          "mini_app_auth_complete",
+          {
+            launch_id: result.launchId,
+            request_id: result.requestId,
+            status: result.status,
+          },
+          reply => {
+            if (!reply?.accepted) return
+
+            if (result.status === "success" && !reply.authenticated) {
+              const {handoffCode: _handoffCode, ...failed} = result
+              this.broker?.send({...failed, status: "error"})
+            } else {
+              this.broker?.send(result)
+            }
+          }
+        ),
+    })
+    const completePopupFailure = result => {
+      this.pushEvent(
+        "mini_app_auth_complete",
+        {
           launch_id: result.launchId,
           request_id: result.requestId,
           status: result.status,
-        }),
-    })
+        },
+        reply => {
+          if (reply?.accepted) this.broker?.send(result)
+        }
+      )
+    }
     this.onHostClick = event => {
       const button = event.target.closest?.("[data-role='mini-app-auth-open']")
       if (!button || !this.el.contains(button)) return
@@ -34,16 +59,11 @@ const MiniAppHost = {
           requestId: button.dataset.requestId,
         })
       ) {
-        this.broker?.send({
+        completePopupFailure({
           type: "authResult",
           version: "1",
           launchId: this.el.dataset.launchId,
           requestId: button.dataset.requestId,
-          status: "error",
-        })
-        this.pushEvent("mini_app_auth_complete", {
-          launch_id: this.el.dataset.launchId,
-          request_id: button.dataset.requestId,
           status: "error",
         })
       }
@@ -69,6 +89,30 @@ const MiniAppHost = {
         launchId: payload.launch_id,
         requestId: payload.request_id,
         status: payload.status,
+      })
+    })
+    this.handleEvent("mini_app_compose_response", payload => {
+      if (payload?.launch_id !== this.el.dataset.launchId) return
+
+      this.broker?.send({
+        type: "composeNoteResult",
+        version: "1",
+        launchId: payload.launch_id,
+        callId: payload.call_id,
+        status: payload.status,
+        ...(payload.request_id ? {requestId: payload.request_id} : {}),
+      })
+    })
+    this.handleEvent("mini_app_compose_published", payload => {
+      if (payload?.launch_id !== this.el.dataset.launchId) return
+
+      this.broker?.send({
+        type: "composeNotePublished",
+        version: "1",
+        launchId: payload.launch_id,
+        requestId: payload.request_id,
+        id: payload.id,
+        scope: payload.scope,
       })
     })
     this.bindFrame()
@@ -133,6 +177,12 @@ const MiniAppHost = {
           code_challenge: request.codeChallenge,
           code_challenge_method: request.codeChallengeMethod,
           handoff_challenge: request.handoffChallenge,
+        }),
+      onComposeRequest: request =>
+        this.pushEvent("mini_app_compose_request", {
+          launch_id: launchId,
+          call_id: request.callId,
+          draft: request.draft,
         }),
     })
   },

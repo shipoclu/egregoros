@@ -56,6 +56,58 @@ const validAuthRequest = (message, launchId) =>
   message.codeChallengeMethod === "S256" &&
   base64UrlSha256(message.handoffChallenge)
 
+const composeDraftFields = new Set([
+  "text",
+  "spoilerText",
+  "language",
+  "visibility",
+  "inReplyTo",
+  "links",
+])
+const composeVisibilities = new Set(["public", "unlisted", "followers", "direct"])
+const validOptionalString = (value, max) => value === undefined || (typeof value === "string" && value.length <= max)
+const validHttpsUrl = value => {
+  if (typeof value !== "string" || value.length > 2048) return false
+  try {
+    const url = new URL(value)
+    return url.protocol === "https:" && !!url.hostname && !url.username && !url.password
+  } catch (_error) {
+    return false
+  }
+}
+const validComposeDraft = draft =>
+  !!draft &&
+  typeof draft === "object" &&
+  !Array.isArray(draft) &&
+  Object.keys(draft).every(key => composeDraftFields.has(key)) &&
+  validOptionalString(draft.text, 5000) &&
+  validOptionalString(draft.spoilerText, 500) &&
+  (draft.language === undefined ||
+    draft.language === "" ||
+    (typeof draft.language === "string" &&
+      draft.language.length <= 35 &&
+      /^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$/.test(draft.language))) &&
+  (draft.visibility === undefined || composeVisibilities.has(draft.visibility)) &&
+  (draft.inReplyTo === undefined || validHttpsUrl(draft.inReplyTo)) &&
+  (draft.links === undefined ||
+    (Array.isArray(draft.links) &&
+      draft.links.length <= 8 &&
+      draft.links.every(validHttpsUrl)))
+
+const validComposeRequest = (message, launchId) =>
+  !!message &&
+  typeof message === "object" &&
+  !Array.isArray(message) &&
+  Object.keys(message).length === 5 &&
+  Object.keys(message).every(key =>
+    ["type", "version", "launchId", "callId", "draft"].includes(key)
+  ) &&
+  message.type === "composeNote" &&
+  message.version === protocolVersion &&
+  message.launchId === launchId &&
+  validRequestId(message.callId) &&
+  validComposeDraft(message.draft)
+
 export const createMiniAppBroker = ({
   iframe,
   appOrigin,
@@ -64,9 +116,17 @@ export const createMiniAppBroker = ({
   onReady,
   onContextRequest,
   onAuthRequest,
+  onComposeRequest,
 }) => {
   let hostPort = null
   let ready = false
+  let seenRequests = new Set()
+
+  const acceptOnce = key => {
+    if (seenRequests.has(key)) return false
+    seenRequests.add(key)
+    return true
+  }
 
   const closePort = () => {
     if (!hostPort) return
@@ -78,6 +138,7 @@ export const createMiniAppBroker = ({
   const start = () => {
     closePort()
     ready = false
+    seenRequests = new Set()
     onLoading?.()
 
     const targetWindow = iframe?.contentWindow
@@ -98,13 +159,14 @@ export const createMiniAppBroker = ({
       if (
         message?.type === "getContext" &&
         message?.launchId === launchId &&
-        validRequestId(message?.requestId)
+        validRequestId(message?.requestId) &&
+        acceptOnce(`context:${message.requestId}`)
       ) {
         onContextRequest?.(message.requestId)
         return
       }
 
-      if (validAuthRequest(message, launchId)) {
+      if (validAuthRequest(message, launchId) && acceptOnce(`auth:${message.requestId}`)) {
         onAuthRequest?.({
           requestId: message.requestId,
           clientId: message.clientId,
@@ -115,6 +177,11 @@ export const createMiniAppBroker = ({
           codeChallengeMethod: message.codeChallengeMethod,
           handoffChallenge: message.handoffChallenge,
         })
+        return
+      }
+
+      if (validComposeRequest(message, launchId) && acceptOnce(`compose:${message.callId}`)) {
+        onComposeRequest?.({callId: message.callId, draft: {...message.draft}})
       }
     }
 

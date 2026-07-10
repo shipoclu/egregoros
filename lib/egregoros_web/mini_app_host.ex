@@ -6,8 +6,13 @@ defmodule EgregorosWeb.MiniAppHost do
   alias Egregoros.MiniApps.Card
   alias Egregoros.MiniApps.AuthRequest
   alias Egregoros.MiniApps.Cards
+  alias Egregoros.MiniApps.ComposeDraft
   alias Egregoros.MiniApps.ContextConsents
   alias Egregoros.MiniApps.LaunchContext
+  alias Egregoros.MiniApps.OAuthRegistrations
+  alias Egregoros.Publish
+  alias Egregoros.User
+  alias Egregoros.Users
 
   def on_mount(:default, _params, session, socket) do
     socket =
@@ -207,6 +212,106 @@ defmodule EgregorosWeb.MiniAppHost do
           </div>
         </section>
 
+        <section
+          :if={@state.status == :open and @state.compose_request}
+          id="mini-app-compose-sheet"
+          class="absolute inset-0 z-30 flex flex-col bg-[color:var(--bg-base)]"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="mini-app-compose-title"
+        >
+          <header class="flex items-center justify-between border-b-2 border-[color:var(--border-default)] px-4 py-3">
+            <div>
+              <p class="font-mono text-[10px] font-bold uppercase tracking-widest text-[color:var(--accent)]">
+                Mini app draft
+              </p>
+              <h2 id="mini-app-compose-title" class="font-bold text-[color:var(--text-primary)]">
+                Review before posting
+              </h2>
+            </div>
+            <button
+              id="mini-app-compose-cancel"
+              type="button"
+              phx-click="mini_app_compose_cancel"
+              class="inline-flex size-9 cursor-pointer items-center justify-center border border-[color:var(--border-muted)] text-[color:var(--text-secondary)] transition hover:border-[color:var(--danger)] hover:text-[color:var(--danger)] focus-visible:outline-none focus-brutal"
+              aria-label="Discard mini app draft"
+            >
+              <.icon name="hero-x-mark" class="size-5" />
+            </button>
+          </header>
+
+          <div class="min-h-0 flex-1 overflow-y-auto p-4">
+            <div class="mb-4 border-l-4 border-[color:var(--warning)] bg-[color:var(--warning-subtle)] p-3 text-xs leading-relaxed text-[color:var(--text-secondary)]">
+              This draft came from <span class="font-mono font-bold">{display_origin(
+                @state.card.app_origin
+              )}</span>. Review and edit every field. Nothing is posted until you press the button below.
+            </div>
+
+            <.form
+              for={@state.compose_request.form}
+              id="mini-app-compose-form"
+              phx-change="mini_app_compose_change"
+              phx-submit="mini_app_compose_submit"
+              class="space-y-4"
+            >
+              <.input
+                field={@state.compose_request.form[:content]}
+                type="textarea"
+                label="Post text"
+                rows="8"
+              />
+              <.input
+                field={@state.compose_request.form[:spoiler_text]}
+                type="text"
+                label="Content warning"
+              />
+              <div class="grid grid-cols-2 gap-3">
+                <.input
+                  field={@state.compose_request.form[:visibility]}
+                  type="select"
+                  label="Visibility"
+                  options={[
+                    {"Public", "public"},
+                    {"Unlisted", "unlisted"},
+                    {"Followers", "followers"},
+                    {"Direct", "direct"}
+                  ]}
+                />
+                <.input
+                  field={@state.compose_request.form[:language]}
+                  type="text"
+                  label="Language"
+                  placeholder="e.g. en"
+                />
+              </div>
+
+              <p
+                :if={@state.compose_request.in_reply_to}
+                id="mini-app-compose-reply-target"
+                class="break-all border border-[color:var(--border-muted)] bg-[color:var(--bg-subtle)] p-3 font-mono text-xs text-[color:var(--text-muted)]"
+              >
+                Replying to {@state.compose_request.in_reply_to}
+              </p>
+
+              <p
+                :if={@state.compose_request.error}
+                id="mini-app-compose-error"
+                class="text-sm font-bold text-[color:var(--danger)]"
+              >
+                {@state.compose_request.error}
+              </p>
+
+              <button
+                id="mini-app-compose-submit"
+                type="submit"
+                class="w-full cursor-pointer border-2 border-[color:var(--border-default)] bg-[color:var(--text-primary)] px-4 py-3 text-sm font-bold text-[color:var(--bg-base)] transition hover:shadow-[4px_4px_0_var(--accent)] focus-visible:outline-none focus-brutal"
+              >
+                Post from Egregoros
+              </button>
+            </.form>
+          </div>
+        </section>
+
         <div
           :if={@state.status == :open}
           class="relative min-h-0 flex-1 bg-white"
@@ -258,7 +363,9 @@ defmodule EgregorosWeb.MiniAppHost do
            launch_id: launch_id(),
            ready?: false,
            context_request: nil,
-           auth_request: nil
+           auth_request: nil,
+           oauth_authenticated?: false,
+           compose_request: nil
          })}
 
       _ ->
@@ -357,10 +464,116 @@ defmodule EgregorosWeb.MiniAppHost do
 
     if (state.launch_id == launch_id and state.auth_request) &&
          state.auth_request.request_id == request_id do
-      {:halt, Phoenix.Component.assign(socket, :mini_app_host, %{state | auth_request: nil})}
+      authenticated? =
+        status == "success" and
+          OAuthRegistrations.active_user_grant?(
+            state.card.app_origin,
+            socket.assigns.mini_app_user_id
+          )
+
+      {:halt, %{accepted: true, authenticated: authenticated?},
+       Phoenix.Component.assign(socket, :mini_app_host, %{
+         state
+         | auth_request: nil,
+           oauth_authenticated?: authenticated?
+       })}
     else
-      {:halt, socket}
+      {:halt, %{accepted: false}, socket}
     end
+  end
+
+  defp handle_host_event(
+         "mini_app_compose_request",
+         %{"launch_id" => launch_id, "call_id" => call_id, "draft" => draft},
+         socket
+       ) do
+    state = socket.assigns.mini_app_host
+
+    cond do
+      not compose_request_base_allowed?(state, launch_id, call_id) ->
+        {:halt, socket}
+
+      not state.oauth_authenticated? ->
+        {:halt, push_compose_response(socket, call_id, "auth_required")}
+
+      not OAuthRegistrations.capability_allowed?(state.card.app_origin, "compose_note") ->
+        {:halt, push_compose_response(socket, call_id, "unavailable")}
+
+      true ->
+        case ComposeDraft.prepare(state.card, draft) do
+          {:ok, prepared} ->
+            request_id = launch_id()
+
+            compose_request = %{
+              call_id: call_id,
+              request_id: request_id,
+              in_reply_to: prepared["in_reply_to"],
+              form:
+                prepared
+                |> Map.take(~w(content spoiler_text language visibility))
+                |> Phoenix.Component.to_form(as: :mini_app_post),
+              error: nil
+            }
+
+            socket =
+              socket
+              |> Phoenix.Component.assign(:mini_app_host, %{
+                state
+                | compose_request: compose_request
+              })
+              |> Phoenix.LiveView.push_event("mini_app_compose_response", %{
+                launch_id: state.launch_id,
+                call_id: call_id,
+                request_id: request_id,
+                status: "accepted"
+              })
+
+            {:halt, socket}
+
+          {:error, _reason} ->
+            {:halt, push_compose_response(socket, call_id, "invalid_draft")}
+        end
+    end
+  end
+
+  defp handle_host_event(
+         "mini_app_compose_change",
+         %{"mini_app_post" => params},
+         socket
+       )
+       when is_map(params) do
+    state = socket.assigns.mini_app_host
+
+    case state.compose_request do
+      %{} = request ->
+        form =
+          params
+          |> Map.take(~w(content spoiler_text language visibility))
+          |> Phoenix.Component.to_form(as: :mini_app_post)
+
+        {:halt,
+         Phoenix.Component.assign(socket, :mini_app_host, %{
+           state
+           | compose_request: %{request | form: form, error: nil}
+         })}
+
+      _ ->
+        {:halt, socket}
+    end
+  end
+
+  defp handle_host_event(
+         "mini_app_compose_submit",
+         %{"mini_app_post" => params},
+         socket
+       )
+       when is_map(params) do
+    {:halt, submit_compose(socket, params)}
+  end
+
+  defp handle_host_event("mini_app_compose_cancel", _params, socket) do
+    state = socket.assigns.mini_app_host
+    {:halt, Phoenix.Component.assign(socket, :mini_app_host, %{state | compose_request: nil})}
   end
 
   defp handle_host_event(event, %{"launch_id" => launch_id}, socket)
@@ -372,7 +585,10 @@ defmodule EgregorosWeb.MiniAppHost do
        Phoenix.Component.assign(socket, :mini_app_host, %{
          state
          | ready?: event == "mini_app_ready",
-           auth_request: if(event == "mini_app_loading", do: nil, else: state.auth_request)
+           auth_request: if(event == "mini_app_loading", do: nil, else: state.auth_request),
+           oauth_authenticated?:
+             if(event == "mini_app_loading", do: false, else: state.oauth_authenticated?),
+           compose_request: if(event == "mini_app_loading", do: nil, else: state.compose_request)
        })}
     else
       {:halt, socket}
@@ -413,19 +629,28 @@ defmodule EgregorosWeb.MiniAppHost do
       launch_id: nil,
       ready?: false,
       context_request: nil,
-      auth_request: nil
+      auth_request: nil,
+      oauth_authenticated?: false,
+      compose_request: nil
     }
   end
 
   defp context_request_allowed?(state, launch_id, request_id) do
     state.status == :open and state.ready? and state.launch_id == launch_id and
-      valid_request_id?(request_id) and active_card?(state.card)
+      is_nil(state.compose_request) and valid_request_id?(request_id) and active_card?(state.card)
   end
 
   defp auth_request_allowed?(state, launch_id, request_id) do
     state.status == :open and state.ready? and state.launch_id == launch_id and
       is_nil(state.auth_request) and is_nil(state.context_request) and
+      is_nil(state.compose_request) and
       valid_request_id?(request_id) and active_card?(state.card)
+  end
+
+  defp compose_request_base_allowed?(state, launch_id, call_id) do
+    state.status == :open and state.ready? and state.launch_id == launch_id and
+      is_nil(state.auth_request) and is_nil(state.context_request) and
+      is_nil(state.compose_request) and valid_request_id?(call_id) and active_card?(state.card)
   end
 
   defp valid_request_id?(request_id) when is_binary(request_id) do
@@ -492,6 +717,71 @@ defmodule EgregorosWeb.MiniAppHost do
       request_id: request_id,
       status: status
     })
+  end
+
+  defp push_compose_response(socket, call_id, status) do
+    state = socket.assigns.mini_app_host
+
+    Phoenix.LiveView.push_event(socket, "mini_app_compose_response", %{
+      launch_id: state.launch_id,
+      call_id: call_id,
+      status: status
+    })
+  end
+
+  defp submit_compose(socket, params) do
+    state = socket.assigns.mini_app_host
+
+    with %{request_id: request_id} = request <- state.compose_request,
+         true <- state.oauth_authenticated?,
+         true <- active_card?(state.card),
+         true <- OAuthRegistrations.capability_allowed?(state.card.app_origin, "compose_note"),
+         %User{} = user <- Users.get(socket.assigns.mini_app_user_id),
+         :ok <- reply_target_still_allowed(state.card, request.in_reply_to),
+         {:ok, publish} <- ComposeDraft.validate_form(params),
+         {:ok, create} <-
+           Publish.post_note(user, publish.content,
+             visibility: publish.visibility,
+             spoiler_text: publish.spoiler_text,
+             language: publish.language,
+             in_reply_to: request.in_reply_to
+           ),
+         id when is_binary(id) <- create.object do
+      socket
+      |> Phoenix.Component.assign(:mini_app_host, %{state | compose_request: nil})
+      |> Phoenix.LiveView.push_event("mini_app_compose_published", %{
+        launch_id: state.launch_id,
+        request_id: request_id,
+        id: id,
+        scope: publish.scope
+      })
+    else
+      _ -> put_compose_error(socket, "Could not post. Review the draft and try again.")
+    end
+  end
+
+  defp reply_target_still_allowed(_card, nil), do: :ok
+
+  defp reply_target_still_allowed(card, in_reply_to) do
+    case ComposeDraft.prepare(card, %{"inReplyTo" => in_reply_to}) do
+      {:ok, _prepared} -> :ok
+      _ -> {:error, :invalid_reply_target}
+    end
+  end
+
+  defp put_compose_error(socket, message) do
+    state = socket.assigns.mini_app_host
+
+    case state.compose_request do
+      %{} = request ->
+        Phoenix.Component.assign(socket, :mini_app_host, %{
+          state
+          | compose_request: %{request | error: message}
+        })
+
+      _ ->
+        socket
+    end
   end
 
   defp host_classes(%{status: :closed}), do: "hidden"

@@ -34,6 +34,19 @@
             Authorization returns only to this app’s exact registered origin. Its requested scopes are fixed by the verified manifest.
           </p>
         </div>
+
+        <div
+          :if={"compose_note" in @mini_app_registration.capabilities}
+          id="oauth-mini-app-capabilities"
+          class="mt-3 border-2 border-[color:var(--warning)] bg-[color:var(--warning-subtle)] p-4"
+        >
+          <p class="text-sm font-bold text-[color:var(--text-primary)]">
+            Host capability: compose a note
+          </p>
+          <p class="mt-1 text-xs leading-relaxed text-[color:var(--text-secondary)]">
+            This app can ask Egregoros to open a prefilled note draft. It can never submit the draft; you must review it and press the host’s post button yourself.
+          </p>
+        </div>
       <% end %>
 
       <.form

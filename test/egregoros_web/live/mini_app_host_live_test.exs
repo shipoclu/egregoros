@@ -8,6 +8,7 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
   alias Egregoros.MiniApps.Manifest
   alias Egregoros.MiniApps.OAuthRegistrations
   alias Egregoros.MiniApps.ResolvedCard
+  alias Egregoros.Objects
   alias Egregoros.Pipeline
   alias Egregoros.Timeline
   alias Egregoros.Users
@@ -196,6 +197,115 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
     })
   end
 
+  test "compose requires completed OAuth and publishes only from the host form", %{
+    conn: conn,
+    user: user
+  } do
+    {:ok, note} =
+      Pipeline.ingest(
+        Note.build(user, ~s(<a href="https://app.example/shared/write">writer</a>)),
+        local: true
+      )
+
+    resolved = resolved_card(oauth?: true)
+    assert {:ok, _registration} = OAuthRegistrations.register(resolved.manifest)
+    assert {:ok, _card} = Cards.put(note, resolved)
+
+    application =
+      Egregoros.OAuth.get_application_by_client_id(client_id_for("https://app.example"))
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/?timeline=public")
+    view |> element("[data-role='open-mini-app']") |> render_click()
+
+    launch_id = :sys.get_state(view.pid).socket.assigns.mini_app_host.launch_id
+    render_hook(view, "mini_app_ready", %{"launch_id" => launch_id})
+    object_count_before_compose = Egregoros.Repo.aggregate(Egregoros.Object, :count)
+
+    compose_params = %{
+      "launch_id" => launch_id,
+      "call_id" => "compose-call-1",
+      "draft" => %{
+        "text" => "Initial result",
+        "spoilerText" => "Result",
+        "language" => "en",
+        "visibility" => "unlisted",
+        "inReplyTo" => note.ap_id,
+        "links" => ["https://app.example/results/1"]
+      }
+    }
+
+    render_hook(view, "mini_app_compose_request", compose_params)
+    refute has_element?(view, "#mini-app-compose-sheet")
+
+    assert_push_event(view, "mini_app_compose_response", %{
+      launch_id: ^launch_id,
+      call_id: "compose-call-1",
+      status: "auth_required"
+    })
+
+    auth = auth_params(launch_id, application.client_id)
+    render_hook(view, "mini_app_auth_request", auth)
+
+    render_hook(view, "mini_app_auth_complete", %{
+      "launch_id" => launch_id,
+      "request_id" => "auth-1",
+      "status" => "success"
+    })
+
+    refute :sys.get_state(view.pid).socket.assigns.mini_app_host.oauth_authenticated?
+
+    render_hook(
+      view,
+      "mini_app_auth_request",
+      auth_params(launch_id, application.client_id, "auth-2")
+    )
+
+    complete_oauth_grant(application, user)
+
+    render_hook(view, "mini_app_auth_complete", %{
+      "launch_id" => launch_id,
+      "request_id" => "auth-2",
+      "status" => "success"
+    })
+
+    render_hook(view, "mini_app_compose_request", compose_params)
+    assert has_element?(view, "#mini-app-compose-sheet")
+    assert has_element?(view, "#mini-app-compose-form")
+    assert has_element?(view, "#mini-app-compose-form textarea", "Initial result")
+    assert Egregoros.Repo.aggregate(Egregoros.Object, :count) == object_count_before_compose
+
+    assert_push_event(view, "mini_app_compose_response", %{
+      launch_id: ^launch_id,
+      call_id: "compose-call-1",
+      request_id: request_id,
+      status: "accepted"
+    })
+
+    view
+    |> form("#mini-app-compose-form", %{
+      "mini_app_post" => %{
+        "content" => "Edited and explicitly submitted",
+        "spoiler_text" => "",
+        "language" => "en",
+        "visibility" => "unlisted"
+      }
+    })
+    |> render_submit()
+
+    refute has_element?(view, "#mini-app-compose-sheet")
+
+    assert_push_event(view, "mini_app_compose_published", %{
+      launch_id: ^launch_id,
+      request_id: ^request_id,
+      id: published_id,
+      scope: "unlisted"
+    })
+
+    assert %{data: %{"source" => %{"content" => "Edited and explicitly submitted"}}} =
+             Objects.get_by_ap_id(published_id)
+  end
+
   defp resolved_card(options \\ []) do
     oauth? = Keyword.get(options, :oauth?, false)
 
@@ -233,10 +343,10 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
     Egregoros.Repo.get!(Egregoros.OAuth.Application, registration.oauth_application_id).client_id
   end
 
-  defp auth_params(launch_id, client_id) do
+  defp auth_params(launch_id, client_id, request_id \\ "auth-1") do
     %{
       "launch_id" => launch_id,
-      "request_id" => "auth-1",
+      "request_id" => request_id,
       "client_id" => client_id,
       "redirect_uri" => "https://app.example/oauth/callback",
       "scopes" => ["read", "write"],
@@ -245,6 +355,31 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
       "code_challenge_method" => "S256",
       "handoff_challenge" => String.duplicate("h", 43)
     }
+  end
+
+  defp complete_oauth_grant(application, user) do
+    verifier = String.duplicate("v", 43)
+    challenge = :crypto.hash(:sha256, verifier) |> Base.url_encode64(padding: false)
+
+    assert {:ok, code} =
+             Egregoros.OAuth.create_authorization_code(
+               application,
+               user,
+               "https://app.example/oauth/callback",
+               "read write",
+               code_challenge: challenge,
+               code_challenge_method: "S256"
+             )
+
+    assert {:ok, _token} =
+             Egregoros.OAuth.exchange_code_for_token(%{
+               "grant_type" => "authorization_code",
+               "code" => code.code,
+               "client_id" => application.client_id,
+               "client_secret" => application.client_secret,
+               "redirect_uri" => "https://app.example/oauth/callback",
+               "code_verifier" => verifier
+             })
   end
 
   defp enable_mini_apps do
