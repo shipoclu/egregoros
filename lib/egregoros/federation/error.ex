@@ -24,7 +24,7 @@ defmodule Egregoros.Federation.Error do
     uncorrelated_follow_response missing_e2ee_payload missing_issuer missing_key
     missing_offset missing_proof missing_public_key credential_expired
     credential_not_active proof_already_present unsupported_cryptosuite
-    voter_not_permitted
+    voter_not_permitted activity_structure_limit actor_discovery_limit
   )a
 
   def classify(reason) when reason in @permanent, do: :permanent

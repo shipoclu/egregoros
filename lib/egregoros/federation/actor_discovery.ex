@@ -2,10 +2,14 @@ defmodule Egregoros.Federation.ActorDiscovery do
   @moduledoc false
 
   alias Egregoros.Users
+  alias Egregoros.RateLimiter
   alias Egregoros.Workers.FetchActor
 
   @as_public "https://www.w3.org/ns/activitystreams#Public"
   @recipient_keys ~w(to cc bto bcc audience)
+  @max_actor_ids 50
+  @domain_limit 60
+  @domain_interval_ms 60_000
 
   def enqueue(activity, opts \\ [])
 
@@ -13,11 +17,13 @@ defmodule Egregoros.Federation.ActorDiscovery do
     if Keyword.get(opts, :local, true) do
       :ok
     else
-      activity
-      |> actor_ids()
-      |> Enum.each(&enqueue_actor/1)
+      actor_ids = actor_ids(activity)
 
-      :ok
+      with :ok <- validate_fan_out(actor_ids),
+           :ok <- reserve_domain_budgets(actor_ids) do
+        Enum.each(actor_ids, &enqueue_actor/1)
+        :ok
+      end
     end
   end
 
@@ -116,4 +122,33 @@ defmodule Egregoros.Federation.ActorDiscovery do
   end
 
   defp enqueue_actor(_), do: :ok
+
+  defp validate_fan_out(actor_ids) when length(actor_ids) <= @max_actor_ids, do: :ok
+  defp validate_fan_out(_actor_ids), do: {:error, :actor_discovery_limit}
+
+  defp reserve_domain_budgets(actor_ids) do
+    actor_ids
+    |> Enum.flat_map(fn actor_id ->
+      case URI.parse(actor_id) do
+        %URI{scheme: scheme, host: host}
+        when scheme in ["http", "https"] and is_binary(host) and host != "" ->
+          [String.downcase(host)]
+
+        _ ->
+          []
+      end
+    end)
+    |> Enum.uniq()
+    |> Enum.reduce_while(:ok, fn domain, :ok ->
+      case RateLimiter.allow?(
+             :actor_discovery_domain,
+             domain,
+             @domain_limit,
+             @domain_interval_ms
+           ) do
+        :ok -> {:cont, :ok}
+        {:error, :rate_limited} = error -> {:halt, error}
+      end
+    end)
+  end
 end

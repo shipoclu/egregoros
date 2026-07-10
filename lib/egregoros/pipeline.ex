@@ -4,6 +4,7 @@ defmodule Egregoros.Pipeline do
   alias Egregoros.ActivityPub.ObjectAuthority
   alias Egregoros.Domain
   alias Egregoros.Federation.ActorDiscovery
+  alias Egregoros.Federation.ActivityLimits
   alias Egregoros.Object
   alias Egregoros.Objects
   alias Egregoros.Repo
@@ -18,6 +19,7 @@ defmodule Egregoros.Pipeline do
     with {:ok, normalized_activity, type_metadata} <- TypeNormalizer.normalize_incoming(activity),
          opts <- TypeNormalizer.put_type_metadata(opts, type_metadata),
          :ok <- validate_namespace(normalized_activity, opts),
+         :ok <- validate_structure(normalized_activity, opts),
          :ok <- validate_authority(normalized_activity, opts),
          {:ok, module} <- ActivityRegistry.fetch(normalized_activity) do
       ingest_with(module, normalized_activity, opts)
@@ -38,8 +40,11 @@ defmodule Egregoros.Pipeline do
   end
 
   defp discover_actors(activity, opts) when is_map(activity) and is_list(opts) do
-    _ = ActorDiscovery.enqueue(activity, opts)
-    :ok
+    ActorDiscovery.enqueue(activity, opts)
+  end
+
+  defp validate_structure(activity, opts) do
+    if Keyword.get(opts, :local, true), do: :ok, else: ActivityLimits.validate(activity)
   end
 
   defp persist_with_pending_effect(module, activity, opts) do

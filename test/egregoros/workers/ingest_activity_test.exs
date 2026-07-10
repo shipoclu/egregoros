@@ -62,6 +62,22 @@ defmodule Egregoros.Workers.IngestActivityTest do
     assert {:discard, :unknown_type} = IngestActivity.perform(job)
   end
 
+  test "rejects excessive actor fan-out before persistence or job creation" do
+    activity = %{
+      "id" => "https://remote.example/objects/too-many-recipients",
+      "type" => "Note",
+      "attributedTo" => "https://remote.example/users/alice",
+      "content" => "Hello",
+      "to" => Enum.map(1..101, &"https://remote.example/users/#{&1}")
+    }
+
+    assert {:discard, :activity_structure_limit} =
+             IngestActivity.perform(%Oban.Job{args: %{"activity" => activity}})
+
+    assert Egregoros.Objects.get_by_ap_id(activity["id"]) == nil
+    refute_enqueued(worker: FetchActor)
+  end
+
   test "discards jobs with invalid arguments" do
     assert {:discard, :invalid_args} = IngestActivity.perform(%Oban.Job{args: %{}})
     assert {:discard, :invalid_args} = IngestActivity.perform(%Oban.Job{args: %{"activity" => 1}})

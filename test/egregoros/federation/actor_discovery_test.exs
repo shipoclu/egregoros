@@ -97,6 +97,47 @@ defmodule Egregoros.Federation.ActorDiscoveryTest do
     assert_enqueued(worker: FetchActor, args: %{"ap_id" => actor_ap_id})
   end
 
+  test "enqueue rejects one actor over the fan-out limit before creating jobs" do
+    activity = %{
+      "to" =>
+        for index <- 1..51 do
+          "https://remote#{index}.example/users/person"
+        end
+    }
+
+    assert {:error, :actor_discovery_limit} =
+             ActorDiscovery.enqueue(activity, local: false)
+
+    refute_enqueued(worker: FetchActor)
+  end
+
+  test "enqueue accepts exactly the actor fan-out limit" do
+    activity = %{
+      "to" =>
+        for index <- 1..50 do
+          "https://remote#{index}.example/users/person"
+        end
+    }
+
+    assert :ok = ActorDiscovery.enqueue(activity, local: false)
+    assert length(all_enqueued(worker: FetchActor)) == 50
+  end
+
+  test "enqueue reserves a per-domain fetch budget before creating jobs" do
+    expect(Egregoros.RateLimiter.Mock, :allow?, fn
+      :actor_discovery_domain, "remote.example", 60, 60_000 ->
+        {:error, :rate_limited}
+    end)
+
+    assert {:error, :rate_limited} =
+             ActorDiscovery.enqueue(
+               %{"actor" => "https://remote.example/users/alice"},
+               local: false
+             )
+
+    refute_enqueued(worker: FetchActor)
+  end
+
   test "enqueue/2 does not enqueue when the actor is already stored" do
     actor_ap_id = "https://remote.example/users/alice"
 
