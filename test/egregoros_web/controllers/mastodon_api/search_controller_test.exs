@@ -60,7 +60,7 @@ defmodule EgregorosWeb.MastodonAPI.SearchControllerTest do
              }
            ]
          },
-         headers: []
+         headers: [{"content-type", "application/activity+json"}]
        }}
     end)
     |> expect(:get, fn url, _headers ->
@@ -81,7 +81,7 @@ defmodule EgregorosWeb.MastodonAPI.SearchControllerTest do
              "publicKeyPem" => "-----BEGIN PUBLIC KEY-----\nMIIB...\n-----END PUBLIC KEY-----\n"
            }
          },
-         headers: []
+         headers: [{"content-type", "application/activity+json"}]
        }}
     end)
 
@@ -118,7 +118,7 @@ defmodule EgregorosWeb.MastodonAPI.SearchControllerTest do
              }
            ]
          },
-         headers: []
+         headers: [{"content-type", "application/activity+json"}]
        }}
     end)
     |> expect(:get, fn url, _headers ->
@@ -139,7 +139,7 @@ defmodule EgregorosWeb.MastodonAPI.SearchControllerTest do
              "publicKeyPem" => "-----BEGIN PUBLIC KEY-----\nMIIB...\n-----END PUBLIC KEY-----\n"
            }
          },
-         headers: []
+         headers: [{"content-type", "application/activity+json"}]
        }}
     end)
 

@@ -86,7 +86,7 @@ defmodule Egregoros.E2EE.ActorKeysTest do
 
     expect(Egregoros.HTTP.Mock, :get, fn url, _headers ->
       assert url == actor_ap_id
-      {:ok, %{status: 200, body: actor, headers: []}}
+      {:ok, %{status: 200, body: actor, headers: [{"content-type", "application/activity+json"}]}}
     end)
 
     assert {:ok, [%{"kid" => "e2ee-new"}, %{"kid" => "e2ee-old"}]} =
@@ -150,7 +150,7 @@ defmodule Egregoros.E2EE.ActorKeysTest do
 
     expect(Egregoros.HTTP.Mock, :get, fn url, _headers ->
       assert url == actor_ap_id
-      {:ok, %{status: 200, body: actor, headers: []}}
+      {:ok, %{status: 200, body: actor, headers: [{"content-type", "application/activity+json"}]}}
     end)
 
     assert {:ok, %{"kid" => "e2ee-fresh"}} = ActorKeys.get_actor_key(actor_ap_id, nil)
@@ -183,7 +183,7 @@ defmodule Egregoros.E2EE.ActorKeysTest do
 
     expect(Egregoros.HTTP.Mock, :get, fn url, _headers ->
       assert url == actor_ap_id
-      {:ok, %{status: 200, body: actor, headers: []}}
+      {:ok, %{status: 200, body: actor, headers: [{"content-type", "application/activity+json"}]}}
     end)
 
     assert {:ok, [%{"kid" => "e2ee-remote"}]} = ActorKeys.list_actor_keys(actor_ap_id)
@@ -289,7 +289,7 @@ defmodule Egregoros.E2EE.ActorKeysTest do
 
     expect(Egregoros.HTTP.Mock, :get, fn url, _headers ->
       assert url == actor_ap_id
-      {:ok, %{status: 200, body: actor, headers: []}}
+      {:ok, %{status: 200, body: actor, headers: [{"content-type", "application/activity+json"}]}}
     end)
 
     assert {:ok, %{"kid" => "e2ee-remote"}} = ActorKeys.get_actor_key(actor_ap_id, nil)
@@ -301,7 +301,13 @@ defmodule Egregoros.E2EE.ActorKeysTest do
 
     expect(Egregoros.HTTP.Mock, :get, fn url, _headers ->
       assert url == actor_ap_id
-      {:ok, %{status: 200, body: "<html>not-json</html>", headers: []}}
+
+      {:ok,
+       %{
+         status: 200,
+         body: "<html>not-json</html>",
+         headers: [{"content-type", "application/activity+json"}]
+       }}
     end)
 
     assert {:error, :invalid_json} = ActorKeys.fetch_actor(actor_ap_id)
@@ -317,7 +323,7 @@ defmodule Egregoros.E2EE.ActorKeysTest do
 
     expect(Egregoros.HTTP.Mock, :get, fn url, _headers ->
       assert url == actor_ap_id
-      {:ok, %{status: 200, body: actor, headers: []}}
+      {:ok, %{status: 200, body: actor, headers: [{"content-type", "application/activity+json"}]}}
     end)
 
     assert {:error, :no_e2ee_keys} = ActorKeys.get_actor_key(actor_ap_id, nil)

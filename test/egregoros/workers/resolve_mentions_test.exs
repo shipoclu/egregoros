@@ -35,7 +35,7 @@ defmodule Egregoros.Workers.ResolveMentionsTest do
     assert {:ok, _} = Pipeline.ingest(follow, local: false)
 
     stub(Egregoros.HTTP.Mock, :get, fn _url, _headers ->
-      {:ok, %{status: 404, body: %{}, headers: []}}
+      {:ok, %{status: 404, body: %{}, headers: [{"content-type", "application/activity+json"}]}}
     end)
 
     assert {:ok, create} = Publish.post_note(local, "hi @toast@donotsta.re")
@@ -81,7 +81,7 @@ defmodule Egregoros.Workers.ResolveMentionsTest do
                  }
                ]
              },
-             headers: []
+             headers: [{"content-type", "application/activity+json"}]
            }}
 
         url == actor_url ->
@@ -99,11 +99,12 @@ defmodule Egregoros.Workers.ResolveMentionsTest do
                    "-----BEGIN PUBLIC KEY-----\nMIIB...\n-----END PUBLIC KEY-----\n"
                }
              },
-             headers: []
+             headers: [{"content-type", "application/activity+json"}]
            }}
 
         true ->
-          {:ok, %{status: 404, body: %{}, headers: []}}
+          {:ok,
+           %{status: 404, body: %{}, headers: [{"content-type", "application/activity+json"}]}}
       end
     end)
 
@@ -214,7 +215,7 @@ defmodule Egregoros.Workers.ResolveMentionsTest do
                  }
                ]
              },
-             headers: []
+             headers: [{"content-type", "application/activity+json"}]
            }}
 
         url == actor_url ->
@@ -232,11 +233,12 @@ defmodule Egregoros.Workers.ResolveMentionsTest do
                    "-----BEGIN PUBLIC KEY-----\nMIIB...\n-----END PUBLIC KEY-----\n"
                }
              },
-             headers: []
+             headers: [{"content-type", "application/activity+json"}]
            }}
 
         true ->
-          {:ok, %{status: 404, body: %{}, headers: []}}
+          {:ok,
+           %{status: 404, body: %{}, headers: [{"content-type", "application/activity+json"}]}}
       end
     end)
   end

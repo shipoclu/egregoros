@@ -8,6 +8,7 @@ defmodule Egregoros.E2EE.ActorKeys do
   alias Egregoros.E2EE.ActorKey
   alias Egregoros.E2EE.Key
   alias Egregoros.Federation.SignedFetch
+  alias Egregoros.Federation.ResponseValidator
   alias Egregoros.Federation.WebFinger
   alias Egregoros.HTTP
   alias Egregoros.Repo
@@ -140,8 +141,9 @@ defmodule Egregoros.E2EE.ActorKeys do
     ]
 
     case HTTP.get(actor_ap_id, headers) do
-      {:ok, %{status: status, body: body}} when status in 200..299 ->
-        decode_json(body)
+      {:ok, %{status: status, body: body} = response} when status in 200..299 ->
+        with :ok <- ResponseValidator.validate_activitystreams(response),
+             do: decode_json(body)
 
       {:ok, %{status: status}} when status in [401, 403] ->
         fetch_actor_signed(actor_ap_id)
@@ -397,7 +399,7 @@ defmodule Egregoros.E2EE.ActorKeys do
 
   defp fetch_actor_signed(actor_ap_id) when is_binary(actor_ap_id) do
     with {:ok, %{status: status, body: body}} when status in 200..299 <-
-           SignedFetch.get(actor_ap_id, accept: @accept),
+           SignedFetch.get_activity(actor_ap_id, accept: @accept),
          {:ok, actor} <- decode_json(body) do
       {:ok, actor}
     else

@@ -191,7 +191,7 @@ defmodule Egregoros.Workers.RefreshRemoteFollowingGraph do
   defp fetch_pages(_url, _pages_left, _items_left, _visited, acc), do: acc
 
   defp fetch_json(url) when is_binary(url) do
-    case SignedFetch.get(url, accept: @accept) do
+    case SignedFetch.get_activity(url, accept: @accept) do
       {:ok, %{status: status, body: body}} when status in 200..299 ->
         decode_json(body)
 

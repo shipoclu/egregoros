@@ -26,7 +26,8 @@ defmodule Egregoros.Workers.RefreshPoll do
 
     with %Object{type: "Question", local: false} = object <- Objects.get_by_ap_id(ap_id),
          :ok <- SafeURL.validate_http_url_federation(ap_id),
-         {:ok, %{status: status, body: body}} <- SignedFetch.get(ap_id, accept: @accept),
+         {:ok, %{status: status, body: body}} <-
+           SignedFetch.get_activity(ap_id, accept: @accept),
          status when status in 200..299 <- status,
          {:ok, %{"type" => "Question"} = question} <- decode_json(body),
          :ok <- validate_id(question, ap_id),

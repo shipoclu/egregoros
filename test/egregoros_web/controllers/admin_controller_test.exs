@@ -98,7 +98,7 @@ defmodule EgregorosWeb.AdminControllerTest do
              "publicKeyPem" => "-----BEGIN PUBLIC KEY-----\nMIIB\n-----END PUBLIC KEY-----"
            }
          },
-         headers: []
+         headers: [{"content-type", "application/activity+json"}]
        }}
     end)
 
@@ -267,7 +267,7 @@ defmodule EgregorosWeb.AdminControllerTest do
              "publicKeyPem" => "-----BEGIN PUBLIC KEY-----\nMIIB\n-----END PUBLIC KEY-----"
            }
          },
-         headers: []
+         headers: [{"content-type", "application/activity+json"}]
        }}
     end)
 

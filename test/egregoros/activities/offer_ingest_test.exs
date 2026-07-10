@@ -117,7 +117,7 @@ defmodule Egregoros.Activities.OfferIngestTest do
       "published" => "2026-01-29T00:00:00Z"
     }
 
-    assert {:error, :invalid} =
+    assert {:error, :id_authority_mismatch} =
              Pipeline.ingest(offer, local: false, inbox_user_ap_id: inbox_user.ap_id)
   end
 end

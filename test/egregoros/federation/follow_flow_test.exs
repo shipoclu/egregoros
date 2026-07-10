@@ -29,7 +29,7 @@ defmodule Egregoros.Federation.FollowFlowTest do
              }
            ]
          },
-         headers: []
+         headers: [{"content-type", "application/activity+json"}]
        }}
     end)
     |> expect(:get, fn url, _headers ->
@@ -50,7 +50,7 @@ defmodule Egregoros.Federation.FollowFlowTest do
              "publicKeyPem" => "-----BEGIN PUBLIC KEY-----\nMIIB...\n-----END PUBLIC KEY-----\n"
            }
          },
-         headers: []
+         headers: [{"content-type", "application/activity+json"}]
        }}
     end)
     |> expect(:post, fn url, body, _headers ->
@@ -61,7 +61,7 @@ defmodule Egregoros.Federation.FollowFlowTest do
       assert decoded["actor"] == local.ap_id
       assert decoded["object"] == actor_url
 
-      {:ok, %{status: 202, body: "", headers: []}}
+      {:ok, %{status: 202, body: "", headers: [{"content-type", "application/activity+json"}]}}
     end)
 
     assert {:ok, remote} = Egregoros.Federation.follow_remote(local, "bob@remote.example")

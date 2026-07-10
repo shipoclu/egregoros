@@ -37,7 +37,7 @@ defmodule EgregorosWeb.MastodonAPI.FollowsControllerTest do
       assert url ==
                "https://remote.example/.well-known/webfinger?resource=acct:bob@remote.example"
 
-      {:ok, %{status: 404, body: "", headers: []}}
+      {:ok, %{status: 404, body: "", headers: [{"content-type", "application/activity+json"}]}}
     end)
 
     conn = post(conn, "/api/v1/follows", %{"uri" => "bob@remote.example"})
@@ -69,7 +69,7 @@ defmodule EgregorosWeb.MastodonAPI.FollowsControllerTest do
              }
            ]
          },
-         headers: []
+         headers: [{"content-type", "application/activity+json"}]
        }}
     end)
     |> expect(:get, fn url, _headers ->
@@ -90,7 +90,7 @@ defmodule EgregorosWeb.MastodonAPI.FollowsControllerTest do
              "publicKeyPem" => "-----BEGIN PUBLIC KEY-----\nMIIB...\n-----END PUBLIC KEY-----\n"
            }
          },
-         headers: []
+         headers: [{"content-type", "application/activity+json"}]
        }}
     end)
     |> expect(:post, fn url, body, _headers ->
@@ -101,7 +101,7 @@ defmodule EgregorosWeb.MastodonAPI.FollowsControllerTest do
       assert decoded["actor"] == user.ap_id
       assert decoded["object"] == actor_url
 
-      {:ok, %{status: 202, body: "", headers: []}}
+      {:ok, %{status: 202, body: "", headers: [{"content-type", "application/activity+json"}]}}
     end)
 
     conn = post(conn, "/api/v1/follows", %{"uri" => "bob@remote.example"})

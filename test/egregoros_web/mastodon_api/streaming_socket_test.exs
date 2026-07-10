@@ -377,7 +377,7 @@ defmodule EgregorosWeb.MastodonAPI.StreamingSocketTest do
     {:ok, like_actor} = Users.create_user(remote_user_attrs("bob@example.com"))
 
     activity = %{
-      "id" => "https://remote.example/activities/like/1",
+      "id" => like_actor.ap_id <> "/activities/like/1",
       "type" => "Like",
       "actor" => like_actor.ap_id,
       "object" => note.ap_id
@@ -404,7 +404,7 @@ defmodule EgregorosWeb.MastodonAPI.StreamingSocketTest do
     {:ok, like_actor} = Users.create_user(remote_user_attrs("bob@example.com"))
 
     activity = %{
-      "id" => "https://remote.example/activities/like/2",
+      "id" => like_actor.ap_id <> "/activities/like/2",
       "type" => "Like",
       "actor" => like_actor.ap_id,
       "object" => note.ap_id

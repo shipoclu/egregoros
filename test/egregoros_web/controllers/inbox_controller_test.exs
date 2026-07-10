@@ -43,9 +43,11 @@ defmodule EgregorosWeb.InboxControllerTest do
         "post",
         "/users/frank/inbox",
         private_key,
-        "https://remote.example/users/alice#main-key"
+        "https://remote.example/users/alice#main-key",
+        ["(request-target)", "host", "date", "digest"],
+        Jason.encode!(create)
       )
-      |> post("/users/frank/inbox", create)
+      |> post_signed("/users/frank/inbox", create)
 
     assert response(conn, 202)
 
@@ -109,7 +111,7 @@ defmodule EgregorosWeb.InboxControllerTest do
         private_key,
         "https://remote.example/users/alice#main-key"
       )
-      |> post(path, create)
+      |> post_signed(path, create)
 
     assert response(conn, 429)
     refute_enqueued(worker: IngestActivity)
@@ -148,9 +150,11 @@ defmodule EgregorosWeb.InboxControllerTest do
         "post",
         "/users/frank/inbox",
         private_key,
-        "https://remote.example/users/alice#main-key"
+        "https://remote.example/users/alice#main-key",
+        ["(request-target)", "host", "date", "digest"],
+        Jason.encode!(follow)
       )
-      |> post("/users/frank/inbox", follow)
+      |> post_signed("/users/frank/inbox", follow)
 
     assert response(conn, 202)
 
@@ -207,9 +211,11 @@ defmodule EgregorosWeb.InboxControllerTest do
         "post",
         "/users/frank/inbox",
         private_key,
-        "https://remote.example/users/alice#main-key"
+        "https://remote.example/users/alice#main-key",
+        ["(request-target)", "host", "date", "digest"],
+        Jason.encode!(create)
       )
-      |> post("/users/frank/inbox", create)
+      |> post_signed("/users/frank/inbox", create)
 
     assert response(conn, 202)
 
@@ -269,9 +275,11 @@ defmodule EgregorosWeb.InboxControllerTest do
         "post",
         "/users/frank/inbox",
         private_key,
-        "https://remote.example/users/alice#main-key"
+        "https://remote.example/users/alice#main-key",
+        ["(request-target)", "host", "date", "digest"],
+        Jason.encode!(like)
       )
-      |> post("/users/frank/inbox", like)
+      |> post_signed("/users/frank/inbox", like)
 
     assert response(conn, 202)
 
@@ -318,9 +326,11 @@ defmodule EgregorosWeb.InboxControllerTest do
         "post",
         "/inbox",
         private_key,
-        "https://remote.example/users/alice#main-key"
+        "https://remote.example/users/alice#main-key",
+        ["(request-target)", "host", "date", "digest"],
+        Jason.encode!(like)
       )
-      |> post("/inbox", like)
+      |> post_signed("/inbox", like)
 
     assert response(conn, 202)
 
@@ -371,9 +381,11 @@ defmodule EgregorosWeb.InboxControllerTest do
         "post",
         "/inbox",
         private_key,
-        "https://remote.example/users/alice#main-key"
+        "https://remote.example/users/alice#main-key",
+        ["(request-target)", "host", "date", "digest"],
+        Jason.encode!(like)
       )
-      |> post("/inbox", like)
+      |> post_signed("/inbox", like)
 
     assert response(conn, 202)
 
@@ -428,9 +440,11 @@ defmodule EgregorosWeb.InboxControllerTest do
         "post",
         "/users/internal.fetch/inbox",
         private_key,
-        "https://remote.example/users/alice#main-key"
+        "https://remote.example/users/alice#main-key",
+        ["(request-target)", "host", "date", "digest"],
+        Jason.encode!(like)
       )
-      |> post("/users/internal.fetch/inbox", like)
+      |> post_signed("/users/internal.fetch/inbox", like)
 
     assert response(conn, 202)
 
@@ -491,9 +505,11 @@ defmodule EgregorosWeb.InboxControllerTest do
         "post",
         "/users/internal.fetch/inbox",
         private_key,
-        "https://remote.example/users/alice#main-key"
+        "https://remote.example/users/alice#main-key",
+        ["(request-target)", "host", "date", "digest"],
+        Jason.encode!(create)
       )
-      |> post("/users/internal.fetch/inbox", create)
+      |> post_signed("/users/internal.fetch/inbox", create)
 
     assert response(conn, 202)
 
@@ -550,9 +566,11 @@ defmodule EgregorosWeb.InboxControllerTest do
         "post",
         "/users/internal.fetch/inbox",
         private_key,
-        "https://remote.example/users/alice#main-key"
+        "https://remote.example/users/alice#main-key",
+        ["(request-target)", "host", "date", "digest"],
+        Jason.encode!(like)
       )
-      |> post("/users/internal.fetch/inbox", like)
+      |> post_signed("/users/internal.fetch/inbox", like)
 
     assert response(conn, 202)
 
@@ -623,9 +641,11 @@ defmodule EgregorosWeb.InboxControllerTest do
         "post",
         "/users/frank/inbox",
         private_key,
-        "https://remote.example/users/alice#main-key"
+        "https://remote.example/users/alice#main-key",
+        ["(request-target)", "host", "date", "digest"],
+        Jason.encode!(accept)
       )
-      |> post("/users/frank/inbox", accept)
+      |> post_signed("/users/frank/inbox", accept)
 
     assert response(conn, 202)
 
@@ -690,9 +710,11 @@ defmodule EgregorosWeb.InboxControllerTest do
         "post",
         "/users/frank/inbox",
         private_key,
-        "https://remote.example/users/alice#main-key"
+        "https://remote.example/users/alice#main-key",
+        ["(request-target)", "host", "date", "digest"],
+        Jason.encode!(create)
       )
-      |> post("/users/frank/inbox", create)
+      |> post_signed("/users/frank/inbox", create)
 
     assert response(conn, 202)
 
@@ -762,7 +784,7 @@ defmodule EgregorosWeb.InboxControllerTest do
         headers,
         body
       )
-      |> post("/users/frank/inbox", body)
+      |> post_signed("/users/frank/inbox", body)
 
     assert response(conn, 202)
 
@@ -817,10 +839,12 @@ defmodule EgregorosWeb.InboxControllerTest do
         "post",
         "/users/frank/inbox",
         private_key,
-        "https://remote.example/users/alice#main-key"
+        "https://remote.example/users/alice#main-key",
+        ["(request-target)", "host", "date", "digest"],
+        Jason.encode!(create)
       )
       |> move_authorization_to_signature_header()
-      |> post("/users/frank/inbox", create)
+      |> post_signed("/users/frank/inbox", create)
 
     assert response(conn, 202)
 
@@ -913,7 +937,7 @@ defmodule EgregorosWeb.InboxControllerTest do
       |> put_req_header("digest", digest)
       |> put_req_header("content-length", content_length)
       |> put_req_header("signature", header)
-      |> post("/users/frank/inbox", body)
+      |> post_signed("/users/frank/inbox", body)
 
     assert response(conn, 202)
 
@@ -986,7 +1010,7 @@ defmodule EgregorosWeb.InboxControllerTest do
         headers,
         signed_body
       )
-      |> post("/users/frank/inbox", sent_body)
+      |> post_signed("/users/frank/inbox", sent_body)
 
     assert response(conn, 401)
     refute Objects.get_by_ap_id(note["id"])
@@ -1029,7 +1053,7 @@ defmodule EgregorosWeb.InboxControllerTest do
         private_key,
         "https://remote.example/users/alice#main-key"
       )
-      |> post("/users/frank/inbox", create)
+      |> post_signed("/users/frank/inbox", create)
 
     assert response(conn, 401)
     refute Objects.get_by_ap_id(note["id"])
@@ -1075,7 +1099,7 @@ defmodule EgregorosWeb.InboxControllerTest do
         private_key,
         "https://remote.example/users/alice#main-key"
       )
-      |> post("/users/frank/inbox", create)
+      |> post_signed("/users/frank/inbox", create)
 
     assert response(conn, 401)
     refute Objects.get_by_ap_id(note["id"])
@@ -1126,6 +1150,7 @@ defmodule EgregorosWeb.InboxControllerTest do
          headers \\ ["(request-target)", "date"],
          body \\ nil
        ) do
+    provided_body = body
     headers = Enum.map(headers, &String.downcase/1)
     body = body || ""
     date = Plug.Conn.get_req_header(conn, "date") |> List.first() || date_header()
@@ -1160,7 +1185,21 @@ defmodule EgregorosWeb.InboxControllerTest do
         "headers=\"#{Enum.join(headers, " ")}\"," <>
         "signature=\"#{signature_b64}\""
 
-    Plug.Conn.put_req_header(conn, "authorization", header)
+    conn = Plug.Conn.put_req_header(conn, "authorization", header)
+
+    if is_nil(provided_body) do
+      conn
+    else
+      conn
+      |> Plug.Conn.assign(:signed_test_body, body)
+      |> Plug.Conn.put_req_header("content-type", "application/activity+json")
+    end
+  end
+
+  defp post_signed(conn, path, params) when is_binary(params), do: post(conn, path, params)
+
+  defp post_signed(conn, path, params) do
+    post(conn, path, Map.get(conn.assigns, :signed_test_body, params))
   end
 
   defp move_authorization_to_signature_header(conn) do

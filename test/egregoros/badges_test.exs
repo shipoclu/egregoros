@@ -156,7 +156,7 @@ defmodule Egregoros.BadgesTest do
              "publicKeyPem" => "-----BEGIN PUBLIC KEY-----\nMIIB\n-----END PUBLIC KEY-----"
            }
          },
-         headers: []
+         headers: [{"content-type", "application/activity+json"}]
        }}
     end)
 

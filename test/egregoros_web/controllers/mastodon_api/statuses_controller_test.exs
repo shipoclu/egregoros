@@ -235,7 +235,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusesControllerTest do
         %{
           "id" => "https://example.com/objects/remote-edit",
           "type" => "Note",
-          "actor" => alice.ap_id,
+          "actor" => "https://example.com/users/remote",
           "content" => "Remote",
           "to" => ["https://www.w3.org/ns/activitystreams#Public"],
           "cc" => []

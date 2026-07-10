@@ -134,7 +134,12 @@ defmodule Egregoros.Workers.RefreshPollTest do
 
       stub(Egregoros.HTTP.Mock, :get, fn url, headers ->
         if url == ap_id do
-          {:ok, %{status: 200, body: updated_question, headers: []}}
+          {:ok,
+           %{
+             status: 200,
+             body: updated_question,
+             headers: [{"content-type", "application/activity+json"}]
+           }}
         else
           Egregoros.HTTP.Stub.get(url, headers)
         end
@@ -170,7 +175,7 @@ defmodule Egregoros.Workers.RefreshPollTest do
            %{
              status: 200,
              body: %{"id" => "https://other.example/objects/1", "type" => "Question"},
-             headers: []
+             headers: [{"content-type", "application/activity+json"}]
            }}
         else
           Egregoros.HTTP.Stub.get(url, headers)
@@ -196,7 +201,12 @@ defmodule Egregoros.Workers.RefreshPollTest do
 
       stub(Egregoros.HTTP.Mock, :get, fn url, headers ->
         if url == ap_id do
-          {:ok, %{status: 200, body: "not-json", headers: []}}
+          {:ok,
+           %{
+             status: 200,
+             body: "not-json",
+             headers: [{"content-type", "application/activity+json"}]
+           }}
         else
           Egregoros.HTTP.Stub.get(url, headers)
         end
@@ -221,7 +231,8 @@ defmodule Egregoros.Workers.RefreshPollTest do
 
       stub(Egregoros.HTTP.Mock, :get, fn url, headers ->
         if url == ap_id do
-          {:ok, %{status: 404, body: %{}, headers: []}}
+          {:ok,
+           %{status: 404, body: %{}, headers: [{"content-type", "application/activity+json"}]}}
         else
           Egregoros.HTTP.Stub.get(url, headers)
         end
@@ -266,7 +277,8 @@ defmodule Egregoros.Workers.RefreshPollTest do
 
       stub(Egregoros.HTTP.Mock, :get, fn url, headers ->
         if url == ap_id do
-          {:ok, %{status: 500, body: %{}, headers: []}}
+          {:ok,
+           %{status: 500, body: %{}, headers: [{"content-type", "application/activity+json"}]}}
         else
           Egregoros.HTTP.Stub.get(url, headers)
         end

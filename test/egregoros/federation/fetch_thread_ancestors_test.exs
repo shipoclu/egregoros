@@ -69,7 +69,7 @@ defmodule Egregoros.Federation.FetchThreadAncestorsTest do
            "to" => [@as_public],
            "content" => "parent"
          },
-         headers: []
+         headers: [{"content-type", "application/activity+json"}]
        }}
     end)
 
@@ -115,7 +115,7 @@ defmodule Egregoros.Federation.FetchThreadAncestorsTest do
            "to" => [@as_public],
            "content" => "parent"
          },
-         headers: []
+         headers: [{"content-type", "application/activity+json"}]
        }}
     end)
 
@@ -171,7 +171,7 @@ defmodule Egregoros.Federation.FetchThreadAncestorsTest do
                "to" => [@as_public],
                "content" => "start"
              },
-             headers: []
+             headers: [{"content-type", "application/activity+json"}]
            }}
 
         ^parent_id ->
@@ -185,7 +185,7 @@ defmodule Egregoros.Federation.FetchThreadAncestorsTest do
                "to" => [@as_public],
                "content" => "parent"
              },
-             headers: []
+             headers: [{"content-type", "application/activity+json"}]
            }}
       end
     end)
@@ -222,7 +222,7 @@ defmodule Egregoros.Federation.FetchThreadAncestorsTest do
 
     expect(Egregoros.HTTP.Mock, :get, fn url, _headers ->
       assert url == parent_id
-      {:ok, %{status: 404, body: "", headers: []}}
+      {:ok, %{status: 404, body: "", headers: [{"content-type", "application/activity+json"}]}}
     end)
 
     assert :ok = FetchThreadAncestors.perform(%Oban.Job{args: %{"start_ap_id" => reply_id}})

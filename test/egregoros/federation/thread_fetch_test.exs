@@ -61,7 +61,7 @@ defmodule Egregoros.Federation.ThreadFetchTest do
            "content" => "Parent",
            "to" => ["https://www.w3.org/ns/activitystreams#Public"]
          },
-         headers: []
+         headers: [{"content-type", "application/activity+json"}]
        }}
     end)
 

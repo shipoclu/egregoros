@@ -59,7 +59,7 @@ defmodule Egregoros.Federation.ThreadRepliesFetchTest do
              }
            ]
          },
-         headers: []
+         headers: [{"content-type", "application/activity+json"}]
        }}
     end)
 
@@ -110,7 +110,7 @@ defmodule Egregoros.Federation.ThreadRepliesFetchTest do
            "type" => "OrderedCollectionPage",
            "orderedItems" => []
          },
-         headers: []
+         headers: [{"content-type", "application/activity+json"}]
        }}
     end)
 
@@ -156,7 +156,7 @@ defmodule Egregoros.Federation.ThreadRepliesFetchTest do
            "type" => "OrderedCollection",
            "first" => first_page
          },
-         headers: []
+         headers: [{"content-type", "application/activity+json"}]
        }}
     end)
 
@@ -183,7 +183,7 @@ defmodule Egregoros.Federation.ThreadRepliesFetchTest do
              }
            ]
          },
-         headers: []
+         headers: [{"content-type", "application/activity+json"}]
        }}
     end)
 
@@ -234,7 +234,7 @@ defmodule Egregoros.Federation.ThreadRepliesFetchTest do
              "replies" => ""
            }
          },
-         headers: []
+         headers: [{"content-type", "application/activity+json"}]
        }}
     end)
 
@@ -250,7 +250,7 @@ defmodule Egregoros.Federation.ThreadRepliesFetchTest do
 
     expect(Egregoros.HTTP.Mock, :get, fn url, _headers ->
       assert url == missing
-      {:ok, %{status: 404, headers: []}}
+      {:ok, %{status: 404, headers: [{"content-type", "application/activity+json"}]}}
     end)
 
     assert :ok = FetchThreadReplies.perform(%Oban.Job{args: %{"root_ap_id" => missing}})
@@ -267,7 +267,7 @@ defmodule Egregoros.Federation.ThreadRepliesFetchTest do
        %{
          status: 200,
          body: %{"id" => "https://remote.example/objects/other", "type" => "Note"},
-         headers: []
+         headers: [{"content-type", "application/activity+json"}]
        }}
     end)
 
@@ -277,7 +277,9 @@ defmodule Egregoros.Federation.ThreadRepliesFetchTest do
 
     expect(Egregoros.HTTP.Mock, :get, fn url, _headers ->
       assert url == invalid_json
-      {:ok, %{status: 200, body: "not json", headers: []}}
+
+      {:ok,
+       %{status: 200, body: "not json", headers: [{"content-type", "application/activity+json"}]}}
     end)
 
     assert :ok = FetchThreadReplies.perform(%Oban.Job{args: %{"root_ap_id" => invalid_json}})
@@ -328,7 +330,7 @@ defmodule Egregoros.Federation.ThreadRepliesFetchTest do
 
     expect(Egregoros.HTTP.Mock, :get, fn url, _headers ->
       assert url == replies_url
-      {:ok, %{status: 200, body: body, headers: []}}
+      {:ok, %{status: 200, body: body, headers: [{"content-type", "application/activity+json"}]}}
     end)
 
     expect(Egregoros.HTTP.Mock, :get, fn url, _headers ->
@@ -346,7 +348,7 @@ defmodule Egregoros.Federation.ThreadRepliesFetchTest do
            "to" => ["https://www.w3.org/ns/activitystreams#Public"],
            "cc" => []
          },
-         headers: []
+         headers: [{"content-type", "application/activity+json"}]
        }}
     end)
 
@@ -393,7 +395,9 @@ defmodule Egregoros.Federation.ThreadRepliesFetchTest do
 
     expect(Egregoros.HTTP.Mock, :get, fn url, _headers ->
       assert url == replies_url
-      {:ok, %{status: 200, body: "not json", headers: []}}
+
+      {:ok,
+       %{status: 200, body: "not json", headers: [{"content-type", "application/activity+json"}]}}
     end)
 
     assert :ok = FetchThreadReplies.perform(%Oban.Job{args: %{"root_ap_id" => json_root}})
@@ -422,7 +426,7 @@ defmodule Egregoros.Federation.ThreadRepliesFetchTest do
 
     expect(Egregoros.HTTP.Mock, :get, fn url, _headers ->
       assert url == replies_url
-      {:ok, %{status: 500, body: %{}, headers: []}}
+      {:ok, %{status: 500, body: %{}, headers: [{"content-type", "application/activity+json"}]}}
     end)
 
     assert {:error, :replies_fetch_failed} =
@@ -444,7 +448,7 @@ defmodule Egregoros.Federation.ThreadRepliesFetchTest do
 
     expect(Egregoros.HTTP.Mock, :get, fn url, _headers ->
       assert url == replies_url
-      {:ok, %{status: 404, headers: []}}
+      {:ok, %{status: 404, headers: [{"content-type", "application/activity+json"}]}}
     end)
 
     assert :ok = FetchThreadReplies.perform(%Oban.Job{args: %{"root_ap_id" => root_id}})
@@ -465,7 +469,7 @@ defmodule Egregoros.Federation.ThreadRepliesFetchTest do
 
     expect(Egregoros.HTTP.Mock, :get, fn url, _headers ->
       assert url == create_id
-      {:ok, %{status: 404, headers: []}}
+      {:ok, %{status: 404, headers: [{"content-type", "application/activity+json"}]}}
     end)
 
     assert :ok = FetchThreadReplies.perform(%Oban.Job{args: %{"root_ap_id" => create_id}})

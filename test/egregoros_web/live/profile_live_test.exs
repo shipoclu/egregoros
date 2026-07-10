@@ -437,7 +437,7 @@ defmodule EgregorosWeb.ProfileLiveTest do
       {:ok,
        %{
          status: 200,
-         headers: [],
+         headers: [{"content-type", "application/activity+json"}],
          body: %{
            "@context" => "https://www.w3.org/ns/activitystreams",
            "id" => "https://remote.example/users/bob",
@@ -454,12 +454,20 @@ defmodule EgregorosWeb.ProfileLiveTest do
 
     expect(Egregoros.HTTP.Mock, :get, fn "https://remote.example/users/bob/followers", _headers ->
       {:ok,
-       %{status: 200, headers: [], body: %{"type" => "OrderedCollection", "totalItems" => 123}}}
+       %{
+         status: 200,
+         headers: [{"content-type", "application/activity+json"}],
+         body: %{"type" => "OrderedCollection", "totalItems" => 123}
+       }}
     end)
 
     expect(Egregoros.HTTP.Mock, :get, fn "https://remote.example/users/bob/following", _headers ->
       {:ok,
-       %{status: 200, headers: [], body: %{"type" => "OrderedCollection", "totalItems" => 45}}}
+       %{
+         status: 200,
+         headers: [{"content-type", "application/activity+json"}],
+         body: %{"type" => "OrderedCollection", "totalItems" => 45}
+       }}
     end)
 
     assert :ok =

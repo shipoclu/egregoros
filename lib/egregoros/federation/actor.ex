@@ -3,6 +3,7 @@ defmodule Egregoros.Federation.Actor do
   alias Egregoros.Domain
   alias Egregoros.HTTP
   alias Egregoros.Federation.SignedFetch
+  alias Egregoros.Federation.ResponseValidator
   alias Egregoros.SafeURL
   alias Egregoros.UserEvents
   alias Egregoros.Users
@@ -61,8 +62,9 @@ defmodule Egregoros.Federation.Actor do
 
   defp fetch_actor(actor_url) when is_binary(actor_url) do
     case HTTP.get(actor_url, headers()) do
-      {:ok, %{status: status, body: body}} when status in 200..299 ->
-        with {:ok, actor} <- decode_json(body) do
+      {:ok, %{status: status, body: body} = response} when status in 200..299 ->
+        with :ok <- ResponseValidator.validate_activitystreams(response),
+             {:ok, actor} <- decode_json(body) do
           actor =
             if sparse_actor?(actor) or missing_endpoints?(actor) do
               case fetch_actor_signed(actor_url) do
@@ -89,7 +91,9 @@ defmodule Egregoros.Federation.Actor do
 
   defp fetch_actor_signed(actor_url) when is_binary(actor_url) do
     with {:ok, %{status: status, body: body}} when status in 200..299 <-
-           SignedFetch.get(actor_url, accept: "application/activity+json, application/ld+json"),
+           SignedFetch.get_activity(actor_url,
+             accept: "application/activity+json, application/ld+json"
+           ),
          {:ok, actor} <- decode_json(body) do
       {:ok, actor}
     else
@@ -188,8 +192,9 @@ defmodule Egregoros.Federation.Actor do
     with true <- url != "",
          :ok <- SafeURL.validate_http_url_federation(url) do
       case HTTP.get(url, headers()) do
-        {:ok, %{status: status, body: body}} when status in 200..299 ->
-          with {:ok, %{} = collection} <- decode_json(body) do
+        {:ok, %{status: status, body: body} = response} when status in 200..299 ->
+          with :ok <- ResponseValidator.validate_activitystreams(response),
+               {:ok, %{} = collection} <- decode_json(body) do
             total_items(collection)
           else
             _ -> nil
@@ -210,7 +215,9 @@ defmodule Egregoros.Federation.Actor do
 
   defp fetch_total_items_signed(url) when is_binary(url) do
     with {:ok, %{status: status, body: body}} when status in 200..299 <-
-           SignedFetch.get(url, accept: "application/activity+json, application/ld+json"),
+           SignedFetch.get_activity(url,
+             accept: "application/activity+json, application/ld+json"
+           ),
          {:ok, %{} = collection} <- decode_json(body) do
       total_items(collection)
     else

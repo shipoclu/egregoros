@@ -33,6 +33,8 @@ defmodule Egregoros.Compat.UpstreamFixturesTest do
   test "ingests an Accept activity with an embedded Follow object (mastodon)" do
     activity = Fixtures.json!("mastodon-accept-activity.json")
 
+    assert {:ok, _follow} = Pipeline.ingest(activity["object"], local: true)
+
     assert {:ok, accept} = Pipeline.ingest(activity, local: false)
     assert accept.type == "Accept"
     assert accept.actor == activity["actor"]

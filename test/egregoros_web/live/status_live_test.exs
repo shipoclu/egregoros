@@ -605,7 +605,7 @@ defmodule EgregorosWeb.StatusLiveTest do
            "type" => "OrderedCollectionPage",
            "orderedItems" => []
          },
-         headers: []
+         headers: [{"content-type", "application/activity+json"}]
        }}
     end)
 

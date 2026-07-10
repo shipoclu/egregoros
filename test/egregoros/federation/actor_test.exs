@@ -45,7 +45,7 @@ defmodule Egregoros.Federation.ActorTest do
              }
            ]
          },
-         headers: []
+         headers: [{"content-type", "application/activity+json"}]
        }}
     end)
 
@@ -96,7 +96,7 @@ defmodule Egregoros.Federation.ActorTest do
              "publicKeyPem" => public_key
            }
          },
-         headers: []
+         headers: [{"content-type", "application/activity+json"}]
        }}
     end)
 
@@ -132,7 +132,7 @@ defmodule Egregoros.Federation.ActorTest do
              "publicKeyPem" => public_key
            }
          },
-         headers: []
+         headers: [{"content-type", "application/activity+json"}]
        }}
     end)
 
@@ -168,7 +168,7 @@ defmodule Egregoros.Federation.ActorTest do
              "publicKeyPem" => public_key
            }
          },
-         headers: []
+         headers: [{"content-type", "application/activity+json"}]
        }}
     end)
 
@@ -190,7 +190,7 @@ defmodule Egregoros.Federation.ActorTest do
              "publicKeyPem" => public_key
            }
          },
-         headers: []
+         headers: [{"content-type", "application/activity+json"}]
        }}
     end)
 
@@ -223,7 +223,7 @@ defmodule Egregoros.Federation.ActorTest do
              "publicKeyPem" => public_key
            }
          },
-         headers: []
+         headers: [{"content-type", "application/activity+json"}]
        }}
     end)
 
@@ -252,7 +252,7 @@ defmodule Egregoros.Federation.ActorTest do
              "publicKeyPem" => public_key
            }
          },
-         headers: []
+         headers: [{"content-type", "application/activity+json"}]
        }}
     end)
 
@@ -275,7 +275,7 @@ defmodule Egregoros.Federation.ActorTest do
              "publicKeyPem" => public_key
            }
          },
-         headers: []
+         headers: [{"content-type", "application/activity+json"}]
        }}
     end)
 
@@ -292,7 +292,7 @@ defmodule Egregoros.Federation.ActorTest do
 
     expect(Egregoros.HTTP.Mock, :get, fn _url, headers ->
       refute List.keyfind(headers, "signature", 0)
-      {:ok, %{status: 401, body: "", headers: []}}
+      {:ok, %{status: 401, body: "", headers: [{"content-type", "application/activity+json"}]}}
     end)
 
     expect(Egregoros.HTTP.Mock, :get, fn _url, headers ->
@@ -314,7 +314,7 @@ defmodule Egregoros.Federation.ActorTest do
              "publicKeyPem" => public_key
            }
          },
-         headers: []
+         headers: [{"content-type", "application/activity+json"}]
        }}
     end)
 
@@ -345,7 +345,7 @@ defmodule Egregoros.Federation.ActorTest do
              "publicKeyPem" => public_key
            }
          },
-         headers: []
+         headers: [{"content-type", "application/activity+json"}]
        }}
     end)
 
@@ -366,7 +366,7 @@ defmodule Egregoros.Federation.ActorTest do
              "publicKeyPem" => public_key
            }
          },
-         headers: []
+         headers: [{"content-type", "application/activity+json"}]
        }}
     end)
 
@@ -394,7 +394,7 @@ defmodule Egregoros.Federation.ActorTest do
              "publicKeyPem" => public_key
            }
          },
-         headers: []
+         headers: [{"content-type", "application/activity+json"}]
        }}
     end)
 
@@ -417,7 +417,7 @@ defmodule Egregoros.Federation.ActorTest do
            "outbox" => actor_url <> "/outbox",
            "publicKey" => %{}
          },
-         headers: []
+         headers: [{"content-type", "application/activity+json"}]
        }}
     end)
 
@@ -467,7 +467,7 @@ defmodule Egregoros.Federation.ActorTest do
              "publicKeyPem" => public_key
            }
          },
-         headers: []
+         headers: [{"content-type", "application/activity+json"}]
        }}
     end)
 
@@ -479,7 +479,8 @@ defmodule Egregoros.Federation.ActorTest do
     actor_url = "https://remote.example/users/alice"
 
     expect(Egregoros.HTTP.Mock, :get, fn _url, _headers ->
-      {:ok, %{status: 200, body: "nope", headers: []}}
+      {:ok,
+       %{status: 200, body: "nope", headers: [{"content-type", "application/activity+json"}]}}
     end)
 
     assert {:error, :invalid_json} = Actor.fetch_and_store(actor_url)
@@ -489,7 +490,7 @@ defmodule Egregoros.Federation.ActorTest do
     actor_url = "https://remote.example/users/alice"
 
     expect(Egregoros.HTTP.Mock, :get, fn _url, _headers ->
-      {:ok, %{status: 500, body: %{}, headers: []}}
+      {:ok, %{status: 500, body: %{}, headers: [{"content-type", "application/activity+json"}]}}
     end)
 
     assert {:error, :actor_fetch_failed} = Actor.fetch_and_store(actor_url)
@@ -515,7 +516,7 @@ defmodule Egregoros.Federation.ActorTest do
              "publicKeyPem" => public_key
            }
          },
-         headers: []
+         headers: [{"content-type", "application/activity+json"}]
        }}
     end)
 
@@ -543,7 +544,7 @@ defmodule Egregoros.Federation.ActorTest do
              "publicKeyPem" => public_key
            }
          },
-         headers: []
+         headers: [{"content-type", "application/activity+json"}]
        }}
     end)
 
@@ -591,7 +592,13 @@ defmodule Egregoros.Federation.ActorTest do
 
     expect(Egregoros.HTTP.Mock, :get, fn url, _headers ->
       assert url == actor_url
-      {:ok, %{status: 200, body: Jason.encode!(actor), headers: []}}
+
+      {:ok,
+       %{
+         status: 200,
+         body: Jason.encode!(actor),
+         headers: [{"content-type", "application/activity+json"}]
+       }}
     end)
 
     assert {:ok, user} = Actor.fetch_and_store(actor_url)
@@ -604,7 +611,7 @@ defmodule Egregoros.Federation.ActorTest do
 
     expect(Egregoros.HTTP.Mock, :get, fn url, _headers ->
       assert url == actor_url
-      {:ok, %{status: 200, body: 123, headers: []}}
+      {:ok, %{status: 200, body: 123, headers: [{"content-type", "application/activity+json"}]}}
     end)
 
     assert {:error, :invalid_json} = Actor.fetch_and_store(actor_url)
@@ -642,7 +649,7 @@ defmodule Egregoros.Federation.ActorTest do
              "publicKeyPem" => public_key
            }
          },
-         headers: []
+         headers: [{"content-type", "application/activity+json"}]
        }}
     end)
 
@@ -650,7 +657,7 @@ defmodule Egregoros.Federation.ActorTest do
       assert List.keyfind(headers, "signature", 0)
       assert List.keyfind(headers, "authorization", 0)
 
-      {:ok, %{status: 500, body: %{}, headers: []}}
+      {:ok, %{status: 500, body: %{}, headers: [{"content-type", "application/activity+json"}]}}
     end)
 
     assert {:error, :missing_inbox} = Actor.fetch_and_store(actor_url)
@@ -677,7 +684,7 @@ defmodule Egregoros.Federation.ActorTest do
              "publicKeyPem" => public_key
            }
          },
-         headers: []
+         headers: [{"content-type", "application/activity+json"}]
        }}
     end)
 
@@ -717,7 +724,7 @@ defmodule Egregoros.Federation.ActorTest do
              "publicKeyPem" => public_key
            }
          },
-         headers: []
+         headers: [{"content-type", "application/activity+json"}]
        }}
     end)
 
@@ -754,7 +761,7 @@ defmodule Egregoros.Federation.ActorTest do
              "publicKeyPem" => public_key
            }
          },
-         headers: []
+         headers: [{"content-type", "application/activity+json"}]
        }}
     end)
 

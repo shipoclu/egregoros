@@ -1,6 +1,7 @@
 defmodule Egregoros.Federation.SignedFetch do
   alias Egregoros.Domain
   alias Egregoros.Federation.InstanceActor
+  alias Egregoros.Federation.ResponseValidator
   alias Egregoros.HTTP
   alias Egregoros.RateLimiter
   alias Egregoros.SafeURL
@@ -24,6 +25,13 @@ defmodule Egregoros.Federation.SignedFetch do
       {:error, :rate_limited} = error -> error
       {:error, _} = error -> error
       _ -> {:error, :signed_fetch_failed}
+    end
+  end
+
+  def get_activity(url, opts \\ []) when is_binary(url) and is_list(opts) do
+    with {:ok, response} <- get(url, opts),
+         :ok <- ResponseValidator.validate_activitystreams(response) do
+      {:ok, response}
     end
   end
 

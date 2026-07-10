@@ -23,7 +23,7 @@ defmodule Egregoros.Workers.RefreshRemoteFollowingGraphTest do
                "type" => "Person",
                "following" => following_root
              },
-             headers: []
+             headers: [{"content-type", "application/activity+json"}]
            }}
 
         url == following_root ->
@@ -34,7 +34,7 @@ defmodule Egregoros.Workers.RefreshRemoteFollowingGraphTest do
                "type" => "OrderedCollection",
                "first" => first_page
              },
-             headers: []
+             headers: [{"content-type", "application/activity+json"}]
            }}
 
         url == first_page ->
@@ -48,7 +48,7 @@ defmodule Egregoros.Workers.RefreshRemoteFollowingGraphTest do
                  %{"id" => "https://third.example/users/charlie"}
                ]
              },
-             headers: []
+             headers: [{"content-type", "application/activity+json"}]
            }}
 
         true ->
@@ -103,7 +103,7 @@ defmodule Egregoros.Workers.RefreshRemoteFollowingGraphTest do
                "type" => "Person",
                "following" => "/users/bob/following"
              },
-             headers: []
+             headers: [{"content-type", "application/activity+json"}]
            }}
 
         url == following_url ->
@@ -118,7 +118,7 @@ defmodule Egregoros.Workers.RefreshRemoteFollowingGraphTest do
                ],
                "next" => next_page
              },
-             headers: []
+             headers: [{"content-type", "application/activity+json"}]
            }}
 
         url == next_page ->
@@ -131,7 +131,7 @@ defmodule Egregoros.Workers.RefreshRemoteFollowingGraphTest do
                  %{"href" => "https://third.example/users/charlie"}
                ]
              },
-             headers: []
+             headers: [{"content-type", "application/activity+json"}]
            }}
 
         true ->
@@ -172,7 +172,12 @@ defmodule Egregoros.Workers.RefreshRemoteFollowingGraphTest do
 
     stub(Egregoros.HTTP.Mock, :get, fn url, _headers ->
       if url == actor_ap_id do
-        {:ok, %{status: 404, body: "Not found", headers: []}}
+        {:ok,
+         %{
+           status: 404,
+           body: "Not found",
+           headers: [{"content-type", "application/activity+json"}]
+         }}
       else
         flunk("unexpected HTTP GET to #{url}")
       end
@@ -193,7 +198,12 @@ defmodule Egregoros.Workers.RefreshRemoteFollowingGraphTest do
 
     stub(Egregoros.HTTP.Mock, :get, fn url, _headers ->
       if url == actor_ap_id do
-        {:ok, %{status: 200, body: "not json", headers: []}}
+        {:ok,
+         %{
+           status: 200,
+           body: "not json",
+           headers: [{"content-type", "application/activity+json"}]
+         }}
       else
         flunk("unexpected HTTP GET to #{url}")
       end
@@ -207,7 +217,7 @@ defmodule Egregoros.Workers.RefreshRemoteFollowingGraphTest do
 
     stub(Egregoros.HTTP.Mock, :get, fn url, _headers ->
       if url == actor_ap_id do
-        {:ok, %{status: 200, body: 123, headers: []}}
+        {:ok, %{status: 200, body: 123, headers: [{"content-type", "application/activity+json"}]}}
       else
         flunk("unexpected HTTP GET to #{url}")
       end
@@ -259,7 +269,7 @@ defmodule Egregoros.Workers.RefreshRemoteFollowingGraphTest do
                "type" => "Person",
                "following" => %{"href" => "/users/bob/following"}
              },
-             headers: []
+             headers: [{"content-type", "application/activity+json"}]
            }}
 
         url == following_url ->
@@ -270,7 +280,7 @@ defmodule Egregoros.Workers.RefreshRemoteFollowingGraphTest do
                "type" => "OrderedCollection",
                "totalItems" => 0
              },
-             headers: []
+             headers: [{"content-type", "application/activity+json"}]
            }}
 
         true ->
@@ -310,7 +320,7 @@ defmodule Egregoros.Workers.RefreshRemoteFollowingGraphTest do
                "type" => "Person",
                "following" => %{"id" => following_url}
              },
-             headers: []
+             headers: [{"content-type", "application/activity+json"}]
            }}
 
         url == following_url ->
@@ -324,7 +334,7 @@ defmodule Egregoros.Workers.RefreshRemoteFollowingGraphTest do
                ],
                "next" => %{"id" => next_page}
              },
-             headers: []
+             headers: [{"content-type", "application/activity+json"}]
            }}
 
         url == next_page ->
@@ -337,7 +347,7 @@ defmodule Egregoros.Workers.RefreshRemoteFollowingGraphTest do
                  %{"url" => %{"href" => "https://third.example/users/charlie"}}
                ]
              },
-             headers: []
+             headers: [{"content-type", "application/activity+json"}]
            }}
 
         true ->
@@ -387,7 +397,7 @@ defmodule Egregoros.Workers.RefreshRemoteFollowingGraphTest do
                "type" => "Person",
                "following" => following_url
              },
-             headers: []
+             headers: [{"content-type", "application/activity+json"}]
            }}
 
         url == following_url ->
@@ -399,7 +409,7 @@ defmodule Egregoros.Workers.RefreshRemoteFollowingGraphTest do
                "items" => ["https://other.example/users/alice"],
                "next" => following_url
              },
-             headers: []
+             headers: [{"content-type", "application/activity+json"}]
            }}
 
         true ->
@@ -437,7 +447,7 @@ defmodule Egregoros.Workers.RefreshRemoteFollowingGraphTest do
              "id" => actor_ap_id,
              "type" => "Person"
            },
-           headers: []
+           headers: [{"content-type", "application/activity+json"}]
          }}
       else
         flunk("unexpected HTTP GET to #{url}")
@@ -463,7 +473,7 @@ defmodule Egregoros.Workers.RefreshRemoteFollowingGraphTest do
                "type" => "Person",
                "following" => following_url
              },
-             headers: []
+             headers: [{"content-type", "application/activity+json"}]
            }}
 
         url == following_url ->
@@ -475,7 +485,7 @@ defmodule Egregoros.Workers.RefreshRemoteFollowingGraphTest do
                "items" => ["https://other.example/users/alice"],
                "next" => next_page
              },
-             headers: []
+             headers: [{"content-type", "application/activity+json"}]
            }}
 
         true ->

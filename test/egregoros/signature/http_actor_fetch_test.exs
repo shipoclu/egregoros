@@ -31,7 +31,7 @@ defmodule Egregoros.Signature.HTTPActorFetchTest do
              "publicKeyPem" => public_key
            }
          },
-         headers: []
+         headers: [{"content-type", "application/activity+json"}]
        }}
     end)
 
@@ -93,7 +93,7 @@ defmodule Egregoros.Signature.HTTPActorFetchTest do
              "publicKeyPem" => public_key
            }
          },
-         headers: []
+         headers: [{"content-type", "application/activity+json"}]
        }}
     end)
 

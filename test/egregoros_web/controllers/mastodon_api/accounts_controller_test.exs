@@ -269,7 +269,7 @@ defmodule EgregorosWeb.MastodonAPI.AccountsControllerTest do
              }
            ]
          },
-         headers: []
+         headers: [{"content-type", "application/activity+json"}]
        }}
     end)
     |> expect(:get, fn url, _headers ->
@@ -290,7 +290,7 @@ defmodule EgregorosWeb.MastodonAPI.AccountsControllerTest do
              "publicKeyPem" => "-----BEGIN PUBLIC KEY-----\nMIIB...\n-----END PUBLIC KEY-----\n"
            }
          },
-         headers: []
+         headers: [{"content-type", "application/activity+json"}]
        }}
     end)
 
@@ -321,7 +321,7 @@ defmodule EgregorosWeb.MastodonAPI.AccountsControllerTest do
              }
            ]
          },
-         headers: []
+         headers: [{"content-type", "application/activity+json"}]
        }}
     end)
     |> expect(:get, fn url, _headers ->
@@ -342,7 +342,7 @@ defmodule EgregorosWeb.MastodonAPI.AccountsControllerTest do
              "publicKeyPem" => "-----BEGIN PUBLIC KEY-----\nMIIB...\n-----END PUBLIC KEY-----\n"
            }
          },
-         headers: []
+         headers: [{"content-type", "application/activity+json"}]
        }}
     end)
 
@@ -878,7 +878,7 @@ defmodule EgregorosWeb.MastodonAPI.AccountsControllerTest do
       assert url ==
                "https://remote.example/.well-known/webfinger?resource=acct:missing@remote.example"
 
-      {:ok, %{status: 404, body: %{}, headers: []}}
+      {:ok, %{status: 404, body: %{}, headers: [{"content-type", "application/activity+json"}]}}
     end)
 
     conn = get(conn, "/api/v1/accounts/lookup", %{"acct" => "missing@remote.example"})

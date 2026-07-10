@@ -28,7 +28,7 @@ defmodule Egregoros.Activities.UndoAuthorizationTest do
       "object" => follow_object.ap_id
     }
 
-    assert {:ok, _undo_object} = Pipeline.ingest(undo, local: false)
+    assert {:ok, _undo_object} = Pipeline.ingest(undo, local: true)
 
     assert Relationships.get_by_type_actor_object("Follow", alice.ap_id, bob.ap_id)
     assert Objects.get_by_ap_id(follow_object.ap_id)

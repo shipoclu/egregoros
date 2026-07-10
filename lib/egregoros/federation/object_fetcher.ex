@@ -11,7 +11,7 @@ defmodule Egregoros.Federation.ObjectFetcher do
     ap_id = String.trim(ap_id)
 
     with :ok <- SafeURL.validate_http_url_federation(ap_id),
-         {:ok, %{status: status, body: body}} <- SignedFetch.get(ap_id, accept: @accept),
+         {:ok, %{status: status, body: body}} <- SignedFetch.get_activity(ap_id, accept: @accept),
          status when status in 200..299 <- status,
          {:ok, map} <- decode_json(body),
          :ok <- validate_id(map, ap_id),
@@ -49,5 +49,5 @@ defmodule Egregoros.Federation.ObjectFetcher do
     if id == expected, do: :ok, else: {:error, :id_mismatch}
   end
 
-  defp validate_id(_map, _expected), do: :ok
+  defp validate_id(_map, _expected), do: {:error, :id_mismatch}
 end

@@ -133,7 +133,7 @@ defmodule Egregoros.Workers.FetchThreadReplies do
   defp fetch_pages(_url, _pages_left, _items_left, _visited), do: :ok
 
   defp fetch_json(url) when is_binary(url) do
-    with {:ok, %{status: status, body: body}} <- SignedFetch.get(url),
+    with {:ok, %{status: status, body: body}} <- SignedFetch.get_activity(url),
          true <- status in 200..299,
          {:ok, %{} = json} <- decode_json(body) do
       {:ok, json}

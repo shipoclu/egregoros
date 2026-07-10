@@ -257,7 +257,9 @@ defmodule EgregorosWeb.E2EEControllerTest do
 
       expect(Egregoros.HTTP.Mock, :get, fn url, _headers ->
         assert url == actor_ap_id
-        {:ok, %{status: 200, body: actor, headers: []}}
+
+        {:ok,
+         %{status: 200, body: actor, headers: [{"content-type", "application/activity+json"}]}}
       end)
 
       conn =
@@ -303,7 +305,9 @@ defmodule EgregorosWeb.E2EEControllerTest do
 
       expect(Egregoros.HTTP.Mock, :get, fn url, _headers ->
         assert url == actor_ap_id
-        {:ok, %{status: 200, body: actor, headers: []}}
+
+        {:ok,
+         %{status: 200, body: actor, headers: [{"content-type", "application/activity+json"}]}}
       end)
 
       authed_conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
@@ -328,7 +332,9 @@ defmodule EgregorosWeb.E2EEControllerTest do
 
       expect(Egregoros.HTTP.Mock, :get, fn url, _headers ->
         assert url == actor_ap_id
-        {:ok, %{status: 200, body: actor, headers: []}}
+
+        {:ok,
+         %{status: 200, body: actor, headers: [{"content-type", "application/activity+json"}]}}
       end)
 
       conn =
@@ -379,12 +385,14 @@ defmodule EgregorosWeb.E2EEControllerTest do
         assert url ==
                  "https://remote.example/.well-known/webfinger?resource=acct:bob@remote.example"
 
-        {:ok, %{status: 200, body: jrd, headers: []}}
+        {:ok, %{status: 200, body: jrd, headers: [{"content-type", "application/activity+json"}]}}
       end)
 
       expect(Egregoros.HTTP.Mock, :get, fn url, _headers ->
         assert url == actor_ap_id
-        {:ok, %{status: 200, body: actor, headers: []}}
+
+        {:ok,
+         %{status: 200, body: actor, headers: [{"content-type", "application/activity+json"}]}}
       end)
 
       conn =
@@ -424,12 +432,18 @@ defmodule EgregorosWeb.E2EEControllerTest do
 
       expect(Egregoros.HTTP.Mock, :get, fn url, _headers ->
         assert url == actor_ap_id
-        {:ok, %{status: 401, body: %{}, headers: []}}
+        {:ok, %{status: 401, body: %{}, headers: [{"content-type", "application/activity+json"}]}}
       end)
 
       expect(Egregoros.HTTP.Mock, :get, fn url, _headers ->
         assert url == actor_ap_id
-        {:ok, %{status: 200, body: Jason.encode!(actor), headers: []}}
+
+        {:ok,
+         %{
+           status: 200,
+           body: Jason.encode!(actor),
+           headers: [{"content-type", "application/activity+json"}]
+         }}
       end)
 
       conn =

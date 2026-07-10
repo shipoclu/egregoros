@@ -41,7 +41,7 @@ defmodule Egregoros.Maintenance.RefetchRemoteActorsTest do
              "publicKeyPem" => user.public_key
            }
          },
-         headers: []
+         headers: [{"content-type", "application/activity+json"}]
        }}
     end)
 

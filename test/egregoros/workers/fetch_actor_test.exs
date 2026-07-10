@@ -31,7 +31,7 @@ defmodule Egregoros.Workers.FetchActorTest do
              "publicKeyPem" => public_key
            }
          },
-         headers: []
+         headers: [{"content-type", "application/activity+json"}]
        }}
     end)
 
