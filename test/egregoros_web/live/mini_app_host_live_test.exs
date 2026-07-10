@@ -6,6 +6,7 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
   alias Egregoros.Activities.Note
   alias Egregoros.MiniApps.Cards
   alias Egregoros.MiniApps.Manifest
+  alias Egregoros.MiniApps.OAuthRegistrations
   alias Egregoros.MiniApps.ResolvedCard
   alias Egregoros.Pipeline
   alias Egregoros.Timeline
@@ -124,13 +125,94 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
     assert card.id
   end
 
-  defp resolved_card do
+  test "validates auth requests against the card origin and presents a host-controlled prompt", %{
+    conn: conn,
+    user: user
+  } do
+    {:ok, note} =
+      Pipeline.ingest(
+        Note.build(user, ~s(<a href="https://app.example/shared/write">writer</a>)),
+        local: true
+      )
+
+    resolved = resolved_card(oauth?: true)
+    assert {:ok, _registration} = OAuthRegistrations.register(resolved.manifest)
+    assert {:ok, _card} = Cards.put(note, resolved)
+
+    application =
+      Egregoros.OAuth.get_application_by_client_id(client_id_for("https://app.example"))
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/?timeline=public")
+    view |> element("[data-role='open-mini-app']") |> render_click()
+
+    state = :sys.get_state(view.pid).socket.assigns.mini_app_host
+    render_hook(view, "mini_app_ready", %{"launch_id" => state.launch_id})
+
+    params = auth_params(state.launch_id, application.client_id)
+    render_hook(view, "mini_app_auth_request", params)
+
+    assert has_element?(view, "#mini-app-auth-consent")
+
+    assert has_element?(
+             view,
+             "#mini-app-auth-open[data-role='mini-app-auth-open'][data-request-id='auth-1']"
+           )
+
+    href =
+      view
+      |> element("#mini-app-auth-open")
+      |> render()
+      |> LazyHTML.from_fragment()
+      |> LazyHTML.attribute("data-auth-url")
+      |> List.first()
+
+    query = href |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
+    assert query["client_id"] == application.client_id
+    assert query["redirect_uri"] == "https://app.example/oauth/callback"
+    assert query["scope"] == "read write"
+    refute Map.has_key?(query, "handoff_challenge")
+
+    view |> element("#mini-app-auth-cancel") |> render_click()
+    refute has_element?(view, "#mini-app-auth-consent")
+
+    assert_push_event(view, "mini_app_auth_response", %{
+      launch_id: _,
+      request_id: "auth-1",
+      status: "cancelled"
+    })
+
+    render_hook(view, "mini_app_auth_request", %{
+      params
+      | "client_id" => String.duplicate("x", 32)
+    })
+
+    refute has_element?(view, "#mini-app-auth-consent")
+
+    assert_push_event(view, "mini_app_auth_response", %{
+      launch_id: _,
+      request_id: "auth-1",
+      status: "invalid_request"
+    })
+  end
+
+  defp resolved_card(options \\ []) do
+    oauth? = Keyword.get(options, :oauth?, false)
+
     manifest = %Manifest{
       version: "1",
       name: "Reader",
       origin: "https://app.example",
       home_url: "https://app.example/",
-      capabilities: [],
+      oauth:
+        if(oauth?,
+          do: %{
+            redirect_uris: ["https://app.example/oauth/callback"],
+            scopes: ["read", "write"]
+          },
+          else: nil
+        ),
+      capabilities: if(oauth?, do: ["compose_note"], else: []),
       cache_ttl_seconds: 600
     }
 
@@ -143,6 +225,25 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
       launch_url: "https://app.example/book/chapter-2",
       image_url: "https://app.example/card.png",
       manifest: manifest
+    }
+  end
+
+  defp client_id_for(origin) do
+    registration = OAuthRegistrations.get_by_origin(origin)
+    Egregoros.Repo.get!(Egregoros.OAuth.Application, registration.oauth_application_id).client_id
+  end
+
+  defp auth_params(launch_id, client_id) do
+    %{
+      "launch_id" => launch_id,
+      "request_id" => "auth-1",
+      "client_id" => client_id,
+      "redirect_uri" => "https://app.example/oauth/callback",
+      "scopes" => ["read", "write"],
+      "state" => String.duplicate("s", 43),
+      "code_challenge" => String.duplicate("c", 43),
+      "code_challenge_method" => "S256",
+      "handoff_challenge" => String.duplicate("h", 43)
     }
   end
 

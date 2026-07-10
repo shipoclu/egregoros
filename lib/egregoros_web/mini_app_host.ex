@@ -4,6 +4,7 @@ defmodule EgregorosWeb.MiniAppHost do
   use EgregorosWeb, :html
 
   alias Egregoros.MiniApps.Card
+  alias Egregoros.MiniApps.AuthRequest
   alias Egregoros.MiniApps.Cards
   alias Egregoros.MiniApps.ContextConsents
   alias Egregoros.MiniApps.LaunchContext
@@ -153,6 +154,59 @@ defmodule EgregorosWeb.MiniAppHost do
           </div>
         </section>
 
+        <section
+          :if={@state.status == :open and @state.auth_request}
+          id="mini-app-auth-consent"
+          class="absolute inset-0 z-30 flex items-center justify-center bg-[color:var(--text-primary)]/60 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="mini-app-auth-consent-title"
+        >
+          <div class="w-full max-w-sm border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] p-5 shadow-[6px_6px_0_var(--border-default)]">
+            <div class="flex items-start gap-3">
+              <div class="flex size-10 shrink-0 items-center justify-center border-2 border-[color:var(--border-default)] bg-[color:var(--accent-subtle)]">
+                <.icon name="hero-lock-closed" class="size-5 text-[color:var(--accent)]" />
+              </div>
+              <div>
+                <h2
+                  id="mini-app-auth-consent-title"
+                  class="font-bold text-[color:var(--text-primary)]"
+                >
+                  Continue to authorization?
+                </h2>
+                <p class="mt-2 text-sm leading-relaxed text-[color:var(--text-secondary)]">
+                  <span class="font-mono font-bold">{display_origin(@state.card.app_origin)}</span>
+                  wants to open this instance’s OAuth approval screen in a separate window.
+                </p>
+                <p class="mt-2 text-xs text-[color:var(--text-muted)]">
+                  The app will not receive your access token through this mini app window.
+                </p>
+              </div>
+            </div>
+
+            <div class="mt-5 flex justify-end gap-2">
+              <button
+                id="mini-app-auth-cancel"
+                type="button"
+                phx-click="mini_app_auth_cancel"
+                class="cursor-pointer border-2 border-[color:var(--border-default)] px-4 py-2 text-sm font-bold text-[color:var(--text-secondary)] transition hover:bg-[color:var(--bg-subtle)] focus-visible:outline-none focus-brutal"
+              >
+                Cancel
+              </button>
+              <button
+                id="mini-app-auth-open"
+                type="button"
+                data-role="mini-app-auth-open"
+                data-request-id={@state.auth_request.request_id}
+                data-auth-url={@state.auth_request.authorization_url}
+                class="cursor-pointer border-2 border-[color:var(--border-default)] bg-[color:var(--text-primary)] px-4 py-2 text-sm font-bold text-[color:var(--bg-base)] transition hover:shadow-[3px_3px_0_var(--accent)] focus-visible:outline-none focus-brutal"
+              >
+                Continue
+              </button>
+            </div>
+          </div>
+        </section>
+
         <div
           :if={@state.status == :open}
           class="relative min-h-0 flex-1 bg-white"
@@ -203,7 +257,8 @@ defmodule EgregorosWeb.MiniAppHost do
            card: card,
            launch_id: launch_id(),
            ready?: false,
-           context_request: nil
+           context_request: nil,
+           auth_request: nil
          })}
 
       _ ->
@@ -262,6 +317,52 @@ defmodule EgregorosWeb.MiniAppHost do
     {:halt, deny_pending_context(socket, "denied")}
   end
 
+  defp handle_host_event(
+         "mini_app_auth_request",
+         %{"launch_id" => launch_id, "request_id" => request_id} = params,
+         socket
+       ) do
+    state = socket.assigns.mini_app_host
+
+    if auth_request_allowed?(state, launch_id, request_id) do
+      auth_params = Map.drop(params, ["launch_id"])
+
+      case AuthRequest.prepare(state.card.app_origin, auth_params) do
+        {:ok, request} ->
+          {:halt,
+           Phoenix.Component.assign(socket, :mini_app_host, %{state | auth_request: request})}
+
+        {:error, _reason} ->
+          {:halt, push_auth_response(socket, request_id, "invalid_request")}
+      end
+    else
+      {:halt, socket}
+    end
+  end
+
+  defp handle_host_event("mini_app_auth_cancel", _params, socket) do
+    case socket.assigns.mini_app_host.auth_request do
+      %{request_id: request_id} -> {:halt, push_auth_response(socket, request_id, "cancelled")}
+      _ -> {:halt, socket}
+    end
+  end
+
+  defp handle_host_event(
+         "mini_app_auth_complete",
+         %{"launch_id" => launch_id, "request_id" => request_id, "status" => status},
+         socket
+       )
+       when status in ["success", "cancelled", "error"] do
+    state = socket.assigns.mini_app_host
+
+    if (state.launch_id == launch_id and state.auth_request) &&
+         state.auth_request.request_id == request_id do
+      {:halt, Phoenix.Component.assign(socket, :mini_app_host, %{state | auth_request: nil})}
+    else
+      {:halt, socket}
+    end
+  end
+
   defp handle_host_event(event, %{"launch_id" => launch_id}, socket)
        when event in ["mini_app_loading", "mini_app_ready"] do
     state = socket.assigns.mini_app_host
@@ -270,7 +371,8 @@ defmodule EgregorosWeb.MiniAppHost do
       {:halt,
        Phoenix.Component.assign(socket, :mini_app_host, %{
          state
-         | ready?: event == "mini_app_ready"
+         | ready?: event == "mini_app_ready",
+           auth_request: if(event == "mini_app_loading", do: nil, else: state.auth_request)
        })}
     else
       {:halt, socket}
@@ -310,12 +412,19 @@ defmodule EgregorosWeb.MiniAppHost do
       card: nil,
       launch_id: nil,
       ready?: false,
-      context_request: nil
+      context_request: nil,
+      auth_request: nil
     }
   end
 
   defp context_request_allowed?(state, launch_id, request_id) do
     state.status == :open and state.ready? and state.launch_id == launch_id and
+      valid_request_id?(request_id) and active_card?(state.card)
+  end
+
+  defp auth_request_allowed?(state, launch_id, request_id) do
+    state.status == :open and state.ready? and state.launch_id == launch_id and
+      is_nil(state.auth_request) and is_nil(state.context_request) and
       valid_request_id?(request_id) and active_card?(state.card)
   end
 
@@ -370,6 +479,18 @@ defmodule EgregorosWeb.MiniAppHost do
       request_id: request_id,
       status: status,
       context: context
+    })
+  end
+
+  defp push_auth_response(socket, request_id, status) do
+    state = socket.assigns.mini_app_host
+
+    socket
+    |> Phoenix.Component.assign(:mini_app_host, %{state | auth_request: nil})
+    |> Phoenix.LiveView.push_event("mini_app_auth_response", %{
+      launch_id: state.launch_id,
+      request_id: request_id,
+      status: status
     })
   end
 

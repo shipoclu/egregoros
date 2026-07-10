@@ -126,3 +126,56 @@ test("context requests are correlated and host responses return through the priv
 
   broker.destroy()
 })
+
+test("auth requests require the active launch and a strict PKCE handoff schema", async () => {
+  const fixture = iframeFixture()
+  const requests = []
+
+  const broker = createMiniAppBroker({
+    iframe: fixture.iframe,
+    appOrigin: "https://app.example",
+    launchId: "launch-auth",
+    onAuthRequest: request => requests.push(request),
+  })
+
+  fixture.load()
+  const appPort = fixture.posts[0].transfer[0]
+  const valid = {
+    type: "requestAuth",
+    version: "1",
+    launchId: "launch-auth",
+    requestId: "auth-1",
+    clientId: "client_1234567890",
+    redirectUri: "https://app.example/oauth/callback",
+    scopes: ["read", "write"],
+    state: "s".repeat(43),
+    codeChallenge: "c".repeat(43),
+    codeChallengeMethod: "S256",
+    handoffChallenge: "h".repeat(43),
+  }
+
+  appPort.postMessage({...valid, launchId: "other"})
+  appPort.postMessage({...valid, scopes: []})
+  appPort.postMessage({...valid, state: "weak"})
+  appPort.postMessage({...valid, codeChallengeMethod: "plain"})
+  appPort.postMessage({...valid, accessToken: "must-not-enter-the-host"})
+  await tick()
+  assert.deepEqual(requests, [])
+
+  appPort.postMessage(valid)
+  await tick()
+  assert.deepEqual(requests, [
+    {
+      requestId: "auth-1",
+      clientId: "client_1234567890",
+      redirectUri: "https://app.example/oauth/callback",
+      scopes: ["read", "write"],
+      state: "s".repeat(43),
+      codeChallenge: "c".repeat(43),
+      codeChallengeMethod: "S256",
+      handoffChallenge: "h".repeat(43),
+    },
+  ])
+
+  broker.destroy()
+})

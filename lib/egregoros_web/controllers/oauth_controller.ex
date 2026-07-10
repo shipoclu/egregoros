@@ -5,9 +5,18 @@ defmodule EgregorosWeb.OAuthController do
        [bucket: :oauth, config_key: :rate_limit_oauth, limit: 30, interval_ms: 60_000]
        when action in [:approve, :token, :revoke]
 
+  plug :secure_response
+
   alias Egregoros.OAuth
   alias Egregoros.MiniApps.OAuthRegistrations, as: MiniAppOAuthRegistrations
   alias Egregoros.User
+
+  defp secure_response(conn, _opts) do
+    conn
+    |> put_resp_header("cache-control", "no-store")
+    |> put_resp_header("pragma", "no-cache")
+    |> put_resp_header("referrer-policy", "no-referrer")
+  end
 
   def authorize(conn, params) do
     case conn.assigns.current_user do
@@ -117,7 +126,13 @@ defmodule EgregorosWeb.OAuthController do
         form: form,
         app: app,
         scope: scope,
-        mini_app_registration: mini_app_registration
+        mini_app_registration: mini_app_registration,
+        cancel_url:
+          oauth_cancel_url(
+            mini_app_registration,
+            redirect_uri,
+            Map.get(params, "state", "")
+          )
       )
     else
       nil ->
@@ -135,6 +150,13 @@ defmodule EgregorosWeb.OAuthController do
         |> put_status(:bad_request)
         |> text("Invalid OAuth request")
     end
+  end
+
+  defp oauth_cancel_url(nil, _redirect_uri, _state), do: "/"
+
+  defp oauth_cancel_url(_mini_app_registration, redirect_uri, state) do
+    redirect_uri
+    |> append_query_params(%{"error" => "access_denied", "state" => to_string(state)})
   end
 
   defp do_approve(conn, user, params) do

@@ -279,10 +279,24 @@ defmodule EgregorosWeb.OAuthControllerTest do
 
     document = consent_conn |> html_response(200) |> LazyHTML.from_document()
 
+    assert get_resp_header(consent_conn, "cache-control") == ["no-store"]
+    assert get_resp_header(consent_conn, "pragma") == ["no-cache"]
+    assert get_resp_header(consent_conn, "referrer-policy") == ["no-referrer"]
+
     assert document |> LazyHTML.query("#oauth-mini-app-origin") |> LazyHTML.text() =~
              "app.example"
 
     assert LazyHTML.query(document, "#oauth-write-confirmation") |> LazyHTML.to_tree() != []
+
+    cancel_url =
+      document
+      |> LazyHTML.query("#oauth-cancel")
+      |> LazyHTML.attribute("href")
+      |> List.first()
+
+    cancel_query = cancel_url |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
+    assert String.starts_with?(cancel_url, "https://app.example/oauth/callback?")
+    assert cancel_query == %{"error" => "access_denied", "state" => "state-1"}
 
     rejected_conn =
       conn
