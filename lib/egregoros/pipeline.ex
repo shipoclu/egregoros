@@ -1,6 +1,7 @@
 defmodule Egregoros.Pipeline do
   alias Egregoros.ActivityRegistry
   alias Egregoros.ActivityPub.TypeNormalizer
+  alias Egregoros.ActivityPub.ObjectAuthority
   alias Egregoros.Domain
   alias Egregoros.Federation.ActorDiscovery
   alias EgregorosWeb.Endpoint
@@ -12,6 +13,7 @@ defmodule Egregoros.Pipeline do
     with {:ok, normalized_activity, type_metadata} <- TypeNormalizer.normalize_incoming(activity),
          opts <- TypeNormalizer.put_type_metadata(opts, type_metadata),
          :ok <- validate_namespace(normalized_activity, opts),
+         :ok <- validate_authority(normalized_activity, opts),
          {:ok, module} <- ActivityRegistry.fetch(normalized_activity) do
       ingest_with(module, normalized_activity, opts)
     end
@@ -74,6 +76,10 @@ defmodule Egregoros.Pipeline do
   end
 
   defp validate_namespace(_activity, _opts), do: :ok
+
+  defp validate_authority(activity, opts) when is_map(activity) and is_list(opts) do
+    if Keyword.get(opts, :local, true), do: :ok, else: ObjectAuthority.validate(activity)
+  end
 
   defp extract_id(%{"id" => id}) when is_binary(id), do: id
   defp extract_id(%{id: id}) when is_binary(id), do: id

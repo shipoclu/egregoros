@@ -263,13 +263,36 @@ defmodule Egregoros.PipelineTest do
     assert {:error, :local_id} = Pipeline.ingest(note, local: false)
   end
 
+  test "ingest rejects a remote object id outside its author's authority" do
+    note =
+      @note
+      |> Map.put("id", "https://victim.example/objects/poisoned")
+      |> Map.put("attributedTo", "https://attacker.example/users/mallory")
+
+    assert {:error, :id_authority_mismatch} = Pipeline.ingest(note, local: false)
+    refute Egregoros.Objects.get_by_ap_id(note["id"])
+  end
+
+  test "ingest rejects a remote activity id outside its actor's authority" do
+    create =
+      @create
+      |> Map.put("id", "https://victim.example/activities/poisoned")
+      |> Map.put("actor", "https://attacker.example/users/mallory")
+      |> put_in(["object", "id"], "https://attacker.example/objects/1")
+      |> put_in(["object", "attributedTo"], "https://attacker.example/users/mallory")
+
+    assert {:error, :id_authority_mismatch} = Pipeline.ingest(create, local: false)
+    refute Egregoros.Objects.get_by_ap_id(create["id"])
+    refute Egregoros.Objects.get_by_ap_id(create["object"]["id"])
+  end
+
   test "ingest does not reject remote objects that use the same host but a different port" do
     uuid = Ecto.UUID.generate()
 
     note =
       @note
       |> Map.put("id", "http://localhost:5000/objects/" <> uuid)
-      |> Map.put("attributedTo", "https://example.com/users/alice")
+      |> Map.put("attributedTo", "http://localhost:5000/users/alice")
 
     assert {:ok, %Object{} = object} = Pipeline.ingest(note, local: false)
     assert object.ap_id == note["id"]
