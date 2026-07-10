@@ -11,6 +11,7 @@ defmodule Egregoros.Application do
       EgregorosWeb.Telemetry,
       Egregoros.Repo,
       Egregoros.RateLimiter.ETS,
+      {Task.Supervisor, name: Egregoros.MediaTaskSupervisor, max_children: 4},
       {Oban, Application.fetch_env!(:egregoros, Oban)},
       {DNSCluster, query: Egregoros.Config.get(:dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Egregoros.PubSub},
