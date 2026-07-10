@@ -52,6 +52,7 @@ defmodule EgregorosWeb.MastodonAPI.SearchControllerTest do
        %{
          status: 200,
          body: %{
+           "subject" => "acct:bob@remote.example",
            "links" => [
              %{
                "rel" => "self",
@@ -60,7 +61,7 @@ defmodule EgregorosWeb.MastodonAPI.SearchControllerTest do
              }
            ]
          },
-         headers: [{"content-type", "application/activity+json"}]
+         headers: [{"content-type", "application/jrd+json"}]
        }}
     end)
     |> expect(:get, fn url, _headers ->
@@ -110,6 +111,7 @@ defmodule EgregorosWeb.MastodonAPI.SearchControllerTest do
        %{
          status: 200,
          body: %{
+           "subject" => "acct:bob@remote.example",
            "links" => [
              %{
                "rel" => "self",
@@ -118,7 +120,7 @@ defmodule EgregorosWeb.MastodonAPI.SearchControllerTest do
              }
            ]
          },
-         headers: [{"content-type", "application/activity+json"}]
+         headers: [{"content-type", "application/jrd+json"}]
        }}
     end)
     |> expect(:get, fn url, _headers ->

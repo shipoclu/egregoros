@@ -42,7 +42,7 @@ defmodule Egregoros.Workers.FollowRemoteTest do
 
     expect(Egregoros.HTTP.Mock, :get, 2, fn
       ^webfinger_url, _headers ->
-        {:ok, %{status: 200, body: jrd, headers: [{"content-type", "application/activity+json"}]}}
+        {:ok, %{status: 200, body: jrd, headers: [{"content-type", "application/jrd+json"}]}}
 
       ^actor_url, _headers ->
         {:ok,

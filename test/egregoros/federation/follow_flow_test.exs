@@ -21,6 +21,7 @@ defmodule Egregoros.Federation.FollowFlowTest do
        %{
          status: 200,
          body: %{
+           "subject" => "acct:bob@remote.example",
            "links" => [
              %{
                "rel" => "self",
@@ -29,7 +30,7 @@ defmodule Egregoros.Federation.FollowFlowTest do
              }
            ]
          },
-         headers: [{"content-type", "application/activity+json"}]
+         headers: [{"content-type", "application/jrd+json"}]
        }}
     end)
     |> expect(:get, fn url, _headers ->

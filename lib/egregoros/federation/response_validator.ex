@@ -18,9 +18,24 @@ defmodule Egregoros.Federation.ResponseValidator do
   def validate_activitystreams(_response),
     do: {:error, :invalid_activitystreams_content_type}
 
-  defp activitystreams_content_type?(value) when is_binary(value) do
+  def validate_webfinger(%{status: status}) when status not in 200..299, do: :ok
+
+  def validate_webfinger(%{status: status, headers: headers}) when status in 200..299 do
+    headers
+    |> header_values("content-type")
+    |> Enum.any?(&webfinger_content_type?/1)
+    |> case do
+      true -> :ok
+      false -> {:error, :invalid_webfinger_content_type}
+    end
+  end
+
+  def validate_webfinger(_response), do: {:error, :invalid_webfinger_content_type}
+
+  def activitystreams_media_type?(value) when is_binary(value) do
     [media_type | _parameters] = String.split(value, ";")
     media_type = media_type |> String.trim() |> String.downcase()
+    value = String.downcase(value)
 
     case media_type do
       "application/activity+json" -> true
@@ -29,7 +44,20 @@ defmodule Egregoros.Federation.ResponseValidator do
     end
   end
 
-  defp activitystreams_content_type?(_value), do: false
+  def activitystreams_media_type?(_value), do: false
+
+  defp activitystreams_content_type?(value), do: activitystreams_media_type?(value)
+
+  defp webfinger_content_type?(value) when is_binary(value) do
+    value
+    |> String.split(";", parts: 2)
+    |> List.first()
+    |> String.trim()
+    |> String.downcase()
+    |> Kernel.==("application/jrd+json")
+  end
+
+  defp webfinger_content_type?(_value), do: false
 
   defp header_values(headers, name) when is_list(headers) do
     headers

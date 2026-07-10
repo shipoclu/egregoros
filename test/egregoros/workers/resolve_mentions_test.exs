@@ -81,7 +81,7 @@ defmodule Egregoros.Workers.ResolveMentionsTest do
                  }
                ]
              },
-             headers: [{"content-type", "application/activity+json"}]
+             headers: [{"content-type", "application/jrd+json"}]
            }}
 
         url == actor_url ->
@@ -215,7 +215,7 @@ defmodule Egregoros.Workers.ResolveMentionsTest do
                  }
                ]
              },
-             headers: [{"content-type", "application/activity+json"}]
+             headers: [{"content-type", "application/jrd+json"}]
            }}
 
         url == actor_url ->

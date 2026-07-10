@@ -28,7 +28,7 @@ defmodule Egregoros.Federation.WebFingerTest do
              }
            ]
          },
-         headers: []
+         headers: [{"content-type", "application/jrd+json"}]
        }}
     end)
 
@@ -55,7 +55,7 @@ defmodule Egregoros.Federation.WebFingerTest do
 
   test "lookup returns :invalid_json when the response body is not JSON" do
     expect(Egregoros.HTTP.Mock, :get, fn _url, _headers ->
-      {:ok, %{status: 200, body: "not json", headers: []}}
+      {:ok, %{status: 200, body: "not json", headers: [{"content-type", "application/jrd+json"}]}}
     end)
 
     assert {:error, :invalid_json} = WebFinger.lookup("@alice@remote.example")
@@ -63,7 +63,71 @@ defmodule Egregoros.Federation.WebFingerTest do
 
   test "lookup returns :not_found when the response does not include a self link" do
     expect(Egregoros.HTTP.Mock, :get, fn _url, _headers ->
-      {:ok, %{status: 200, body: %{"links" => []}, headers: []}}
+      {:ok,
+       %{
+         status: 200,
+         body: %{"subject" => "acct:alice@remote.example", "links" => []},
+         headers: [{"content-type", "application/jrd+json"}]
+       }}
+    end)
+
+    assert {:error, :not_found} = WebFinger.lookup("@alice@remote.example")
+  end
+
+  test "lookup rejects a response bound to a different subject" do
+    expect(Egregoros.HTTP.Mock, :get, fn _url, _headers ->
+      {:ok,
+       %{
+         status: 200,
+         headers: [{"content-type", "application/jrd+json"}],
+         body: %{
+           "subject" => "acct:mallory@remote.example",
+           "links" => [
+             %{
+               "rel" => "self",
+               "type" => "application/activity+json",
+               "href" => "https://remote.example/users/mallory"
+             }
+           ]
+         }
+       }}
+    end)
+
+    assert {:error, :invalid_webfinger_subject} =
+             WebFinger.lookup("@alice@remote.example")
+  end
+
+  test "lookup requires the JRD response media type" do
+    expect(Egregoros.HTTP.Mock, :get, fn _url, _headers ->
+      {:ok,
+       %{
+         status: 200,
+         headers: [{"content-type", "text/html"}],
+         body: %{"subject" => "acct:alice@remote.example", "links" => []}
+       }}
+    end)
+
+    assert {:error, :invalid_webfinger_content_type} =
+             WebFinger.lookup("@alice@remote.example")
+  end
+
+  test "lookup requires an ActivityStreams self-link media type" do
+    expect(Egregoros.HTTP.Mock, :get, fn _url, _headers ->
+      {:ok,
+       %{
+         status: 200,
+         headers: [{"content-type", "application/jrd+json"}],
+         body: %{
+           "subject" => "acct:alice@remote.example",
+           "links" => [
+             %{
+               "rel" => "self",
+               "type" => "text/html",
+               "href" => "https://remote.example/@alice"
+             }
+           ]
+         }
+       }}
     end)
 
     assert {:error, :not_found} = WebFinger.lookup("@alice@remote.example")
@@ -99,6 +163,7 @@ defmodule Egregoros.Federation.WebFingerTest do
        %{
          status: 200,
          body: %{
+           "subject" => "acct:alice@remote.example",
            "links" => [
              %{
                "rel" => "self",
@@ -107,7 +172,7 @@ defmodule Egregoros.Federation.WebFingerTest do
              }
            ]
          },
-         headers: []
+         headers: [{"content-type", "application/jrd+json"}]
        }}
     end)
 
@@ -130,6 +195,7 @@ defmodule Egregoros.Federation.WebFingerTest do
        %{
          status: 200,
          body: %{
+           "subject" => "acct:alice@remote.example",
            "links" => [
              %{
                "rel" => "self",
@@ -138,7 +204,7 @@ defmodule Egregoros.Federation.WebFingerTest do
              }
            ]
          },
-         headers: []
+         headers: [{"content-type", "application/jrd+json"}]
        }}
     end)
 

@@ -261,6 +261,7 @@ defmodule EgregorosWeb.MastodonAPI.AccountsControllerTest do
        %{
          status: 200,
          body: %{
+           "subject" => "acct:bob@remote.example",
            "links" => [
              %{
                "rel" => "self",
@@ -269,7 +270,7 @@ defmodule EgregorosWeb.MastodonAPI.AccountsControllerTest do
              }
            ]
          },
-         headers: [{"content-type", "application/activity+json"}]
+         headers: [{"content-type", "application/jrd+json"}]
        }}
     end)
     |> expect(:get, fn url, _headers ->
@@ -313,6 +314,7 @@ defmodule EgregorosWeb.MastodonAPI.AccountsControllerTest do
        %{
          status: 200,
          body: %{
+           "subject" => "acct:bob@remote.example",
            "links" => [
              %{
                "rel" => "self",
@@ -321,7 +323,7 @@ defmodule EgregorosWeb.MastodonAPI.AccountsControllerTest do
              }
            ]
          },
-         headers: [{"content-type", "application/activity+json"}]
+         headers: [{"content-type", "application/jrd+json"}]
        }}
     end)
     |> expect(:get, fn url, _headers ->

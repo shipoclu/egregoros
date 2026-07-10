@@ -1,18 +1,23 @@
 defmodule Egregoros.Federation.WebFinger do
   alias Egregoros.Config
+  alias Egregoros.Federation.ResponseValidator
   alias Egregoros.HTTP
   alias Egregoros.SafeURL
 
   def lookup(handle) when is_binary(handle) do
     with {:ok, username, domain} <- parse_handle(handle),
+         subject = "acct:" <> username <> "@" <> domain,
          scheme <- lookup_scheme(),
          url <-
            scheme <>
              "://" <>
-             domain <> "/.well-known/webfinger?resource=acct:" <> username <> "@" <> domain,
+             domain <> "/.well-known/webfinger?resource=" <> subject,
          :ok <- SafeURL.validate_http_url_federation(url),
-         {:ok, %{status: status, body: body}} when status in 200..299 <- HTTP.get(url, headers()),
+         {:ok, %{status: status, body: body} = response} when status in 200..299 <-
+           HTTP.get(url, headers()),
+         :ok <- ResponseValidator.validate_webfinger(response),
          {:ok, jrd} <- decode_json(body),
+         :ok <- validate_subject(jrd, subject),
          {:ok, actor_url} <- find_actor_url(jrd) do
       {:ok, actor_url}
     else
@@ -42,15 +47,23 @@ defmodule Egregoros.Federation.WebFinger do
   defp find_actor_url(%{"links" => links}) when is_list(links) do
     links
     |> Enum.find(fn link ->
-      Map.get(link, "rel") == "self" and is_binary(Map.get(link, "href"))
+      Map.get(link, "rel") == "self" and
+        is_binary(Map.get(link, "href")) and
+        ResponseValidator.activitystreams_media_type?(Map.get(link, "type"))
     end)
     |> case do
-      %{"href" => href} -> {:ok, href}
-      _ -> {:error, :not_found}
+      %{"href" => href} ->
+        with :ok <- SafeURL.validate_http_url_federation(href), do: {:ok, href}
+
+      _ ->
+        {:error, :not_found}
     end
   end
 
   defp find_actor_url(_), do: {:error, :not_found}
+
+  defp validate_subject(%{"subject" => subject}, subject), do: :ok
+  defp validate_subject(_jrd, _subject), do: {:error, :invalid_webfinger_subject}
 
   defp parse_handle(handle) do
     handle =
@@ -60,7 +73,7 @@ defmodule Egregoros.Federation.WebFinger do
 
     case String.split(handle, "@", parts: 2) do
       [username, domain] when username != "" and domain != "" ->
-        {:ok, username, domain}
+        {:ok, username, String.downcase(domain)}
 
       _ ->
         {:error, :invalid_handle}

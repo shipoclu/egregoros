@@ -354,6 +354,7 @@ defmodule EgregorosWeb.E2EEControllerTest do
       actor_ap_id = "https://remote.example/users/bob"
 
       jrd = %{
+        "subject" => "acct:bob@remote.example",
         "links" => [
           %{
             "rel" => "self",
@@ -385,7 +386,7 @@ defmodule EgregorosWeb.E2EEControllerTest do
         assert url ==
                  "https://remote.example/.well-known/webfinger?resource=acct:bob@remote.example"
 
-        {:ok, %{status: 200, body: jrd, headers: [{"content-type", "application/activity+json"}]}}
+        {:ok, %{status: 200, body: jrd, headers: [{"content-type", "application/jrd+json"}]}}
       end)
 
       expect(Egregoros.HTTP.Mock, :get, fn url, _headers ->
