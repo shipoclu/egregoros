@@ -6,8 +6,8 @@ defmodule Egregoros.OAuth.Token do
   @primary_key {:id, FlakeId.Ecto.Type, autogenerate: true}
   @foreign_key_type FlakeId.Ecto.Type
 
-  @required_fields ~w(token_digest refresh_token_digest application_id)a
-  @optional_fields ~w(user_id scopes expires_at refresh_expires_at revoked_at)a
+  @required_fields ~w(token_digest refresh_token_digest family_id application_id)a
+  @optional_fields ~w(user_id scopes expires_at refresh_expires_at revoked_at consumed_at)a
 
   schema "oauth_tokens" do
     field :token_digest, :string
@@ -18,6 +18,8 @@ defmodule Egregoros.OAuth.Token do
     field :expires_at, :utc_datetime_usec
     field :refresh_expires_at, :utc_datetime_usec
     field :revoked_at, :utc_datetime_usec
+    field :consumed_at, :utc_datetime_usec
+    field :family_id, :string
 
     belongs_to :user, Egregoros.User
     belongs_to :application, Egregoros.OAuth.Application
@@ -31,6 +33,7 @@ defmodule Egregoros.OAuth.Token do
     |> validate_required(@required_fields)
     |> validate_length(:token_digest, is: 64)
     |> validate_length(:refresh_token_digest, is: 64)
+    |> validate_length(:family_id, min: 1, max: 255)
     |> unique_constraint(:token_digest)
     |> unique_constraint(:refresh_token_digest)
   end

@@ -94,7 +94,9 @@ defmodule EgregorosWeb.OAuthController do
             "redirect_uri" => redirect_uri,
             "response_type" => "code",
             "scope" => scope,
-            "state" => Map.get(params, "state", "")
+            "state" => Map.get(params, "state", ""),
+            "code_challenge" => Map.get(params, "code_challenge", ""),
+            "code_challenge_method" => Map.get(params, "code_challenge_method", "")
           },
           as: :oauth
         )
@@ -124,7 +126,11 @@ defmodule EgregorosWeb.OAuthController do
            Map.get(params, "redirect_uri"),
          true <- OAuth.redirect_uri_allowed?(app, redirect_uri),
          scope when is_binary(scope) <- Map.get(params, "scope"),
-         {:ok, auth_code} <- OAuth.create_authorization_code(app, user, redirect_uri, scope) do
+         {:ok, auth_code} <-
+           OAuth.create_authorization_code(app, user, redirect_uri, scope,
+             code_challenge: Map.get(params, "code_challenge"),
+             code_challenge_method: Map.get(params, "code_challenge_method")
+           ) do
       state = params |> Map.get("state", "") |> to_string()
 
       if oob_redirect_uri?(redirect_uri) do

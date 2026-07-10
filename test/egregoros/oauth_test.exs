@@ -62,11 +62,70 @@ defmodule Egregoros.OAuthTest do
   end
 
   test "create_application stores empty redirect_uris when given nil or an invalid value" do
-    {:ok, app} = OAuth.create_application(%{"client_name" => "Husky", "redirect_uris" => nil})
-    assert app.redirect_uris == []
+    assert {:error, %Ecto.Changeset{}} =
+             OAuth.create_application(%{"client_name" => "Husky", "redirect_uris" => nil})
 
-    {:ok, app} = OAuth.create_application(%{"client_name" => "Husky", "redirect_uris" => 123})
-    assert app.redirect_uris == []
+    assert {:error, %Ecto.Changeset{}} =
+             OAuth.create_application(%{"client_name" => "Husky", "redirect_uris" => 123})
+  end
+
+  test "create_application rejects unsafe redirect URI forms" do
+    for redirect_uri <- [
+          "http://example.com/callback",
+          "https://user@example.com/callback",
+          "https://example.com/callback#fragment",
+          "javascript:alert(1)",
+          "file:///tmp/token",
+          "https://example.com/callback\nSet-Cookie: x=y"
+        ] do
+      assert {:error, %Ecto.Changeset{}} =
+               OAuth.create_application(%{
+                 "client_name" => "Unsafe",
+                 "redirect_uris" => redirect_uri
+               })
+    end
+  end
+
+  test "create_application permits HTTPS, loopback, OOB, and reverse-domain native redirects" do
+    for redirect_uri <- [
+          "https://example.com/callback",
+          "http://localhost:4000/callback",
+          "http://127.0.0.1:49152/callback",
+          "urn:ietf:wg:oauth:2.0:oob",
+          "com.example.native:/oauth/callback"
+        ] do
+      assert {:ok, _app} =
+               OAuth.create_application(%{
+                 "client_name" => "Safe",
+                 "redirect_uris" => redirect_uri
+               })
+    end
+  end
+
+  test "public native redirects require S256 PKCE" do
+    user = create_user!()
+    app = create_app!(%{"redirect_uris" => "com.example.native:/oauth/callback"})
+
+    assert {:error, :pkce_required} =
+             OAuth.create_authorization_code(
+               app,
+               user,
+               "com.example.native:/oauth/callback",
+               "read"
+             )
+
+    verifier = String.duplicate("v", 43)
+    challenge = :crypto.hash(:sha256, verifier) |> Base.url_encode64(padding: false)
+
+    assert {:ok, _code} =
+             OAuth.create_authorization_code(
+               app,
+               user,
+               "com.example.native:/oauth/callback",
+               "read",
+               code_challenge: challenge,
+               code_challenge_method: "S256"
+             )
   end
 
   test "get_application_by_client_id returns nil for nil ids" do
@@ -129,8 +188,44 @@ defmodule Egregoros.OAuthTest do
              })
 
     assert is_binary(token.token)
+    assert %DateTime{} = token.expires_at
+    assert DateTime.diff(token.expires_at, DateTime.utc_now(), :second) in 3_590..3_600
     assert OAuth.get_user_by_token(token.token).id == user.id
     assert OAuth.get_authorization_code(auth_code.code) == nil
+  end
+
+  test "authorization code exchange verifies an S256 PKCE challenge" do
+    user = create_user!()
+    app = create_app!()
+    verifier = String.duplicate("a", 43)
+
+    challenge =
+      :crypto.hash(:sha256, verifier)
+      |> Base.url_encode64(padding: false)
+
+    assert {:ok, auth_code} =
+             OAuth.create_authorization_code(
+               app,
+               user,
+               "urn:ietf:wg:oauth:2.0:oob",
+               "read",
+               code_challenge: challenge,
+               code_challenge_method: "S256"
+             )
+
+    params = %{
+      "grant_type" => "authorization_code",
+      "code" => auth_code.code,
+      "client_id" => app.client_id,
+      "client_secret" => app.client_secret,
+      "redirect_uri" => "urn:ietf:wg:oauth:2.0:oob"
+    }
+
+    assert {:error, :invalid_grant} =
+             OAuth.exchange_code_for_token(Map.put(params, "code_verifier", "wrong"))
+
+    assert {:ok, _token} =
+             OAuth.exchange_code_for_token(Map.put(params, "code_verifier", verifier))
   end
 
   test "authorization code exchange fails for invalid client id" do
@@ -250,6 +345,84 @@ defmodule Egregoros.OAuthTest do
 
     old = OAuth.get_token(token.token)
     assert old == nil
+  end
+
+  test "reusing a consumed refresh token revokes its token family" do
+    user = create_user!()
+    app = create_app!()
+
+    assert {:ok, auth_code} =
+             OAuth.create_authorization_code(app, user, "urn:ietf:wg:oauth:2.0:oob", "read")
+
+    assert {:ok, token} =
+             OAuth.exchange_code_for_token(%{
+               "grant_type" => "authorization_code",
+               "code" => auth_code.code,
+               "client_id" => app.client_id,
+               "client_secret" => app.client_secret,
+               "redirect_uri" => "urn:ietf:wg:oauth:2.0:oob"
+             })
+
+    refresh_params = %{
+      "grant_type" => "refresh_token",
+      "refresh_token" => token.refresh_token,
+      "client_id" => app.client_id,
+      "client_secret" => app.client_secret
+    }
+
+    assert {:ok, successor} = OAuth.exchange_code_for_token(refresh_params)
+    assert {:error, :invalid_grant} = OAuth.exchange_code_for_token(refresh_params)
+    assert OAuth.get_token(successor.token) == nil
+  end
+
+  test "concurrent refresh replay mints at most one successor and revokes the family" do
+    user = create_user!()
+    app = create_app!()
+
+    assert {:ok, auth_code} =
+             OAuth.create_authorization_code(app, user, "urn:ietf:wg:oauth:2.0:oob", "read")
+
+    assert {:ok, token} =
+             OAuth.exchange_code_for_token(%{
+               "grant_type" => "authorization_code",
+               "code" => auth_code.code,
+               "client_id" => app.client_id,
+               "client_secret" => app.client_secret,
+               "redirect_uri" => "urn:ietf:wg:oauth:2.0:oob"
+             })
+
+    refresh_params = %{
+      "grant_type" => "refresh_token",
+      "refresh_token" => token.refresh_token,
+      "client_id" => app.client_id,
+      "client_secret" => app.client_secret
+    }
+
+    supervisor = start_supervised!(Task.Supervisor)
+    parent = self()
+
+    tasks =
+      for _ <- 1..2 do
+        Task.Supervisor.async_nolink(supervisor, fn ->
+          receive do
+            :go -> OAuth.exchange_code_for_token(refresh_params)
+          end
+        end)
+      end
+
+    Enum.each(tasks, fn task ->
+      Ecto.Adapters.SQL.Sandbox.allow(Repo, parent, task.pid)
+      Mox.allow(Egregoros.Config.Mock, parent, task.pid)
+      send(task.pid, :go)
+    end)
+
+    results = Enum.map(tasks, &Task.await(&1, 5_000))
+
+    assert Enum.count(results, &match?({:ok, %Token{}}, &1)) == 1
+    assert Enum.count(results, &(&1 == {:error, :invalid_grant})) == 1
+
+    {:ok, successor} = Enum.find(results, &match?({:ok, %Token{}}, &1))
+    assert OAuth.get_token(successor.token) == nil
   end
 
   test "refresh grant can narrow scopes but not widen them" do

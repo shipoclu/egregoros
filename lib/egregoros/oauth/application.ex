@@ -32,20 +32,58 @@ defmodule Egregoros.OAuth.Application do
   end
 
   defp validate_redirect_uris(changeset) do
-    validate_change(changeset, :redirect_uris, fn :redirect_uris, value ->
-      cond do
-        not is_list(value) ->
-          [redirect_uris: "must be a list"]
+    changeset =
+      validate_change(changeset, :redirect_uris, fn :redirect_uris, value ->
+        cond do
+          not is_list(value) ->
+            [redirect_uris: "must be a list"]
 
-        Enum.any?(value, &(&1 == nil)) ->
-          [redirect_uris: "must not contain null values"]
+          Enum.any?(value, &(&1 == nil)) ->
+            [redirect_uris: "must not contain null values"]
 
-        Enum.any?(value, &(is_binary(&1) and String.trim(&1) == "")) ->
-          [redirect_uris: "must not contain empty values"]
+          Enum.any?(value, &(is_binary(&1) and String.trim(&1) == "")) ->
+            [redirect_uris: "must not contain empty values"]
 
-        true ->
-          []
-      end
-    end)
+          Enum.any?(value, &(not valid_redirect_uri?(&1))) ->
+            [redirect_uris: "contains an unsafe or invalid URI"]
+
+          true ->
+            []
+        end
+      end)
+
+    if get_field(changeset, :redirect_uris) == [] do
+      add_error(changeset, :redirect_uris, "must contain at least one URI")
+    else
+      changeset
+    end
   end
+
+  defp valid_redirect_uri?("urn:ietf:wg:oauth:2.0:oob"), do: true
+
+  defp valid_redirect_uri?(value) when is_binary(value) do
+    if String.match?(value, ~r/[\x00-\x1F\x7F]/) do
+      false
+    else
+      case URI.parse(value) do
+        %URI{scheme: "https", host: host, userinfo: nil, fragment: nil}
+        when is_binary(host) and host != "" ->
+          true
+
+        %URI{scheme: "http", host: host, userinfo: nil, fragment: nil}
+        when host in ["localhost", "127.0.0.1", "::1"] ->
+          true
+
+        %URI{scheme: scheme, host: nil, userinfo: nil, fragment: nil, path: "/" <> _}
+        when is_binary(scheme) ->
+          String.contains?(scheme, ".") and
+            String.match?(scheme, ~r/^[a-z][a-z0-9+.-]*$/)
+
+        _ ->
+          false
+      end
+    end
+  end
+
+  defp valid_redirect_uri?(_value), do: false
 end

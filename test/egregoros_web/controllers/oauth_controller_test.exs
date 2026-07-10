@@ -31,7 +31,7 @@ defmodule EgregorosWeb.OAuthControllerTest do
     assert response["scope"] == "read"
     assert is_binary(response["access_token"])
     assert is_binary(response["refresh_token"])
-    refute Map.has_key?(response, "expires_in")
+    assert response["expires_in"] in 3_590..3_600
   end
 
   test "POST /oauth/token exchanges a refresh_token for a new bearer token", %{conn: conn} do
