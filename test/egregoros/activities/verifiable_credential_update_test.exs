@@ -17,6 +17,10 @@ defmodule Egregoros.Activities.VerifiableCredentialUpdateTest do
 
   @public "https://www.w3.org/ns/activitystreams#Public"
 
+  setup do
+    Egregoros.TestSupport.CredentialProof.allow_valid()
+  end
+
   test "accepts an Update that only adds Public to the credential recipients" do
     {:ok, recipient} = Users.create_local_user("vc_update_recipient")
     {:ok, _badge} = insert_badge_definition("UpdatePublic")

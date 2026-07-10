@@ -10,6 +10,7 @@ Mox.defmock(Egregoros.BannerStorage.Mock, for: Egregoros.BannerStorage)
 Mox.defmock(Egregoros.MediaStorage.Mock, for: Egregoros.MediaStorage)
 Mox.defmock(Egregoros.HTML.Sanitizer.Mock, for: Egregoros.HTML.Sanitizer)
 Mox.defmock(Egregoros.RateLimiter.Mock, for: Egregoros.RateLimiter)
+Mox.defmock(Egregoros.CredentialProofVerifier.Mock, for: Egregoros.CredentialProofVerifier)
 Mox.defmock(Egregoros.PleromaMigration.Source.Mock, for: Egregoros.PleromaMigration.Source)
 
 Mox.defmock(Egregoros.PleromaMigration.PostgresClient.Mock,

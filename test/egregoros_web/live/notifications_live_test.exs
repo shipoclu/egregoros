@@ -16,6 +16,7 @@ defmodule EgregorosWeb.NotificationsLiveTest do
   alias EgregorosWeb.URL
 
   setup do
+    Egregoros.TestSupport.CredentialProof.allow_valid()
     {:ok, user} = Users.create_local_user("alice")
     {:ok, actor} = Users.create_local_user("bob")
 

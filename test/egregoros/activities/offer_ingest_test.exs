@@ -1,6 +1,10 @@
 defmodule Egregoros.Activities.OfferIngestTest do
   use Egregoros.DataCase, async: true
 
+  setup do
+    Egregoros.TestSupport.CredentialProof.allow_valid()
+  end
+
   alias Egregoros.Object
   alias Egregoros.Objects
   alias Egregoros.Pipeline

@@ -1,6 +1,10 @@
 defmodule Egregoros.BadgesTest do
   use Egregoros.DataCase, async: true
 
+  setup do
+    Egregoros.TestSupport.CredentialProof.allow_valid()
+  end
+
   alias Egregoros.BadgeDefinition
   alias Egregoros.Activities.Accept
   alias Egregoros.Badges

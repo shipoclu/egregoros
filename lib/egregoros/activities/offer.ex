@@ -79,7 +79,12 @@ defmodule Egregoros.Activities.Offer do
          # Offers can include objects that aren't addressed directly to the inbox user,
          # so we bypass inbox targeting for the embedded object itself.
          {:ok, object} <-
-           Pipeline.ingest(embedded_object, Keyword.delete(opts, :inbox_user_ap_id)) do
+           Pipeline.ingest(
+             embedded_object,
+             opts
+             |> Keyword.delete(:inbox_user_ap_id)
+             |> Keyword.put(:credential_actor_ap_id, activity["actor"])
+           ) do
       activity
       |> to_object_attrs(object.ap_id, opts)
       |> Objects.upsert_object()

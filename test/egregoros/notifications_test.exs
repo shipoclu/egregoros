@@ -11,6 +11,10 @@ defmodule Egregoros.NotificationsTest do
   alias Egregoros.TestSupport.Fixtures
   alias Egregoros.Users
 
+  setup do
+    Egregoros.TestSupport.CredentialProof.allow_valid()
+  end
+
   test "lists follow notifications for the recipient" do
     {:ok, alice} = Users.create_local_user("alice")
     {:ok, bob} = Users.create_local_user("bob")

@@ -1,6 +1,10 @@
 defmodule Egregoros.NotificationsPubSubTest do
   use Egregoros.DataCase, async: true
 
+  setup do
+    Egregoros.TestSupport.CredentialProof.allow_valid()
+  end
+
   alias Egregoros.Notifications
   alias Egregoros.Pipeline
   alias Egregoros.Publish

@@ -8,6 +8,7 @@ defmodule Egregoros.Activities.VerifiableCredential do
   alias Egregoros.ActivityPub.ObjectValidators.Types.ObjectID
   alias Egregoros.ActivityPub.ObjectValidators.Types.Recipients
   alias Egregoros.BadgeDefinition
+  alias Egregoros.CredentialProofVerifier
   alias Egregoros.Federation.InstanceActor
   alias Egregoros.InboxTargeting
   alias Egregoros.Objects
@@ -44,8 +45,6 @@ defmodule Egregoros.Activities.VerifiableCredential do
       |> validate_issuer()
       |> validate_recipient(object, opts)
 
-    # TODO: Verify the embedded proof; we skip it for now because we do not yet support
-    # elliptic curve instance actor keys.
     case apply_action(changeset, :insert) do
       {:ok, %__MODULE__{} = credential} -> {:ok, apply_credential(object, credential)}
       {:error, %Ecto.Changeset{} = changeset} -> {:error, changeset}
@@ -53,7 +52,8 @@ defmodule Egregoros.Activities.VerifiableCredential do
   end
 
   def ingest(object, opts) do
-    with :ok <- validate_inbox_target(object, opts) do
+    with :ok <- validate_inbox_target(object, opts),
+         :ok <- verify_remote_proof(object, opts) do
       object
       |> to_object_attrs(opts)
       |> Objects.upsert_object()
@@ -61,6 +61,22 @@ defmodule Egregoros.Activities.VerifiableCredential do
   end
 
   def side_effects(_object, _opts), do: :ok
+
+  defp verify_remote_proof(object, opts) when is_map(object) and is_list(opts) do
+    if Keyword.get(opts, :local, true) do
+      :ok
+    else
+      context = %{
+        actor_ap_id: Keyword.get(opts, :credential_actor_ap_id) || issuer_ap_id(object),
+        recipient_ap_id: recipient_ap_id(object)
+      }
+
+      case CredentialProofVerifier.verify(object, context) do
+        :ok -> :ok
+        {:error, _reason} -> {:error, :invalid_credential_proof}
+      end
+    end
+  end
 
   defp validate_inbox_target(%{} = object, opts) when is_list(opts) do
     if Keyword.get(opts, :skip_inbox_target, false) do

@@ -1,6 +1,10 @@
 defmodule EgregorosWeb.PleromaAPI.OffersControllerTest do
   use EgregorosWeb.ConnCase, async: true
 
+  setup do
+    Egregoros.TestSupport.CredentialProof.allow_valid()
+  end
+
   import Mox
 
   alias Egregoros.Objects

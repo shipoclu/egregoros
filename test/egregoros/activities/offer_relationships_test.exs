@@ -7,6 +7,10 @@ defmodule Egregoros.Activities.OfferRelationshipsTest do
   alias Egregoros.TestSupport.Fixtures
   alias Egregoros.Users
 
+  setup do
+    Egregoros.TestSupport.CredentialProof.allow_valid()
+  end
+
   test "accepting an offer records an accepted relationship" do
     {:ok, recipient} = Users.create_local_user("offer_accept_recipient")
 

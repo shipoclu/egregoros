@@ -13,6 +13,7 @@ defmodule EgregorosWeb.BadgesLiveTest do
   alias Egregoros.Users
 
   setup do
+    Egregoros.TestSupport.CredentialProof.allow_valid()
     {:ok, recipient} = Users.create_local_user("badge_recipient")
 
     %{recipient: recipient}
