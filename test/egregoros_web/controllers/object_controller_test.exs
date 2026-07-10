@@ -2,6 +2,7 @@ defmodule EgregorosWeb.ObjectControllerTest do
   use EgregorosWeb.ConnCase, async: true
 
   alias Egregoros.Objects
+  alias Egregoros.Activities.Delete
   alias Egregoros.Pipeline
   alias Egregoros.Publish
   alias Egregoros.Users
@@ -52,6 +53,28 @@ defmodule EgregorosWeb.ObjectControllerTest do
     uuid = Ecto.UUID.generate()
     conn = get(conn, "/objects/#{uuid}")
     assert response(conn, 404)
+  end
+
+  test "GET /objects/:uuid returns a 410 ActivityStreams tombstone after deletion", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("deleted-author")
+    uuid = Ecto.UUID.generate()
+
+    note = %{
+      "id" => Endpoint.url() <> "/objects/" <> uuid,
+      "type" => "Note",
+      "attributedTo" => user.ap_id,
+      "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+      "content" => "Soon deleted"
+    }
+
+    assert {:ok, object} = Pipeline.ingest(note, local: true)
+    assert {:ok, _delete} = Pipeline.ingest(Delete.build(user, object), local: true)
+
+    conn = get(conn, "/objects/#{uuid}")
+    assert conn.status == 410
+    assert [content_type] = get_resp_header(conn, "content-type")
+    assert String.contains?(content_type, "application/activity+json")
+    assert Jason.decode!(conn.resp_body)["type"] == "Tombstone"
   end
 
   test "GET /objects/:uuid does not serve remote objects with local ids", %{conn: conn} do

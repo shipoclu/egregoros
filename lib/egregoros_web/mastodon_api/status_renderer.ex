@@ -326,13 +326,10 @@ defmodule EgregorosWeb.MastodonAPI.StatusRenderer do
 
   defp format_datetime(%Object{}), do: DateTime.utc_now() |> DateTime.to_iso8601()
 
-  defp edited_at(%Object{
-         type: "Note",
-         inserted_at: %DateTime{} = inserted_at,
-         updated_at: %DateTime{} = updated_at
-       }) do
-    case DateTime.compare(updated_at, inserted_at) do
-      :gt -> DateTime.to_iso8601(updated_at)
+  defp edited_at(%Object{type: "Note", data: %{"updated" => updated}})
+       when is_binary(updated) do
+    case DateTime.from_iso8601(updated) do
+      {:ok, datetime, _offset} -> DateTime.to_iso8601(datetime)
       _ -> nil
     end
   end

@@ -2,6 +2,7 @@ defmodule Egregoros.Workers.IngestActivity do
   use Oban.Worker, queue: :federation_incoming, max_attempts: 5
 
   alias Egregoros.Pipeline
+  alias Egregoros.Federation.Error
 
   @impl Oban.Worker
   def perform(%Oban.Job{args: %{"activity" => activity} = args}) when is_map(activity) do
@@ -12,8 +13,14 @@ defmodule Egregoros.Workers.IngestActivity do
       |> maybe_put_inbox_user_ap_id(inbox_user_ap_id)
 
     case Pipeline.ingest(activity, opts) do
-      {:ok, _object} -> :ok
-      {:error, reason} -> {:discard, reason}
+      {:ok, _object} ->
+        :ok
+
+      {:error, reason} ->
+        case Error.classify(reason) do
+          :permanent -> {:discard, reason}
+          :transient -> {:error, reason}
+        end
     end
   end
 

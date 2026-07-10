@@ -49,7 +49,7 @@ defmodule Egregoros.Activities.DeleteSideEffectsTest do
     assert Objects.get_by_ap_id(note.ap_id)
   end
 
-  test "deletes the target object and relationships when Delete.actor matches the target actor" do
+  test "tombstones the target and deletes relationships when Delete.actor matches the target actor" do
     {:ok, inbox_user} = Users.create_local_user("inbox-user")
 
     alice_ap_id = "https://remote.example/users/alice"
@@ -96,7 +96,17 @@ defmodule Egregoros.Activities.DeleteSideEffectsTest do
     assert {:ok, _delete_object} =
              Pipeline.ingest(delete, local: false, inbox_user_ap_id: inbox_user.ap_id)
 
-    refute Objects.get_by_ap_id(note.ap_id)
+    assert %Egregoros.Object{} = tombstone = Objects.get_by_ap_id(note.ap_id)
+    assert tombstone.type == "Tombstone"
+    assert tombstone.data["id"] == note.ap_id
+    assert tombstone.data["formerType"] == "Note"
+    assert tombstone.internal["tombstone"]["delete_activity_id"] == delete["id"]
     refute Relationships.get_by_type_actor_object("Like", inbox_user.ap_id, note.ap_id)
+
+    assert {:ok, replayed} =
+             Pipeline.ingest(note.data, local: false, inbox_user_ap_id: inbox_user.ap_id)
+
+    assert replayed.type == "Tombstone"
+    assert Objects.get_by_ap_id(note.ap_id).type == "Tombstone"
   end
 end

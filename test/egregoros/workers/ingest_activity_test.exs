@@ -3,6 +3,7 @@ defmodule Egregoros.Workers.IngestActivityTest do
 
   alias Egregoros.Workers.IngestActivity
   alias Egregoros.Workers.FetchActor
+  alias Egregoros.Federation.Error
 
   test "ingests activities as remote objects" do
     job = %Oban.Job{
@@ -64,5 +65,14 @@ defmodule Egregoros.Workers.IngestActivityTest do
   test "discards jobs with invalid arguments" do
     assert {:discard, :invalid_args} = IngestActivity.perform(%Oban.Job{args: %{}})
     assert {:discard, :invalid_args} = IngestActivity.perform(%Oban.Job{args: %{"activity" => 1}})
+  end
+
+  test "classifies validation errors as permanent and infrastructure errors as transient" do
+    assert Error.classify(:unknown_type) == :permanent
+    assert Error.classify(:unauthorized_update) == :permanent
+    assert Error.classify(:timeout) == :transient
+
+    assert Error.classify(%DBConnection.ConnectionError{message: "database unavailable"}) ==
+             :transient
   end
 end

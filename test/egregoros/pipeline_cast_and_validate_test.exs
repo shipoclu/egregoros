@@ -1,5 +1,5 @@
 defmodule Egregoros.PipelineCastAndValidateTest do
-  use ExUnit.Case, async: true
+  use Egregoros.DataCase, async: true
 
   alias Egregoros.Pipeline
   alias Egregoros.TestSupport.PipelineCastAndValidateProbe

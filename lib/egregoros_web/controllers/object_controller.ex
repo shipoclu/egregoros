@@ -8,6 +8,13 @@ defmodule EgregorosWeb.ObjectController do
     ap_id = Endpoint.url() <> "/objects/" <> uuid
 
     case Objects.get_by_ap_id(ap_id) do
+      %{local: true, type: "Tombstone"} = object ->
+        data = Map.put_new(object.data, "@context", "https://www.w3.org/ns/activitystreams")
+
+        conn
+        |> put_resp_content_type("application/activity+json")
+        |> send_resp(410, Jason.encode!(data))
+
       %{local: true} = object ->
         if Objects.publicly_visible?(object) do
           data = Map.put_new(object.data, "@context", "https://www.w3.org/ns/activitystreams")

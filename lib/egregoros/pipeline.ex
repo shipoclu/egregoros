@@ -4,7 +4,12 @@ defmodule Egregoros.Pipeline do
   alias Egregoros.ActivityPub.ObjectAuthority
   alias Egregoros.Domain
   alias Egregoros.Federation.ActorDiscovery
+  alias Egregoros.Object
+  alias Egregoros.Objects
+  alias Egregoros.Repo
   alias EgregorosWeb.Endpoint
+
+  @effect_key "side_effects"
 
   def ingest(activity, opts \\ []) when is_map(activity) do
     # Normalize multi-type objects before routing so ActivityRegistry and validations
@@ -23,10 +28,9 @@ defmodule Egregoros.Pipeline do
   def ingest_with(module, activity, opts \\ [])
       when is_atom(module) and is_map(activity) and is_list(opts) do
     with {:ok, validated} <- cast_and_validate(module, activity, opts),
-         :ok <- discover_actors(validated, opts),
-         {:ok, object} <- module.ingest(validated, opts),
-         :ok <- module.side_effects(object, opts) do
-      {:ok, object}
+         {:ok, object, run_effects?} <- persist_with_pending_effect(module, validated, opts),
+         :ok <- discover_actors(validated, opts) do
+      run_side_effects(module, object, opts, run_effects?)
     else
       {:error, _} = error -> error
       _ -> {:error, :invalid}
@@ -38,7 +42,105 @@ defmodule Egregoros.Pipeline do
     :ok
   end
 
+  defp persist_with_pending_effect(module, activity, opts) do
+    case Repo.transaction(fn ->
+           case module.ingest(activity, opts) do
+             {:ok, %Object{} = object} -> mark_effect_pending(object, module)
+             {:ok, object} -> {object, true}
+             {:error, reason} -> Repo.rollback(reason)
+             _ -> Repo.rollback(:invalid)
+           end
+         end) do
+      {:ok, {object, run_effects?}} -> {:ok, object, run_effects?}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp mark_effect_pending(%Object{} = object, module) do
+    module_name = Atom.to_string(module)
+    effect = get_in(object.internal || %{}, ["pipeline", @effect_key])
+
+    if match?(%{"module" => ^module_name, "state" => "completed"}, effect) do
+      {object, false}
+    else
+      attempts =
+        case effect do
+          %{"attempts" => attempts} when is_integer(attempts) and attempts >= 0 -> attempts + 1
+          _ -> 1
+        end
+
+      internal =
+        put_effect(object.internal, %{
+          "module" => module_name,
+          "state" => "pending",
+          "attempts" => attempts
+        })
+
+      case Objects.update_object(object, %{internal: internal}) do
+        {:ok, %Object{} = updated} -> {updated, true}
+        {:error, reason} -> Repo.rollback(reason)
+      end
+    end
+  end
+
+  defp run_side_effects(_module, %Object{} = object, _opts, false), do: {:ok, object}
+
+  defp run_side_effects(module, %Object{} = object, opts, true) do
+    case module.side_effects(object, opts) do
+      :ok ->
+        with {:ok, _completed} <- mark_effect_completed(object, module), do: {:ok, object}
+
+      {:error, _reason} = error ->
+        error
+
+      _ ->
+        {:error, :invalid}
+    end
+  end
+
+  defp run_side_effects(module, object, opts, true) do
+    case module.side_effects(object, opts) do
+      :ok -> {:ok, object}
+      {:error, _reason} = error -> error
+      _ -> {:error, :invalid}
+    end
+  end
+
+  defp mark_effect_completed(%Object{} = object, module) do
+    current = Objects.get_by_ap_id(object.ap_id) || object
+    module_name = Atom.to_string(module)
+
+    effect =
+      (current.internal || %{})
+      |> get_in(["pipeline", @effect_key])
+      |> case do
+        %{} = effect -> effect
+        _ -> %{}
+      end
+      |> Map.merge(%{
+        "module" => module_name,
+        "state" => "completed",
+        "completed_at" => DateTime.utc_now() |> DateTime.to_iso8601()
+      })
+
+    internal = put_effect(current.internal, effect)
+
+    case Objects.update_object(current, %{internal: internal}) do
+      {:ok, %Object{} = updated} -> {:ok, updated}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp put_effect(internal, effect) do
+    internal = if is_map(internal), do: internal, else: %{}
+    pipeline = if is_map(internal["pipeline"]), do: internal["pipeline"], else: %{}
+    pipeline = Map.put(pipeline, @effect_key, effect)
+    Map.put(internal, "pipeline", pipeline)
+  end
+
   defp cast_and_validate(module, activity, opts) do
+    _ = Code.ensure_loaded(module)
+
     # Prefer cast_and_validate/2 if available (allows passing opts for inbox targeting)
     # Fall back to cast_and_validate/1 for backwards compatibility
     result =

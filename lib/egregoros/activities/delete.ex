@@ -83,13 +83,14 @@ defmodule Egregoros.Activities.Delete do
 
   def side_effects(%Object{} = delete_object, opts) do
     target = Objects.get_by_ap_id(delete_object.object)
-    _ = delete_target(delete_object, target)
 
-    if Keyword.get(opts, :local, true) do
-      deliver_delete(delete_object)
+    with :ok <- tombstone_target(delete_object, target) do
+      if Keyword.get(opts, :local, true) do
+        deliver_delete(delete_object)
+      end
+
+      :ok
     end
-
-    :ok
   end
 
   defp validate_inbox_target(%{} = activity, opts) when is_list(opts) do
@@ -98,13 +99,39 @@ defmodule Egregoros.Activities.Delete do
 
   defp validate_inbox_target(_activity, _opts), do: :ok
 
-  defp delete_target(%Object{actor: actor} = _delete_object, %Object{actor: actor} = target) do
-    _ = Objects.delete_object(target)
-    _ = Relationships.delete_all_for_object(target.ap_id)
-    :ok
+  defp tombstone_target(%Object{actor: actor} = delete_object, %Object{actor: actor} = target) do
+    tombstone_data =
+      target.data
+      |> Map.take(["to", "cc", "bto", "bcc", "audience"])
+      |> Map.merge(%{
+        "id" => target.ap_id,
+        "type" => "Tombstone",
+        "formerType" => target.type,
+        "deleted" =>
+          delete_object.data["published"] || DateTime.utc_now() |> DateTime.to_iso8601()
+      })
+
+    internal =
+      Map.put(target.internal || %{}, "tombstone", %{
+        "delete_activity_id" => delete_object.ap_id,
+        "deleted_by" => actor
+      })
+
+    case Objects.update_object(target, %{
+           type: "Tombstone",
+           data: tombstone_data,
+           internal: internal
+         }) do
+      {:ok, _tombstone} ->
+        _ = Relationships.delete_all_for_object(target.ap_id)
+        :ok
+
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
 
-  defp delete_target(_delete_object, _target), do: :ok
+  defp tombstone_target(_delete_object, _target), do: :ok
 
   defp deliver_delete(%Object{} = delete_object) do
     with %{} = actor <- Users.get_by_ap_id(delete_object.actor) do

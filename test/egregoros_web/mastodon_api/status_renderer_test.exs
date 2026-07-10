@@ -1298,15 +1298,20 @@ defmodule EgregorosWeb.MastodonAPI.StatusRendererTest do
     assert {:ok, create} = Publish.post_note(alice, "Hello")
     note = Objects.get_by_ap_id(create.object)
 
+    edited_at = DateTime.utc_now() |> DateTime.to_iso8601()
+
     assert {:ok, updated_note} =
              Objects.update_object(note, %{
-               data: Map.put(note.data, "content", "Edited")
+               data:
+                 note.data
+                 |> Map.put("content", "Edited")
+                 |> Map.put("updated", edited_at)
              })
 
     rendered = StatusRenderer.render_status(updated_note, alice)
 
     assert rendered["content"] =~ "Edited"
-    assert rendered["edited_at"] == DateTime.to_iso8601(updated_note.updated_at)
+    assert rendered["edited_at"] == edited_at
   end
 
   test "reblog status bookmarked flag reflects the original status" do

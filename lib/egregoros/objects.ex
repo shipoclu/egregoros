@@ -24,7 +24,10 @@ defmodule Egregoros.Objects do
 
     %Object{}
     |> Object.changeset(attrs)
-    |> Repo.insert()
+    # A constraint conflict aborts an enclosing PostgreSQL transaction unless
+    # the insert is isolated in a savepoint. Federation replay intentionally
+    # handles that conflict by loading the existing object below.
+    |> Repo.insert(mode: :savepoint)
     |> case do
       {:ok, %Object{} = object} ->
         _ = maybe_bump_actor_last_activity(object)
@@ -113,7 +116,10 @@ defmodule Egregoros.Objects do
 
       true ->
         if flake_id?(id) do
-          Repo.get(Object, id)
+          case Repo.get(Object, id) do
+            %Object{type: "Tombstone"} -> nil
+            object -> object
+          end
         else
           nil
         end
