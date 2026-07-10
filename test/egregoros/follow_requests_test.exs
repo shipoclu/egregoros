@@ -135,4 +135,95 @@ defmodule Egregoros.FollowRequestsTest do
     assert Relationships.get_by_type_actor_object("FollowRequest", alice.ap_id, bob.ap_id) == nil
     assert Relationships.get_by_type_actor_object("Follow", alice.ap_id, bob.ap_id) == nil
   end
+
+  test "an Accept cannot invent a follow from an uncorrelated embedded object" do
+    {:ok, alice} = Users.create_local_user("alice-forged-accept")
+
+    forged_follow = %{
+      "id" => "https://attacker.example/activities/follow/invented",
+      "type" => "Follow",
+      "actor" => alice.ap_id,
+      "object" => "https://attacker.example/users/mallory"
+    }
+
+    accept = %{
+      "id" => "https://attacker.example/activities/accept/invented",
+      "type" => "Accept",
+      "actor" => "https://attacker.example/users/mallory",
+      "object" => forged_follow
+    }
+
+    assert {:error, :uncorrelated_follow_response} = Pipeline.ingest(accept, local: false)
+
+    refute Relationships.get_by_type_actor_object(
+             "Follow",
+             alice.ap_id,
+             forged_follow["object"]
+           )
+  end
+
+  test "only the target of the exact pending Follow may accept it" do
+    {:ok, alice} = Users.create_local_user("alice-wrong-acceptor")
+
+    {:ok, bob} =
+      Users.create_user(%{
+        nickname: "bob-wrong-acceptor",
+        ap_id: "https://remote.example/users/bob-wrong-acceptor",
+        inbox: "https://remote.example/users/bob-wrong-acceptor/inbox",
+        outbox: "https://remote.example/users/bob-wrong-acceptor/outbox",
+        public_key: "remote-key",
+        local: false
+      })
+
+    {:ok, follow} = Pipeline.ingest(Follow.build(alice, bob), local: true)
+
+    forged_accept = %{
+      "id" => "https://remote.example/activities/accept/wrong-actor",
+      "type" => "Accept",
+      "actor" => "https://remote.example/users/mallory",
+      "object" => follow.data
+    }
+
+    assert {:error, :uncorrelated_follow_response} =
+             Pipeline.ingest(forged_accept, local: false)
+
+    assert Relationships.get_by_type_actor_object("FollowRequest", alice.ap_id, bob.ap_id)
+    refute Relationships.get_by_type_actor_object("Follow", alice.ap_id, bob.ap_id)
+  end
+
+  test "Reject cannot remove an established Follow without a pending request" do
+    {:ok, alice} = Users.create_local_user("alice-established-follow")
+
+    {:ok, bob} =
+      Users.create_user(%{
+        nickname: "bob-established-follow",
+        ap_id: "https://remote.example/users/bob-established-follow",
+        inbox: "https://remote.example/users/bob-established-follow/inbox",
+        outbox: "https://remote.example/users/bob-established-follow/outbox",
+        public_key: "remote-key",
+        local: false
+      })
+
+    {:ok, follow} = Pipeline.ingest(Follow.build(alice, bob), local: true)
+
+    accept = %{
+      "id" => "https://remote.example/activities/accept/established",
+      "type" => "Accept",
+      "actor" => bob.ap_id,
+      "object" => follow.data
+    }
+
+    assert {:ok, _} = Pipeline.ingest(accept, local: false)
+    assert Relationships.get_by_type_actor_object("Follow", alice.ap_id, bob.ap_id)
+
+    reject = %{
+      "id" => "https://remote.example/activities/reject/established",
+      "type" => "Reject",
+      "actor" => bob.ap_id,
+      "object" => follow.data
+    }
+
+    assert {:error, :uncorrelated_follow_response} = Pipeline.ingest(reject, local: false)
+    assert Relationships.get_by_type_actor_object("Follow", alice.ap_id, bob.ap_id)
+  end
 end

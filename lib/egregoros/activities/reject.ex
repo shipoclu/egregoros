@@ -4,6 +4,7 @@ defmodule Egregoros.Activities.Reject do
   import Ecto.Changeset
 
   alias Egregoros.Activities.Helpers
+  alias Egregoros.Activities.FollowResponseAuthorization
   alias Egregoros.ActivityPub.TypeNormalizer
   alias Egregoros.ActivityPub.ObjectValidators.Types.DateTime, as: APDateTime
   alias Egregoros.ActivityPub.ObjectValidators.Types.ObjectID
@@ -49,7 +50,8 @@ defmodule Egregoros.Activities.Reject do
   end
 
   def ingest(activity, opts) do
-    with :ok <- validate_inbox_target(activity, opts) do
+    with :ok <- validate_inbox_target(activity, opts),
+         :ok <- FollowResponseAuthorization.authorize(activity, opts) do
       activity
       |> to_object_attrs(opts)
       |> Objects.upsert_object()
@@ -97,17 +99,7 @@ defmodule Egregoros.Activities.Reject do
           nil
       end
 
-    follow_data =
-      cond do
-        match?(%Object{type: "Follow"}, follow_object) ->
-          follow_object.data
-
-        is_map(reject_object.data["object"]) ->
-          reject_object.data["object"]
-
-        true ->
-          nil
-      end
+    follow_data = if match?(%Object{type: "Follow"}, follow_object), do: follow_object.data
 
     case follow_data do
       %{"type" => "Follow", "actor" => actor, "object" => target} ->
@@ -119,7 +111,6 @@ defmodule Egregoros.Activities.Reject do
           _ =
             Relationships.delete_by_type_actor_object("FollowRequest", actor_ap_id, target_ap_id)
 
-          _ = Relationships.delete_by_type_actor_object("Follow", actor_ap_id, target_ap_id)
           _ = maybe_unsubscribe_relay(actor_ap_id, target_ap_id)
         end
 

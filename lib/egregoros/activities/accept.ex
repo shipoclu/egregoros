@@ -6,6 +6,7 @@ defmodule Egregoros.Activities.Accept do
   require Logger
 
   alias Egregoros.Activities.Helpers
+  alias Egregoros.Activities.FollowResponseAuthorization
   alias Egregoros.Activities.Update
   alias Egregoros.Pipeline
   alias Egregoros.ActivityPub.TypeNormalizer
@@ -54,7 +55,8 @@ defmodule Egregoros.Activities.Accept do
   end
 
   def ingest(activity, opts) do
-    with :ok <- validate_inbox_target(activity, opts) do
+    with :ok <- validate_inbox_target(activity, opts),
+         :ok <- FollowResponseAuthorization.authorize(activity, opts) do
       activity
       |> to_object_attrs(opts)
       |> Objects.upsert_object()
@@ -83,17 +85,7 @@ defmodule Egregoros.Activities.Accept do
           nil
       end
 
-    follow_data =
-      cond do
-        match?(%Object{type: "Follow"}, follow_object) ->
-          follow_object.data
-
-        is_map(accept_object.data["object"]) ->
-          accept_object.data["object"]
-
-        true ->
-          nil
-      end
+    follow_data = if match?(%Object{type: "Follow"}, follow_object), do: follow_object.data
 
     case follow_data do
       %{"type" => "Follow", "actor" => actor, "object" => target} ->
