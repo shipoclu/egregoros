@@ -5,6 +5,7 @@ defmodule Egregoros.OAuth do
   alias Egregoros.OAuth.AuthorizationCode
   alias Egregoros.OAuth.Scopes
   alias Egregoros.OAuth.Token
+  alias Egregoros.MiniApps.OAuthRegistrations, as: MiniAppOAuthRegistrations
   alias Egregoros.Repo
   alias Egregoros.User
 
@@ -53,33 +54,41 @@ defmodule Egregoros.OAuth do
         opts \\ []
       )
       when is_binary(redirect_uri) and is_binary(scopes) and is_list(opts) do
-    if redirect_uri_allowed?(application, redirect_uri) do
-      if Scopes.subset?(scopes, application.scopes) do
-        with {:ok, pkce_attrs} <- pkce_attrs(application, opts) do
-          ttl_seconds =
-            Egregoros.Config.get(:oauth_code_ttl_seconds, @default_code_ttl_seconds)
+    with :ok <-
+           MiniAppOAuthRegistrations.validate_authorization(
+             application,
+             redirect_uri,
+             scopes,
+             opts
+           ) do
+      if redirect_uri_allowed?(application, redirect_uri) do
+        if Scopes.subset?(scopes, application.scopes) do
+          with {:ok, pkce_attrs} <- pkce_attrs(application, opts) do
+            ttl_seconds =
+              Egregoros.Config.get(:oauth_code_ttl_seconds, @default_code_ttl_seconds)
 
-          expires_at = DateTime.add(DateTime.utc_now(), ttl_seconds, :second)
+            expires_at = DateTime.add(DateTime.utc_now(), ttl_seconds, :second)
 
-          attrs =
-            Map.merge(pkce_attrs, %{
-              code: generate_token(32),
-              redirect_uri: redirect_uri,
-              scopes: scopes,
-              expires_at: expires_at,
-              user_id: user.id,
-              application_id: application.id
-            })
+            attrs =
+              Map.merge(pkce_attrs, %{
+                code: generate_token(32),
+                redirect_uri: redirect_uri,
+                scopes: scopes,
+                expires_at: expires_at,
+                user_id: user.id,
+                application_id: application.id
+              })
 
-          %AuthorizationCode{}
-          |> AuthorizationCode.changeset(attrs)
-          |> Repo.insert()
+            %AuthorizationCode{}
+            |> AuthorizationCode.changeset(attrs)
+            |> Repo.insert()
+          end
+        else
+          {:error, :invalid_scope}
         end
       else
-        {:error, :invalid_scope}
+        {:error, :invalid_redirect_uri}
       end
-    else
-      {:error, :invalid_redirect_uri}
     end
   end
 
@@ -102,7 +111,8 @@ defmodule Egregoros.OAuth do
              is_binary(redirect_uri) do
     case get_application_by_client_id(client_id) do
       %OAuthApplication{} = application ->
-        if Plug.Crypto.secure_compare(application.client_secret, client_secret) do
+        if MiniAppOAuthRegistrations.application_allowed?(application) and
+             Plug.Crypto.secure_compare(application.client_secret, client_secret) do
           exchange_authorization_code(application, code, redirect_uri, params)
         else
           {:error, :invalid_grant}
@@ -125,7 +135,8 @@ defmodule Egregoros.OAuth do
     refresh_token = String.trim(refresh_token)
 
     with %OAuthApplication{} = application <- get_application_by_client_id(client_id),
-         true <- Plug.Crypto.secure_compare(application.client_secret, client_secret) do
+         true <- Plug.Crypto.secure_compare(application.client_secret, client_secret),
+         true <- MiniAppOAuthRegistrations.application_allowed?(application) do
       rotate_refresh_token(application, refresh_token, params)
     else
       nil -> {:error, :invalid_client}
@@ -182,9 +193,11 @@ defmodule Egregoros.OAuth do
         t.token_digest == ^token_digest and is_nil(t.revoked_at) and
           (is_nil(t.expires_at) or t.expires_at > ^now),
       left_join: u in assoc(t, :user),
-      preload: [user: u]
+      left_join: a in assoc(t, :application),
+      preload: [user: u, application: a]
     )
     |> Repo.one()
+    |> enforce_application_policy()
   end
 
   def revoke_token(%{
@@ -396,6 +409,7 @@ defmodule Egregoros.OAuth do
   defp rotate_locked_refresh_token(%Token{} = old_token, application, params) do
     if refresh_token_active?(old_token) do
       with {:ok, scopes} <- refresh_scopes(params, old_token, application),
+           :ok <- MiniAppOAuthRegistrations.validate_token_scopes(application, scopes),
            {:ok, _consumed} <-
              old_token
              |> Token.changeset(%{
@@ -501,6 +515,25 @@ defmodule Egregoros.OAuth do
   end
 
   defp revoke_token_record_for_token(_application_id, _token), do: :ok
+
+  defp enforce_application_policy(nil), do: nil
+
+  defp enforce_application_policy(%Token{application: %OAuthApplication{} = application} = token) do
+    if MiniAppOAuthRegistrations.application_allowed?(application) do
+      token
+    else
+      now = DateTime.utc_now()
+
+      from(t in Token,
+        where: t.application_id == ^application.id and is_nil(t.revoked_at)
+      )
+      |> Repo.update_all(set: [revoked_at: now])
+
+      nil
+    end
+  end
+
+  defp enforce_application_policy(%Token{} = token), do: token
 
   defp pkce_attrs(application, opts) do
     challenge = normalize_optional_string(Keyword.get(opts, :code_challenge))

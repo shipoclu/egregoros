@@ -25,6 +25,8 @@ defmodule Egregoros.MiniApps.CardsTest do
     assert stored.title == "Chapter 2"
     assert stored.expires_at == DateTime.add(stored.resolved_at, 600, :second)
     assert Cards.get_active(object) == stored
+    assert Cards.list_active_for_objects([object]) == %{object.id => stored}
+    assert Cards.list_active_for_objects([]) == %{}
 
     reloaded = Objects.get_by_ap_id(object.ap_id)
     assert reloaded.data == original_data

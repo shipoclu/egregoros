@@ -2,6 +2,9 @@ defmodule EgregorosWeb.OAuthControllerTest do
   use EgregorosWeb.ConnCase, async: true
 
   alias Egregoros.OAuth
+  alias Egregoros.MiniApps.Manifest
+  alias Egregoros.MiniApps.OAuthRegistrations
+  alias Egregoros.Repo
   alias Egregoros.Users
 
   test "POST /oauth/token exchanges a code for a bearer token", %{conn: conn} do
@@ -217,5 +220,86 @@ defmodule EgregorosWeb.OAuthControllerTest do
     location = redirected_to(conn)
     assert String.starts_with?(location, "https://client.example/cb")
     assert location =~ "code="
+  end
+
+  test "mini-app consent identifies the origin and requires separate write confirmation", %{
+    conn: conn
+  } do
+    stub(Egregoros.Config.Mock, :get, fn
+      :mini_apps_enabled, false -> true
+      :mini_apps_domain_allowlist, [] -> []
+      :mini_apps_domain_denylist, [] -> []
+      key, default -> Egregoros.Config.Stub.get(key, default)
+    end)
+
+    {:ok, user} =
+      Users.register_local_user(%{
+        nickname: "miniapp-oauth-user",
+        email: "miniapp-oauth@example.com",
+        password: "very secure password"
+      })
+
+    manifest_json =
+      Jason.encode!(%{
+        "version" => "1",
+        "name" => "Writer",
+        "homeUrl" => "https://app.example/",
+        "oauth" => %{
+          "redirectUris" => ["https://app.example/oauth/callback"],
+          "scopes" => ["read", "write"]
+        },
+        "capabilities" => ["compose_note"]
+      })
+
+    {:ok, manifest} =
+      Manifest.decode(
+        manifest_json,
+        "https://app.example/.well-known/fediverse-miniapp.json"
+      )
+
+    {:ok, registration} = OAuthRegistrations.register(manifest)
+    app = Repo.get!(Egregoros.OAuth.Application, registration.oauth_application_id)
+    verifier = String.duplicate("v", 43)
+    challenge = :crypto.hash(:sha256, verifier) |> Base.url_encode64(padding: false)
+
+    oauth_params = %{
+      "client_id" => app.client_id,
+      "redirect_uri" => "https://app.example/oauth/callback",
+      "response_type" => "code",
+      "scope" => "read write",
+      "state" => "state-1",
+      "code_challenge" => challenge,
+      "code_challenge_method" => "S256"
+    }
+
+    consent_conn =
+      conn
+      |> Plug.Test.init_test_session(%{user_id: user.id})
+      |> get("/oauth/authorize", oauth_params)
+
+    document = consent_conn |> html_response(200) |> LazyHTML.from_document()
+
+    assert document |> LazyHTML.query("#oauth-mini-app-origin") |> LazyHTML.text() =~
+             "app.example"
+
+    assert LazyHTML.query(document, "#oauth-write-confirmation") |> LazyHTML.to_tree() != []
+
+    rejected_conn =
+      conn
+      |> recycle()
+      |> Plug.Test.init_test_session(%{user_id: user.id})
+      |> post("/oauth/authorize", %{"oauth" => oauth_params})
+
+    assert response(rejected_conn, 400) =~ "Invalid OAuth request"
+
+    approved_conn =
+      conn
+      |> recycle()
+      |> Plug.Test.init_test_session(%{user_id: user.id})
+      |> post("/oauth/authorize", %{
+        "oauth" => Map.put(oauth_params, "write_confirmed", "true")
+      })
+
+    assert redirected_to(approved_conn) =~ "https://app.example/oauth/callback"
   end
 end

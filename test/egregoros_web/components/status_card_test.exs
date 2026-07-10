@@ -5,6 +5,68 @@ defmodule EgregorosWeb.StatusCardTest do
 
   alias EgregorosWeb.StatusCard
 
+  test "renders a mini-app rich card with an exact host-open event contract" do
+    html =
+      render_component(&StatusCard.status_card/1, %{
+        id: "post-mini-app",
+        current_user: nil,
+        entry: %{
+          object: %{
+            id: "note-1",
+            type: "Note",
+            inserted_at: ~U[2025-01-01 00:00:00Z],
+            local: false,
+            data: %{"content" => ~s(<a href="https://app.example/shared">reader</a>)}
+          },
+          actor: %{display_name: "Alice", handle: "@alice", avatar_url: nil},
+          attachments: [],
+          liked?: false,
+          likes_count: 0,
+          reposted?: false,
+          reposts_count: 0,
+          reactions: %{},
+          mini_app_card: %{
+            id: "card-1",
+            source_url: "https://app.example/shared",
+            app_origin: "https://app.example",
+            app_name: "Reader",
+            title: "Chapter 2",
+            button_title: "Read",
+            launch_url: "https://app.example/book/chapter-2",
+            image_url: "https://app.example/card.png"
+          }
+        }
+      })
+
+    document = LazyHTML.from_document(html)
+
+    assert document
+           |> LazyHTML.query("#post-mini-app-mini-app")
+           |> LazyHTML.to_tree()
+           |> length() == 1
+
+    assert document
+           |> LazyHTML.query("#post-mini-app-mini-app-open")
+           |> LazyHTML.to_tree()
+           |> length() == 1
+
+    open_button = LazyHTML.query(document, "#post-mini-app-mini-app-open")
+
+    assert LazyHTML.attribute(open_button, "data-mini-app-origin") == ["https://app.example"]
+
+    assert LazyHTML.attribute(open_button, "data-mini-app-launch-url") ==
+             ["https://app.example/book/chapter-2"]
+
+    assert document
+           |> LazyHTML.query(~s(#post-mini-app-mini-app img[src^="https://app.example"]))
+           |> LazyHTML.to_tree() == []
+
+    assert LazyHTML.attribute(
+             LazyHTML.query(document, "#post-mini-app-mini-app img"),
+             "src"
+           ) == ["/mini-app-assets/card-1/image"]
+  end
+
   test "renders a post with attachments and actions" do
     html =
       render_component(&StatusCard.status_card/1, %{

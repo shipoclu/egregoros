@@ -47,6 +47,43 @@ defmodule Egregoros.MiniApps.Fetcher.ReqTest do
              Fetcher.Req.get("https://app.example/page", :page)
   end
 
+  test "fetches only bounded raster image assets" do
+    png = <<137, 80, 78, 71, 13, 10, 26, 10>>
+
+    Req.Test.stub(Fetcher.Req, fn conn ->
+      assert get_req_header(conn, "accept") == [
+               "image/avif,image/webp,image/png,image/jpeg,image/gif"
+             ]
+
+      conn
+      |> put_resp_content_type("image/png")
+      |> send_resp(200, png)
+    end)
+
+    assert {:ok, %{body: ^png}} =
+             Fetcher.Req.get("https://app.example/card.png", :asset)
+  end
+
+  test "rejects active image formats and oversized assets" do
+    Req.Test.stub(Fetcher.Req, fn conn ->
+      conn
+      |> put_resp_content_type("image/svg+xml")
+      |> send_resp(200, "<svg></svg>")
+    end)
+
+    assert {:error, :invalid_content_type} =
+             Fetcher.Req.get("https://app.example/card.svg", :asset)
+
+    Req.Test.stub(Fetcher.Req, fn conn ->
+      conn
+      |> put_resp_content_type("image/png")
+      |> send_resp(200, String.duplicate("x", 2_000_001))
+    end)
+
+    assert {:error, :response_too_large} =
+             Fetcher.Req.get("https://app.example/huge.png", :asset)
+  end
+
   test "rejects redirects without following them" do
     test_pid = self()
 

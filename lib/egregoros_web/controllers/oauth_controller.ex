@@ -6,6 +6,7 @@ defmodule EgregorosWeb.OAuthController do
        when action in [:approve, :token, :revoke]
 
   alias Egregoros.OAuth
+  alias Egregoros.MiniApps.OAuthRegistrations, as: MiniAppOAuthRegistrations
   alias Egregoros.User
 
   def authorize(conn, params) do
@@ -86,7 +87,17 @@ defmodule EgregorosWeb.OAuthController do
            Map.get(params, "redirect_uri"),
          true <- OAuth.redirect_uri_allowed?(app, redirect_uri),
          "code" <- Map.get(params, "response_type"),
-         scope when is_binary(scope) <- Map.get(params, "scope") do
+         scope when is_binary(scope) <- Map.get(params, "scope"),
+         :ok <-
+           MiniAppOAuthRegistrations.validate_authorization(
+             app,
+             redirect_uri,
+             scope,
+             code_challenge: Map.get(params, "code_challenge"),
+             code_challenge_method: Map.get(params, "code_challenge_method")
+           ) do
+      mini_app_registration = MiniAppOAuthRegistrations.get_by_application_id(app.id)
+
       form =
         Phoenix.Component.to_form(
           %{
@@ -96,12 +107,18 @@ defmodule EgregorosWeb.OAuthController do
             "scope" => scope,
             "state" => Map.get(params, "state", ""),
             "code_challenge" => Map.get(params, "code_challenge", ""),
-            "code_challenge_method" => Map.get(params, "code_challenge_method", "")
+            "code_challenge_method" => Map.get(params, "code_challenge_method", ""),
+            "write_confirmed" => "false"
           },
           as: :oauth
         )
 
-      render(conn, :authorize, form: form, app: app, scope: scope)
+      render(conn, :authorize,
+        form: form,
+        app: app,
+        scope: scope,
+        mini_app_registration: mini_app_registration
+      )
     else
       nil ->
         conn
@@ -126,6 +143,7 @@ defmodule EgregorosWeb.OAuthController do
            Map.get(params, "redirect_uri"),
          true <- OAuth.redirect_uri_allowed?(app, redirect_uri),
          scope when is_binary(scope) <- Map.get(params, "scope"),
+         :ok <- validate_write_confirmation(app, scope, params),
          {:ok, auth_code} <-
            OAuth.create_authorization_code(app, user, redirect_uri, scope,
              code_challenge: Map.get(params, "code_challenge"),
@@ -177,6 +195,19 @@ defmodule EgregorosWeb.OAuthController do
 
   defp oob_redirect_uri?("urn:ietf:wg:oauth:2.0:oob"), do: true
   defp oob_redirect_uri?(_), do: false
+
+  defp validate_write_confirmation(app, scope, params) do
+    registration = MiniAppOAuthRegistrations.get_by_application_id(app.id)
+    write_requested? = "write" in String.split(scope, ~r/\s+/, trim: true)
+
+    if registration && write_requested? do
+      if Map.get(params, "write_confirmed") in [true, "true", "1", "on"],
+        do: :ok,
+        else: {:error, :write_confirmation_required}
+    else
+      :ok
+    end
+  end
 
   defp append_query_params(url, params) when is_binary(url) and is_map(params) do
     uri = URI.parse(url)

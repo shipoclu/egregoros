@@ -93,7 +93,7 @@ defmodule EgregorosWeb.BadgesLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash} current_user={@current_user}>
+    <Layouts.app flash={@flash} current_user={@current_user} mini_app_host={@mini_app_host}>
       <AppShell.app_shell
         id="badges-shell"
         nav_id="badges-nav"

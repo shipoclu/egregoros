@@ -10,6 +10,7 @@ defmodule EgregorosWeb.Components.TimelineItems.NoteCard do
   alias EgregorosWeb.Components.Shared.ContentBody
   alias EgregorosWeb.Components.Shared.InteractionBar
   alias EgregorosWeb.Components.Shared.StatusMenu
+  alias EgregorosWeb.Components.TimelineItems.MiniAppCard
   alias EgregorosWeb.ProfilePaths
   alias EgregorosWeb.URL
 
@@ -185,6 +186,12 @@ defmodule EgregorosWeb.Components.TimelineItems.NoteCard do
       id={@id}
       attachments={@entry.attachments}
       object={@entry.object}
+    />
+
+    <MiniAppCard.mini_app_card
+      :if={is_map(Map.get(@entry, :mini_app_card))}
+      id={@id <> "-mini-app"}
+      card={@entry.mini_app_card}
     />
     """
   end

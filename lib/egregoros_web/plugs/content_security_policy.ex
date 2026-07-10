@@ -8,7 +8,7 @@ defmodule EgregorosWeb.Plugs.ContentSecurityPolicy do
             "base-uri 'self'",
             "object-src 'none'",
             "frame-ancestors 'none'",
-            "frame-src 'none'",
+            "frame-src __MINI_APP_FRAMES__",
             "form-action 'self'",
             "script-src 'self'",
             "style-src 'self' 'unsafe-inline'",
@@ -27,6 +27,9 @@ defmodule EgregorosWeb.Plugs.ContentSecurityPolicy do
 
   @impl Plug
   def call(conn, _opts) do
+    frame_sources = if Egregoros.MiniApps.enabled?(), do: "https:", else: "'none'"
+    policy = String.replace(@policy, "__MINI_APP_FRAMES__", frame_sources)
+
     header =
       if Egregoros.Config.get(:csp_report_only, false) do
         "content-security-policy-report-only"
@@ -34,6 +37,6 @@ defmodule EgregorosWeb.Plugs.ContentSecurityPolicy do
         "content-security-policy"
       end
 
-    put_resp_header(conn, header, @policy)
+    put_resp_header(conn, header, policy)
   end
 end

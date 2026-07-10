@@ -90,7 +90,7 @@ defmodule EgregorosWeb.ExploreLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash} current_user={@current_user}>
+    <Layouts.app flash={@flash} current_user={@current_user} mini_app_host={@mini_app_host}>
       <AppShell.app_shell
         id="explore-shell"
         nav_id="explore-nav"

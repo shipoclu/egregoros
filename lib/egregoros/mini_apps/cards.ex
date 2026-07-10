@@ -48,20 +48,44 @@ defmodule Egregoros.MiniApps.Cards do
   end
 
   def get_active(%Object{id: object_id}) when not is_nil(object_id) do
-    if MiniApps.enabled?() do
-      now = DateTime.utc_now()
-
-      card =
-        from(card in Card,
-          where: card.object_id == ^object_id and card.expires_at > ^now
-        )
-        |> Repo.one()
-
-      if card_allowed?(card), do: card
-    end
+    [object_id]
+    |> list_active_for_object_ids()
+    |> Map.get(object_id)
   end
 
   def get_active(%Object{}), do: nil
+
+  def get_active_by_id(card_id) when is_binary(card_id) do
+    if MiniApps.enabled?() do
+      now = DateTime.utc_now()
+
+      Card
+      |> Repo.get(card_id)
+      |> case do
+        %Card{expires_at: expires_at} = card ->
+          if DateTime.after?(expires_at, now) and card_allowed?(card), do: card
+
+        _ ->
+          nil
+      end
+    end
+  rescue
+    ArgumentError -> nil
+    Ecto.Query.CastError -> nil
+  end
+
+  def get_active_by_id(_card_id), do: nil
+
+  def list_active_for_objects(objects) when is_list(objects) do
+    objects
+    |> Enum.map(fn
+      %Object{id: id} when not is_nil(id) -> id
+      _ -> nil
+    end)
+    |> Enum.reject(&is_nil/1)
+    |> Enum.uniq()
+    |> list_active_for_object_ids()
+  end
 
   def delete(%Object{id: object_id}) when not is_nil(object_id) do
     from(card in Card, where: card.object_id == ^object_id)
@@ -71,6 +95,23 @@ defmodule Egregoros.MiniApps.Cards do
   end
 
   def delete(%Object{}), do: :ok
+
+  defp list_active_for_object_ids([]), do: %{}
+
+  defp list_active_for_object_ids(object_ids) do
+    if MiniApps.enabled?() do
+      now = DateTime.utc_now()
+
+      from(card in Card,
+        where: card.object_id in ^object_ids and card.expires_at > ^now
+      )
+      |> Repo.all()
+      |> Enum.filter(&card_allowed?/1)
+      |> Map.new(&{&1.object_id, &1})
+    else
+      %{}
+    end
+  end
 
   defp card_allowed?(%Card{app_origin: origin}) do
     case URI.parse(origin) do

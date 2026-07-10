@@ -1,6 +1,7 @@
 defmodule EgregorosWeb.ViewModels.Status do
   @moduledoc false
 
+  alias Egregoros.MiniApps.Cards, as: MiniAppCards
   alias Egregoros.Objects
   alias Egregoros.Objects.Polls
   alias Egregoros.Relationships
@@ -328,6 +329,7 @@ defmodule EgregorosWeb.ViewModels.Status do
       |> Enum.uniq()
 
     badge_recipient_cards = Actor.cards_by_ap_id(badge_recipient_ap_ids)
+    mini_app_cards = MiniAppCards.list_active_for_objects(content_objects)
 
     %{
       reblogs_by_ap_id: reblogs_by_ap_id,
@@ -337,7 +339,8 @@ defmodule EgregorosWeb.ViewModels.Status do
       emoji_counts: emoji_counts,
       emoji_me_relationships: emoji_me_relationships,
       followed_actors: followed_actors,
-      badge_recipient_cards: badge_recipient_cards
+      badge_recipient_cards: badge_recipient_cards,
+      mini_app_cards: mini_app_cards
     }
   end
 
@@ -420,6 +423,9 @@ defmodule EgregorosWeb.ViewModels.Status do
         type == "VerifiableCredential" ->
           Map.put(decorated, :badge, badge_view_model(object, ctx))
 
+        type == "Note" ->
+          maybe_put_mini_app_card(decorated, object, ctx)
+
         true ->
           decorated
       end
@@ -431,6 +437,25 @@ defmodule EgregorosWeb.ViewModels.Status do
   end
 
   defp decorate_content_with_context(_object, _current_user, _ctx, _opts), do: nil
+
+  defp maybe_put_mini_app_card(decorated, object, ctx) do
+    case Map.get(ctx.mini_app_cards, object.id) do
+      %Egregoros.MiniApps.Card{} = card ->
+        Map.put(decorated, :mini_app_card, %{
+          id: card.id,
+          source_url: card.source_url,
+          app_origin: card.app_origin,
+          app_name: card.app_name,
+          title: card.title,
+          button_title: card.button_title,
+          launch_url: card.launch_url,
+          image_url: card.image_url
+        })
+
+      _ ->
+        decorated
+    end
+  end
 
   defp badge_view_model(%{data: %{} = data} = object, ctx) do
     subject = credential_subject(data)

@@ -87,27 +87,34 @@ defmodule EgregorosWeb.Router do
     post "/settings/account", SettingsController, :update_account
     post "/settings/password", SettingsController, :update_password
     post "/logout", RegistrationController, :logout
+    get "/mini-app-assets/:card_id/image", MiniAppAssetController, :image
 
-    live "/settings/privacy", PrivacyLive
-    live "/search", SearchLive
-    live "/explore", ExploreLive
-    live "/tags/:tag", TagLive
-    live "/notifications", NotificationsLive
-    live "/messages", MessagesLive
-    live "/bookmarks", BookmarksLive, :bookmarks
-    live "/favourites", BookmarksLive, :favourites
-    live "/@:nickname", ProfileLive
-    live "/@:nickname/followers", RelationshipsLive, :followers
-    live "/@:nickname/following", RelationshipsLive, :following
-    live "/@:nickname/badges", BadgesLive, :index
-    live "/@:nickname/badges/:id", BadgesLive, :show
-    live "/@:nickname/:uuid", StatusLive
+    live_session :mini_app_host,
+      on_mount: [{EgregorosWeb.MiniAppHost, :default}] do
+      live "/settings/privacy", PrivacyLive
+      live "/search", SearchLive
+      live "/explore", ExploreLive
+      live "/tags/:tag", TagLive
+      live "/notifications", NotificationsLive
+      live "/messages", MessagesLive
+      live "/bookmarks", BookmarksLive, :bookmarks
+      live "/favourites", BookmarksLive, :favourites
+      live "/@:nickname", ProfileLive
+      live "/@:nickname/followers", RelationshipsLive, :followers
+      live "/@:nickname/following", RelationshipsLive, :following
+      live "/@:nickname/badges", BadgesLive, :index
+      live "/@:nickname/badges/:id", BadgesLive, :show
+      live "/@:nickname/:uuid", StatusLive
+    end
   end
 
   scope "/", EgregorosWeb do
     pipe_through :browser_root
 
-    live "/", TimelineLive
+    live_session :root_mini_app_host,
+      on_mount: [{EgregorosWeb.MiniAppHost, :default}] do
+      live "/", TimelineLive
+    end
   end
 
   scope "/", EgregorosWeb do
@@ -144,6 +151,8 @@ defmodule EgregorosWeb.Router do
   scope "/", EgregorosWeb do
     pipe_through :api
 
+    get "/.well-known/oauth-authorization-server", OAuthServerMetadataController, :show
+    post "/oauth/mini-app/register", MiniAppRegistrationController, :create
     post "/oauth/token", OAuthController, :token
     post "/oauth/revoke", OAuthController, :revoke
     get "/api/pleroma/frontend_configurations", PleromaFrontendConfigurationsController, :index

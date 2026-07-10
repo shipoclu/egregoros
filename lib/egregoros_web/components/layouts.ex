@@ -37,6 +37,8 @@ defmodule EgregorosWeb.Layouts do
     default: nil,
     doc: "the current [scope](https://hexdocs.pm/phoenix/scopes.html)"
 
+  attr :mini_app_host, :map, default: nil
+
   slot :inner_block, required: true
 
   def app(assigns) do
@@ -184,6 +186,8 @@ defmodule EgregorosWeb.Layouts do
       </div>
 
       <.flash_group flash={@flash} />
+
+      <EgregorosWeb.MiniAppHost.host :if={@mini_app_host} state={@mini_app_host} />
     </div>
     """
   end

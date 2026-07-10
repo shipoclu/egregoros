@@ -15,8 +15,17 @@ defmodule Egregoros.MiniApps.Fetcher.Req do
   ]
 
   @resource_config %{
-    manifest: %{accept: "application/json", max_bytes: 65_536},
-    page: %{accept: "text/html", max_bytes: 1_000_000}
+    manifest: %{
+      accept: "application/json",
+      content_types: ["application/json"],
+      max_bytes: 65_536
+    },
+    page: %{accept: "text/html", content_types: ["text/html"], max_bytes: 1_000_000},
+    asset: %{
+      accept: "image/avif,image/webp,image/png,image/jpeg,image/gif",
+      content_types: ~w(image/avif image/webp image/png image/jpeg image/gif),
+      max_bytes: 2_000_000
+    }
   }
 
   @impl true
@@ -26,7 +35,7 @@ defmodule Egregoros.MiniApps.Fetcher.Req do
     with {:ok, connect_url, connect_options} <- pinned_request(url),
          {:ok, response} <- request(connect_url, connect_options, config),
          :ok <- validate_status(response.status),
-         :ok <- validate_content_type(response, config.accept) do
+         :ok <- validate_content_type(response, config.content_types) do
       {:ok, Req.Response.to_map(response) |> Map.take([:status, :body, :headers])}
     end
   end
@@ -110,7 +119,7 @@ defmodule Egregoros.MiniApps.Fetcher.Req do
   defp validate_status(status) when status in 300..399, do: {:error, :redirect_not_allowed}
   defp validate_status(status), do: {:error, {:unexpected_status, status}}
 
-  defp validate_content_type(response, expected) do
+  defp validate_content_type(response, expected) when is_list(expected) do
     valid? =
       response
       |> Req.Response.get_header("content-type")
@@ -120,7 +129,7 @@ defmodule Egregoros.MiniApps.Fetcher.Req do
         |> List.first()
         |> String.trim()
         |> String.downcase()
-        |> Kernel.==(expected)
+        |> then(&(&1 in expected))
       end)
 
     if valid?, do: :ok, else: {:error, :invalid_content_type}

@@ -3,6 +3,9 @@ defmodule EgregorosWeb.ViewModels.StatusTest do
 
   alias Egregoros.Activities.Note
   alias Egregoros.Interactions
+  alias Egregoros.MiniApps.Cards
+  alias Egregoros.MiniApps.Manifest
+  alias Egregoros.MiniApps.ResolvedCard
   alias Egregoros.Objects
   alias Egregoros.Pipeline
   alias Egregoros.Publish
@@ -25,6 +28,48 @@ defmodule EgregorosWeb.ViewModels.StatusTest do
     assert entry.likes_count == 0
     assert entry.reposts_count == 0
     assert entry.reactions["🔥"].count == 0
+  end
+
+  test "decorates a note with only the active mini-app card presentation fields" do
+    enable_mini_apps()
+    {:ok, user} = Users.create_local_user("mini-app-status-alice")
+    {:ok, note} = Pipeline.ingest(Note.build(user, "Reader"), local: true)
+
+    manifest = %Manifest{
+      version: "1",
+      name: "Reader",
+      origin: "https://app.example",
+      home_url: "https://app.example/",
+      capabilities: [],
+      cache_ttl_seconds: 600
+    }
+
+    resolved = %ResolvedCard{
+      source_url: "https://app.example/shared/chapter-2",
+      app_origin: "https://app.example",
+      app_name: "Reader",
+      title: "Chapter 2",
+      button_title: "Read",
+      launch_url: "https://app.example/book/chapter-2",
+      image_url: "https://app.example/card.png",
+      manifest: manifest
+    }
+
+    assert {:ok, _card} = Cards.put(note, resolved)
+
+    entry = Status.decorate(note, user)
+    card = Cards.get_active(note)
+
+    assert entry.mini_app_card == %{
+             id: card.id,
+             source_url: "https://app.example/shared/chapter-2",
+             app_origin: "https://app.example",
+             app_name: "Reader",
+             title: "Chapter 2",
+             button_title: "Read",
+             launch_url: "https://app.example/book/chapter-2",
+             image_url: "https://app.example/card.png"
+           }
   end
 
   test "includes emoji reactions outside the default set when present" do
@@ -818,5 +863,14 @@ defmodule EgregorosWeb.ViewModels.StatusTest do
     assert entry.badge.recipient == nil
     assert entry.badge.badge_path == nil
     assert entry.badge.valid_range == nil
+  end
+
+  defp enable_mini_apps do
+    stub(Egregoros.Config.Mock, :get, fn
+      :mini_apps_enabled, false -> true
+      :mini_apps_domain_allowlist, [] -> []
+      :mini_apps_domain_denylist, [] -> []
+      key, default -> Egregoros.Config.Stub.get(key, default)
+    end)
   end
 end

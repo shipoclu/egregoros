@@ -19,6 +19,23 @@
         <span class="font-semibold text-slate-900 dark:text-slate-100">{@scope}</span>
       </p>
 
+      <%= if @mini_app_registration do %>
+        <div
+          id="oauth-mini-app-origin"
+          class="mt-5 border-2 border-[color:var(--border-default)] bg-[color:var(--bg-subtle)] p-4"
+        >
+          <p class="text-xs font-bold uppercase tracking-wide text-[color:var(--text-muted)]">
+            Fediverse mini app
+          </p>
+          <p class="mt-1 font-mono text-sm font-bold text-[color:var(--text-primary)]">
+            {@mini_app_registration.app_origin}
+          </p>
+          <p class="mt-2 text-xs leading-relaxed text-[color:var(--text-muted)]">
+            Authorization returns only to this app’s exact registered origin. Its requested scopes are fixed by the verified manifest.
+          </p>
+        </div>
+      <% end %>
+
       <.form
         for={@form}
         id="oauth-authorize-form"
@@ -32,6 +49,21 @@
         <.input type="hidden" field={@form[:state]} />
         <.input type="hidden" field={@form[:code_challenge]} />
         <.input type="hidden" field={@form[:code_challenge_method]} />
+
+        <div
+          :if={@mini_app_registration && "write" in @mini_app_registration.scopes}
+          class="border-2 border-[color:var(--danger)] bg-[color:var(--danger-subtle)] p-4"
+        >
+          <.input
+            id="oauth-write-confirmation"
+            type="checkbox"
+            field={@form[:write_confirmed]}
+            label="I understand this app can use the API to create, edit, and delete content as my account."
+          />
+          <p class="mt-2 text-xs leading-relaxed text-[color:var(--danger)]">
+            This API permission is separate from the host composer: mini-app compose actions still open a prefilled draft and never submit it automatically.
+          </p>
+        </div>
 
         <.button type="submit" class="w-full">Authorize</.button>
         <.button navigate={~p"/"} variant="secondary" class="w-full">Cancel</.button>
