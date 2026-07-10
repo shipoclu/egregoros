@@ -1,6 +1,15 @@
 defmodule EgregorosWeb.RegistrationController do
   use EgregorosWeb, :controller
 
+  plug EgregorosWeb.Plugs.RateLimit,
+       [
+         bucket: :registration,
+         config_key: :rate_limit_registration,
+         limit: 5,
+         interval_ms: 3_600_000
+       ]
+       when action == :create
+
   alias Egregoros.InstanceSettings
   alias Egregoros.User
   alias Egregoros.Users

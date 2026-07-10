@@ -1,6 +1,10 @@
 defmodule EgregorosWeb.OAuthController do
   use EgregorosWeb, :controller
 
+  plug EgregorosWeb.Plugs.RateLimit,
+       [bucket: :oauth, config_key: :rate_limit_oauth, limit: 30, interval_ms: 60_000]
+       when action in [:approve, :token, :revoke]
+
   alias Egregoros.OAuth
   alias Egregoros.User
 

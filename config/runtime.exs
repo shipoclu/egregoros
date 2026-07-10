@@ -32,6 +32,24 @@ if allow_private_federation in ~w(true 1) do
   config :egregoros, :allow_private_federation, true
 end
 
+trusted_proxies =
+  System.get_env("EGREGOROS_TRUSTED_PROXIES", "")
+  |> String.split(",", trim: true)
+  |> Enum.map(&String.trim/1)
+  |> Enum.reject(&(&1 == ""))
+
+if trusted_proxies != [] do
+  config :egregoros, :trusted_proxies, trusted_proxies
+end
+
+case Integer.parse(System.get_env("EGREGOROS_RATE_LIMIT_NODE_COUNT", "1")) do
+  {node_count, ""} when node_count >= 1 ->
+    config :egregoros, :rate_limit_node_count, node_count
+
+  _ ->
+    :ok
+end
+
 scheduled_status_min_offset_seconds =
   System.get_env("EGREGOROS_SCHEDULED_STATUS_MIN_OFFSET_SECONDS", "")
   |> String.trim()

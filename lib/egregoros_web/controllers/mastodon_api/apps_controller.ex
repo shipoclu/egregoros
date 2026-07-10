@@ -1,6 +1,12 @@
 defmodule EgregorosWeb.MastodonAPI.AppsController do
   use EgregorosWeb, :controller
 
+  plug EgregorosWeb.Plugs.RateLimit,
+    bucket: :oauth_apps,
+    config_key: :rate_limit_oauth_apps,
+    limit: 20,
+    interval_ms: 3_600_000
+
   alias Egregoros.OAuth
 
   def create(conn, params) do

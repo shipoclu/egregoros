@@ -1,6 +1,10 @@
 defmodule EgregorosWeb.SessionController do
   use EgregorosWeb, :controller
 
+  plug EgregorosWeb.Plugs.RateLimit,
+       [bucket: :login, config_key: :rate_limit_login, limit: 10, interval_ms: 60_000]
+       when action == :create
+
   alias Egregoros.Users
   alias EgregorosWeb.ReturnTo
 

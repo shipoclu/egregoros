@@ -2,6 +2,7 @@ defmodule EgregorosWeb.Plugs.RateLimitInbox do
   import Plug.Conn
 
   alias Egregoros.RateLimiter
+  alias EgregorosWeb.ClientIP
 
   @default_limit 120
   @default_interval_ms 10_000
@@ -43,14 +44,6 @@ defmodule EgregorosWeb.Plugs.RateLimitInbox do
   end
 
   defp rate_key(conn) do
-    ip_key(conn) <> "|" <> conn.request_path
+    ClientIP.address(conn) <> "|" <> conn.request_path
   end
-
-  defp ip_key(%Plug.Conn{remote_ip: remote_ip}) when is_tuple(remote_ip) do
-    remote_ip
-    |> :inet.ntoa()
-    |> List.to_string()
-  end
-
-  defp ip_key(_conn), do: "unknown"
 end

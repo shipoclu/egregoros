@@ -1,4 +1,12 @@
 defmodule Egregoros.RateLimiter.ETS do
+  @moduledoc """
+  Atomic, fixed-window rate limits local to one Erlang node.
+
+  In a multi-node deployment, configure `:rate_limit_node_count` to the
+  maximum number of nodes that can receive traffic. The HTTP plug divides
+  each deployment-wide limit across those nodes.
+  """
+
   use GenServer
 
   @behaviour Egregoros.RateLimiter
@@ -37,11 +45,10 @@ defmodule Egregoros.RateLimiter.ETS do
       true ->
         now_ms = System.monotonic_time(:millisecond)
         window_id = div(now_ms, interval_ms)
-        ets_key = {bucket, key, interval_ms}
+        ets_key = {bucket, key, interval_ms, window_id}
+        new_count = bump_counter(ets_key, now_ms)
 
-        {new_count, last_seen_ms} = bump_counter(ets_key, window_id, now_ms)
-
-        if new_count <= limit and is_integer(last_seen_ms) do
+        if new_count <= limit do
           :ok
         else
           {:error, :rate_limited}
@@ -59,28 +66,17 @@ defmodule Egregoros.RateLimiter.ETS do
     {:noreply, state}
   end
 
-  defp bump_counter(ets_key, window_id, now_ms) do
-    case :ets.lookup(@table, ets_key) do
-      [{^ets_key, ^window_id, count, _last_seen_ms}] when is_integer(count) ->
-        new_count = count + 1
-        :ets.insert(@table, {ets_key, window_id, new_count, now_ms})
-        {new_count, now_ms}
-
-      [{^ets_key, _old_window_id, _count, _last_seen_ms}] ->
-        :ets.insert(@table, {ets_key, window_id, 1, now_ms})
-        {1, now_ms}
-
-      [] ->
-        :ets.insert(@table, {ets_key, window_id, 1, now_ms})
-        {1, now_ms}
-    end
+  defp bump_counter(ets_key, now_ms) do
+    count = :ets.update_counter(@table, ets_key, {2, 1}, {ets_key, 0, now_ms})
+    _ = :ets.update_element(@table, ets_key, {3, now_ms})
+    count
   end
 
   defp cleanup_old_entries(threshold_ms) when is_integer(threshold_ms) do
     match_spec = [
       {
-        {:"$1", :"$2", :"$3", :"$4"},
-        [{:<, :"$4", threshold_ms}],
+        {:"$1", :"$2", :"$3"},
+        [{:<, :"$3", threshold_ms}],
         [true]
       }
     ]

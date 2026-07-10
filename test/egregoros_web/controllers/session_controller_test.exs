@@ -3,6 +3,21 @@ defmodule EgregorosWeb.SessionControllerTest do
 
   alias Egregoros.Users
 
+  test "POST /login is rate limited before checking credentials", %{conn: conn} do
+    expect(Egregoros.RateLimiter.Mock, :allow?, fn :login, key, 10, 60_000 ->
+      assert key == "127.0.0.1|/login"
+      {:error, :rate_limited}
+    end)
+
+    conn =
+      post(conn, "/login", %{
+        "session" => %{"nickname" => "alice", "password" => "guess"}
+      })
+
+    assert response(conn, 429) == "Too Many Requests"
+    assert get_resp_header(conn, "retry-after") == ["60"]
+  end
+
   test "GET /login renders form", %{conn: conn} do
     conn = get(conn, "/login")
     html = html_response(conn, 200)

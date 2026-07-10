@@ -1,6 +1,24 @@
 defmodule EgregorosWeb.PasskeysController do
   use EgregorosWeb, :controller
 
+  plug EgregorosWeb.Plugs.RateLimit,
+       [
+         bucket: :passkey_registration,
+         config_key: :rate_limit_registration,
+         limit: 5,
+         interval_ms: 3_600_000
+       ]
+       when action in [:registration_options, :registration_finish]
+
+  plug EgregorosWeb.Plugs.RateLimit,
+       [
+         bucket: :passkey_login,
+         config_key: :rate_limit_login,
+         limit: 10,
+         interval_ms: 60_000
+       ]
+       when action in [:authentication_options, :authentication_finish]
+
   alias Egregoros.InstanceSettings
   alias Egregoros.Passkeys
   alias Egregoros.Passkeys.Credential
