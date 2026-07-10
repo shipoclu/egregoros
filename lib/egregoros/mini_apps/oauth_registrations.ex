@@ -4,6 +4,7 @@ defmodule Egregoros.MiniApps.OAuthRegistrations do
   import Ecto.Query
 
   alias Egregoros.MiniApps
+  alias Egregoros.MiniApps.Declarations
   alias Egregoros.MiniApps.Manifest
   alias Egregoros.MiniApps.OAuthRegistration
   alias Egregoros.OAuth
@@ -26,7 +27,8 @@ defmodule Egregoros.MiniApps.OAuthRegistrations do
   def register_with_status(%Manifest{oauth: nil}), do: {:error, :oauth_not_declared}
 
   def register_with_status(%Manifest{oauth: oauth} = manifest) when is_map(oauth) do
-    with :ok <- require_origin_allowed(manifest.origin) do
+    with :ok <- require_origin_allowed(manifest.origin),
+         {:ok, _declaration, _status} <- Declarations.ensure(manifest) do
       case Repo.transaction(fn -> register_locked(manifest) end) do
         {:ok, {%OAuthRegistration{} = registration, status}} ->
           {:ok, registration, status}
@@ -188,7 +190,7 @@ defmodule Egregoros.MiniApps.OAuthRegistrations do
   defp fingerprint(manifest) do
     manifest.oauth
     |> then(fn oauth ->
-      {oauth.redirect_uris, oauth.scopes, manifest.capabilities}
+      {oauth.redirect_uris, oauth.scopes, manifest.capabilities, manifest.wallet}
     end)
     |> :erlang.term_to_binary()
     |> then(&:crypto.hash(:sha256, &1))

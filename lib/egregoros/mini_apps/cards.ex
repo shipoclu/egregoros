@@ -4,6 +4,7 @@ defmodule Egregoros.MiniApps.Cards do
   import Ecto.Query
 
   alias Egregoros.MiniApps.Card
+  alias Egregoros.MiniApps.Declarations
   alias Egregoros.MiniApps.ResolvedCard
   alias Egregoros.MiniApps
   alias Egregoros.Object
@@ -31,13 +32,19 @@ defmodule Egregoros.MiniApps.Cards do
       expires_at: expires_at
     }
 
-    %Card{}
-    |> Card.changeset(attrs)
-    |> Repo.insert(
-      conflict_target: :object_id,
-      on_conflict: {:replace, @replace_fields},
-      returning: true
-    )
+    changeset = Card.changeset(%Card{}, attrs)
+
+    if changeset.valid? do
+      with {:ok, _declaration, _status} <- Declarations.ensure(resolved.manifest) do
+        Repo.insert(changeset,
+          conflict_target: :object_id,
+          on_conflict: {:replace, @replace_fields},
+          returning: true
+        )
+      end
+    else
+      {:error, changeset}
+    end
   end
 
   def put(%Object{}, %ResolvedCard{}) do

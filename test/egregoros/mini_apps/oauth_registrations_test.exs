@@ -2,6 +2,7 @@ defmodule Egregoros.MiniApps.OAuthRegistrationsTest do
   use Egregoros.DataCase, async: true
 
   alias Egregoros.MiniApps.Manifest
+  alias Egregoros.MiniApps.Declarations
   alias Egregoros.MiniApps.OAuthRegistrations
   alias Egregoros.OAuth
   alias Egregoros.OAuth.Application, as: OAuthApplication
@@ -27,6 +28,7 @@ defmodule Egregoros.MiniApps.OAuthRegistrationsTest do
     assert first.capabilities == ["compose_note"]
     assert first.oauth_application_id == second.oauth_application_id
     assert Repo.aggregate(OAuthApplication, :count) == 1
+    assert Declarations.get_by_origin("https://app.example")
 
     application = Repo.get!(OAuthApplication, first.oauth_application_id)
     assert application.name == "Writer"

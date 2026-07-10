@@ -2,6 +2,7 @@ defmodule Egregoros.MiniApps.CardsTest do
   use Egregoros.DataCase, async: true
 
   alias Egregoros.MiniApps.Cards
+  alias Egregoros.MiniApps.Declarations
   alias Egregoros.MiniApps.Manifest
   alias Egregoros.MiniApps.ResolvedCard
   alias Egregoros.Objects
@@ -42,6 +43,23 @@ defmodule Egregoros.MiniApps.CardsTest do
     assert first.id == second.id
     assert Cards.get_active(object).title == "Second"
     assert Repo.aggregate(Egregoros.MiniApps.Card, :count) == 1
+  end
+
+  test "pins security declarations before caching a resolved card" do
+    object = object_fixture()
+    resolved = resolved_card("Wallet", wallet?: true)
+
+    assert {:ok, _card} = Cards.put(object, resolved)
+    assert Declarations.wallet_enabled?("https://app.example")
+
+    changed_wallet =
+      put_in(resolved.manifest.wallet, [:evm, :required_chains], ["eip155:1"])
+
+    changed_manifest = %{resolved.manifest | wallet: changed_wallet}
+    changed = %{resolved | manifest: changed_manifest, title: "Changed"}
+
+    assert {:error, :manifest_changed} = Cards.put(object, changed)
+    assert Cards.get_active(object).title == "Wallet"
   end
 
   test "expired cards are not active and cards can be cleared" do
@@ -112,12 +130,21 @@ defmodule Egregoros.MiniApps.CardsTest do
     object
   end
 
-  defp resolved_card(title) do
+  defp resolved_card(title, options \\ []) do
+    wallet? = Keyword.get(options, :wallet?, false)
+
     manifest = %Manifest{
       version: "1",
       name: "Reader",
       origin: "https://app.example",
       home_url: "https://app.example/",
+      wallet:
+        if(wallet?,
+          do: %{
+            evm: %{enabled: true, required: false, required_chains: ["eip155:8453"]}
+          },
+          else: nil
+        ),
       capabilities: [],
       cache_ttl_seconds: 600
     }
