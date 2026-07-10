@@ -220,3 +220,72 @@ test("compose requests accept only the narrow draft schema on the active launch"
   assert.deepEqual(requests, [{callId: "compose-call-1", draft: valid.draft}])
   broker.destroy()
 })
+
+test("close and external navigation are launch-bound, replay-safe public actions", async () => {
+  const fixture = iframeFixture()
+  const closes = []
+  const external = []
+  const broker = createMiniAppBroker({
+    iframe: fixture.iframe,
+    appOrigin: "https://app.example",
+    launchId: "launch-actions",
+    onCloseRequest: requestId => closes.push(requestId),
+    onExternalRequest: request => external.push(request),
+  })
+
+  fixture.load()
+  const appPort = fixture.posts[0].transfer[0]
+
+  appPort.postMessage({
+    type: "openExternal",
+    version: "1",
+    launchId: "launch-actions",
+    requestId: "external-1",
+    url: "javascript:alert(1)",
+    userActivation: true,
+  })
+  appPort.postMessage({
+    type: "openExternal",
+    version: "1",
+    launchId: "launch-actions",
+    requestId: "external-1",
+    url: "https://docs.example/chapter/1",
+    userActivation: false,
+  })
+  appPort.postMessage({
+    type: "openExternal",
+    version: "1",
+    launchId: "launch-actions",
+    requestId: "external-1",
+    url: "https://docs.example/chapter/1",
+    userActivation: true,
+  })
+  appPort.postMessage({
+    type: "openExternal",
+    version: "1",
+    launchId: "launch-actions",
+    requestId: "external-1",
+    url: "https://docs.example/chapter/1",
+    userActivation: true,
+  })
+
+  appPort.postMessage({
+    type: "close",
+    version: "1",
+    launchId: "wrong",
+    requestId: "close-1",
+  })
+  appPort.postMessage({
+    type: "close",
+    version: "1",
+    launchId: "launch-actions",
+    requestId: "close-1",
+  })
+  await tick()
+
+  assert.deepEqual(external, [
+    {requestId: "external-1", url: "https://docs.example/chapter/1"},
+  ])
+  assert.deepEqual(closes, ["close-1"])
+  broker.destroy()
+})

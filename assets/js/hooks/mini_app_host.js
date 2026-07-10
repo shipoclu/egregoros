@@ -42,6 +42,12 @@ const MiniAppHost = {
       )
     }
     this.onHostClick = event => {
+      const externalButton = event.target.closest?.("[data-role='mini-app-external-open']")
+      if (externalButton && this.el.contains(externalButton)) {
+        window.open(externalButton.dataset.externalUrl, "_blank", "noopener,noreferrer")
+        return
+      }
+
       const button = event.target.closest?.("[data-role='mini-app-auth-open']")
       if (!button || !this.el.contains(button)) return
 
@@ -115,6 +121,17 @@ const MiniAppHost = {
         scope: payload.scope,
       })
     })
+    this.handleEvent("mini_app_external_response", payload => {
+      if (payload?.launch_id !== this.el.dataset.launchId) return
+
+      this.broker?.send({
+        type: "openExternalResult",
+        version: "1",
+        launchId: payload.launch_id,
+        requestId: payload.request_id,
+        status: payload.status,
+      })
+    })
     this.bindFrame()
   },
 
@@ -183,6 +200,17 @@ const MiniAppHost = {
           launch_id: launchId,
           call_id: request.callId,
           draft: request.draft,
+        }),
+      onCloseRequest: requestId =>
+        this.pushEvent("mini_app_close_request", {
+          launch_id: launchId,
+          request_id: requestId,
+        }),
+      onExternalRequest: request =>
+        this.pushEvent("mini_app_external_request", {
+          launch_id: launchId,
+          request_id: request.requestId,
+          url: request.url,
         }),
     })
   },

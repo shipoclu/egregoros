@@ -306,6 +306,89 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
              Objects.get_by_ap_id(published_id)
   end
 
+  test "external navigation requires host confirmation and close is launch-bound", %{
+    conn: conn,
+    user: user
+  } do
+    {:ok, note} =
+      Pipeline.ingest(
+        Note.build(user, ~s(<a href="https://app.example/shared/chapter-2">reader</a>)),
+        local: true
+      )
+
+    assert {:ok, _card} = Cards.put(note, resolved_card())
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/?timeline=public")
+    view |> element("[data-role='open-mini-app']") |> render_click()
+
+    launch_id = :sys.get_state(view.pid).socket.assigns.mini_app_host.launch_id
+    render_hook(view, "mini_app_ready", %{"launch_id" => launch_id})
+
+    render_hook(view, "mini_app_external_request", %{
+      "launch_id" => launch_id,
+      "request_id" => "external-invalid",
+      "url" => "javascript:alert(1)"
+    })
+
+    refute has_element?(view, "#mini-app-external-confirmation")
+
+    assert_push_event(view, "mini_app_external_response", %{
+      launch_id: ^launch_id,
+      request_id: "external-invalid",
+      status: "invalid_request"
+    })
+
+    render_hook(view, "mini_app_external_request", %{
+      "launch_id" => launch_id,
+      "request_id" => "external-1",
+      "url" => "https://docs.example/chapter/1"
+    })
+
+    assert has_element?(view, "#mini-app-external-confirmation")
+
+    assert has_element?(
+             view,
+             "#mini-app-external-open[data-role='mini-app-external-open'][data-external-url='https://docs.example/chapter/1']"
+           )
+
+    view |> element("#mini-app-external-open") |> render_click()
+    refute has_element?(view, "#mini-app-external-confirmation")
+
+    assert_push_event(view, "mini_app_external_response", %{
+      launch_id: ^launch_id,
+      request_id: "external-1",
+      status: "approved"
+    })
+
+    render_hook(view, "mini_app_external_request", %{
+      "launch_id" => launch_id,
+      "request_id" => "external-2",
+      "url" => "https://docs.example/chapter/2"
+    })
+
+    view |> element("#mini-app-external-deny") |> render_click()
+
+    assert_push_event(view, "mini_app_external_response", %{
+      launch_id: ^launch_id,
+      request_id: "external-2",
+      status: "denied"
+    })
+
+    render_hook(view, "mini_app_close_request", %{
+      "launch_id" => "wrong",
+      "request_id" => "close-1"
+    })
+
+    assert has_element?(view, "#mini-app-host[data-state='open']")
+
+    render_hook(view, "mini_app_close_request", %{
+      "launch_id" => launch_id,
+      "request_id" => "close-1"
+    })
+
+    assert has_element?(view, "#mini-app-host[data-state='closed']")
+  end
+
   defp resolved_card(options \\ []) do
     oauth? = Keyword.get(options, :oauth?, false)
 

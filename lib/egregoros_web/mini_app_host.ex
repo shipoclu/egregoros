@@ -8,6 +8,7 @@ defmodule EgregorosWeb.MiniAppHost do
   alias Egregoros.MiniApps.Cards
   alias Egregoros.MiniApps.ComposeDraft
   alias Egregoros.MiniApps.ContextConsents
+  alias Egregoros.MiniApps.ExternalURL
   alias Egregoros.MiniApps.LaunchContext
   alias Egregoros.MiniApps.OAuthRegistrations
   alias Egregoros.Publish
@@ -312,6 +313,49 @@ defmodule EgregorosWeb.MiniAppHost do
           </div>
         </section>
 
+        <section
+          :if={@state.status == :open and @state.external_request}
+          id="mini-app-external-confirmation"
+          class="absolute inset-0 z-30 flex items-center justify-center bg-[color:var(--text-primary)]/60 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="mini-app-external-title"
+        >
+          <div class="w-full max-w-sm border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] p-5 shadow-[6px_6px_0_var(--border-default)]">
+            <h2 id="mini-app-external-title" class="font-bold text-[color:var(--text-primary)]">
+              Leave Egregoros?
+            </h2>
+            <p class="mt-2 text-sm leading-relaxed text-[color:var(--text-secondary)]">
+              <span class="font-mono font-bold">{display_origin(@state.card.app_origin)}</span>
+              wants to open this external destination:
+            </p>
+            <p class="mt-3 break-all border border-[color:var(--border-muted)] bg-[color:var(--bg-subtle)] p-3 font-mono text-xs text-[color:var(--text-primary)]">
+              {@state.external_request.url}
+            </p>
+
+            <div class="mt-5 flex justify-end gap-2">
+              <button
+                id="mini-app-external-deny"
+                type="button"
+                phx-click="mini_app_external_deny"
+                class="cursor-pointer border-2 border-[color:var(--border-default)] px-4 py-2 text-sm font-bold text-[color:var(--text-secondary)] transition hover:bg-[color:var(--bg-subtle)] focus-visible:outline-none focus-brutal"
+              >
+                Stay here
+              </button>
+              <button
+                id="mini-app-external-open"
+                type="button"
+                data-role="mini-app-external-open"
+                data-external-url={@state.external_request.url}
+                phx-click="mini_app_external_confirm"
+                class="cursor-pointer border-2 border-[color:var(--border-default)] bg-[color:var(--text-primary)] px-4 py-2 text-sm font-bold text-[color:var(--bg-base)] transition hover:shadow-[3px_3px_0_var(--accent)] focus-visible:outline-none focus-brutal"
+              >
+                Open external site
+              </button>
+            </div>
+          </div>
+        </section>
+
         <div
           :if={@state.status == :open}
           class="relative min-h-0 flex-1 bg-white"
@@ -365,7 +409,8 @@ defmodule EgregorosWeb.MiniAppHost do
            context_request: nil,
            auth_request: nil,
            oauth_authenticated?: false,
-           compose_request: nil
+           compose_request: nil,
+           external_request: nil
          })}
 
       _ ->
@@ -576,6 +621,48 @@ defmodule EgregorosWeb.MiniAppHost do
     {:halt, Phoenix.Component.assign(socket, :mini_app_host, %{state | compose_request: nil})}
   end
 
+  defp handle_host_event(
+         "mini_app_external_request",
+         %{"launch_id" => launch_id, "request_id" => request_id, "url" => url},
+         socket
+       ) do
+    state = socket.assigns.mini_app_host
+
+    with true <- host_action_allowed?(state, launch_id, request_id),
+         {:ok, url} <- ExternalURL.validate(url) do
+      {:halt,
+       Phoenix.Component.assign(socket, :mini_app_host, %{
+         state
+         | external_request: %{request_id: request_id, url: url}
+       })}
+    else
+      _ -> {:halt, push_external_response(socket, request_id, "invalid_request")}
+    end
+  end
+
+  defp handle_host_event("mini_app_external_deny", _params, socket) do
+    {:halt, finish_external_request(socket, "denied")}
+  end
+
+  defp handle_host_event("mini_app_external_confirm", _params, socket) do
+    {:halt, finish_external_request(socket, "approved")}
+  end
+
+  defp handle_host_event(
+         "mini_app_close_request",
+         %{"launch_id" => launch_id, "request_id" => request_id},
+         socket
+       ) do
+    state = socket.assigns.mini_app_host
+
+    if state.status != :closed and state.launch_id == launch_id and
+         valid_request_id?(request_id) and active_card?(state.card) do
+      {:halt, Phoenix.Component.assign(socket, :mini_app_host, closed_state())}
+    else
+      {:halt, socket}
+    end
+  end
+
   defp handle_host_event(event, %{"launch_id" => launch_id}, socket)
        when event in ["mini_app_loading", "mini_app_ready"] do
     state = socket.assigns.mini_app_host
@@ -588,7 +675,9 @@ defmodule EgregorosWeb.MiniAppHost do
            auth_request: if(event == "mini_app_loading", do: nil, else: state.auth_request),
            oauth_authenticated?:
              if(event == "mini_app_loading", do: false, else: state.oauth_authenticated?),
-           compose_request: if(event == "mini_app_loading", do: nil, else: state.compose_request)
+           compose_request: if(event == "mini_app_loading", do: nil, else: state.compose_request),
+           external_request:
+             if(event == "mini_app_loading", do: nil, else: state.external_request)
        })}
     else
       {:halt, socket}
@@ -631,26 +720,36 @@ defmodule EgregorosWeb.MiniAppHost do
       context_request: nil,
       auth_request: nil,
       oauth_authenticated?: false,
-      compose_request: nil
+      compose_request: nil,
+      external_request: nil
     }
   end
 
   defp context_request_allowed?(state, launch_id, request_id) do
     state.status == :open and state.ready? and state.launch_id == launch_id and
-      is_nil(state.compose_request) and valid_request_id?(request_id) and active_card?(state.card)
+      is_nil(state.compose_request) and is_nil(state.external_request) and
+      valid_request_id?(request_id) and active_card?(state.card)
   end
 
   defp auth_request_allowed?(state, launch_id, request_id) do
     state.status == :open and state.ready? and state.launch_id == launch_id and
       is_nil(state.auth_request) and is_nil(state.context_request) and
-      is_nil(state.compose_request) and
+      is_nil(state.compose_request) and is_nil(state.external_request) and
       valid_request_id?(request_id) and active_card?(state.card)
   end
 
   defp compose_request_base_allowed?(state, launch_id, call_id) do
     state.status == :open and state.ready? and state.launch_id == launch_id and
       is_nil(state.auth_request) and is_nil(state.context_request) and
-      is_nil(state.compose_request) and valid_request_id?(call_id) and active_card?(state.card)
+      is_nil(state.compose_request) and is_nil(state.external_request) and
+      valid_request_id?(call_id) and active_card?(state.card)
+  end
+
+  defp host_action_allowed?(state, launch_id, request_id) do
+    state.status == :open and state.ready? and state.launch_id == launch_id and
+      is_nil(state.auth_request) and is_nil(state.context_request) and
+      is_nil(state.compose_request) and is_nil(state.external_request) and
+      valid_request_id?(request_id) and active_card?(state.card)
   end
 
   defp valid_request_id?(request_id) when is_binary(request_id) do
@@ -725,6 +824,34 @@ defmodule EgregorosWeb.MiniAppHost do
     Phoenix.LiveView.push_event(socket, "mini_app_compose_response", %{
       launch_id: state.launch_id,
       call_id: call_id,
+      status: status
+    })
+  end
+
+  defp finish_external_request(socket, status) do
+    state = socket.assigns.mini_app_host
+
+    case state.external_request do
+      %{request_id: request_id} ->
+        socket
+        |> Phoenix.Component.assign(:mini_app_host, %{state | external_request: nil})
+        |> Phoenix.LiveView.push_event("mini_app_external_response", %{
+          launch_id: state.launch_id,
+          request_id: request_id,
+          status: status
+        })
+
+      _ ->
+        socket
+    end
+  end
+
+  defp push_external_response(socket, request_id, status) do
+    state = socket.assigns.mini_app_host
+
+    Phoenix.LiveView.push_event(socket, "mini_app_external_response", %{
+      launch_id: state.launch_id,
+      request_id: request_id,
       status: status
     })
   end

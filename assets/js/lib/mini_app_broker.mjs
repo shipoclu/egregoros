@@ -108,6 +108,32 @@ const validComposeRequest = (message, launchId) =>
   validRequestId(message.callId) &&
   validComposeDraft(message.draft)
 
+const validCloseRequest = (message, launchId) =>
+  !!message &&
+  typeof message === "object" &&
+  !Array.isArray(message) &&
+  Object.keys(message).length === 4 &&
+  Object.keys(message).every(key => ["type", "version", "launchId", "requestId"].includes(key)) &&
+  message.type === "close" &&
+  message.version === protocolVersion &&
+  message.launchId === launchId &&
+  validRequestId(message.requestId)
+
+const validExternalRequest = (message, launchId) =>
+  !!message &&
+  typeof message === "object" &&
+  !Array.isArray(message) &&
+  Object.keys(message).length === 6 &&
+  Object.keys(message).every(key =>
+    ["type", "version", "launchId", "requestId", "url", "userActivation"].includes(key)
+  ) &&
+  message.type === "openExternal" &&
+  message.version === protocolVersion &&
+  message.launchId === launchId &&
+  validRequestId(message.requestId) &&
+  validHttpsUrl(message.url) &&
+  message.userActivation === true
+
 export const createMiniAppBroker = ({
   iframe,
   appOrigin,
@@ -117,6 +143,8 @@ export const createMiniAppBroker = ({
   onContextRequest,
   onAuthRequest,
   onComposeRequest,
+  onCloseRequest,
+  onExternalRequest,
 }) => {
   let hostPort = null
   let ready = false
@@ -182,6 +210,16 @@ export const createMiniAppBroker = ({
 
       if (validComposeRequest(message, launchId) && acceptOnce(`compose:${message.callId}`)) {
         onComposeRequest?.({callId: message.callId, draft: {...message.draft}})
+        return
+      }
+
+      if (validCloseRequest(message, launchId) && acceptOnce(`close:${message.requestId}`)) {
+        onCloseRequest?.(message.requestId)
+        return
+      }
+
+      if (validExternalRequest(message, launchId) && acceptOnce(`external:${message.requestId}`)) {
+        onExternalRequest?.({requestId: message.requestId, url: message.url})
       }
     }
 
