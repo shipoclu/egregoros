@@ -60,8 +60,8 @@ The initial manifest would declare:
 - OAuth client metadata (or an indirection to standard OAuth client
   registration);
 - requested capabilities/scopes; and
-- a future immutable ActivityPub actor declaration for public publishing and
-  consent-gated transactional mentions, deferred beyond the first release.
+- an immutable ActivityPub actor declaration for public publishing and
+  consent-gated transactional mentions.
 
 The manifest is intentionally domain-scoped: one app identity owns the domain,
 while individual paths identify launch destinations/shareable views within that
@@ -340,7 +340,7 @@ domains may operate as mini apps. Rule changes take effect immediately: a newly
 blocked app's iframe closes, future host calls and token use are denied, and its
 links revert to ordinary links.
 
-#### Proposed ActivityPub messaging and notification consent
+#### ActivityPub messaging and notification consent
 
 Public app messages and consent-gated transactional mentions are specified as
 a post-v1 extension in
@@ -349,7 +349,7 @@ operates one normal ActivityPub `Application` or `Service` actor. Public notes
 are delivered to its followers; transactional notes are non-public, address
 exactly one consenting actor, and contain one matching `Mention`.
 
-Notification permission is deliberately separate from launch context. A future
+Notification permission is deliberately separate from launch context. The
 SDK `notifications.getPermission()`/`requestPermission()` surface reports and
 requests user-specific permission only after OAuth and a host-owned gesture
 confirmation. An OAuth-authenticated backend endpoint provides the
@@ -364,8 +364,10 @@ capability, requires active OAuth, answers non-prompting state reads, owns the
 grant/deny dialog, and provides independent Privacy-settings revocation.
 The OAuth-authenticated backend endpoint derives the app solely from the bearer
 token's registered client and returns the canonical recipient actor only for a
-current grant. Actor-document activation and inbound enforcement remain
-unimplemented. Public ActivityPub publishing requires no mini-app host
+current grant. Inbound enforcement requires one exact local recipient and
+matching mention plus current notification and OAuth grants; invalid or revoked
+deliveries are acknowledged without persistence. Actor-document activation
+remains unimplemented. Public ActivityPub publishing requires no mini-app host
 extension and can be implemented independently.
 
 #### Dynamic registration

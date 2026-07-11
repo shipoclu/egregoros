@@ -1,6 +1,8 @@
 defmodule Egregoros.MiniApps.Declarations do
   @moduledoc false
 
+  import Ecto.Query, only: [where: 3]
+
   alias Egregoros.MiniApps
   alias Egregoros.MiniApps.Declaration
   alias Egregoros.MiniApps.Manifest
@@ -49,6 +51,30 @@ defmodule Egregoros.MiniApps.Declarations do
   end
 
   def notification_actor(_origin), do: {:error, :notifications_not_declared}
+
+  def notification_origin_for_actor(actor_url) when is_binary(actor_url) do
+    declarations =
+      Declaration
+      |> where(
+        [declaration],
+        declaration.activity_pub_actor_url == ^actor_url and
+          declaration.activity_pub_transactional_mentions == true
+      )
+      |> Repo.all()
+
+    case declarations do
+      [%Declaration{app_origin: origin}] ->
+        if origin_allowed?(origin), do: {:ok, origin}, else: {:error, :domain_denied}
+
+      [] ->
+        :not_declared
+
+      _ ->
+        {:error, :ambiguous_actor}
+    end
+  end
+
+  def notification_origin_for_actor(_actor_url), do: :not_declared
 
   defp ensure_locked(manifest) do
     lock_origin(manifest.origin)

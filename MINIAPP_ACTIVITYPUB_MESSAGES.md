@@ -5,8 +5,8 @@
 > notification-consent decisions. The SDK and broker implement the typed
 > permission transport, and the host implements OAuth-gated state reads,
 > confirmation, persistence, and revocation UI. The OAuth-authenticated backend
-> permission endpoint is available. Actor-document activation and inbound
-> consent enforcement are not yet implemented.
+> permission endpoint and inbound transactional-message consent enforcement are
+> available. Actor-document activation is not yet implemented.
 
 This guide defines the smallest useful ActivityPub service a mini-app developer
 can operate for two distinct purposes:
@@ -264,10 +264,11 @@ Transactional constraints are strict:
 
 The receiving Egregoros instance verifies the normal ActivityPub signature and
 authorization rules, resolves the sender to a current mini-app declaration,
-and checks the local recipient's current consent. Without a matching grant it
-must not create a notification or direct-message timeline item. It should
-return a non-oracular success response after safe processing so revocation does
-not become a remote account-state probe.
+and checks both the local recipient's current notification consent and active
+OAuth grant. Without both grants it does not persist the activity or note and
+therefore cannot create a notification or direct-message timeline item. The
+inbound worker still returns a non-oracular success so revocation does not
+become a remote account-state probe.
 
 This receiver check is the decisive safety boundary: a stale or malicious app
 cannot restore revoked user-visible notifications merely by continuing to send
@@ -317,22 +318,22 @@ necessary but never sufficient to bypass moderation or abuse controls.
 - [ ] Delivery to the personal inbox only.
 - [ ] Private activity/note IDs do not disclose content publicly.
 - [ ] Sender-side unsubscribe and immediate enqueue suppression.
-- [ ] Receiver-side current-consent enforcement and immediate revocation.
+- [x] Receiver-side current-consent and OAuth enforcement with immediate revocation.
 - [ ] Adversarial tests for forged recipients, stale grants, replay, SSRF,
       signature failure, public-audience smuggling, rate abuse, and post-revoke
       delivery.
 
 ## 9. What remains to implement in Egregoros
 
-The manifest declaration, immutable persistence, and consent decision data
-model are implemented. A complete Egregoros flow still needs:
+The manifest declaration, immutable persistence, consent decision data model,
+and receiver-side suppression are implemented. A complete Egregoros flow still
+needs:
 
 1. SSRF-safe actor-document validation before activating the declaration;
-2. inbound transactional-mention recognition and consent enforcement;
-3. notification-specific audit events; and
-4. federation, security, and browser interoperability tests for the completed
+2. notification-specific audit events; and
+3. federation, security, and browser interoperability tests for the completed
    end-to-end flow.
 
-Until those pieces ship, an app may declare its actor and publish ordinary
-public ActivityPub notes, but it must not claim Egregoros-enforced consent for
-transactional mentions.
+Until actor activation ships, declarations are not cryptographically tied to
+the actor document and transactional delivery must remain an experimental,
+operator-controlled feature.

@@ -5,6 +5,7 @@ defmodule Egregoros.Pipeline do
   alias Egregoros.Domain
   alias Egregoros.Federation.ActorDiscovery
   alias Egregoros.Federation.ActivityLimits
+  alias Egregoros.MiniApps.TransactionalMessages
   alias Egregoros.Object
   alias Egregoros.Objects
   alias Egregoros.Repo
@@ -21,8 +22,12 @@ defmodule Egregoros.Pipeline do
          :ok <- validate_namespace(normalized_activity, opts),
          :ok <- validate_structure(normalized_activity, opts),
          :ok <- validate_authority(normalized_activity, opts),
-         {:ok, module} <- ActivityRegistry.fetch(normalized_activity) do
+         {:ok, module} <- ActivityRegistry.fetch(normalized_activity),
+         :allow <- TransactionalMessages.classify_inbound(normalized_activity, opts) do
       ingest_with(module, normalized_activity, opts)
+    else
+      :ignore -> {:ok, :ignored}
+      {:error, _reason} = error -> error
     end
   end
 

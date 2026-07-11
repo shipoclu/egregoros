@@ -64,13 +64,13 @@ can independently revoke mini-app context, OAuth, and wallet access from
 Settings → Privacy; revocation closes a matching active mini app in all open
 Egregoros tabs immediately.
 
-For developers considering app-owned public ActivityPub notes and future
+For developers considering app-owned public ActivityPub notes and
 consent-gated transactional mentions, see
 [`MINIAPP_ACTIVITYPUB_MESSAGES.md`](MINIAPP_ACTIVITYPUB_MESSAGES.md). The
 manifest declaration, consent data model, and typed SDK/broker transport are
 implemented together with host-owned consent and revocation UI; the backend
-permission endpoint is also implemented, while inbound transactional
-enforcement remains future work.
+permission endpoint and inbound transactional enforcement are also
+implemented. Actor-document activation remains future work.
 
 ## Architecture (quick tour)
 

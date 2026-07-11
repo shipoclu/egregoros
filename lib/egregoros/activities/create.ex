@@ -75,7 +75,11 @@ defmodule Egregoros.Activities.Create do
 
   def ingest(activity, opts) do
     with :ok <- validate_inbox_target(activity, opts),
-         {:ok, object} <- Pipeline.ingest(activity["object"], opts) do
+         {:ok, object} <-
+           Pipeline.ingest(
+             activity["object"],
+             Keyword.put(opts, :containing_create_actor, activity["actor"])
+           ) do
       activity
       |> to_object_attrs(object, opts)
       |> Objects.upsert_object()
