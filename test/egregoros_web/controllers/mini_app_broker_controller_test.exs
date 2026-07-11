@@ -22,7 +22,12 @@ defmodule EgregorosWeb.MiniAppBrokerControllerTest do
 
   test "serves a data-free broker with an exact app CSP and sandbox", %{conn: conn} do
     card = card_fixture()
-    conn = get(conn, "/mini-apps/broker/#{card.id}?launch_id=#{@launch_id}")
+
+    conn =
+      get(
+        conn,
+        "/mini-apps/broker/#{card.id}?launch_id=#{@launch_id}&resolution_token=#{card.resolution_token}"
+      )
 
     assert html_response(conn, 200) =~ ~s(src="https://app.example/read/chapter-2")
     assert conn.resp_body =~ ~s(sandbox="allow-scripts allow-forms allow-same-origin")
@@ -41,8 +46,36 @@ defmodule EgregorosWeb.MiniAppBrokerControllerTest do
 
   test "rejects stale cards and malformed launch identifiers", %{conn: conn} do
     card = card_fixture()
-    assert response(get(conn, "/mini-apps/broker/#{card.id}?launch_id=short"), 404)
-    assert response(get(conn, "/mini-apps/broker/missing?launch_id=#{@launch_id}"), 404)
+
+    assert response(
+             get(
+               conn,
+               "/mini-apps/broker/#{card.id}?launch_id=short&resolution_token=#{card.resolution_token}"
+             ),
+             404
+           )
+
+    assert response(
+             get(
+               conn,
+               "/mini-apps/broker/missing?launch_id=#{@launch_id}&resolution_token=#{card.resolution_token}"
+             ),
+             404
+           )
+  end
+
+  test "requires the exact immutable card resolution token", %{conn: conn} do
+    card = card_fixture()
+
+    assert response(get(conn, "/mini-apps/broker/#{card.id}?launch_id=#{@launch_id}"), 404)
+
+    assert response(
+             get(
+               conn,
+               "/mini-apps/broker/#{card.id}?launch_id=#{@launch_id}&resolution_token=#{Ecto.UUID.generate()}"
+             ),
+             404
+           )
   end
 
   test "rejects an app on the browser-visible session-cookie hostname at every port", %{
@@ -55,7 +88,13 @@ defmodule EgregorosWeb.MiniAppBrokerControllerTest do
       |> Map.put(:host, "App.Example.")
       |> Map.put(:port, 443)
 
-    assert response(get(conn, "/mini-apps/broker/#{card.id}?launch_id=#{@launch_id}"), 404)
+    assert response(
+             get(
+               conn,
+               "/mini-apps/broker/#{card.id}?launch_id=#{@launch_id}&resolution_token=#{card.resolution_token}"
+             ),
+             404
+           )
   end
 
   defp card_fixture(origin \\ "https://app.example") do

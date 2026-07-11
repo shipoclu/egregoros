@@ -8,12 +8,14 @@ defmodule Egregoros.MiniApps.Card do
   @primary_key {:id, FlakeId.Ecto.Type, autogenerate: true}
   @foreign_key_type FlakeId.Ecto.Type
   @required_fields ~w(
-    object_id source_url app_origin app_name title button_title launch_url resolved_at expires_at
+    object_id resolution_token source_url app_origin app_name title button_title launch_url
+    resolved_at expires_at
   )a
   @optional_fields ~w(image_url)a
 
   schema "mini_app_cards" do
     belongs_to :object, Egregoros.Object
+    field :resolution_token, Ecto.UUID
     field :source_url, :string
     field :app_origin, :string
     field :app_name, :string

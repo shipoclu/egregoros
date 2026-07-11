@@ -62,6 +62,7 @@ defmodule EgregorosWeb.ViewModels.StatusTest do
 
     assert entry.mini_app_card == %{
              id: card.id,
+             resolution_token: card.resolution_token,
              source_url: "https://app.example/shared/chapter-2",
              app_origin: "https://app.example",
              app_name: "Reader",

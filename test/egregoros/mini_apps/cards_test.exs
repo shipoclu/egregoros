@@ -5,8 +5,10 @@ defmodule Egregoros.MiniApps.CardsTest do
   alias Egregoros.MiniApps.Declarations
   alias Egregoros.MiniApps.Manifest
   alias Egregoros.MiniApps.ResolvedCard
+  alias Egregoros.MiniApps.Card
   alias Egregoros.Objects
   alias Egregoros.Repo
+  alias Egregoros.Workers.ResolveMiniAppCard
 
   @public "https://www.w3.org/ns/activitystreams#Public"
 
@@ -34,15 +36,39 @@ defmodule Egregoros.MiniApps.CardsTest do
     assert reloaded.internal == original_internal
   end
 
-  test "replaces the single card for a note" do
+  test "refreshes metadata without invalidating an unchanged app identity" do
     object = object_fixture()
 
     assert {:ok, first} = Cards.put(object, resolved_card("First"))
     assert {:ok, second} = Cards.put(object, resolved_card("Second"))
 
     assert first.id == second.id
+    assert first.resolution_token == second.resolution_token
+    assert Cards.active?(first)
+    assert Cards.active?(second)
+    assert Cards.get_active_by_id(second.id, second.resolution_token) == second
     assert Cards.get_active(object).title == "Second"
-    assert Repo.aggregate(Egregoros.MiniApps.Card, :count) == 1
+    assert Repo.aggregate(Card, :count) == 1
+  end
+
+  test "rotates identity when the exact source or launch URL changes" do
+    object = object_fixture()
+
+    assert {:ok, first} = Cards.put(object, resolved_card("First"))
+
+    replacement = %{
+      resolved_card("Second")
+      | source_url: "https://app.example/shared/chapter-3",
+        launch_url: "https://app.example/book/chapter-3"
+    }
+
+    assert {:ok, second} = Cards.put(object, replacement)
+
+    assert first.id == second.id
+    refute first.resolution_token == second.resolution_token
+    refute Cards.active?(first)
+    assert Cards.active?(second)
+    assert Cards.get_active_by_id(first.id, first.resolution_token) == nil
   end
 
   test "pins security declarations before caching a resolved card" do
@@ -62,16 +88,38 @@ defmodule Egregoros.MiniApps.CardsTest do
     assert Cards.get_active(object).title == "Wallet"
   end
 
-  test "expired cards are not active and cards can be cleared" do
+  test "expired cards remain available while a unique revalidation is enqueued" do
     object = object_fixture()
     assert {:ok, stored} = Cards.put(object, resolved_card("Reader"))
 
     past = DateTime.add(DateTime.utc_now(), -1, :second)
-    stored |> Ecto.Changeset.change(expires_at: past) |> Repo.update!()
+    expired = stored |> Ecto.Changeset.change(expires_at: past) |> Repo.update!()
+
+    assert Cards.get_active(object) == expired
+
+    assert_enqueued(
+      worker: ResolveMiniAppCard,
+      args: %{"object_id" => object.id, "resolution_token" => stored.resolution_token}
+    )
+
+    assert Cards.get_active_by_id(stored.id, stored.resolution_token) == expired
+    assert :ok = Cards.delete(object)
+    assert Repo.get(Card, stored.id) == nil
+  end
+
+  test "cards beyond the bounded stale grace are hidden but still revalidated" do
+    object = object_fixture()
+    assert {:ok, stored} = Cards.put(object, resolved_card("Reader"))
+
+    too_old = DateTime.add(DateTime.utc_now(), -3_601, :second)
+    stored |> Ecto.Changeset.change(expires_at: too_old) |> Repo.update!()
 
     assert Cards.get_active(object) == nil
-    assert :ok = Cards.delete(object)
-    assert Repo.get(Egregoros.MiniApps.Card, stored.id) == nil
+
+    assert_enqueued(
+      worker: ResolveMiniAppCard,
+      args: %{"object_id" => object.id, "resolution_token" => stored.resolution_token}
+    )
   end
 
   test "refuses to persist a card whose URLs cross the app origin" do

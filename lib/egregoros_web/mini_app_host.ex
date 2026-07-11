@@ -632,7 +632,9 @@ defmodule EgregorosWeb.MiniAppHost do
           <iframe
             id="mini-app-frame"
             title={@state.card.app_name <> " mini app"}
-            src={~p"/mini-apps/broker/#{@state.card.id}?launch_id=#{@state.launch_id}"}
+            src={
+              ~p"/mini-apps/broker/#{@state.card.id}?launch_id=#{@state.launch_id}&resolution_token=#{@state.card.resolution_token}"
+            }
             referrerpolicy="no-referrer"
             class={[
               "h-full w-full border-0 transition-opacity duration-200",
@@ -646,8 +648,12 @@ defmodule EgregorosWeb.MiniAppHost do
     """
   end
 
-  defp handle_host_event("mini_app_open", %{"card_id" => card_id}, socket) do
-    case Cards.get_active_by_id(card_id) do
+  defp handle_host_event(
+         "mini_app_open",
+         %{"card_id" => card_id, "resolution_token" => resolution_token},
+         socket
+       ) do
+    case Cards.get_active_by_id(card_id, resolution_token) do
       %Card{} = card ->
         wallet_declaration = Declarations.get_by_origin(card.app_origin)
 
@@ -674,6 +680,8 @@ defmodule EgregorosWeb.MiniAppHost do
         {:halt, socket}
     end
   end
+
+  defp handle_host_event("mini_app_open", _params, socket), do: {:halt, socket}
 
   defp handle_host_event("mini_app_collapse", _params, socket) do
     {:halt, update_status(socket, :collapsed)}
@@ -714,7 +722,8 @@ defmodule EgregorosWeb.MiniAppHost do
 
     with %{request_id: request_id} <- state.context_request,
          true <- is_binary(user_id),
-         %Card{} = card <- Cards.get_active_by_id(state.card.id),
+         %Card{} = card <-
+           Cards.get_active_by_id(state.card.id, state.card.resolution_token),
          {:ok, _consent} <- ContextConsents.grant(user_id, card.app_origin) do
       {:halt, release_context(socket, card, request_id)}
     else
@@ -1298,7 +1307,7 @@ defmodule EgregorosWeb.MiniAppHost do
     Phoenix.Component.assign(socket, :mini_app_host, %{state | ready?: ready?})
   end
 
-  defp active_card?(%Card{id: id}), do: match?(%Card{}, Cards.get_active_by_id(id))
+  defp active_card?(%Card{} = card), do: Cards.active?(card)
   defp active_card?(_card), do: false
 
   defp launch_id do

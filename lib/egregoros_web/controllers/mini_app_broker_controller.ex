@@ -5,9 +5,13 @@ defmodule EgregorosWeb.MiniAppBrokerController do
   alias Egregoros.MiniApps.Card
   alias Egregoros.PublicHostPolicy
 
-  def show(conn, %{"card_id" => card_id, "launch_id" => launch_id}) do
+  def show(conn, %{
+        "card_id" => card_id,
+        "launch_id" => launch_id,
+        "resolution_token" => resolution_token
+      }) do
     with true <- valid_launch_id?(launch_id),
-         %Card{} = card <- Cards.get_active_by_id(card_id),
+         %Card{} = card <- Cards.get_active_by_id(card_id, resolution_token),
          false <- cookie_host_app?(card, conn.host) do
       nonce = :crypto.strong_rand_bytes(18) |> Base.url_encode64(padding: false)
 

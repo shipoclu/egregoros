@@ -25,7 +25,11 @@ defmodule EgregorosWeb.MiniAppAssetControllerTest do
         {:ok, %{status: 200, body: png, headers: [{"content-type", "image/png"}]}}
     end)
 
-    conn = get(conn, "/mini-app-assets/#{card.id}/image")
+    conn =
+      get(
+        conn,
+        "/mini-app-assets/#{card.id}/image?resolution_token=#{card.resolution_token}"
+      )
 
     assert conn.status == 200
     assert conn.resp_body == png
@@ -40,7 +44,28 @@ defmodule EgregorosWeb.MiniAppAssetControllerTest do
       flunk("unknown card IDs must not trigger fetches")
     end)
 
-    conn = get(conn, "/mini-app-assets/#{Ecto.UUID.generate()}/image")
+    conn =
+      get(
+        conn,
+        "/mini-app-assets/#{Ecto.UUID.generate()}/image?resolution_token=#{Ecto.UUID.generate()}"
+      )
+
+    assert response(conn, 404)
+  end
+
+  test "rejects a token from a different card resolution without fetching", %{conn: conn} do
+    card = card_fixture("https://app.example/card.png")
+
+    expect(Egregoros.MiniApps.Fetcher.Mock, :get, 0, fn _url, _kind ->
+      flunk("mismatched card resolutions must not trigger fetches")
+    end)
+
+    conn =
+      get(
+        conn,
+        "/mini-app-assets/#{card.id}/image?resolution_token=#{Ecto.UUID.generate()}"
+      )
+
     assert response(conn, 404)
   end
 
@@ -51,7 +76,12 @@ defmodule EgregorosWeb.MiniAppAssetControllerTest do
       "https://app.example/card.png", :asset -> {:error, :timeout}
     end)
 
-    conn = get(conn, "/mini-app-assets/#{card.id}/image")
+    conn =
+      get(
+        conn,
+        "/mini-app-assets/#{card.id}/image?resolution_token=#{card.resolution_token}"
+      )
+
     assert response(conn, 502) == "Unable to load image"
     assert get_resp_header(conn, "cache-control") == ["private, no-store, max-age=0"]
   end

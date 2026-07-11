@@ -7,11 +7,11 @@ defmodule EgregorosWeb.MiniAppAssetController do
 
   @image_content_types ~w(image/avif image/webp image/png image/jpeg image/gif)
 
-  def image(conn, %{"card_id" => card_id}) do
+  def image(conn, %{"card_id" => card_id, "resolution_token" => resolution_token}) do
     conn = no_store(conn)
 
     with %Card{image_url: image_url} when is_binary(image_url) and image_url != "" <-
-           Cards.get_active_by_id(card_id),
+           Cards.get_active_by_id(card_id, resolution_token),
          {:ok, %{body: body, headers: headers}} <- Fetcher.get(image_url, :asset),
          content_type when content_type in @image_content_types <- content_type(headers),
          true <- is_binary(body) do
@@ -24,6 +24,12 @@ defmodule EgregorosWeb.MiniAppAssetController do
       %Card{} -> send_resp(conn, 404, "Not found")
       _ -> send_resp(conn, 502, "Unable to load image")
     end
+  end
+
+  def image(conn, _params) do
+    conn
+    |> no_store()
+    |> send_resp(404, "Not found")
   end
 
   defp no_store(conn) do

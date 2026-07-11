@@ -174,6 +174,67 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
     assert_push_event(view, "mini_app_frame_reload", %{launch_id: ^new_launch_id})
   end
 
+  test "does not grant context after the opened card resolution is replaced", %{
+    conn: conn,
+    user: user
+  } do
+    {:ok, note} =
+      Pipeline.ingest(
+        Note.build(user, ~s(<a href="https://app.example/shared/chapter-2">reader</a>)),
+        local: true
+      )
+
+    assert {:ok, opened_card} = Cards.put(note, resolved_card())
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/?timeline=public")
+    view |> element("[data-role='open-mini-app']") |> render_click()
+
+    state = :sys.get_state(view.pid).socket.assigns.mini_app_host
+    render_hook(view, "mini_app_ready", %{"launch_id" => state.launch_id})
+
+    render_hook(view, "mini_app_context_request", %{
+      "launch_id" => state.launch_id,
+      "request_id" => "ctx-swap"
+    })
+
+    assert has_element?(view, "#mini-app-context-consent", "app.example")
+
+    replacement_manifest = %{
+      resolved_card().manifest
+      | name: "Replacement",
+        origin: "https://replacement.example",
+        home_url: "https://replacement.example/"
+    }
+
+    replacement = %{
+      resolved_card()
+      | source_url: "https://replacement.example/shared/chapter-2",
+        app_origin: "https://replacement.example",
+        app_name: "Replacement",
+        launch_url: "https://replacement.example/book/chapter-2",
+        image_url: "https://replacement.example/card.png",
+        manifest: replacement_manifest
+    }
+
+    assert {:ok, replacement_card} = Cards.put(note, replacement)
+    assert opened_card.id == replacement_card.id
+    refute opened_card.resolution_token == replacement_card.resolution_token
+
+    view |> element("#mini-app-context-approve") |> render_click()
+
+    assert_push_event(view, "mini_app_context_response", %{
+      launch_id: _,
+      request_id: "ctx-swap",
+      status: "unavailable",
+      context: nil
+    })
+
+    refute Egregoros.MiniApps.ContextConsents.approved?(
+             user.id,
+             "https://replacement.example"
+           )
+  end
+
   test "validates auth requests against the card origin and presents a host-controlled prompt", %{
     conn: conn,
     user: user

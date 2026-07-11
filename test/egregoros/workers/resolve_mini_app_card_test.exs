@@ -66,7 +66,44 @@ defmodule Egregoros.Workers.ResolveMiniAppCardTest do
 
     {:ok, object} = Objects.update_object(object, %{data: Map.put(object.data, "to", [])})
 
-    assert :ok = ResolveMiniAppCard.perform(%Oban.Job{args: %{"object_id" => object.id}})
+    assert :ok = ResolveMiniAppCard.maybe_enqueue(object)
+    assert Cards.get_active(object) == nil
+    refute_enqueued(worker: ResolveMiniAppCard, args: %{"object_id" => object.id})
+  end
+
+  test "invalidates an old card before attempting a changed candidate" do
+    object = note_fixture(~s(<a href="https://app.example/read">reader</a>))
+    enable_mini_apps()
+    {:ok, old_card} = stored_card_fixture(object)
+
+    {:ok, object} =
+      Objects.update_object(object, %{
+        data:
+          Map.put(
+            object.data,
+            "content",
+            ~s(<a href="https://replacement.example/read">replacement</a>)
+          )
+      })
+
+    assert :ok = ResolveMiniAppCard.maybe_enqueue(object)
+    assert Cards.get_active_by_id(old_card.id, old_card.resolution_token) == nil
+
+    assert_enqueued(
+      worker: ResolveMiniAppCard,
+      args: %{"object_id" => object.id}
+    )
+
+    expect(Egregoros.MiniApps.Fetcher.Mock, :get, fn
+      "https://replacement.example/.well-known/fediverse-miniapp.json", :manifest ->
+        {:error, :timeout}
+    end)
+
+    Egregoros.Config.with_impl(Egregoros.Config.Mock, fn ->
+      assert {:error, :no_mini_app} =
+               ResolveMiniAppCard.perform(%Oban.Job{args: %{"object_id" => object.id}})
+    end)
+
     assert Cards.get_active(object) == nil
   end
 
@@ -90,6 +127,44 @@ defmodule Egregoros.Workers.ResolveMiniAppCardTest do
       assert {:error, :no_mini_app} =
                ResolveMiniAppCard.perform(%Oban.Job{args: %{"object_id" => object.id}})
     end)
+  end
+
+  test "never stores a resolution for an object revision changed during network fetches" do
+    object = note_fixture(~s(<a href="https://app.example/read">reader</a>))
+    enable_mini_apps()
+
+    expect(Egregoros.MiniApps.Fetcher.Mock, :get, 4, fn
+      "https://app.example/.well-known/fediverse-miniapp.json", :manifest ->
+        ok_response(manifest_json("https://app.example"), "application/json")
+
+      "https://app.example/read", :page ->
+        {:ok, _updated} =
+          Objects.update_object(object, %{
+            data:
+              Map.put(
+                object.data,
+                "content",
+                ~s(<a href="https://replacement.example/read">replacement</a>)
+              )
+          })
+
+        ok_response("<html><body>Old</body></html>", "text/html")
+
+      "https://replacement.example/.well-known/fediverse-miniapp.json", :manifest ->
+        ok_response(manifest_json("https://replacement.example"), "application/json")
+
+      "https://replacement.example/read", :page ->
+        ok_response("<html><body>Replacement</body></html>", "text/html")
+    end)
+
+    Egregoros.Config.with_impl(Egregoros.Config.Mock, fn ->
+      assert :ok =
+               ResolveMiniAppCard.perform(%Oban.Job{args: %{"object_id" => object.id}})
+    end)
+
+    assert stored = Cards.get_active(object)
+    assert stored.source_url == "https://replacement.example/read"
+    assert stored.app_origin == "https://replacement.example"
   end
 
   test "does not enqueue an unpersisted note" do
@@ -158,5 +233,15 @@ defmodule Egregoros.Workers.ResolveMiniAppCardTest do
 
   defp ok_response(body, content_type) do
     {:ok, %{status: 200, body: body, headers: [{"content-type", content_type}]}}
+  end
+
+  defp manifest_json(origin) do
+    Jason.encode!(%{
+      "version" => "1",
+      "name" => "Reader",
+      "homeUrl" => origin <> "/",
+      "capabilities" => [],
+      "cacheTtlSeconds" => 600
+    })
   end
 end

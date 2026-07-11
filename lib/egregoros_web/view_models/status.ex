@@ -443,6 +443,7 @@ defmodule EgregorosWeb.ViewModels.Status do
       %Egregoros.MiniApps.Card{} = card ->
         Map.put(decorated, :mini_app_card, %{
           id: card.id,
+          resolution_token: card.resolution_token,
           source_url: card.source_url,
           app_origin: card.app_origin,
           app_name: card.app_name,

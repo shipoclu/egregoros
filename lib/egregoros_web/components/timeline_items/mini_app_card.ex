@@ -17,7 +17,7 @@ defmodule EgregorosWeb.Components.TimelineItems.MiniAppCard do
         <div class="relative flex w-24 shrink-0 items-center justify-center overflow-hidden border-r-2 border-[color:var(--border-default)] bg-[color:var(--accent-subtle)] sm:w-32">
           <img
             :if={is_binary(@card.image_url)}
-            src={~p"/mini-app-assets/#{@card.id}/image"}
+            src={~p"/mini-app-assets/#{@card.id}/image?resolution_token=#{@card.resolution_token}"}
             alt=""
             loading="lazy"
             decoding="async"
@@ -49,6 +49,7 @@ defmodule EgregorosWeb.Components.TimelineItems.MiniAppCard do
             type="button"
             data-role="open-mini-app"
             data-mini-app-card-id={@card.id}
+            data-mini-app-resolution-token={@card.resolution_token}
             data-mini-app-origin={@card.app_origin}
             data-mini-app-source-url={@card.source_url}
             data-mini-app-launch-url={@card.launch_url}
@@ -56,12 +57,18 @@ defmodule EgregorosWeb.Components.TimelineItems.MiniAppCard do
               JS.dispatch("egregoros:mini-app-open",
                 detail: %{
                   cardId: @card.id,
+                  resolutionToken: @card.resolution_token,
                   appOrigin: @card.app_origin,
                   sourceUrl: @card.source_url,
                   launchUrl: @card.launch_url
                 }
               )
-              |> JS.push("mini_app_open", value: %{"card_id" => @card.id})
+              |> JS.push("mini_app_open",
+                value: %{
+                  "card_id" => @card.id,
+                  "resolution_token" => @card.resolution_token
+                }
+              )
             }
             class="mt-3 inline-flex cursor-pointer items-center gap-2 border-2 border-[color:var(--border-default)] bg-[color:var(--text-primary)] px-4 py-2 text-sm font-bold text-[color:var(--bg-base)] transition hover:-translate-y-0.5 hover:shadow-[3px_3px_0_var(--accent)] focus-visible:outline-none focus-brutal"
           >
