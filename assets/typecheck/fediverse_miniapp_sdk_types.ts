@@ -16,7 +16,19 @@ const chainId: Hex = await provider.request({method: "eth_chainId", params: []})
 const accounts: EvmAddress[] = await provider.request({method: "eth_requestAccounts", params: []})
 const signature: Hex = await provider.request({
   method: "personal_sign",
-  params: ["hello", accounts[0]],
+  params: ["0x68656c6c6f", accounts[0]],
+})
+const transactionHash: Hex = await provider.request({
+  method: "eth_sendTransaction",
+  params: [{
+    from: accounts[0],
+    to: "0x2222222222222222222222222222222222222222",
+    type: "0x2",
+    accessList: [{
+      address: "0x2222222222222222222222222222222222222222",
+      storageKeys: ["0x0000000000000000000000000000000000000000000000000000000000000000"],
+    }],
+  }],
 })
 const notificationPermission: MiniAppNotificationPermission =
   await sdk.notifications.getPermission()
@@ -32,5 +44,6 @@ void issuer
 void noteId
 void chainId
 void signature
+void transactionHash
 void notificationPermission
 void requestedNotificationPermission

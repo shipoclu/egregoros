@@ -662,7 +662,10 @@ test("privileged wallet methods require activation and exact bounded payloads", 
     ...personal,
     requestId: "typed-1",
     method: "eth_signTypedData_v4",
-    params: [account, '{"types":{},"primaryType":"Mail","domain":{},"message":{}}'],
+    params: [
+      account,
+      '{"types":{"EIP712Domain":[],"Mail":[]},"primaryType":"Mail","domain":{},"message":{}}',
+    ],
   })
   appPort.postMessage({
     ...personal,
@@ -670,9 +673,10 @@ test("privileged wallet methods require activation and exact bounded payloads", 
     method: "eth_sendTransaction",
     params: [
       {
-        from: account,
+        from: account.toUpperCase().replace("0X", "0x"),
         to: "0x2222222222222222222222222222222222222222",
-        value: "0x1",
+        value: "0xA",
+        data: "0xAB",
       },
     ],
   })
@@ -683,7 +687,10 @@ test("privileged wallet methods require activation and exact bounded payloads", 
     {
       requestId: "typed-1",
       method: "eth_signTypedData_v4",
-      params: [account, '{"types":{},"primaryType":"Mail","domain":{},"message":{}}'],
+      params: [
+        account,
+        '{"domain":{},"message":{},"primaryType":"Mail","types":{"EIP712Domain":[],"Mail":[]}}',
+      ],
     },
     {
       requestId: "tx-1",
@@ -692,7 +699,8 @@ test("privileged wallet methods require activation and exact bounded payloads", 
         {
           from: account,
           to: "0x2222222222222222222222222222222222222222",
-          value: "0x1",
+          data: "0xab",
+          value: "0xa",
         },
       ],
     },

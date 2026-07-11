@@ -70,6 +70,11 @@ export interface MiniAppNotificationPermission {
   readonly actorUrl: string
 }
 
+export interface EvmAccessListEntry {
+  readonly address: EvmAddress
+  readonly storageKeys: readonly Hex[]
+}
+
 export interface EvmTransactionRequest {
   readonly from: EvmAddress
   readonly to?: EvmAddress
@@ -81,6 +86,8 @@ export interface EvmTransactionRequest {
   readonly maxPriorityFeePerGas?: Hex
   readonly nonce?: Hex
   readonly chainId?: Hex
+  readonly type?: Hex
+  readonly accessList?: readonly EvmAccessListEntry[]
 }
 
 export type EvmWalletRequest =
@@ -89,7 +96,7 @@ export type EvmWalletRequest =
   | {readonly method: "eth_requestAccounts"; readonly params?: readonly []}
   | {
       readonly method: "personal_sign"
-      readonly params: readonly [message: string, account: EvmAddress]
+      readonly params: readonly [message: Hex, account: EvmAddress]
     }
   | {
       readonly method: "eth_signTypedData_v4"
@@ -110,8 +117,14 @@ export interface MiniAppEvmProvider {
   ): Promise<EvmAddress[]>
   request(
     args: {
-      readonly method: "personal_sign" | "eth_signTypedData_v4"
-      readonly params: readonly [string, EvmAddress] | readonly [EvmAddress, string]
+      readonly method: "personal_sign"
+      readonly params: readonly [Hex, EvmAddress]
+    }
+  ): Promise<Hex>
+  request(
+    args: {
+      readonly method: "eth_signTypedData_v4"
+      readonly params: readonly [EvmAddress, string]
     }
   ): Promise<Hex>
   request(args: {

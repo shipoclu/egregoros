@@ -1,4 +1,9 @@
-import {validEvmWalletPayload} from "../wallet/injected_evm_wallet_adapter.mjs"
+import {
+  normalizeEvmWalletErrorCode,
+  normalizeEvmWalletPayload,
+  normalizeEvmWalletResult,
+  privilegedEvmWalletMethod,
+} from "../wallet/evm_wallet_schema.mjs"
 
 const protocolVersion = "1"
 const launchIdPattern = /^[A-Za-z0-9_-]{43}$/
@@ -98,7 +103,7 @@ export const createFediverseMiniAppSDK = ({
     clearTimeout(request.timer)
 
     try {
-      request.resolve(transform(message))
+      request.resolve(transform(message, request))
     } catch (error) {
       request.reject(error)
     }
@@ -240,21 +245,28 @@ export const createFediverseMiniAppSDK = ({
 
     if (message.type === "walletResult") {
       const baseFields = ["type", "version", "launchId", "requestId"]
-      const valid =
-        exactFields(message, [...baseFields, "result"]) ||
-        (exactFields(message, [...baseFields, "error"]) &&
-          message.error &&
-          typeof message.error === "object" &&
-          !Array.isArray(message.error) &&
-          exactFields(message.error, ["code", "message"]) &&
-          Number.isInteger(message.error.code) &&
-          typeof message.error.message === "string")
-      if (!valid || !requestIdPattern.test(message.requestId || "")) return
-      settle(message, "requestId", "walletResult", result => {
-        if (result.error) {
-          throw miniAppError(result.error.code, result.error.message || "Wallet request failed")
+      if (!requestIdPattern.test(message.requestId || "")) return
+      settle(message, "requestId", "walletResult", (result, request) => {
+        if (
+          exactFields(result, [...baseFields, "error"]) &&
+          result.error &&
+          typeof result.error === "object" &&
+          !Array.isArray(result.error) &&
+          exactFields(result.error, ["code", "message"]) &&
+          Number.isInteger(result.error.code) &&
+          typeof result.error.message === "string" &&
+          result.error.message.length <= 256
+        ) {
+          throw miniAppError(normalizeEvmWalletErrorCode(result.error.code), "Wallet request failed")
         }
-        return result.result
+        if (!exactFields(result, [...baseFields, "result"])) {
+          throw miniAppError(-32603, "Invalid wallet response")
+        }
+        try {
+          return normalizeEvmWalletResult(request.walletMethod, result.result)
+        } catch (_error) {
+          throw miniAppError(-32603, "Invalid wallet response")
+        }
       })
     }
   }
@@ -298,7 +310,7 @@ export const createFediverseMiniAppSDK = ({
     port.postMessage({...message, version: protocolVersion, launchId: bootstrapData.launchId})
   }
 
-  const request = async (message, responseType, correlationField = "requestId") => {
+  const request = async (message, responseType, correlationField = "requestId", metadata = {}) => {
     await connected
     const id = randomId(cryptoObject)
     const envelope = {...message, [correlationField]: id}
@@ -309,7 +321,7 @@ export const createFediverseMiniAppSDK = ({
         reject(miniAppError("TIMEOUT", `${message.type} timed out`))
       }, timeoutMs)
 
-      pending.set(id, {resolve, reject, timer, responseType})
+      pending.set(id, {resolve, reject, timer, responseType, ...metadata})
       send(envelope).catch(error => {
         clearTimeout(timer)
         pending.delete(id)
@@ -332,16 +344,14 @@ export const createFediverseMiniAppSDK = ({
       if (!bootstrapData.capabilities.includes("wallet.evm")) {
         throw miniAppError(4200, "EVM wallet capability is unavailable")
       }
-      if (!validEvmWalletPayload(payload || {})) {
+      let normalized
+      try {
+        normalized = normalizeEvmWalletPayload(payload || {})
+      } catch (_error) {
         throw miniAppError(-32602, "Invalid wallet parameters")
       }
 
-      if (
-        ["eth_requestAccounts", "personal_sign", "eth_signTypedData_v4", "eth_sendTransaction"].includes(
-          payload.method
-        ) &&
-        !userActivation()
-      ) {
+      if (privilegedEvmWalletMethod(normalized.method) && !userActivation()) {
         throw miniAppError(
           "USER_ACTIVATION_REQUIRED",
           "Privileged wallet requests require a user gesture"
@@ -351,11 +361,13 @@ export const createFediverseMiniAppSDK = ({
       return request(
         {
           type: "walletRequest",
-          method: payload.method,
-          params: payload.params || [],
+          method: normalized.method,
+          params: normalized.params,
           userActivation: userActivation(),
         },
-        "walletResult"
+        "walletResult",
+        "requestId",
+        {walletMethod: normalized.method}
       )
     },
   })

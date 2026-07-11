@@ -5,7 +5,12 @@ import {
 } from "../lib/mini_app_auth_relay.mjs"
 import {createMiniAppReadiness} from "../lib/mini_app_readiness.mjs"
 import {selectEvmWalletAdapter} from "../wallet/evm_wallet_adapter.mjs"
-import {walletContextMatches} from "../wallet/wallet_execution_guard.mjs"
+import {evmWalletErrorCode} from "../wallet/evm_wallet_schema.mjs"
+import {
+  createWalletExecutionTracker,
+  executeWalletRequest,
+  normalizeWalletExecution,
+} from "../wallet/wallet_execution_guard.mjs"
 
 const MiniAppHost = {
   mounted() {
@@ -13,6 +18,7 @@ const MiniAppHost = {
     this.frame = null
     this.brokerKey = null
     this.walletAdapter = selectEvmWalletAdapter({ethereum: window.ethereum})
+    this.walletExecutionTracker = createWalletExecutionTracker()
     this.walletCheckPending = false
     this.walletCompatible = null
     this.walletConfigKey = null
@@ -172,35 +178,38 @@ const MiniAppHost = {
       })
     })
     this.handleEvent("mini_app_wallet_execute", async payload => {
-      if (payload?.launch_id !== this.el.dataset.launchId) return
+      let execution
+      try {
+        execution = normalizeWalletExecution(payload, this.el.dataset.launchId)
+      } catch (_error) {
+        return
+      }
 
       try {
-        if (payload.expected_chain_id || payload.expected_accounts) {
-          const matches = await walletContextMatches(this.walletAdapter, {
-            chainId: payload.expected_chain_id,
-            accounts: payload.expected_accounts,
-          })
-          if (!matches) {
-            throw Object.assign(new Error("Wallet account or chain changed"), {code: 4901})
-          }
-        }
-
-        const result = await this.walletAdapter.request({
-          method: payload.method,
-          params: payload.params,
-        })
+        const completed = await executeWalletRequest(
+          this.walletAdapter,
+          payload,
+          this.el.dataset.launchId,
+          this.walletExecutionTracker
+        )
         this.pushEvent("mini_app_wallet_execution_result", {
-          launch_id: payload.launch_id,
-          request_id: payload.request_id,
+          launch_id: execution.launchId,
+          request_id: completed.requestId,
+          execution_token: completed.executionToken,
+          method: completed.method,
           status: "ok",
-          result,
+          result: completed.result,
         })
       } catch (error) {
+        const code = evmWalletErrorCode(error)
+        if (code === 4100) return
         this.pushEvent("mini_app_wallet_execution_result", {
-          launch_id: payload.launch_id,
-          request_id: payload.request_id,
+          launch_id: execution.launchId,
+          request_id: execution.requestId,
+          execution_token: execution.executionToken,
+          method: execution.method,
           status: "error",
-          code: Number.isInteger(error?.code) ? error.code : 4001,
+          code,
         })
       }
     })
@@ -271,6 +280,7 @@ const MiniAppHost = {
 
   initializeWallet() {
     this.walletConfigKey = this.walletConfigurationKey()
+    this.walletExecutionTracker = createWalletExecutionTracker()
     const configKey = this.walletConfigKey
     const required = this.el.dataset.walletRequired === "true"
     if (!required) {

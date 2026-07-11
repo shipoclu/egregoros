@@ -632,12 +632,17 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
       launch_id: ^launch_id,
       request_id: "wallet-chain",
       method: "eth_chainId",
-      params: []
+      params: [],
+      execution_token: chain_token
     })
+
+    assert byte_size(chain_token) == 43
 
     render_hook(view, "mini_app_wallet_execution_result", %{
       "launch_id" => launch_id,
       "request_id" => "wallet-chain",
+      "method" => "eth_chainId",
+      "execution_token" => chain_token,
       "status" => "ok",
       "result" => "0x2105"
     })
@@ -655,9 +660,19 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
       "params" => []
     })
 
+    assert_push_event(view, "mini_app_wallet_execute", %{
+      launch_id: ^launch_id,
+      request_id: "wallet-chain-error",
+      method: "eth_chainId",
+      params: [],
+      execution_token: chain_error_token
+    })
+
     render_hook(view, "mini_app_wallet_execution_result", %{
       "launch_id" => launch_id,
       "request_id" => "wallet-chain-error",
+      "method" => "eth_chainId",
+      "execution_token" => chain_error_token,
       "status" => "error",
       "code" => 4900
     })
@@ -675,9 +690,19 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
       "params" => []
     })
 
+    assert_push_event(view, "mini_app_wallet_execute", %{
+      launch_id: ^launch_id,
+      request_id: "wallet-chain-invalid",
+      method: "eth_chainId",
+      params: [],
+      execution_token: chain_invalid_token
+    })
+
     render_hook(view, "mini_app_wallet_execution_result", %{
       "launch_id" => launch_id,
       "request_id" => "wallet-chain-invalid",
+      "method" => "eth_chainId",
+      "execution_token" => chain_invalid_token,
       "status" => "ok",
       "result" => "not-a-chain"
     })
@@ -732,7 +757,8 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
       launch_id: ^launch_id,
       request_id: "wallet-connect-2",
       method: "eth_requestAccounts",
-      params: []
+      params: [],
+      execution_token: connect_token
     })
 
     accounts = [
@@ -743,6 +769,8 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
     render_hook(view, "mini_app_wallet_execution_result", %{
       "launch_id" => launch_id,
       "request_id" => "wallet-connect-2",
+      "method" => "eth_requestAccounts",
+      "execution_token" => connect_token,
       "status" => "ok",
       "result" => accounts
     })
@@ -766,12 +794,15 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
       launch_id: ^launch_id,
       request_id: "wallet-accounts-2",
       method: "eth_accounts",
-      params: []
+      params: [],
+      execution_token: accounts_token
     })
 
     render_hook(view, "mini_app_wallet_execution_result", %{
       "launch_id" => launch_id,
       "request_id" => "wallet-accounts-2",
+      "method" => "eth_accounts",
+      "execution_token" => accounts_token,
       "status" => "ok",
       "result" => [List.first(accounts), "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]
     })
@@ -873,6 +904,12 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
     assert has_element?(view, "#mini-app-wallet-approval[data-method='personal_sign']")
     assert has_element?(view, "#mini-app-wallet-review-message", "0x68656c6c6f")
 
+    assert has_element?(
+             view,
+             "#mini-app-wallet-review-exact",
+             ~s({"method":"personal_sign","params":["0x68656c6c6f","#{account}"]})
+           )
+
     view |> element("#mini-app-wallet-approve") |> render_click()
 
     assert_push_event(view, "mini_app_wallet_execute", %{
@@ -881,14 +918,47 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
       method: "personal_sign",
       params: ^params,
       expected_chain_id: "0x2105",
-      expected_accounts: [^account]
+      expected_accounts: [^account],
+      execution_token: execution_token
     })
+
+    assert byte_size(execution_token) == 43
 
     signature = "0x" <> String.duplicate("ab", 65)
 
     render_hook(view, "mini_app_wallet_execution_result", %{
       "launch_id" => launch_id,
       "request_id" => "sign-1",
+      "method" => "eth_sendTransaction",
+      "execution_token" => execution_token,
+      "status" => "ok",
+      "result" => signature
+    })
+
+    refute_push_event(view, "mini_app_wallet_response", %{
+      launch_id: ^launch_id,
+      request_id: "sign-1"
+    })
+
+    render_hook(view, "mini_app_wallet_execution_result", %{
+      "launch_id" => launch_id,
+      "request_id" => "sign-1",
+      "method" => "personal_sign",
+      "execution_token" => String.duplicate("x", 43),
+      "status" => "ok",
+      "result" => signature
+    })
+
+    refute_push_event(view, "mini_app_wallet_response", %{
+      launch_id: ^launch_id,
+      request_id: "sign-1"
+    })
+
+    render_hook(view, "mini_app_wallet_execution_result", %{
+      "launch_id" => launch_id,
+      "request_id" => "sign-1",
+      "method" => "personal_sign",
+      "execution_token" => execution_token,
       "status" => "ok",
       "result" => signature
     })

@@ -1,4 +1,7 @@
-import {validEvmWalletPayload} from "../wallet/injected_evm_wallet_adapter.mjs"
+import {
+  normalizeEvmWalletPayload,
+  privilegedEvmWalletMethod,
+} from "../wallet/evm_wallet_schema.mjs"
 
 const protocolVersion = "1"
 const defaultLimits = Object.freeze({
@@ -261,23 +264,34 @@ const validExternalRequest = (message, launchId) =>
   validHttpsUrl(message.url) &&
   message.userActivation === true
 
-const validWalletRequest = (message, launchId) =>
-  !!message &&
-  typeof message === "object" &&
-  !Array.isArray(message) &&
-  Object.keys(message).length === 7 &&
-  Object.keys(message).every(key =>
-    ["type", "version", "launchId", "requestId", "method", "params", "userActivation"].includes(key)
-  ) &&
-  message.type === "walletRequest" &&
-  message.version === protocolVersion &&
-  message.launchId === launchId &&
-  validRequestId(message.requestId) &&
-  validEvmWalletPayload({method: message.method, params: message.params}) &&
-  (!["eth_requestAccounts", "personal_sign", "eth_signTypedData_v4", "eth_sendTransaction"].includes(
-    message.method
-  ) || message.userActivation === true) &&
-  typeof message.userActivation === "boolean"
+const normalizeWalletMessagePayload = message => {
+  try {
+    return normalizeEvmWalletPayload({method: message.method, params: message.params})
+  } catch (_error) {
+    return null
+  }
+}
+
+const validWalletRequest = (message, launchId) => {
+  if (
+    !message ||
+    typeof message !== "object" ||
+    Array.isArray(message) ||
+    Object.keys(message).length !== 7 ||
+    !Object.keys(message).every(key =>
+      ["type", "version", "launchId", "requestId", "method", "params", "userActivation"].includes(key)
+    ) ||
+    message.type !== "walletRequest" ||
+    message.version !== protocolVersion ||
+    message.launchId !== launchId ||
+    !validRequestId(message.requestId) ||
+    typeof message.userActivation !== "boolean"
+  ) {
+    return false
+  }
+  const payload = normalizeWalletMessagePayload(message)
+  return !!payload && (!privilegedEvmWalletMethod(payload.method) || message.userActivation === true)
+}
 
 export const createMiniAppBroker = ({
   iframe,
@@ -480,10 +494,11 @@ export const createMiniAppBroker = ({
         validWalletRequest(message, launchId) &&
         acceptOnce(`wallet:${message.requestId}`)
       ) {
+        const payload = normalizeWalletMessagePayload(message)
         onWalletRequest?.({
           requestId: message.requestId,
-          method: message.method,
-          params: structuredClone(message.params),
+          method: payload.method,
+          params: payload.params,
         })
       }
     }

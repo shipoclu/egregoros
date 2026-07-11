@@ -300,6 +300,67 @@ test("requires a current user gesture before privileged host actions", async () 
   hostPort.close()
 })
 
+test("normalizes wallet requests and rejects malformed wallet results without waiting for timeout", async () => {
+  const f = fixture()
+  const sdk = createFediverseMiniAppSDK({
+    windowObject: f.windowObject,
+    parentWindow: f.parentWindow,
+    cryptoObject: f.cryptoObject,
+    navigatorObject: {userActivation: {isActive: true}},
+    allowedHostOrigin: () => true,
+    timeoutMs: 1_000,
+  })
+  const hostPort = f.bootstrap()
+  await sdk.connect()
+
+  const account = "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+  const recipient = "0xBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"
+  const walletMessage = nextMessage(hostPort)
+  const walletPromise = sdk.wallet.getProvider().request({
+    method: "eth_sendTransaction",
+    params: [{from: account, to: recipient, value: "0xA", data: "0xAB"}],
+  })
+  const request = await walletMessage
+  assert.deepEqual(request.params, [
+    {
+      from: account.toLowerCase(),
+      to: recipient.toLowerCase(),
+      data: "0xab",
+      value: "0xa",
+    },
+  ])
+
+  hostPort.postMessage({
+    type: "walletResult",
+    version: "1",
+    launchId,
+    requestId: request.requestId,
+    result: "0x" + "ab".repeat(200_000),
+  })
+  await assert.rejects(
+    walletPromise,
+    error => error.code === -32603 && error.message === "Invalid wallet response"
+  )
+
+  const chainMessage = nextMessage(hostPort)
+  const chainPromise = sdk.wallet.getProvider().request({method: "eth_chainId", params: []})
+  const chainRequest = await chainMessage
+  hostPort.postMessage({
+    type: "walletResult",
+    version: "1",
+    launchId,
+    requestId: chainRequest.requestId,
+    error: {code: 4001, message: "x".repeat(257)},
+  })
+  await assert.rejects(
+    chainPromise,
+    error => error.code === -32603 && error.message === "Invalid wallet response"
+  )
+
+  sdk.destroy()
+  hostPort.close()
+})
+
 test("reads and requests ActivityPub notification permission through a typed capability", async () => {
   const f = fixture()
   const sdk = createFediverseMiniAppSDK({
