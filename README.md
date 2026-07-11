@@ -69,7 +69,8 @@ consent-gated transactional mentions, see
 [`MINIAPP_ACTIVITYPUB_MESSAGES.md`](MINIAPP_ACTIVITYPUB_MESSAGES.md). The
 manifest declaration, consent data model, and typed SDK/broker transport are
 implemented together with host-owned consent and revocation UI; the backend
-permission endpoint and inbound transactional enforcement remain future work.
+permission endpoint is also implemented, while inbound transactional
+enforcement remains future work.
 
 ## Architecture (quick tour)
 

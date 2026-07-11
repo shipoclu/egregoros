@@ -156,6 +156,11 @@ defmodule EgregorosWeb.Router do
     post "/oauth/mini-app/register", MiniAppRegistrationController, :create
     post "/oauth/token", OAuthController, :token
     post "/oauth/revoke", OAuthController, :revoke
+
+    get "/api/v1/mini-apps/notification-permission",
+        MiniAppNotificationPermissionController,
+        :show
+
     get "/api/pleroma/frontend_configurations", PleromaFrontendConfigurationsController, :index
     get "/api/pleroma/emoji.json", PleromaEmojiController, :index
     post "/inbox", InstanceInboxController, :inbox

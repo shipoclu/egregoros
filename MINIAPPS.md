@@ -362,7 +362,9 @@ declaration, Egregoros has actor-bound consent storage, and the SDK/broker have
 a typed, capability-gated permission transport. The host advertises the
 capability, requires active OAuth, answers non-prompting state reads, owns the
 grant/deny dialog, and provides independent Privacy-settings revocation.
-Actor-document activation, the backend check, and inbound enforcement remain
+The OAuth-authenticated backend endpoint derives the app solely from the bearer
+token's registered client and returns the canonical recipient actor only for a
+current grant. Actor-document activation and inbound enforcement remain
 unimplemented. Public ActivityPub publishing requires no mini-app host
 extension and can be implemented independently.
 

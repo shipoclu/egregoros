@@ -4,9 +4,9 @@
 > Egregoros parses and immutably persists the mini-app actor declaration and
 > notification-consent decisions. The SDK and broker implement the typed
 > permission transport, and the host implements OAuth-gated state reads,
-> confirmation, persistence, and revocation UI. Actor-document activation, the
-> backend permission endpoint, and inbound consent enforcement are not yet
-> implemented.
+> confirmation, persistence, and revocation UI. The OAuth-authenticated backend
+> permission endpoint is available. Actor-document activation and inbound
+> consent enforcement are not yet implemented.
 
 This guide defines the smallest useful ActivityPub service a mini-app developer
 can operate for two distinct purposes:
@@ -194,7 +194,7 @@ UI, not for authorizing backend delivery.
 ## 5. Authoritative backend permission check
 
 The app backend identifies the user through its existing OAuth `read` grant.
-After the host-owned SDK confirmation, it calls a proposed Egregoros endpoint
+After the host-owned SDK confirmation, it calls the Egregoros endpoint
 with that user's bearer token:
 
 ```http
@@ -328,10 +328,9 @@ The manifest declaration, immutable persistence, and consent decision data
 model are implemented. A complete Egregoros flow still needs:
 
 1. SSRF-safe actor-document validation before activating the declaration;
-2. the OAuth-authenticated backend permission endpoint;
-3. inbound transactional-mention recognition and consent enforcement;
-4. notification-specific audit events; and
-5. federation, security, and browser interoperability tests for the completed
+2. inbound transactional-mention recognition and consent enforcement;
+3. notification-specific audit events; and
+4. federation, security, and browser interoperability tests for the completed
    end-to-end flow.
 
 Until those pieces ship, an app may declare its actor and publish ordinary
