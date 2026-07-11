@@ -4,6 +4,10 @@ import test from "node:test"
 import {createMiniAppBroker} from "../js/lib/mini_app_broker.mjs"
 
 const tick = () => new Promise(resolve => setImmediate(resolve))
+const markReady = async (appPort, launchId) => {
+  appPort.postMessage({type: "ready", version: "1", launchId})
+  await tick()
+}
 
 const iframeFixture = () => {
   const listeners = new Map()
@@ -53,6 +57,7 @@ test("broker transfers one capability port only to the exact same-origin frame r
       issuer: "https://social.example",
       authorizationServerMetadata:
         "https://social.example/.well-known/oauth-authorization-server",
+      authorizationResultRelay: "https://social.example/mini-apps/oauth/relay",
       capabilities: [],
     },
   })
@@ -63,7 +68,7 @@ test("broker transfers one capability port only to the exact same-origin frame r
   assert.equal(fixture.hasLoadListener(), false)
 })
 
-test("ready is accepted only through the transferred port for the active launch", async () => {
+test("ready is accepted once through the transferred port for the active launch", async () => {
   const fixture = iframeFixture()
   let readyCount = 0
 
@@ -77,17 +82,199 @@ test("ready is accepted only through the transferred port for the active launch"
   fixture.load()
   const appPort = fixture.posts[0].transfer[0]
 
-  appPort.postMessage({type: "ready", version: "1", launchId: "wrong"})
-  appPort.postMessage({type: "unknown", launchId: "launch-2"})
-  appPort.postMessage({type: "ready", launchId: "launch-2"})
-  await tick()
-  assert.equal(readyCount, 0)
-
   appPort.postMessage({type: "ready", version: "1", launchId: "launch-2"})
   appPort.postMessage({type: "ready", version: "1", launchId: "launch-2"})
   await tick()
   assert.equal(readyCount, 1)
 
+  broker.destroy()
+})
+
+test("rejects every app request sent before the launch is ready", async () => {
+  const fixture = iframeFixture()
+  const requests = []
+  const violations = []
+  const broker = createMiniAppBroker({
+    iframe: fixture.iframe,
+    appOrigin: "https://app.example",
+    hostOrigin: "https://social.example",
+    launchId: "launch-not-ready",
+    onContextRequest: requestId => requests.push(requestId),
+    onProtocolViolation: reason => violations.push(reason),
+  })
+
+  fixture.load()
+  const appPort = fixture.posts[0].transfer[0]
+  appPort.postMessage({
+    type: "getContext",
+    version: "1",
+    launchId: "launch-not-ready",
+    requestId: "ctx-before-ready",
+  })
+  await tick()
+
+  assert.deepEqual(requests, [])
+  assert.deepEqual(violations, ["ready_required"])
+  broker.destroy()
+})
+
+test("closes a launch that exceeds message, request, outstanding, byte, or rate budgets", async () => {
+  const scenarios = [
+    {
+      name: "message_count",
+      limits: {maxMessages: 2, maxRequests: 8, maxOutstanding: 8, rateCapacity: 8},
+      messages: launchId => [
+        {type: "ready", version: "1", launchId},
+        {type: "unknown", version: "1", launchId},
+        {type: "unknown", version: "1", launchId},
+      ],
+    },
+    {
+      name: "request_count",
+      limits: {maxMessages: 8, maxRequests: 1, maxOutstanding: 8, rateCapacity: 8},
+      messages: launchId => [
+        {type: "ready", version: "1", launchId},
+        {type: "close", version: "1", launchId, requestId: "close-1"},
+        {type: "close", version: "1", launchId, requestId: "close-2"},
+      ],
+    },
+    {
+      name: "outstanding",
+      limits: {maxMessages: 8, maxRequests: 8, maxOutstanding: 1, rateCapacity: 8},
+      messages: launchId => [
+        {type: "ready", version: "1", launchId},
+        {type: "getContext", version: "1", launchId, requestId: "ctx-1"},
+        {type: "getContext", version: "1", launchId, requestId: "ctx-2"},
+      ],
+    },
+    {
+      name: "message_bytes",
+      limits: {maxMessages: 8, maxRequests: 8, maxOutstanding: 8, maxMessageBytes: 128, rateCapacity: 8},
+      messages: launchId => [
+        {type: "ready", version: "1", launchId},
+        {type: "unknown", version: "1", launchId, padding: "x".repeat(256)},
+      ],
+    },
+    {
+      name: "total_bytes",
+      limits: {
+        maxMessages: 8,
+        maxRequests: 8,
+        maxOutstanding: 8,
+        maxMessageBytes: 256,
+        maxTotalBytes: 180,
+        rateCapacity: 8,
+      },
+      messages: launchId => [
+        {type: "ready", version: "1", launchId},
+        {type: "unknown", version: "1", launchId, padding: "x".repeat(80)},
+      ],
+    },
+    {
+      name: "rate_limit",
+      limits: {maxMessages: 8, maxRequests: 8, maxOutstanding: 8, rateCapacity: 1, ratePerSecond: 0},
+      messages: launchId => [
+        {type: "ready", version: "1", launchId},
+        {type: "unknown", version: "1", launchId},
+      ],
+    },
+  ]
+
+  for (const scenario of scenarios) {
+    const fixture = iframeFixture()
+    const violations = []
+    const launchId = `launch-${scenario.name}`
+    const broker = createMiniAppBroker({
+      iframe: fixture.iframe,
+      appOrigin: "https://app.example",
+      hostOrigin: "https://social.example",
+      launchId,
+      limits: scenario.limits,
+      onProtocolViolation: reason => violations.push(reason),
+    })
+
+    fixture.load()
+    const appPort = fixture.posts[0].transfer[0]
+    for (const message of scenario.messages(launchId)) appPort.postMessage(message)
+    await tick()
+
+    assert.deepEqual(violations, [scenario.name], scenario.name)
+    broker.destroy()
+  }
+})
+
+test("an iframe reload cannot reset or revive the active launch budget", async () => {
+  const fixture = iframeFixture()
+  const violations = []
+  const broker = createMiniAppBroker({
+    iframe: fixture.iframe,
+    appOrigin: "https://app.example",
+    hostOrigin: "https://social.example",
+    launchId: "launch-reload-budget",
+    limits: {maxMessages: 2, maxRequests: 8, maxOutstanding: 8, rateCapacity: 8},
+    onProtocolViolation: reason => violations.push(reason),
+  })
+
+  fixture.load()
+  const firstPort = fixture.posts[0].transfer[0]
+  firstPort.postMessage({type: "ready", version: "1", launchId: "launch-reload-budget"})
+  firstPort.postMessage({type: "unknown", version: "1", launchId: "launch-reload-budget"})
+  await tick()
+
+  fixture.load()
+  const secondPort = fixture.posts[1].transfer[0]
+  secondPort.postMessage({type: "ready", version: "1", launchId: "launch-reload-budget"})
+  await tick()
+
+  fixture.load()
+  broker.destroy()
+
+  assert.deepEqual(violations, ["message_count"])
+  assert.equal(fixture.posts.length, 2)
+})
+
+test("releases outstanding capacity only for the exactly correlated host response", async () => {
+  const fixture = iframeFixture()
+  const violations = []
+  const requests = []
+  const broker = createMiniAppBroker({
+    iframe: fixture.iframe,
+    appOrigin: "https://app.example",
+    hostOrigin: "https://social.example",
+    launchId: "launch-outstanding",
+    limits: {maxOutstanding: 1},
+    onContextRequest: requestId => requests.push(requestId),
+    onProtocolViolation: reason => violations.push(reason),
+  })
+
+  fixture.load()
+  const appPort = fixture.posts[0].transfer[0]
+  appPort.postMessage({type: "ready", version: "1", launchId: "launch-outstanding"})
+  appPort.postMessage({
+    type: "getContext",
+    version: "1",
+    launchId: "launch-outstanding",
+    requestId: "ctx-1",
+  })
+  await tick()
+  broker.send({
+    type: "contextResult",
+    version: "1",
+    launchId: "launch-outstanding",
+    requestId: "wrong",
+    status: "unavailable",
+    context: null,
+  })
+  appPort.postMessage({
+    type: "getContext",
+    version: "1",
+    launchId: "launch-outstanding",
+    requestId: "ctx-2",
+  })
+  await tick()
+
+  assert.deepEqual(requests, ["ctx-1"])
+  assert.deepEqual(violations, ["outstanding"])
   broker.destroy()
 })
 
@@ -108,6 +295,7 @@ test("context requests are correlated and host responses return through the priv
   const appPort = fixture.posts[0].transfer[0]
   appPort.onmessage = event => responses.push(event.data)
   appPort.start?.()
+  await markReady(appPort, "launch-3")
 
   appPort.postMessage({type: "getContext", version: "1", launchId: "wrong", requestId: "ctx-1"})
   appPort.postMessage({type: "getContext", version: "1", launchId: "launch-3", requestId: "bad request"})
@@ -151,6 +339,7 @@ test("auth requests require the active launch and a strict PKCE handoff schema",
 
   fixture.load()
   const appPort = fixture.posts[0].transfer[0]
+  await markReady(appPort, "launch-auth")
   const valid = {
     type: "requestAuth",
     version: "1",
@@ -191,6 +380,66 @@ test("auth requests require the active launch and a strict PKCE handoff schema",
   broker.destroy()
 })
 
+test("rejects enumerable-property smuggling on schema arrays", async () => {
+  const fixture = iframeFixture()
+  const requests = []
+  const broker = createMiniAppBroker({
+    iframe: fixture.iframe,
+    appOrigin: "https://app.example",
+    launchId: "launch-array-smuggling",
+    capabilities: ["wallet.evm"],
+    onAuthRequest: request => requests.push(request),
+    onComposeRequest: request => requests.push(request),
+    onWalletRequest: request => requests.push(request),
+  })
+
+  fixture.load()
+  const appPort = fixture.posts[0].transfer[0]
+  await markReady(appPort, "launch-array-smuggling")
+
+  const scopes = ["read"]
+  scopes.accessToken = "smuggled"
+  appPort.postMessage({
+    type: "requestAuth",
+    version: "1",
+    launchId: "launch-array-smuggling",
+    requestId: "auth-smuggle",
+    clientId: "client_1234567890",
+    redirectUri: "https://app.example/oauth/callback",
+    scopes,
+    state: "s".repeat(43),
+    codeChallenge: "c".repeat(43),
+    codeChallengeMethod: "S256",
+    handoffChallenge: "h".repeat(43),
+  })
+
+  const links = ["https://app.example/result"]
+  links.accessToken = "smuggled"
+  appPort.postMessage({
+    type: "composeNote",
+    version: "1",
+    launchId: "launch-array-smuggling",
+    callId: "compose-smuggle",
+    draft: {text: "hello", links},
+  })
+
+  const params = []
+  params.accessToken = "smuggled"
+  appPort.postMessage({
+    type: "walletRequest",
+    version: "1",
+    launchId: "launch-array-smuggling",
+    requestId: "wallet-smuggle",
+    method: "eth_chainId",
+    params,
+    userActivation: false,
+  })
+  await tick()
+
+  assert.deepEqual(requests, [])
+  broker.destroy()
+})
+
 test("compose requests accept only the narrow draft schema on the active launch", async () => {
   const fixture = iframeFixture()
   const requests = []
@@ -203,6 +452,7 @@ test("compose requests accept only the narrow draft schema on the active launch"
 
   fixture.load()
   const appPort = fixture.posts[0].transfer[0]
+  await markReady(appPort, "launch-compose")
   const valid = {
     type: "composeNote",
     version: "1",
@@ -246,6 +496,7 @@ test("close and external navigation are launch-bound, replay-safe public actions
 
   fixture.load()
   const appPort = fixture.posts[0].transfer[0]
+  await markReady(appPort, "launch-actions")
 
   appPort.postMessage({
     type: "openExternal",
@@ -315,6 +566,7 @@ test("wallet discovery and connection requests use a strict, replay-safe schema"
   fixture.load()
   assert.deepEqual(fixture.posts[0].message.bootstrap.capabilities, ["wallet.evm"])
   const appPort = fixture.posts[0].transfer[0]
+  await markReady(appPort, "launch-wallet")
 
   appPort.postMessage({
     type: "walletRequest",
@@ -390,6 +642,7 @@ test("privileged wallet methods require activation and exact bounded payloads", 
 
   fixture.load()
   const appPort = fixture.posts[0].transfer[0]
+  await markReady(appPort, "launch-sign")
   const personal = {
     type: "walletRequest",
     version: "1",
@@ -461,6 +714,7 @@ test("notification permission requests are capability-gated, strict, and replay-
 
   fixture.load()
   const appPort = fixture.posts[0].transfer[0]
+  await markReady(appPort, "launch-notifications")
   const get = {
     type: "getNotificationPermission",
     version: "1",
@@ -505,6 +759,7 @@ test("notification messages are rejected when the host omitted the capability", 
 
   fixture.load()
   const appPort = fixture.posts[0].transfer[0]
+  await markReady(appPort, "launch-no-notifications")
   appPort.postMessage({
     type: "getNotificationPermission",
     version: "1",

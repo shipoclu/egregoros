@@ -41,6 +41,7 @@ defmodule Egregoros.MiniApps.AuthRequestTest do
     assert query["code_challenge"] == String.duplicate("c", 43)
     assert query["code_challenge_method"] == "S256"
     refute Map.has_key?(query, "handoff_challenge")
+    assert request.relay_state == String.duplicate("s", 43)
   end
 
   test "rejects a client from another origin and any mutation of the fixed request", %{

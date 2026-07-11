@@ -31,5 +31,6 @@ Before deploying:
 The reference intentionally has no backend and therefore does not demonstrate
 dynamic OAuth registration or token exchange. Those operations belong on an
 app backend; bearer tokens and client secrets must never enter iframe
-JavaScript. The SDK's bootstrap gives that backend the exact issuer and OAuth
-metadata URL needed to implement the flow.
+JavaScript. The SDK's bootstrap gives that backend the exact issuer, OAuth
+metadata URL, opener-free authorization-result relay URL, and launch ID needed
+to validate and bind the flow to OAuth state.

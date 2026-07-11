@@ -78,7 +78,8 @@ customize it:
 
 - retain the `security_headers` import on every public site;
 - do not add, delete, or rewrite either CSP response-header name;
-- do not cache `/mini-apps/broker/*`, OAuth callbacks, or authenticated HTML;
+- do not cache `/mini-apps/broker/*`, `/mini-apps/oauth/relay`, OAuth callbacks,
+  or authenticated HTML;
 - keep `X-Forwarded-Proto` and `Host` accurate; and
 - validate with `caddy validate --config /etc/caddy/Caddyfile` before reload.
 
@@ -137,6 +138,8 @@ After deployment, inspect both an ordinary page and a real broker response:
 curl --fail --silent --show-error --head https://social.example/
 curl --fail --silent --show-error --head \
   'https://social.example/mini-apps/broker/CARD_ID?launch_id=LAUNCH_ID'
+curl --fail --silent --show-error --head \
+  'https://social.example/mini-apps/oauth/relay'
 ```
 
 Confirm that the ordinary page has one enforced CSP, `frame-src 'self'` when
@@ -144,4 +147,6 @@ mini apps are enabled, and `frame-ancestors 'none'`. Confirm that the broker has
 one enforced CSP containing the exact app origin, `frame-ancestors 'self'`,
 `Referrer-Policy: no-referrer`, and `Cache-Control: private, no-store,
 max-age=0`. Confirm neither response has `X-Frame-Options` and neither proxy nor
-CDN rewrites these values.
+CDN rewrites these values. Confirm that the OAuth relay is no-store, has
+`Cross-Origin-Opener-Policy: same-origin`, `Referrer-Policy: no-referrer`, and
+an enforced CSP with `frame-ancestors 'none'` and only its same-origin script.

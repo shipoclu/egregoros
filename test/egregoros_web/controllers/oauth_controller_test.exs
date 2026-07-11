@@ -282,6 +282,7 @@ defmodule EgregorosWeb.OAuthControllerTest do
     assert get_resp_header(consent_conn, "cache-control") == ["no-store"]
     assert get_resp_header(consent_conn, "pragma") == ["no-cache"]
     assert get_resp_header(consent_conn, "referrer-policy") == ["no-referrer"]
+    assert get_resp_header(consent_conn, "cross-origin-opener-policy") == ["same-origin"]
 
     assert document |> LazyHTML.query("#oauth-mini-app-origin") |> LazyHTML.text() =~
              "app.example"

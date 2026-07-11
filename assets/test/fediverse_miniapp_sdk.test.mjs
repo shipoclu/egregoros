@@ -41,6 +41,7 @@ const fixture = () => {
           issuer: "https://social.example",
           authorizationServerMetadata:
             "https://social.example/.well-known/oauth-authorization-server",
+          authorizationResultRelay: "https://social.example/mini-apps/oauth/relay",
           capabilities: ["wallet.evm"],
           ...message,
         },
@@ -74,6 +75,7 @@ test("pins the exact bootstrap origin and exposes immutable bootstrap data", asy
     issuer: "https://social.example",
     authorizationServerMetadata:
       "https://social.example/.well-known/oauth-authorization-server",
+    authorizationResultRelay: "https://social.example/mini-apps/oauth/relay",
     capabilities: ["wallet.evm"],
   })
   assert.equal(Object.isFrozen(sdk.bootstrap), true)

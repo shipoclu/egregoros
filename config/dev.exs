@@ -29,6 +29,8 @@ config :egregoros, EgregorosWeb.Endpoint,
     mini_app_sdk: {Esbuild, :install_and_run, [:mini_app_sdk, ~w(--sourcemap=inline --watch)]},
     mini_app_frame:
       {Esbuild, :install_and_run, [:mini_app_frame, ~w(--sourcemap=inline --watch)]},
+    mini_app_auth_completion:
+      {Esbuild, :install_and_run, [:mini_app_auth_completion, ~w(--sourcemap=inline --watch)]},
     tailwind: {Tailwind, :install_and_run, [:egregoros, ~w(--watch)]}
   ]
 

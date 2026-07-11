@@ -25,6 +25,7 @@ defmodule Egregoros.MiniApps.AuthRequest do
       {:ok,
        %{
          request_id: request_id,
+         relay_state: state,
          callback_origin: app_origin,
          authorization_url:
            authorization_url(

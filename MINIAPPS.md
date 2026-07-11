@@ -178,12 +178,35 @@ The authorization handoff is as follows:
    app's current manifest, then opens its own authorization/consent surface.
 4. The authorization response goes only to the app's exact-origin callback,
    where the backend exchanges the code and establishes the app's own session.
-   The callback sends the host only a success/failure signal correlated to the
-   request plus an opaque app-session handoff code—never the OAuth code,
-   Egregoros tokens, or app session data. It uses a `postMessage` targeted to
-   the exact Egregoros origin, and Egregoros accepts it only from the registered
-   exact callback origin and active request ID. The host relays that result to
-   the original iframe.
+   The authorization popup is opened with `noopener,noreferrer`, so the app
+   callback never receives a reference capable of navigating the Egregoros
+   window. After the exchange, the callback redirects the popup to the exact
+   host-owned `authorizationResultRelay` URL from bootstrap, with only the
+   launch ID, validated OAuth state, status, and opaque app-session handoff code
+   in the URL fragment.
+   The fragment is not sent in the HTTP request. The minimal host page validates
+   it and broadcasts the result over a same-origin `BroadcastChannel` whose
+   name contains the unguessable launch ID. The main host accepts it only for
+   its active authorization request, rechecks the live OAuth grant server-side,
+   and relays the result to the original iframe. The OAuth code, Egregoros
+   tokens, and app session data never enter this channel.
+
+The iframe sends its backend the exact `authorizationResultRelay` and
+`launchId` from the already origin-pinned bootstrap while preparing its OAuth
+state. The backend MUST require the relay URL to equal
+`<trusted issuer>/mini-apps/oauth/relay`, bind both bootstrap values to the
+OAuth state, and use them only once. A successful callback redirects to:
+
+```text
+https://social.example/mini-apps/oauth/relay#version=1&launch_id=LAUNCH_ID&state=OAUTH_STATE&status=success&handoff_code=HANDOFF_CODE
+```
+
+Cancellation uses `status=cancelled` with no `handoff_code`; other failures use
+`status=error`. Duplicate fragment keys, extra fields, invalid identifiers, and
+fragments over 1024 characters are rejected. The relay response uses
+`Cross-Origin-Opener-Policy: same-origin`, `frame-ancestors 'none'`, no-store,
+and a no-referrer policy. It contains no user/session data and never reads
+`window.opener`.
 
 The app may call `ready` before or after authentication. Failed, cancelled, or
 expired authorization leaves the app able to use only non-authenticated SDK
@@ -215,9 +238,11 @@ exchanges the OAuth code:
    After a successful OAuth code exchange, it creates a random,
    single-use `handoff_code`, bound to that challenge, with a short TTL (at
    most 60 seconds).
-3. The callback sends Egregoros `{requestId, status: "success", handoffCode}`.
-   Egregoros forwards it unchanged to the original exact-origin iframe and
-   does not persist it in logs or app state.
+3. The callback redirects its opener-free popup to the host relay fragment
+   shown above with `{launchId, state, status: "success", handoffCode}`. The host
+   correlates that launch to the one pending request, forwards the result to
+   the original exact-origin iframe, and does not persist the fragment or code
+   in HTTP logs or app state.
 4. The iframe sends `handoff_code` and `handoff_verifier` directly to its app
    backend over HTTPS. Only the iframe knows the verifier, so an Egregoros host
    that can see the code and challenge cannot redeem it. The backend establishes
@@ -472,8 +497,9 @@ instance. Construction requires an `allowedHostOrigin(origin)` callback; there
 is deliberately no accept-any-host default. The app can allow a known instance
 exactly or validate an instance through its own discovery/trust policy before
 returning `true`. The connected SDK exposes a frozen `bootstrap` containing
-`hostOrigin`, OAuth `issuer`, `authorizationServerMetadata`, protocol version,
-launch ID, and the currently available capability names.
+`hostOrigin`, OAuth `issuer`, `authorizationServerMetadata`, the exact
+`authorizationResultRelay`, protocol version, launch ID, and the currently
+available capability names.
 
 Every published SDK build MUST ship matching TypeScript declarations even when
 its runtime is authored in JavaScript. Egregoros builds
@@ -768,6 +794,17 @@ responses, and IDs from another channel are rejected without side effects.
 Errors returned to the app are stable codes without stack traces, database
 identifiers, network topology, or secret-bearing details.
 
+The v1 concrete per-launch ceilings are 384 KiB for one structured message,
+2 MiB total channel payload, 512 received browser envelopes, 128 accepted
+request IDs, and eight correlated requests awaiting responses. The app-to-host
+side uses a token bucket with a burst of 40 messages and a refill of 20 per
+second. The server independently accepts at most 256 broker events, 128
+requests, the same byte ceilings and rate, and only one host-owned prompt or
+operation at a time. Traffic before the one valid `ready` message, exceeding
+any ceiling, or attempting to overwrite a pending prompt is rejected; a budget
+violation closes the private port and launch. A new iframe load does not reset
+these per-launch counters; only a new random launch ID does.
+
 `ready`, `getContext`, wallet, compose, and OAuth messages all pass through the
 same broker. The host MUST re-check the current manifest identity,
 capabilities, user state, disclosure state, OAuth state, and domain policy at
@@ -997,7 +1034,7 @@ The choices are:
 | Pre-auth SDK data | Bootstrap issuer/origin only | Enables dynamic registration without exposing user or note context. |
 | Authentication trigger | App calls `requestAuth` | No automatic prompt merely from card display or launch. |
 | Authentication requirement | On demand | OAuth is required for compose/auth-gated capabilities, not for public/read-only apps. |
-| OAuth callback completion | Exact-origin `postMessage` with opaque handoff code | OAuth code/tokens stay with app backend; code needs iframe verifier. |
+| OAuth callback completion | Opener-free popup redirects to a host-owned fragment relay and launch-secret `BroadcastChannel` | The hostile callback cannot navigate Egregoros; OAuth code/tokens stay with the app backend and the handoff code still needs the iframe verifier. |
 | Repeat consent | Reuse valid immutable grant | Authorization UI still provides account identity, switch, and cancel. |
 | Token renewal | Short-lived access + refresh token | Backend refreshes server-to-server. |
 | Iframe session establishment | Mandatory verifier-bound one-time handoff | Works when third-party cookies/storage are unavailable. |

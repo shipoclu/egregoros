@@ -123,6 +123,7 @@ defmodule Egregoros.MixProject do
         "esbuild egregoros",
         "esbuild mini_app_sdk",
         "esbuild mini_app_frame",
+        "esbuild mini_app_auth_completion",
         "cmd cp assets/js/lib/fediverse_miniapp_sdk.d.ts priv/static/assets/js/fediverse-miniapp-sdk-v1.d.ts"
       ],
       "assets.deploy": [
@@ -130,6 +131,7 @@ defmodule Egregoros.MixProject do
         "esbuild egregoros --minify",
         "esbuild mini_app_sdk --minify",
         "esbuild mini_app_frame --minify",
+        "esbuild mini_app_auth_completion --minify",
         "cmd cp assets/js/lib/fediverse_miniapp_sdk.d.ts priv/static/assets/js/fediverse-miniapp-sdk-v1.d.ts",
         "phx.digest"
       ],

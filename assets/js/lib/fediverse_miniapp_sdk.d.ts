@@ -10,6 +10,7 @@ export interface MiniAppBootstrap {
   readonly hostOrigin: string
   readonly issuer: string
   readonly authorizationServerMetadata: string
+  readonly authorizationResultRelay: string
   readonly capabilities: readonly MiniAppCapability[]
 }
 

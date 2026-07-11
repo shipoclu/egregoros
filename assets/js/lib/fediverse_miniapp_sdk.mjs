@@ -43,6 +43,7 @@ const frozenBootstrap = message =>
     hostOrigin: message.hostOrigin,
     issuer: message.issuer,
     authorizationServerMetadata: message.authorizationServerMetadata,
+    authorizationResultRelay: message.authorizationResultRelay,
     capabilities: Object.freeze([...message.capabilities]),
   })
 
@@ -264,7 +265,7 @@ export const createFediverseMiniAppSDK = ({
     if (event?.source !== parentWindow || event?.ports?.length !== 1) return
     if (!message || typeof message !== "object" || Array.isArray(message)) return
     if (
-      Object.keys(message).length !== 7 ||
+      Object.keys(message).length !== 8 ||
       message.type !== "fediverse-miniapp:bootstrap" ||
       message.version !== protocolVersion ||
       !launchIdPattern.test(message.launchId || "") ||
@@ -273,6 +274,7 @@ export const createFediverseMiniAppSDK = ({
       message.issuer !== message.hostOrigin ||
       message.authorizationServerMetadata !==
         `${message.hostOrigin}/.well-known/oauth-authorization-server` ||
+      message.authorizationResultRelay !== `${message.hostOrigin}/mini-apps/oauth/relay` ||
       !Array.isArray(message.capabilities) ||
       !message.capabilities.every(value => typeof value === "string") ||
       !hostAllowed(message.hostOrigin)

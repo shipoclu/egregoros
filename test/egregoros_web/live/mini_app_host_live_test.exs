@@ -266,7 +266,7 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
 
     assert has_element?(
              view,
-             "#mini-app-auth-open[data-role='mini-app-auth-open'][data-request-id='auth-1']"
+             "#mini-app-auth-open[data-role='mini-app-auth-open'][data-request-id='auth-1'][data-auth-state='#{String.duplicate("s", 43)}']"
            )
 
     href =

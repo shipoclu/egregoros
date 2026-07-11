@@ -42,6 +42,7 @@ test("relays one exact-host channel to one exact-origin sandboxed app frame", as
     issuer: "https://social.example",
     authorizationServerMetadata:
       "https://social.example/.well-known/oauth-authorization-server",
+    authorizationResultRelay: "https://social.example/mini-apps/oauth/relay",
     capabilities: [],
   }
 

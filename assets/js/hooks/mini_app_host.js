@@ -1,5 +1,8 @@
 import {createMiniAppBroker} from "../lib/mini_app_broker.mjs"
-import {createMiniAppAuthRelay} from "../lib/mini_app_auth_relay.mjs"
+import {
+  createMiniAppAuthRelay,
+  openMiniAppAuthWindow,
+} from "../lib/mini_app_auth_relay.mjs"
 import {createMiniAppReadiness} from "../lib/mini_app_readiness.mjs"
 import {selectEvmWalletAdapter} from "../wallet/evm_wallet_adapter.mjs"
 import {walletContextMatches} from "../wallet/wallet_execution_guard.mjs"
@@ -18,7 +21,6 @@ const MiniAppHost = {
         this.pushEvent("mini_app_ready_timeout", {launch_id: launchId}),
     })
     this.authRelay = createMiniAppAuthRelay({
-      windowObject: window,
       sendResult: result =>
         this.pushEvent(
           "mini_app_auth_complete",
@@ -62,20 +64,31 @@ const MiniAppHost = {
       const button = event.target.closest?.("[data-role='mini-app-auth-open']")
       if (!button || !this.el.contains(button)) return
 
-      const popup = window.open(
-        button.dataset.authUrl,
-        `fediverse-miniapp-auth-${button.dataset.requestId}`,
-        "popup=yes,width=520,height=720,resizable=yes,scrollbars=yes"
-      )
-
       if (
         !this.authRelay.begin({
-          popup,
-          appOrigin: this.el.dataset.appOrigin,
           launchId: this.el.dataset.launchId,
+          requestId: button.dataset.requestId,
+          state: button.dataset.authState,
+        })
+      ) {
+        completePopupFailure({
+          type: "authResult",
+          version: "1",
+          launchId: this.el.dataset.launchId,
+          requestId: button.dataset.requestId,
+          status: "error",
+        })
+        return
+      }
+
+      if (
+        !openMiniAppAuthWindow({
+          windowObject: window,
+          url: button.dataset.authUrl,
           requestId: button.dataset.requestId,
         })
       ) {
+        this.authRelay.cancel()
         completePopupFailure({
           type: "authResult",
           version: "1",
@@ -387,6 +400,11 @@ const MiniAppHost = {
           request_id: request.requestId,
           method: request.method,
           params: request.params,
+        }),
+      onProtocolViolation: reason =>
+        this.pushEvent("mini_app_protocol_violation", {
+          launch_id: launchId,
+          reason,
         }),
     })
   },

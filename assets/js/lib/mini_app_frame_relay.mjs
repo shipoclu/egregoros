@@ -11,7 +11,7 @@ const validBootstrap = (message, hostOrigin, appOrigin) =>
   !!message.bootstrap &&
   typeof message.bootstrap === "object" &&
   !Array.isArray(message.bootstrap) &&
-  Object.keys(message.bootstrap).length === 7 &&
+  Object.keys(message.bootstrap).length === 8 &&
   message.bootstrap.type === "fediverse-miniapp:bootstrap" &&
   message.bootstrap.version === protocolVersion &&
   launchIdPattern.test(message.bootstrap.launchId || "") &&
@@ -19,6 +19,7 @@ const validBootstrap = (message, hostOrigin, appOrigin) =>
   message.bootstrap.issuer === hostOrigin &&
   message.bootstrap.authorizationServerMetadata ===
     `${hostOrigin}/.well-known/oauth-authorization-server` &&
+  message.bootstrap.authorizationResultRelay === `${hostOrigin}/mini-apps/oauth/relay` &&
   Array.isArray(message.bootstrap.capabilities) &&
   message.bootstrap.capabilities.every(capability => typeof capability === "string")
 

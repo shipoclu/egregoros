@@ -1,6 +1,92 @@
 import {validEvmWalletPayload} from "../wallet/injected_evm_wallet_adapter.mjs"
 
 const protocolVersion = "1"
+const defaultLimits = Object.freeze({
+  maxMessageBytes: 384 * 1024,
+  maxTotalBytes: 2 * 1024 * 1024,
+  maxMessages: 512,
+  maxRequests: 128,
+  maxOutstanding: 8,
+  rateCapacity: 40,
+  ratePerSecond: 20,
+  maxDepth: 16,
+  maxNodes: 4096,
+})
+
+const positiveLimit = (value, fallback) =>
+  Number.isSafeInteger(value) && value > 0 ? value : fallback
+
+const nonNegativeLimit = (value, fallback) =>
+  typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : fallback
+
+const brokerLimits = overrides => ({
+  maxMessageBytes: positiveLimit(overrides?.maxMessageBytes, defaultLimits.maxMessageBytes),
+  maxTotalBytes: positiveLimit(overrides?.maxTotalBytes, defaultLimits.maxTotalBytes),
+  maxMessages: positiveLimit(overrides?.maxMessages, defaultLimits.maxMessages),
+  maxRequests: positiveLimit(overrides?.maxRequests, defaultLimits.maxRequests),
+  maxOutstanding: positiveLimit(overrides?.maxOutstanding, defaultLimits.maxOutstanding),
+  rateCapacity: positiveLimit(overrides?.rateCapacity, defaultLimits.rateCapacity),
+  ratePerSecond: nonNegativeLimit(overrides?.ratePerSecond, defaultLimits.ratePerSecond),
+  maxDepth: positiveLimit(overrides?.maxDepth, defaultLimits.maxDepth),
+  maxNodes: positiveLimit(overrides?.maxNodes, defaultLimits.maxNodes),
+})
+
+const boundedMessageBytes = (value, limits) => {
+  const seen = new Set()
+  const encoder = new TextEncoder()
+  let bytes = 0
+  let nodes = 0
+
+  const add = count => {
+    bytes += count
+    return bytes <= limits.maxMessageBytes
+  }
+
+  const addString = string => {
+    if (string.length > limits.maxMessageBytes - bytes) return false
+    return add(encoder.encode(string).byteLength + 2)
+  }
+
+  const visit = (item, depth) => {
+    nodes += 1
+    if (nodes > limits.maxNodes || depth > limits.maxDepth) return false
+    if (item === null) return add(4)
+    if (typeof item === "string") return addString(item)
+    if (typeof item === "boolean") return add(item ? 4 : 5)
+    if (typeof item === "number") return Number.isFinite(item) && add(24)
+    if (typeof item !== "object" || seen.has(item)) return false
+
+    seen.add(item)
+    if (Array.isArray(item)) {
+      if (item.length > limits.maxNodes - nodes) return false
+      let ownKeys = 0
+      for (const key in item) {
+        if (!Object.hasOwn(item, key)) continue
+        ownKeys += 1
+        if (ownKeys > item.length) return false
+      }
+      if (ownKeys !== item.length) return false
+      if (!add(2 + Math.max(item.length - 1, 0))) return false
+      for (const entry of item) if (!visit(entry, depth + 1)) return false
+      return true
+    }
+
+    const prototype = Object.getPrototypeOf(item)
+    if (prototype !== Object.prototype && prototype !== null) return false
+    if (!add(2)) return false
+    let entries = 0
+    for (const key in item) {
+      if (!Object.hasOwn(item, key)) continue
+      entries += 1
+      if (entries > limits.maxNodes - nodes) return false
+      if (entries > 1 && !add(1)) return false
+      if (!addString(key) || !add(1) || !visit(item[key], depth + 1)) return false
+    }
+    return true
+  }
+
+  return visit(value, 0) ? bytes : null
+}
 
 const validReadyMessage = (message, launchId) =>
   !!message &&
@@ -208,16 +294,20 @@ export const createMiniAppBroker = ({
   onCloseRequest,
   onExternalRequest,
   onWalletRequest,
+  onProtocolViolation,
+  limits: limitOverrides,
+  now = () => performance.now(),
 }) => {
+  const limits = brokerLimits(limitOverrides)
   let hostPort = null
   let ready = false
   let seenRequests = new Set()
-
-  const acceptOnce = key => {
-    if (seenRequests.has(key)) return false
-    seenRequests.add(key)
-    return true
-  }
+  let outstandingRequests = new Set()
+  let totalBytes = 0
+  let messageCount = 0
+  let rateTokens = limits.rateCapacity
+  let rateUpdatedAt = now()
+  let violated = false
 
   const closePort = () => {
     if (!hostPort) return
@@ -226,10 +316,82 @@ export const createMiniAppBroker = ({
     hostPort = null
   }
 
+  const violate = reason => {
+    if (violated) return
+    violated = true
+    closePort()
+    onProtocolViolation?.(reason)
+  }
+
+  const consumeBytes = message => {
+    const bytes = boundedMessageBytes(message, limits)
+    if (bytes === null) {
+      violate("message_bytes")
+      return false
+    }
+    if (totalBytes + bytes > limits.maxTotalBytes) {
+      violate("total_bytes")
+      return false
+    }
+    totalBytes += bytes
+    return true
+  }
+
+  const consumeInbound = message => {
+    if (messageCount >= limits.maxMessages) {
+      violate("message_count")
+      return false
+    }
+
+    const current = now()
+    const elapsed = Math.max(current - rateUpdatedAt, 0)
+    rateTokens = Math.min(
+      limits.rateCapacity,
+      rateTokens + (elapsed * limits.ratePerSecond) / 1000
+    )
+    rateUpdatedAt = current
+    if (rateTokens < 1) {
+      violate("rate_limit")
+      return false
+    }
+
+    rateTokens -= 1
+    messageCount += 1
+    return consumeBytes(message)
+  }
+
+  const acceptOnce = (key, {trackOutstanding = true} = {}) => {
+    if (seenRequests.has(key)) return false
+    if (seenRequests.size >= limits.maxRequests) {
+      violate("request_count")
+      return false
+    }
+    if (trackOutstanding && outstandingRequests.size >= limits.maxOutstanding) {
+      violate("outstanding")
+      return false
+    }
+    seenRequests.add(key)
+    if (trackOutstanding) outstandingRequests.add(key)
+    return true
+  }
+
+  const responseRequestKey = message => {
+    if (!message || typeof message !== "object" || Array.isArray(message)) return null
+    if (message.launchId !== launchId) return null
+
+    if (message.type === "contextResult") return `context:${message.requestId}`
+    if (message.type === "notificationPermissionResult") return `notification:${message.requestId}`
+    if (message.type === "authResult") return `auth:${message.requestId}`
+    if (message.type === "composeNoteResult") return `compose:${message.callId}`
+    if (message.type === "openExternalResult") return `external:${message.requestId}`
+    if (message.type === "walletResult") return `wallet:${message.requestId}`
+    return null
+  }
+
   const start = () => {
     closePort()
     ready = false
-    seenRequests = new Set()
+    if (violated) return
     onLoading?.()
 
     const targetWindow = iframe?.contentWindow
@@ -240,12 +402,20 @@ export const createMiniAppBroker = ({
 
     hostPort.onmessage = event => {
       const message = event?.data
+      if (!consumeInbound(message)) return
 
       if (!ready && validReadyMessage(message, launchId)) {
         ready = true
         onReady?.()
         return
       }
+
+      if (!ready) {
+        violate("ready_required")
+        return
+      }
+
+      if (validReadyMessage(message, launchId)) return
 
       if (
         validContextRequest(message, launchId) &&
@@ -292,7 +462,10 @@ export const createMiniAppBroker = ({
         return
       }
 
-      if (validCloseRequest(message, launchId) && acceptOnce(`close:${message.requestId}`)) {
+      if (
+        validCloseRequest(message, launchId) &&
+        acceptOnce(`close:${message.requestId}`, {trackOutstanding: false})
+      ) {
         onCloseRequest?.(message.requestId)
         return
       }
@@ -324,6 +497,7 @@ export const createMiniAppBroker = ({
         hostOrigin,
         issuer: hostOrigin,
         authorizationServerMetadata: `${hostOrigin}/.well-known/oauth-authorization-server`,
+        authorizationResultRelay: `${hostOrigin}/mini-apps/oauth/relay`,
         capabilities: [...capabilities],
       }
 
@@ -341,7 +515,15 @@ export const createMiniAppBroker = ({
   iframe.addEventListener("load", start)
 
   return {
-    send: message => hostPort?.postMessage(message),
+    send: message => {
+      if (!hostPort || !ready || violated || !consumeBytes(message)) return false
+      const requestKey = responseRequestKey(message)
+      if (requestKey && outstandingRequests.has(requestKey)) {
+        outstandingRequests.delete(requestKey)
+      }
+      hostPort.postMessage(message)
+      return true
+    },
     destroy: () => {
       iframe.removeEventListener("load", start)
       closePort()

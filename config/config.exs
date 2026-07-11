@@ -87,6 +87,12 @@ config :esbuild,
       ~w(js/mini_app_frame.js --bundle --target=es2022 --outfile=../priv/static/assets/js/mini-app-frame-relay.js),
     cd: Path.expand("../assets", __DIR__),
     env: %{"NODE_PATH" => [Path.expand("../deps", __DIR__), Mix.Project.build_path()]}
+  ],
+  mini_app_auth_completion: [
+    args:
+      ~w(js/mini_app_auth_completion.js --bundle --target=es2022 --outfile=../priv/static/assets/js/mini-app-auth-completion-relay.js),
+    cd: Path.expand("../assets", __DIR__),
+    env: %{"NODE_PATH" => [Path.expand("../deps", __DIR__), Mix.Project.build_path()]}
   ]
 
 # Configure tailwind (the version is required)

@@ -243,14 +243,25 @@ tokens, or call bearer-token APIs in iframe JavaScript.
 
 A backend deployment should:
 
-1. Read the exact issuer and metadata URL from the SDK bootstrap and send them
-   to the app backend as untrusted input.
+1. Read the exact issuer, metadata URL, `authorizationResultRelay`, and
+   `launchId` from the SDK bootstrap and send them to the app backend as
+   untrusted input.
 2. Validate the issuer against the same trusted-host policy used by the app.
 3. Register one client per app manifest and issuer, then reuse it.
 4. Keep client secrets and access/refresh tokens only on the backend.
 5. Use transaction-specific S256 PKCE, high-entropy state, the exact registered
-   callback, and the verifier-bound one-time iframe handoff.
+   callback, and the verifier-bound one-time iframe handoff. Bind the exact
+   relay URL and launch ID to the OAuth state.
 6. Store no OAuth token in a URL, browser log, analytics event, or host message.
+7. After exchanging the callback code, redirect the opener-free popup to
+   `<authorizationResultRelay>#version=1&launch_id=...&state=...&status=success&handoff_code=...`.
+   The handoff code belongs in the fragment, never a query parameter. For
+   cancellation or error, omit it and use `status=cancelled` or `status=error`.
+
+The backend must accept the relay URL only when it is exactly
+`<trusted issuer>/mini-apps/oauth/relay`. It must never derive or accept an
+arbitrary relay domain from request input. The callback must not use
+`window.opener` or send its result directly to the Egregoros page.
 
 If the backend listens locally on port `4100`, narrowly proxy only its required
 paths instead of proxying the whole site:

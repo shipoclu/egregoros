@@ -20,6 +20,25 @@ defmodule EgregorosWeb.MiniAppHost do
   alias Egregoros.User
   alias Egregoros.Users
 
+  @broker_events [
+    "mini_app_ready",
+    "mini_app_context_request",
+    "mini_app_notification_permission_request",
+    "mini_app_auth_request",
+    "mini_app_compose_request",
+    "mini_app_close_request",
+    "mini_app_external_request",
+    "mini_app_wallet_request"
+  ]
+  @broker_request_events @broker_events -- ["mini_app_ready"]
+  @broker_outstanding_events @broker_request_events -- ["mini_app_close_request"]
+  @broker_max_message_bytes 384 * 1024
+  @broker_max_total_bytes 2 * 1024 * 1024
+  @broker_max_messages 256
+  @broker_max_requests 128
+  @broker_rate_capacity 40
+  @broker_rate_per_second 20
+
   def on_mount(:default, _params, session, socket) do
     user_id = Map.get(session, "user_id")
     if Phoenix.LiveView.connected?(socket), do: Permissions.subscribe(user_id)
@@ -28,6 +47,11 @@ defmodule EgregorosWeb.MiniAppHost do
       socket
       |> Phoenix.Component.assign(:mini_app_host, closed_state())
       |> Phoenix.Component.assign(:mini_app_user_id, user_id)
+      |> Phoenix.LiveView.attach_hook(
+        :mini_app_broker_budget,
+        :handle_event,
+        &handle_broker_event/3
+      )
       |> Phoenix.LiveView.attach_hook(
         :mini_app_host_events,
         :handle_event,
@@ -41,6 +65,38 @@ defmodule EgregorosWeb.MiniAppHost do
 
     {:cont, socket}
   end
+
+  defp handle_broker_event(event, %{"launch_id" => launch_id} = params, socket)
+       when event in @broker_events do
+    state = socket.assigns.mini_app_host
+
+    cond do
+      state.status not in [:open, :collapsed] or state.launch_id != launch_id ->
+        {:halt, socket}
+
+      event in @broker_request_events and not state.ready? ->
+        {:halt, socket}
+
+      true ->
+        case consume_broker_budget(state.broker_budget, event, params) do
+          {:ok, budget} ->
+            socket =
+              Phoenix.Component.assign(socket, :mini_app_host, %{state | broker_budget: budget})
+
+            if event in @broker_outstanding_events and host_request_pending?(state),
+              do: {:halt, socket},
+              else: {:cont, socket}
+
+          {:error, _reason} ->
+            {:halt, Phoenix.Component.assign(socket, :mini_app_host, closed_state())}
+        end
+    end
+  end
+
+  defp handle_broker_event(event, _params, socket) when event in @broker_events,
+    do: {:halt, socket}
+
+  defp handle_broker_event(_event, _params, socket), do: {:cont, socket}
 
   defp handle_permission_info(
          {:mini_app_permission_revoked, app_origin, kind},
@@ -296,6 +352,7 @@ defmodule EgregorosWeb.MiniAppHost do
                 type="button"
                 data-role="mini-app-auth-open"
                 data-request-id={@state.auth_request.request_id}
+                data-auth-state={@state.auth_request.relay_state}
                 data-auth-url={@state.auth_request.authorization_url}
                 class="cursor-pointer border-2 border-[color:var(--border-default)] bg-[color:var(--text-primary)] px-4 py-2 text-sm font-bold text-[color:var(--bg-base)] transition hover:shadow-[3px_3px_0_var(--accent)] focus-visible:outline-none focus-brutal"
               >
@@ -673,7 +730,8 @@ defmodule EgregorosWeb.MiniAppHost do
            external_request: nil,
            wallet_declaration: wallet_declaration,
            wallet_request: nil,
-           wallet_incompatible?: false
+           wallet_incompatible?: false,
+           broker_budget: new_broker_budget()
          })}
 
       _ ->
@@ -1004,7 +1062,8 @@ defmodule EgregorosWeb.MiniAppHost do
             context_request: nil,
             compose_request: nil,
             external_request: nil,
-            wallet_request: nil
+            wallet_request: nil,
+            broker_budget: new_broker_budget()
         })
         |> Phoenix.LiveView.push_event("mini_app_frame_reload", %{launch_id: launch_id})
 
@@ -1280,6 +1339,29 @@ defmodule EgregorosWeb.MiniAppHost do
     end
   end
 
+  defp handle_host_event(
+         "mini_app_protocol_violation",
+         %{"launch_id" => launch_id, "reason" => reason},
+         socket
+       )
+       when reason in [
+              "ready_required",
+              "message_bytes",
+              "total_bytes",
+              "message_count",
+              "request_count",
+              "outstanding",
+              "rate_limit"
+            ] do
+    state = socket.assigns.mini_app_host
+
+    if state.status in [:open, :collapsed] and state.launch_id == launch_id do
+      {:halt, Phoenix.Component.assign(socket, :mini_app_host, closed_state())}
+    else
+      {:halt, socket}
+    end
+  end
+
   defp handle_host_event(event, _params, socket)
        when event in [
               "mini_app_notification_permission_request",
@@ -1332,12 +1414,81 @@ defmodule EgregorosWeb.MiniAppHost do
       external_request: nil,
       wallet_declaration: nil,
       wallet_request: nil,
-      wallet_incompatible?: false
+      wallet_incompatible?: false,
+      broker_budget: nil
     }
+  end
+
+  defp new_broker_budget do
+    %{
+      messages: 0,
+      requests: 0,
+      total_bytes: 0,
+      rate_tokens: @broker_rate_capacity * 1.0,
+      rate_updated_at: System.monotonic_time(:millisecond)
+    }
+  end
+
+  defp consume_broker_budget(budget, event, params) when is_map(budget) do
+    with {:ok, encoded} <- Jason.encode(params),
+         message_bytes <- byte_size(encoded),
+         true <- message_bytes <= @broker_max_message_bytes or {:error, :message_bytes},
+         true <-
+           budget.total_bytes + message_bytes <= @broker_max_total_bytes or
+             {:error, :total_bytes},
+         true <- budget.messages < @broker_max_messages or {:error, :message_count},
+         request_count <- budget.requests + if(event in @broker_request_events, do: 1, else: 0),
+         true <- request_count <= @broker_max_requests or {:error, :request_count},
+         {:ok, rate_tokens, updated_at} <- consume_broker_rate(budget) do
+      {:ok,
+       %{
+         budget
+         | messages: budget.messages + 1,
+           requests: request_count,
+           total_bytes: budget.total_bytes + message_bytes,
+           rate_tokens: rate_tokens,
+           rate_updated_at: updated_at
+       }}
+    else
+      {:error, _reason} = error -> error
+      false -> {:error, :budget}
+    end
+  end
+
+  defp consume_broker_budget(_budget, _event, _params), do: {:error, :budget}
+
+  defp consume_broker_rate(budget) do
+    now = System.monotonic_time(:millisecond)
+    elapsed = max(now - budget.rate_updated_at, 0)
+
+    tokens =
+      min(
+        @broker_rate_capacity * 1.0,
+        budget.rate_tokens + elapsed * @broker_rate_per_second / 1_000
+      )
+
+    if tokens >= 1.0,
+      do: {:ok, tokens - 1.0, now},
+      else: {:error, :rate_limit}
+  end
+
+  defp host_request_pending?(state) do
+    Enum.any?(
+      [
+        state.context_request,
+        state.auth_request,
+        state.notification_request,
+        state.compose_request,
+        state.external_request,
+        state.wallet_request
+      ],
+      &(not is_nil(&1))
+    )
   end
 
   defp context_request_allowed?(state, launch_id, request_id) do
     state.status == :open and state.ready? and state.launch_id == launch_id and
+      is_nil(state.context_request) and is_nil(state.auth_request) and
       is_nil(state.compose_request) and is_nil(state.external_request) and
       is_nil(state.wallet_request) and is_nil(state.notification_request) and
       valid_request_id?(request_id) and active_card?(state.card)
