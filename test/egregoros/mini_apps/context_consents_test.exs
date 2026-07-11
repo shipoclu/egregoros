@@ -2,6 +2,7 @@ defmodule Egregoros.MiniApps.ContextConsentsTest do
   use Egregoros.DataCase, async: true
 
   alias Egregoros.MiniApps.ContextConsents
+  alias Egregoros.MiniApps.Permissions
   alias Egregoros.Users
 
   setup do
@@ -42,9 +43,13 @@ defmodule Egregoros.MiniApps.ContextConsentsTest do
 
   test "revokes the reusable disclosure" do
     {:ok, user} = Users.create_local_user("mini-app-context-revoke-user")
-    assert {:ok, _consent} = ContextConsents.grant(user.id, "https://app.example")
+    assert {:ok, consent} = ContextConsents.grant(user.id, "https://app.example")
+    assert ContextConsents.list_for_user(user.id) == [consent]
+    Permissions.subscribe(user.id)
     assert :ok = ContextConsents.revoke(user.id, "https://app.example")
+    assert_receive {:mini_app_permission_revoked, "https://app.example", :context}
     refute ContextConsents.approved?(user.id, "https://app.example")
+    assert ContextConsents.list_for_user(user.id) == []
   end
 
   test "fails closed for invalid identifiers and origins" do
@@ -52,6 +57,8 @@ defmodule Egregoros.MiniApps.ContextConsentsTest do
     refute ContextConsents.approved?("not-a-flake-id", "https://app.example")
     refute ContextConsents.approved?("not-a-flake-id", "not an origin")
     assert :ok = ContextConsents.revoke("not-a-flake-id", "https://app.example")
+    assert ContextConsents.list_for_user(nil) == []
+    assert ContextConsents.list_for_user("not-a-flake-id") == []
   end
 
   defp enable_mini_apps do

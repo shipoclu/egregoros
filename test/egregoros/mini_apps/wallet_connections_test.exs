@@ -3,6 +3,7 @@ defmodule Egregoros.MiniApps.WalletConnectionsTest do
 
   alias Egregoros.MiniApps.Declarations
   alias Egregoros.MiniApps.Manifest
+  alias Egregoros.MiniApps.Permissions
   alias Egregoros.MiniApps.WalletConnections
   alias Egregoros.Users
 
@@ -81,7 +82,9 @@ defmodule Egregoros.MiniApps.WalletConnectionsTest do
     refute WalletConnections.connected?(user.id, "https://wallet.example")
     assert [_connection] = WalletConnections.list_for_user(user.id)
 
+    Permissions.subscribe(user.id)
     assert :ok = WalletConnections.revoke(user.id, "https://wallet.example")
+    assert_receive {:mini_app_permission_revoked, "https://wallet.example", :wallet}
     assert WalletConnections.list_for_user(user.id) == []
   end
 

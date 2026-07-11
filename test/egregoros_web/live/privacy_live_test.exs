@@ -4,9 +4,14 @@ defmodule EgregorosWeb.PrivacyLiveTest do
   import Phoenix.LiveViewTest
 
   alias Egregoros.Relationships
+  alias Egregoros.MiniApps.ContextConsents
   alias Egregoros.MiniApps.Declarations
   alias Egregoros.MiniApps.Manifest
+  alias Egregoros.MiniApps.OAuthRegistrations
   alias Egregoros.MiniApps.WalletConnections
+  alias Egregoros.OAuth
+  alias Egregoros.OAuth.Application, as: OAuthApplication
+  alias Egregoros.Repo
   alias Egregoros.Users
 
   setup do
@@ -72,6 +77,63 @@ defmodule EgregorosWeb.PrivacyLiveTest do
     refute has_element?(view, "#wallet-connection-#{connection.id}")
   end
 
+  test "lists and revokes mini-app context disclosure", %{conn: conn, alice: alice} do
+    assert {:ok, consent} = ContextConsents.grant(alice.id, "https://reader.example")
+    conn = Plug.Test.init_test_session(conn, %{user_id: alice.id})
+    {:ok, view, _html} = live(conn, "/settings/privacy")
+
+    assert has_element?(view, "#context-consent-#{consent.id}")
+
+    view
+    |> element(
+      "button[data-role='privacy-revoke-context'][phx-value-origin='https://reader.example']"
+    )
+    |> render_click()
+
+    refute ContextConsents.approved?(alice.id, "https://reader.example")
+    refute has_element?(view, "#context-consent-#{consent.id}")
+  end
+
+  test "lists and revokes mini-app OAuth access", %{conn: conn, alice: alice} do
+    assert {:ok, registration} = OAuthRegistrations.register(oauth_manifest())
+    application = Repo.get!(OAuthApplication, registration.oauth_application_id)
+    verifier = String.duplicate("v", 43)
+    challenge = :crypto.hash(:sha256, verifier) |> Base.url_encode64(padding: false)
+
+    assert {:ok, code} =
+             OAuth.create_authorization_code(
+               application,
+               alice,
+               "https://writer.example/oauth/callback",
+               "read write",
+               code_challenge: challenge,
+               code_challenge_method: "S256"
+             )
+
+    assert {:ok, _token} =
+             OAuth.exchange_code_for_token(%{
+               "grant_type" => "authorization_code",
+               "code" => code.code,
+               "client_id" => application.client_id,
+               "client_secret" => application.client_secret,
+               "redirect_uri" => "https://writer.example/oauth/callback",
+               "code_verifier" => verifier
+             })
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: alice.id})
+    {:ok, view, _html} = live(conn, "/settings/privacy")
+    assert has_element?(view, "#oauth-grant-#{registration.id}")
+
+    view
+    |> element(
+      "button[data-role='privacy-revoke-oauth'][phx-value-origin='https://writer.example']"
+    )
+    |> render_click()
+
+    refute OAuthRegistrations.active_user_grant?("https://writer.example", alice.id)
+    refute has_element?(view, "#oauth-grant-#{registration.id}")
+  end
+
   test "lists blocks and mutes for the current user", %{
     conn: conn,
     alice: alice,
@@ -135,6 +197,27 @@ defmodule EgregorosWeb.PrivacyLiveTest do
              Manifest.decode(
                Jason.encode!(attrs),
                "https://wallet.example/.well-known/fediverse-miniapp.json"
+             )
+
+    manifest
+  end
+
+  defp oauth_manifest do
+    attrs = %{
+      "version" => "1",
+      "name" => "Writer App",
+      "homeUrl" => "https://writer.example/",
+      "oauth" => %{
+        "redirectUris" => ["https://writer.example/oauth/callback"],
+        "scopes" => ["read", "write"]
+      },
+      "capabilities" => ["compose_note"]
+    }
+
+    assert {:ok, manifest} =
+             Manifest.decode(
+               Jason.encode!(attrs),
+               "https://writer.example/.well-known/fediverse-miniapp.json"
              )
 
     manifest

@@ -12,6 +12,7 @@ defmodule EgregorosWeb.MiniAppHost do
   alias Egregoros.MiniApps.ExternalURL
   alias Egregoros.MiniApps.LaunchContext
   alias Egregoros.MiniApps.OAuthRegistrations
+  alias Egregoros.MiniApps.Permissions
   alias Egregoros.MiniApps.WalletConnections
   alias Egregoros.MiniApps.WalletRequest
   alias Egregoros.Publish
@@ -19,18 +20,42 @@ defmodule EgregorosWeb.MiniAppHost do
   alias Egregoros.Users
 
   def on_mount(:default, _params, session, socket) do
+    user_id = Map.get(session, "user_id")
+    if Phoenix.LiveView.connected?(socket), do: Permissions.subscribe(user_id)
+
     socket =
       socket
       |> Phoenix.Component.assign(:mini_app_host, closed_state())
-      |> Phoenix.Component.assign(:mini_app_user_id, Map.get(session, "user_id"))
+      |> Phoenix.Component.assign(:mini_app_user_id, user_id)
       |> Phoenix.LiveView.attach_hook(
         :mini_app_host_events,
         :handle_event,
         &handle_host_event/3
       )
+      |> Phoenix.LiveView.attach_hook(
+        :mini_app_permission_events,
+        :handle_info,
+        &handle_permission_info/2
+      )
 
     {:cont, socket}
   end
+
+  defp handle_permission_info(
+         {:mini_app_permission_revoked, app_origin, kind},
+         socket
+       )
+       when kind in [:context, :oauth, :wallet] do
+    case socket.assigns.mini_app_host do
+      %{card: %Card{app_origin: ^app_origin}} ->
+        {:halt, Phoenix.Component.assign(socket, :mini_app_host, closed_state())}
+
+      _state ->
+        {:halt, socket}
+    end
+  end
+
+  defp handle_permission_info(_message, socket), do: {:cont, socket}
 
   attr :state, :map, required: true
 

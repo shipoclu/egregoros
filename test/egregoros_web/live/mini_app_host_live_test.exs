@@ -7,6 +7,7 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
   alias Egregoros.MiniApps.Cards
   alias Egregoros.MiniApps.Manifest
   alias Egregoros.MiniApps.OAuthRegistrations
+  alias Egregoros.MiniApps.Permissions
   alias Egregoros.MiniApps.WalletConnections
   alias Egregoros.MiniApps.ResolvedCard
   alias Egregoros.Objects
@@ -595,6 +596,28 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
     })
 
     assert has_element?(view, "#mini-app-wallet-incompatible")
+  end
+
+  test "permission revocation immediately tears down the matching active app", %{
+    conn: conn,
+    user: user
+  } do
+    {:ok, note} =
+      Pipeline.ingest(
+        Note.build(user, ~s(<a href="https://app.example/shared/chapter">reader</a>)),
+        local: true
+      )
+
+    assert {:ok, _card} = Cards.put(note, resolved_card())
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/?timeline=public")
+    view |> element("[data-role='open-mini-app']") |> render_click()
+    assert has_element?(view, "#mini-app-host[data-state='open']")
+
+    :ok = Permissions.notify_revoked(user.id, "https://app.example", :context)
+    _ = render(view)
+
+    assert has_element?(view, "#mini-app-host[data-state='closed']")
   end
 
   test "privileged wallet requests are reviewed exactly and rechecked before execution", %{

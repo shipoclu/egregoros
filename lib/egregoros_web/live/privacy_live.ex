@@ -2,6 +2,8 @@ defmodule EgregorosWeb.PrivacyLive do
   use EgregorosWeb, :live_view
 
   alias Egregoros.Notifications
+  alias Egregoros.MiniApps.ContextConsents
+  alias Egregoros.MiniApps.OAuthRegistrations
   alias Egregoros.MiniApps.WalletConnections
   alias Egregoros.Relationship
   alias Egregoros.Relationships
@@ -28,6 +30,18 @@ defmodule EgregorosWeb.PrivacyLive do
         _ -> []
       end
 
+    context_consents =
+      case current_user do
+        %User{id: user_id} -> ContextConsents.list_for_user(user_id)
+        _ -> []
+      end
+
+    oauth_grants =
+      case current_user do
+        %User{id: user_id} -> OAuthRegistrations.list_user_grants(user_id)
+        _ -> []
+      end
+
     {:ok,
      socket
      |> assign(
@@ -37,6 +51,8 @@ defmodule EgregorosWeb.PrivacyLive do
        blocks: blocks,
        targets_by_ap_id: target_cards(mutes ++ blocks)
      )
+     |> stream(:context_consents, context_consents, dom_id: &"context-consent-#{&1.id}")
+     |> stream(:oauth_grants, oauth_grants, dom_id: &"oauth-grant-#{&1.id}")
      |> stream(:wallet_connections, wallet_connections, dom_id: &"wallet-connection-#{&1.id}")}
   end
 
@@ -58,6 +74,38 @@ defmodule EgregorosWeb.PrivacyLive do
          stream(socket, :wallet_connections, WalletConnections.list_for_user(user_id),
            reset: true,
            dom_id: &"wallet-connection-#{&1.id}"
+         )}
+
+      _ ->
+        {:noreply, socket}
+    end
+  end
+
+  def handle_event("privacy-revoke-context", %{"origin" => origin}, socket) do
+    case socket.assigns.current_user do
+      %User{id: user_id} ->
+        :ok = ContextConsents.revoke(user_id, origin)
+
+        {:noreply,
+         stream(socket, :context_consents, ContextConsents.list_for_user(user_id),
+           reset: true,
+           dom_id: &"context-consent-#{&1.id}"
+         )}
+
+      _ ->
+        {:noreply, socket}
+    end
+  end
+
+  def handle_event("privacy-revoke-oauth", %{"origin" => origin}, socket) do
+    case socket.assigns.current_user do
+      %User{id: user_id} ->
+        :ok = OAuthRegistrations.revoke_user_grant(origin, user_id)
+
+        {:noreply,
+         stream(socket, :oauth_grants, OAuthRegistrations.list_user_grants(user_id),
+           reset: true,
+           dom_id: &"oauth-grant-#{&1.id}"
          )}
 
       _ ->
@@ -277,6 +325,93 @@ defmodule EgregorosWeb.PrivacyLive do
                 </div>
               </.card>
             </div>
+
+            <.card class="p-6">
+              <div class="flex items-center justify-between gap-4">
+                <div>
+                  <h3 class="text-xl font-bold text-[color:var(--text-primary)]">
+                    Mini-app launch context
+                  </h3>
+                  <p class="mt-1 text-sm text-[color:var(--text-secondary)]">
+                    Revoke access to the public note details you previously disclosed.
+                  </p>
+                </div>
+                <.icon name="hero-document-text" class="size-6 text-[color:var(--accent)]" />
+              </div>
+
+              <div id="context-consents" phx-update="stream" class="mt-4 space-y-3">
+                <p
+                  id="context-consents-empty"
+                  class="hidden only:block text-sm text-[color:var(--text-secondary)]"
+                >
+                  No mini apps have launch-context access.
+                </p>
+                <div
+                  :for={{id, consent} <- @streams.context_consents}
+                  id={id}
+                  class="flex items-center justify-between gap-4 border border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-4 py-3"
+                >
+                  <p class="min-w-0 truncate font-mono text-sm font-bold text-[color:var(--text-primary)]">
+                    {consent.app_origin}
+                  </p>
+                  <button
+                    type="button"
+                    data-role="privacy-revoke-context"
+                    phx-click="privacy-revoke-context"
+                    phx-value-origin={consent.app_origin}
+                    class="shrink-0 border-2 border-[color:var(--border-default)] px-3 py-2 text-xs font-bold uppercase tracking-wide text-[color:var(--text-secondary)] transition hover:border-[color:var(--danger)] hover:text-[color:var(--danger)]"
+                  >
+                    Revoke
+                  </button>
+                </div>
+              </div>
+            </.card>
+
+            <.card class="p-6">
+              <div class="flex items-center justify-between gap-4">
+                <div>
+                  <h3 class="text-xl font-bold text-[color:var(--text-primary)]">
+                    Mini-app OAuth access
+                  </h3>
+                  <p class="mt-1 text-sm text-[color:var(--text-secondary)]">
+                    Revoking access invalidates the app's active access and refresh tokens.
+                  </p>
+                </div>
+                <.icon name="hero-key" class="size-6 text-[color:var(--accent)]" />
+              </div>
+
+              <div id="oauth-grants" phx-update="stream" class="mt-4 space-y-3">
+                <p
+                  id="oauth-grants-empty"
+                  class="hidden only:block text-sm text-[color:var(--text-secondary)]"
+                >
+                  No mini apps have OAuth access.
+                </p>
+                <div
+                  :for={{id, grant} <- @streams.oauth_grants}
+                  id={id}
+                  class="flex flex-col gap-3 border border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div class="min-w-0">
+                    <p class="truncate font-mono text-sm font-bold text-[color:var(--text-primary)]">
+                      {grant.app_origin}
+                    </p>
+                    <p class="mt-1 text-xs text-[color:var(--text-muted)]">
+                      Scopes: {Enum.join(grant.scopes, ", ")}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    data-role="privacy-revoke-oauth"
+                    phx-click="privacy-revoke-oauth"
+                    phx-value-origin={grant.app_origin}
+                    class="shrink-0 border-2 border-[color:var(--border-default)] px-3 py-2 text-xs font-bold uppercase tracking-wide text-[color:var(--text-secondary)] transition hover:border-[color:var(--danger)] hover:text-[color:var(--danger)]"
+                  >
+                    Revoke
+                  </button>
+                </div>
+              </div>
+            </.card>
 
             <.card class="p-6">
               <div class="flex items-center justify-between gap-4">

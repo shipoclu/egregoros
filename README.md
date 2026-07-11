@@ -45,6 +45,25 @@ Implements a Mastodon-compatible API sufficient for real clients (including WebS
 - Composer with visibility, language, content warnings, sensitive toggle, attachments, emoji picker, mention autocomplete
 - Profiles, notifications, settings, light/dark/system theme
 
+### Fediverse mini apps
+
+Mini apps are disabled by default. Operators can enable them and apply exact or
+wildcard domain policy with comma-separated runtime settings:
+
+```sh
+EGREGOROS_MINI_APPS_ENABLED=true
+EGREGOROS_MINI_APPS_DOMAIN_ALLOWLIST=apps.example,*.trusted.example
+EGREGOROS_MINI_APPS_DOMAIN_DENYLIST=blocked.trusted.example,*.abuse.example
+```
+
+The denylist wins over the allowlist. An empty allowlist permits any otherwise
+valid domain; a non-empty allowlist permits only matching domains. Restarting
+with a changed policy tears down existing browser sessions, and every discovery,
+OAuth, context, compose, and wallet operation rechecks the current policy. Users
+can independently revoke mini-app context, OAuth, and wallet access from
+Settings → Privacy; revocation closes a matching active mini app in all open
+Egregoros tabs immediately.
+
 ## Architecture (quick tour)
 
 - **Core ingestion:** `lib/egregoros/pipeline.ex` → activity module (`lib/egregoros/activities/*`) → `objects` + `relationships` + side effects (broadcast, notifications, delivery).

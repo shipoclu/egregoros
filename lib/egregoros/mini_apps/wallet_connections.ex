@@ -5,6 +5,7 @@ defmodule Egregoros.MiniApps.WalletConnections do
 
   alias Egregoros.MiniApps.Declarations
   alias Egregoros.MiniApps.Origin
+  alias Egregoros.MiniApps.Permissions
   alias Egregoros.MiniApps.WalletConnection
   alias Egregoros.Repo
 
@@ -68,10 +69,13 @@ defmodule Egregoros.MiniApps.WalletConnections do
   def list_for_user(_user_id), do: []
 
   def revoke(user_id, app_origin) when is_binary(user_id) and is_binary(app_origin) do
-    from(connection in WalletConnection,
-      where: connection.user_id == ^user_id and connection.app_origin == ^app_origin
-    )
-    |> Repo.delete_all()
+    {count, _rows} =
+      from(connection in WalletConnection,
+        where: connection.user_id == ^user_id and connection.app_origin == ^app_origin
+      )
+      |> Repo.delete_all()
+
+    if count > 0, do: Permissions.notify_revoked(user_id, app_origin, :wallet)
 
     :ok
   rescue

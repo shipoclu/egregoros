@@ -4,6 +4,7 @@ defmodule Egregoros.MiniApps.OAuthRegistrationsTest do
   alias Egregoros.MiniApps.Manifest
   alias Egregoros.MiniApps.Declarations
   alias Egregoros.MiniApps.OAuthRegistrations
+  alias Egregoros.MiniApps.Permissions
   alias Egregoros.OAuth
   alias Egregoros.OAuth.Application, as: OAuthApplication
   alias Egregoros.OAuth.Token
@@ -121,6 +122,48 @@ defmodule Egregoros.MiniApps.OAuthRegistrationsTest do
     assert Repo.get!(Token, token.id).revoked_at
     refute OAuthRegistrations.capability_allowed?("https://app.example", "compose_note")
     refute OAuthRegistrations.active_user_grant?("https://app.example", user.id)
+  end
+
+  test "lists and immediately revokes a user's app grant and token family" do
+    {:ok, registration} = OAuthRegistrations.register(manifest_fixture())
+    application = Repo.get!(OAuthApplication, registration.oauth_application_id)
+    {:ok, user} = Users.create_local_user("mini-app-oauth-revoke-user")
+    verifier = String.duplicate("v", 43)
+    challenge = :crypto.hash(:sha256, verifier) |> Base.url_encode64(padding: false)
+
+    assert {:ok, code} =
+             OAuth.create_authorization_code(
+               application,
+               user,
+               "https://app.example/oauth/callback",
+               "read write",
+               code_challenge: challenge,
+               code_challenge_method: "S256"
+             )
+
+    assert {:ok, token} =
+             OAuth.exchange_code_for_token(%{
+               "grant_type" => "authorization_code",
+               "code" => code.code,
+               "client_id" => application.client_id,
+               "client_secret" => application.client_secret,
+               "redirect_uri" => "https://app.example/oauth/callback",
+               "code_verifier" => verifier
+             })
+
+    assert [%{app_origin: "https://app.example", scopes: ["read", "write"]}] =
+             OAuthRegistrations.list_user_grants(user.id)
+
+    Permissions.subscribe(user.id)
+    assert :ok = OAuthRegistrations.revoke_user_grant("https://app.example", user.id)
+    assert_receive {:mini_app_permission_revoked, "https://app.example", :oauth}
+    assert OAuth.get_token(token.token) == nil
+    assert OAuth.get_token(token.refresh_token) == nil
+    refute OAuthRegistrations.active_user_grant?("https://app.example", user.id)
+    assert OAuthRegistrations.list_user_grants(user.id) == []
+    assert OAuthRegistrations.list_user_grants(nil) == []
+    assert :ok = OAuthRegistrations.revoke_user_grant("https://missing.example", user.id)
+    assert :ok = OAuthRegistrations.revoke_user_grant(nil, nil)
   end
 
   defp manifest_fixture(overrides \\ []) do

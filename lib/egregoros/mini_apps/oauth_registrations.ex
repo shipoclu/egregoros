@@ -7,8 +7,10 @@ defmodule Egregoros.MiniApps.OAuthRegistrations do
   alias Egregoros.MiniApps.Declarations
   alias Egregoros.MiniApps.Manifest
   alias Egregoros.MiniApps.OAuthRegistration
+  alias Egregoros.MiniApps.Permissions
   alias Egregoros.OAuth
   alias Egregoros.OAuth.Application, as: OAuthApplication
+  alias Egregoros.OAuth.AuthorizationCode
   alias Egregoros.OAuth.Scopes
   alias Egregoros.OAuth.Token
   alias Egregoros.Repo
@@ -99,6 +101,64 @@ defmodule Egregoros.MiniApps.OAuthRegistrations do
   end
 
   def active_user_grant?(_origin, _user_id), do: false
+
+  def list_user_grants(user_id) when is_binary(user_id) do
+    now = DateTime.utc_now()
+
+    from(registration in OAuthRegistration,
+      join: token in Token,
+      on: token.application_id == registration.oauth_application_id,
+      where:
+        token.user_id == ^user_id and is_nil(token.revoked_at) and
+          (is_nil(token.expires_at) or token.expires_at > ^now),
+      distinct: registration.id,
+      order_by: [desc: registration.registered_at, asc: registration.app_origin],
+      select: %{
+        id: registration.id,
+        app_origin: registration.app_origin,
+        scopes: registration.scopes,
+        capabilities: registration.capabilities
+      }
+    )
+    |> Repo.all()
+  rescue
+    ArgumentError -> []
+    Ecto.Query.CastError -> []
+  end
+
+  def list_user_grants(_user_id), do: []
+
+  def revoke_user_grant(origin, user_id) when is_binary(origin) and is_binary(user_id) do
+    case get_by_origin(origin) do
+      %OAuthRegistration{oauth_application_id: application_id} ->
+        now = DateTime.utc_now()
+
+        Repo.transaction(fn ->
+          from(token in Token,
+            where:
+              token.application_id == ^application_id and token.user_id == ^user_id and
+                is_nil(token.revoked_at)
+          )
+          |> Repo.update_all(set: [revoked_at: now])
+
+          from(code in AuthorizationCode,
+            where: code.application_id == ^application_id and code.user_id == ^user_id
+          )
+          |> Repo.delete_all()
+        end)
+
+        Permissions.notify_revoked(user_id, origin, :oauth)
+        :ok
+
+      nil ->
+        :ok
+    end
+  rescue
+    ArgumentError -> :ok
+    Ecto.Query.CastError -> :ok
+  end
+
+  def revoke_user_grant(_origin, _user_id), do: :ok
 
   def validate_authorization(%OAuthApplication{} = application, redirect_uri, scopes, opts)
       when is_binary(redirect_uri) and is_binary(scopes) and is_list(opts) do
