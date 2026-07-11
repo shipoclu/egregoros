@@ -404,6 +404,15 @@ returning `true`. The connected SDK exposes a frozen `bootstrap` containing
 `hostOrigin`, OAuth `issuer`, `authorizationServerMetadata`, protocol version,
 launch ID, and the currently available capability names.
 
+Every published SDK build MUST ship matching TypeScript declarations even when
+its runtime is authored in JavaScript. Egregoros builds
+`fediverse-miniapp-sdk-v1.d.ts` beside the ESM file and type-checks the public
+surface in CI. The declarations cover bootstrap/context DTOs, OAuth and compose
+inputs/results, publication receipts, stable SDK errors, wallet capabilities,
+and overloads for every allowlisted EIP-1193 method. A runtime/declaration
+change is one versioned SDK change; publishing JavaScript with missing or stale
+types is a release failure.
+
 The reference API is promise-based:
 
 ```js

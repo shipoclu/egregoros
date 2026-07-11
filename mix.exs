@@ -113,17 +113,22 @@ defmodule Egregoros.MixProject do
       "ecto.reset": ["ecto.drop", "ecto.setup"],
       test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
-      "assets.test": ["cmd --cd assets node --test"],
+      "assets.test": [
+        "cmd --cd assets node --test",
+        "cmd deno check assets/typecheck/fediverse_miniapp_sdk_types.ts"
+      ],
       "assets.build": [
         "compile",
         "tailwind egregoros",
         "esbuild egregoros",
-        "esbuild mini_app_sdk"
+        "esbuild mini_app_sdk",
+        "cmd cp assets/js/lib/fediverse_miniapp_sdk.d.ts priv/static/assets/js/fediverse-miniapp-sdk-v1.d.ts"
       ],
       "assets.deploy": [
         "tailwind egregoros --minify",
         "esbuild egregoros --minify",
         "esbuild mini_app_sdk --minify",
+        "cmd cp assets/js/lib/fediverse_miniapp_sdk.d.ts priv/static/assets/js/fediverse-miniapp-sdk-v1.d.ts",
         "phx.digest"
       ],
       precommit: [

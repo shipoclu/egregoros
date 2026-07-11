@@ -1,0 +1,31 @@
+# Fediverse mini-app reference
+
+This is a deliberately small, static v1 mini app. It demonstrates that useful
+apps can render and use public host actions before OAuth, while optional wallet
+access remains host mediated.
+
+Before deploying:
+
+1. Replace every `https://miniapp.example` URL in `public/.well-known/fediverse-miniapp.json`.
+2. Replace the trusted Egregoros origin in `public/app.mjs`; do not use an
+   accept-any-origin callback.
+3. Build and copy the pinned SDK artifact:
+
+   ```sh
+   MIX_ENV=prod mix assets.build
+   cp priv/static/assets/js/fediverse-miniapp-sdk-v1.js \
+     examples/fediverse-miniapp/public/fediverse-miniapp-sdk-v1.js
+   cp priv/static/assets/js/fediverse-miniapp-sdk-v1.d.ts \
+     examples/fediverse-miniapp/public/fediverse-miniapp-sdk-v1.d.ts
+   ```
+
+4. Serve `public/` from the exact HTTPS origin in the manifest, without
+   redirects. The manifest must be available at
+   `/.well-known/fediverse-miniapp.json` and the page must permit framing by the
+   Egregoros instances you support through CSP `frame-ancestors`.
+
+The reference intentionally has no backend and therefore does not demonstrate
+dynamic OAuth registration or token exchange. Those operations belong on an
+app backend; bearer tokens and client secrets must never enter iframe
+JavaScript. The SDK's bootstrap gives that backend the exact issuer and OAuth
+metadata URL needed to implement the flow.
