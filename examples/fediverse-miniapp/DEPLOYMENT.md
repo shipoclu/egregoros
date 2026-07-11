@@ -238,8 +238,9 @@ matching wildcard deny rules take precedence.
 ## 8. Adding an OAuth backend later
 
 The static reference app has no OAuth backend. Do not perform dynamic client
-registration, store a client secret, exchange authorization codes, refresh
-tokens, or call bearer-token APIs in iframe JavaScript.
+registration, exchange authorization codes, store access/refresh tokens, or
+call bearer-token APIs in iframe JavaScript. Mini apps are public OAuth clients;
+Egregoros does not return a client secret for them.
 
 A backend deployment should:
 
@@ -247,8 +248,11 @@ A backend deployment should:
    `launchId` from the SDK bootstrap and send them to the app backend as
    untrusted input.
 2. Validate the issuer against the same trusted-host policy used by the app.
-3. Register one client per app manifest and issuer, then reuse it.
-4. Keep client secrets and access/refresh tokens only on the backend.
+3. Register one public client per app manifest and issuer, cache its stable
+   `client_id`, and reuse it. Equivalent registration returns that same ID and
+   no secret.
+4. Keep access/refresh tokens only on the backend. Omit `client_secret` from
+   token and revocation requests; `client_credentials` is unavailable.
 5. Use transaction-specific S256 PKCE, high-entropy state, the exact registered
    callback, and the verifier-bound one-time iframe handoff. Bind the exact
    relay URL and launch ID to the OAuth state.

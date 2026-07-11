@@ -228,13 +228,13 @@ defmodule Egregoros.Media do
     with [user_id, _filename] <- String.split(rest, "/", parts: 2),
          %User{} = owner <- Users.get(user_id) do
       from(o in Object,
-        where: o.actor == ^owner.ap_id and o.type in ^@allowed_types,
-        order_by: [desc: o.inserted_at]
+        where:
+          o.actor == ^owner.ap_id and o.local == true and o.type in ^@allowed_types and
+            fragment("? @> ?", o.internal, ^%{"media" => %{"paths" => [path]}}),
+        order_by: [desc: o.inserted_at],
+        limit: 1
       )
-      |> Repo.all()
-      |> Enum.find(fn object ->
-        path in List.wrap(get_in(object.internal || %{}, ["media", "paths"]))
-      end)
+      |> Repo.one()
     else
       _ -> nil
     end

@@ -138,15 +138,20 @@ defmodule EgregorosWeb.MiniAppNotificationPermissionControllerTest do
                code_challenge_method: "S256"
              )
 
-    assert {:ok, token} =
-             OAuth.exchange_code_for_token(%{
-               "grant_type" => "authorization_code",
-               "code" => code.code,
-               "client_id" => application.client_id,
-               "client_secret" => application.client_secret,
-               "redirect_uri" => redirect_uri,
-               "code_verifier" => verifier
-             })
+    params = %{
+      "grant_type" => "authorization_code",
+      "code" => code.code,
+      "client_id" => application.client_id,
+      "redirect_uri" => redirect_uri,
+      "code_verifier" => verifier
+    }
+
+    params =
+      if OAuthRegistrations.public_client?(application),
+        do: params,
+        else: Map.put(params, "client_secret", application.client_secret)
+
+    assert {:ok, token} = OAuth.exchange_code_for_token(params)
 
     token.token
   end

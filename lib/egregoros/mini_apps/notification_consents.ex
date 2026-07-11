@@ -4,8 +4,10 @@ defmodule Egregoros.MiniApps.NotificationConsents do
   import Ecto.Query
 
   alias Egregoros.MiniApps.Declarations
+  alias Egregoros.MiniApps.GrantLock
   alias Egregoros.MiniApps.NotificationConsent
   alias Egregoros.MiniApps.NotificationAudits
+  alias Egregoros.MiniApps.OAuthRegistrations
   alias Egregoros.MiniApps.Origin
   alias Egregoros.MiniApps.Permissions
   alias Egregoros.Repo
@@ -36,7 +38,12 @@ defmodule Egregoros.MiniApps.NotificationConsents do
          {:ok, actor_url} <- Declarations.notification_actor(app_origin) do
       case Repo.transaction(fn ->
              lock_delivery(user_id, app_origin)
-             decide_locked(user, app_origin, actor_url, decision)
+
+             if oauth_decision_allowed?(decision, user_id, app_origin) do
+               decide_locked(user, app_origin, actor_url, decision)
+             else
+               {:error, :oauth_required}
+             end
            end) do
         {:ok, result} -> result
         {:error, reason} -> {:error, reason}
@@ -84,14 +91,14 @@ defmodule Egregoros.MiniApps.NotificationConsents do
 
   def lock_delivery(user_id, app_origin)
       when is_binary(user_id) and is_binary(app_origin) do
-    Ecto.Adapters.SQL.query!(
-      Repo,
-      "SELECT pg_advisory_xact_lock(hashtext($1))",
-      ["mini-app-notification:" <> user_id <> ":" <> app_origin]
-    )
-
-    :ok
+    GrantLock.acquire(user_id, app_origin)
   end
+
+  defp oauth_decision_allowed?(:granted, user_id, app_origin) do
+    OAuthRegistrations.active_user_grant?(app_origin, user_id)
+  end
+
+  defp oauth_decision_allowed?(:denied, _user_id, _app_origin), do: true
 
   defp decide_locked(user, app_origin, actor_url, decision) do
     now = DateTime.utc_now()

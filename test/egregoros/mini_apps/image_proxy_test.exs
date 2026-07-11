@@ -66,10 +66,7 @@ defmodule Egregoros.MiniApps.ImageProxyTest do
   end
 
   test "the application module never links the in-process Image or Vix decoders" do
-    assert {:ok, {_module, [imports: imports]}} =
-             ImageProxy
-             |> :code.which()
-             |> :beam_lib.chunks([:imports])
+    imports = module_imports(ImageProxy)
 
     refute Enum.any?(imports, fn {module, _function, _arity} ->
              module == Image or module |> Atom.to_string() |> String.starts_with?("Elixir.Vix.")
@@ -101,11 +98,59 @@ defmodule Egregoros.MiniApps.ImageProxyTest do
     assert Image.pages(image) == 1
   end
 
+  test "normalizes JPEG, WebP, and AVIF inputs to the fixed WebP output", %{
+    safe_webp: safe_webp
+  } do
+    inputs = [
+      {image_binary(3, 2, ".jpg"), " image/JPEG ; charset=binary"},
+      {image_binary(3, 2, ".webp"), "IMAGE/WEBP"},
+      {image_binary(3, 2, ".avif"), "image/avif"}
+    ]
+
+    for {input, declared_content_type} <- inputs do
+      assert {:ok, %{body: ^safe_webp, content_type: "image/webp"}} =
+               ImageProxy.sanitize(input, declared_content_type)
+    end
+  end
+
+  test "accepts bounded VP8X and VP8L still-image containers", %{safe_webp: safe_webp} do
+    vp8x =
+      webp([
+        webp_chunk("VP8X", <<0, 0, 0, 0, 2::little-24, 1::little-24>>),
+        webp_chunk("EXIF", "safe metadata"),
+        webp_chunk("VP8 ", <<0, 0, 0, 0x9D, 0x01, 0x2A, 3::little-16, 2::little-16>>)
+      ])
+
+    packed = Bitwise.bor(2, Bitwise.bsl(1, 14))
+    vp8l = webp([webp_chunk("VP8L", <<0x2F, packed::little-32>>)])
+
+    for input <- [vp8x, vp8l] do
+      assert {:ok, %{body: ^safe_webp, content_type: "image/webp"}} =
+               ImageProxy.sanitize(input, "image/webp")
+    end
+  end
+
   test "requires the declared MIME type to match the actual raster signature" do
     png = image_binary(2, 2, ".png")
 
     assert {:error, :image_content_type_mismatch} =
              ImageProxy.sanitize(png, "image/jpeg")
+  end
+
+  test "rejects invalid argument types, invalid UTF-8, and empty media types" do
+    png = image_binary(2, 2, ".png")
+
+    for {body, declared_content_type, expected_error} <- [
+          {nil, "image/png", :invalid_image},
+          {%{}, "image/png", :invalid_image},
+          {png, nil, :invalid_image},
+          {png, %{}, :invalid_image},
+          {png, <<"image/png", 0xFF>>, :image_content_type_mismatch},
+          {png, "  ; smuggled=image/png", :image_content_type_mismatch}
+        ] do
+      assert {:error, ^expected_error} =
+               ImageProxy.sanitize(body, declared_content_type)
+    end
   end
 
   test "rejects truncated files and non-raster active content" do
@@ -277,6 +322,108 @@ defmodule Egregoros.MiniApps.ImageProxyTest do
              ImageProxy.sanitize(image_binary(2, 2, ".png"), "image/png")
   end
 
+  test "fails closed on an invalid pre-READY worker handshake", %{
+    launcher: launcher,
+    python: python
+  } do
+    replace_executable(
+      launcher,
+      """
+      #!#{python}
+      import sys
+      sys.stdout.write("NOT-READY\\n")
+      sys.stdout.flush()
+      """
+    )
+
+    assert {:error, :image_processing_unavailable} =
+             ImageProxy.sanitize(image_binary(2, 2, ".png"), "image/png")
+  end
+
+  test "bounds diagnostics before accepting the worker READY handshake", %{
+    launcher: launcher,
+    python: python
+  } do
+    replace_executable(
+      launcher,
+      """
+      #!#{python}
+      import sys, time
+      sys.stdout.write("x" * 5000)
+      sys.stdout.flush()
+      time.sleep(30)
+      """
+    )
+
+    assert {:error, :image_processing_unavailable} =
+             ImageProxy.sanitize(image_binary(2, 2, ".png"), "image/png")
+  end
+
+  test "fails closed when the worker never reaches its READY handshake", %{
+    launcher: launcher,
+    python: python
+  } do
+    replace_executable(
+      launcher,
+      """
+      #!#{python}
+      import time
+      time.sleep(30)
+      """
+    )
+
+    Application.put_env(:egregoros, :mini_app_image_processing_timeout_ms, 200)
+
+    assert {:error, :image_processing_unavailable} =
+             ImageProxy.sanitize(image_binary(2, 2, ".png"), "image/png")
+  end
+
+  test "fails closed when a worker exits during a partial READY handshake", %{
+    launcher: launcher,
+    python: python
+  } do
+    replace_executable(
+      launcher,
+      """
+      #!#{python}
+      import sys
+      sys.stdout.write("REA")
+      sys.stdout.flush()
+      """
+    )
+
+    assert {:error, :image_processing_unavailable} =
+             ImageProxy.sanitize(image_binary(2, 2, ".png"), "image/png")
+  end
+
+  test "rejects unsafe worker paths and temporary-directory configuration", %{
+    decoder: decoder,
+    launcher: launcher,
+    root: root
+  } do
+    Application.put_env(:egregoros, :mini_app_image_decoder, launcher)
+
+    assert {:error, :image_processing_unavailable} =
+             ImageProxy.sanitize(image_binary(2, 2, ".png"), "image/png")
+
+    Application.put_env(:egregoros, :mini_app_image_decoder, decoder)
+    Application.put_env(:egregoros, :mini_app_image_worker_script, Path.join(root, "missing.py"))
+
+    assert {:error, :image_processing_unavailable} =
+             ImageProxy.sanitize(image_binary(2, 2, ".png"), "image/png")
+
+    Application.put_env(:egregoros, :mini_app_image_worker_script, launcher)
+    Application.put_env(:egregoros, :mini_app_image_tmp_dir, "relative/tmp")
+
+    assert {:error, :image_processing_unavailable} =
+             ImageProxy.sanitize(image_binary(2, 2, ".png"), "image/png")
+
+    Application.put_env(:egregoros, :mini_app_image_tmp_dir, Path.join(root, "missing"))
+
+    assert {:error, :image_processing_unavailable} =
+             ImageProxy.sanitize(image_binary(2, 2, ".png"), "image/png")
+  end
+
   test "rejects animation markers and malformed PNG structure before decoding" do
     png = image_binary(2, 2, ".png")
     animated_png = insert_png_chunk_after_header(png, "acTL", <<0, 0, 0, 2, 0, 0, 0, 0>>)
@@ -291,6 +438,60 @@ defmodule Egregoros.MiniApps.ImageProxyTest do
 
     assert {:error, :invalid_image} =
              ImageProxy.sanitize(prefix <> <<Bitwise.bxor(byte, 1)>> <> tail, "image/png")
+  end
+
+  test "rejects malformed PNG chunk order, terminators, and animation data" do
+    png = image_binary(2, 2, ".png")
+    <<signature::binary-size(8), ihdr::binary-size(25), chunks::binary>> = png
+    {idat_type_offset, 4} = :binary.match(chunks, "IDAT")
+    idat_chunk_offset = idat_type_offset - 4
+
+    <<_preceding_chunks::binary-size(idat_chunk_offset), idat_length::big-32, "IDAT",
+      idat_rest::binary>> = chunks
+
+    <<idat_data::binary-size(idat_length), idat_crc::big-32, iend::binary>> = idat_rest
+    idat = <<idat_length::big-32, "IDAT", idat_data::binary, idat_crc::big-32>>
+
+    malformed = [
+      signature <> png_chunk("aa1a", <<>>) <> ihdr <> chunks,
+      signature <> idat <> ihdr <> iend,
+      signature <> ihdr <> iend,
+      signature <> ihdr <> idat <> png_chunk("IEND", <<0>>),
+      signature <> ihdr <> idat <> iend <> png_chunk("aaAa", <<>>),
+      signature <> ihdr <> ihdr <> chunks
+    ]
+
+    for input <- malformed do
+      assert {:error, :invalid_image} = ImageProxy.sanitize(input, "image/png")
+    end
+
+    assert {:error, :animated_image_not_allowed} =
+             ImageProxy.sanitize(
+               insert_png_chunk_after_header(png, "fdAT", <<0::32>>),
+               "image/png"
+             )
+  end
+
+  test "rejects truncated PNG chunk streams and zero dimensions" do
+    png = image_binary(2, 2, ".png")
+    <<signature::binary-size(8), ihdr::binary-size(25), remaining_chunks::binary>> = png
+
+    assert {:error, :invalid_image} =
+             ImageProxy.sanitize(signature <> ihdr, "image/png")
+
+    assert {:error, :invalid_image} =
+             ImageProxy.sanitize(
+               signature <> ihdr <> <<5::big-32, "IDAT", "x">>,
+               "image/png"
+             )
+
+    zero_width_ihdr = png_chunk("IHDR", <<0::big-32, 2::big-32, 8, 2, 0, 0, 0>>)
+
+    assert {:error, :invalid_image} =
+             ImageProxy.sanitize(
+               signature <> zero_width_ihdr <> remaining_chunks,
+               "image/png"
+             )
   end
 
   test "bounds container metadata work before starting an OS worker" do
@@ -323,6 +524,59 @@ defmodule Egregoros.MiniApps.ImageProxyTest do
 
     assert {:error, :animated_image_not_allowed} =
              ImageProxy.sanitize(animated, "image/webp")
+  end
+
+  test "rejects malformed, ambiguous, and animated WebP containers" do
+    vp8 = webp_chunk("VP8 ", <<0, 0, 0, 0x9D, 0x01, 0x2A, 2::little-16, 2::little-16>>)
+    vp8l = webp_chunk("VP8L", <<0x2F, 0::little-32>>)
+
+    malformed = [
+      webp([]),
+      webp([webp_chunk("EXIF", <<>>)]),
+      webp([webp_chunk("VP8X", <<0, 0, 0>>), vp8]),
+      webp([vp8, vp8l]),
+      webp([webp_chunk("JUNK", <<>>), vp8]),
+      webp([webp_chunk("VP8 ", <<0, 0, 0>>)]),
+      binary_part(webp([vp8]), 0, byte_size(webp([vp8])) - 1)
+    ]
+
+    for input <- malformed do
+      assert {:error, error} = ImageProxy.sanitize(input, "image/webp")
+      assert error in [:invalid_image, :unsupported_image_type]
+    end
+
+    assert {:error, :animated_image_not_allowed} =
+             ImageProxy.sanitize(
+               webp([
+                 webp_chunk("VP8X", <<0x02, 0, 0, 0, 1::little-24, 1::little-24>>),
+                 vp8
+               ]),
+               "image/webp"
+             )
+
+    assert {:error, :animated_image_not_allowed} =
+             ImageProxy.sanitize(webp([webp_chunk("ANMF", <<>>), vp8]), "image/webp")
+  end
+
+  test "accepts a still AVIF brand and rejects animated or malformed AVIF headers", %{
+    safe_webp: safe_webp
+  } do
+    assert {:ok, %{body: ^safe_webp, content_type: "image/webp"}} =
+             ImageProxy.sanitize(avif("avif", ["mif1"]), "image/avif")
+
+    for input <- [avif("avis", ["mif1"]), avif("avif", ["avis"])] do
+      assert {:error, :animated_image_not_allowed} =
+               ImageProxy.sanitize(input, "image/avif")
+    end
+
+    for input <- [
+          <<12::big-32, "ftyp", "avif">>,
+          <<24::big-32, "ftyp", "avif", 0::32>>,
+          avif("mif1", ["miaf"])
+        ] do
+      assert {:error, error} = ImageProxy.sanitize(input, "image/avif")
+      assert error in [:invalid_image, :unsupported_image_type]
+    end
   end
 
   test "rejects control characters and oversized declared media types" do
@@ -437,6 +691,47 @@ defmodule Egregoros.MiniApps.ImageProxyTest do
     body
   end
 
+  defp module_imports(module) do
+    with path when is_list(path) <- :code.which(module),
+         {:ok, {^module, [imports: imports]}} <- :beam_lib.chunks(path, [:imports]) do
+      imports
+    else
+      _coverage_instrumented -> compile_uninstrumented_imports(module)
+    end
+  end
+
+  defp compile_uninstrumented_imports(module) do
+    directory =
+      Path.join(System.tmp_dir!(), "egregoros-image-proxy-beam-#{Ecto.UUID.generate()}")
+
+    source = Path.expand("../../../lib/egregoros/mini_apps/image_proxy.ex", __DIR__)
+    elixirc = System.find_executable("elixirc") || flunk("elixirc is required for this test")
+    :ok = File.mkdir(directory)
+
+    code_path_arguments =
+      Enum.flat_map(:code.get_path(), fn path -> ["-pa", List.to_string(path)] end)
+
+    try do
+      arguments =
+        code_path_arguments ++
+          ["--ignore-module-conflict", "-o", directory, source]
+
+      assert {diagnostics, 0} =
+               System.cmd(elixirc, arguments, stderr_to_stdout: true)
+
+      assert diagnostics == ""
+
+      beam_path = Path.join(directory, Atom.to_string(module) <> ".beam")
+
+      assert {:ok, {^module, [imports: imports]}} =
+               :beam_lib.chunks(String.to_charlist(beam_path), [:imports])
+
+      imports
+    after
+      File.rm_rf!(directory)
+    end
+  end
+
   defp write_executable(path, contents) do
     :ok = File.write(path, contents, [:exclusive])
     :ok = File.chmod(path, 0o700)
@@ -487,5 +782,23 @@ defmodule Egregoros.MiniApps.ImageProxyTest do
   defp png_chunk(type, data) do
     <<byte_size(data)::big-32, type::binary-size(4), data::binary,
       :erlang.crc32([type, data])::big-32>>
+  end
+
+  defp webp(chunks) do
+    chunks = IO.iodata_to_binary(chunks)
+
+    <<byte_size(chunks) + 4::little-32, "WEBP", chunks::binary>>
+    |> then(&<<"RIFF", &1::binary>>)
+  end
+
+  defp webp_chunk(type, data) do
+    padding = if rem(byte_size(data), 2) == 0, do: <<>>, else: <<0>>
+    <<type::binary-size(4), byte_size(data)::little-32, data::binary, padding::binary>>
+  end
+
+  defp avif(major_brand, compatible_brands) do
+    brands = IO.iodata_to_binary(compatible_brands)
+    size = 16 + byte_size(brands)
+    <<size::big-32, "ftyp", major_brand::binary-size(4), 0::big-32, brands::binary>>
   end
 end

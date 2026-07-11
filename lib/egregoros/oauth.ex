@@ -5,6 +5,8 @@ defmodule Egregoros.OAuth do
   alias Egregoros.OAuth.AuthorizationCode
   alias Egregoros.OAuth.Scopes
   alias Egregoros.OAuth.Token
+  alias Egregoros.MiniApps.GrantLock
+  alias Egregoros.MiniApps.OAuthRegistration
   alias Egregoros.MiniApps.OAuthRegistrations, as: MiniAppOAuthRegistrations
   alias Egregoros.Repo
   alias Egregoros.User
@@ -13,24 +15,30 @@ defmodule Egregoros.OAuth do
   @default_access_token_ttl_seconds 3_600
   @default_refresh_token_ttl_seconds 31_536_000
 
-  def create_application(attrs) when is_map(attrs) do
-    now = DateTime.utc_now()
+  def create_application(attrs, opts \\ []) when is_map(attrs) and is_list(opts) do
+    client_type = Keyword.get(opts, :client_type, :confidential)
 
-    application_attrs = %{
-      name: Map.get(attrs, "client_name") || Map.get(attrs, :client_name) || "App",
-      website: Map.get(attrs, "website") || Map.get(attrs, :website),
-      redirect_uris:
-        parse_redirect_uris(Map.get(attrs, "redirect_uris") || Map.get(attrs, :redirect_uris)),
-      scopes: Map.get(attrs, "scopes") || Map.get(attrs, :scopes) || "",
-      client_id: generate_token(32),
-      client_secret: generate_token(48),
-      inserted_at: now,
-      updated_at: now
-    }
+    if client_type in [:confidential, :public_mini_app] do
+      now = DateTime.utc_now()
 
-    %OAuthApplication{}
-    |> OAuthApplication.changeset(application_attrs)
-    |> Repo.insert()
+      application_attrs = %{
+        name: Map.get(attrs, "client_name") || Map.get(attrs, :client_name) || "App",
+        website: Map.get(attrs, "website") || Map.get(attrs, :website),
+        redirect_uris:
+          parse_redirect_uris(Map.get(attrs, "redirect_uris") || Map.get(attrs, :redirect_uris)),
+        scopes: Map.get(attrs, "scopes") || Map.get(attrs, :scopes) || "",
+        client_id: generate_token(32),
+        client_secret: generate_token(48),
+        inserted_at: now,
+        updated_at: now
+      }
+
+      %OAuthApplication{client_type: client_type}
+      |> OAuthApplication.changeset(application_attrs)
+      |> Repo.insert()
+    else
+      {:error, :invalid_client_type}
+    end
   end
 
   def get_application_by_client_id(nil), do: nil
@@ -103,19 +111,18 @@ defmodule Egregoros.OAuth do
           "grant_type" => "authorization_code",
           "code" => code,
           "client_id" => client_id,
-          "client_secret" => client_secret,
           "redirect_uri" => redirect_uri
         } = params
       )
-      when is_binary(code) and is_binary(client_id) and is_binary(client_secret) and
-             is_binary(redirect_uri) do
+      when is_binary(code) and is_binary(client_id) and is_binary(redirect_uri) do
     case get_application_by_client_id(client_id) do
       %OAuthApplication{} = application ->
-        if MiniAppOAuthRegistrations.application_allowed?(application) and
-             Plug.Crypto.secure_compare(application.client_secret, client_secret) do
-          exchange_authorization_code(application, code, redirect_uri, params)
-        else
-          {:error, :invalid_grant}
+        case authenticate_token_client(application, params) do
+          {:ok, client_auth} ->
+            exchange_authorization_code(application, code, redirect_uri, params, client_auth)
+
+          {:error, reason} ->
+            {:error, reason}
         end
 
       nil ->
@@ -127,20 +134,17 @@ defmodule Egregoros.OAuth do
         %{
           "grant_type" => "refresh_token",
           "refresh_token" => refresh_token,
-          "client_id" => client_id,
-          "client_secret" => client_secret
+          "client_id" => client_id
         } = params
       )
-      when is_binary(refresh_token) and is_binary(client_id) and is_binary(client_secret) do
+      when is_binary(refresh_token) and is_binary(client_id) do
     refresh_token = String.trim(refresh_token)
 
     with %OAuthApplication{} = application <- get_application_by_client_id(client_id),
-         true <- Plug.Crypto.secure_compare(application.client_secret, client_secret),
-         true <- MiniAppOAuthRegistrations.application_allowed?(application) do
-      rotate_refresh_token(application, refresh_token, params)
+         {:ok, client_auth} <- authenticate_token_client(application, params) do
+      rotate_refresh_token(application, refresh_token, params, client_auth)
     else
       nil -> {:error, :invalid_client}
-      false -> {:error, :invalid_grant}
       {:error, _} = error -> error
       _ -> {:error, :invalid_grant}
     end
@@ -158,6 +162,8 @@ defmodule Egregoros.OAuth do
     client_secret = String.trim(client_secret)
 
     with %OAuthApplication{} = application <- get_application_by_client_id(client_id),
+         false <- MiniAppOAuthRegistrations.public_client?(application),
+         true <- MiniAppOAuthRegistrations.application_allowed?(application),
          true <- Plug.Crypto.secure_compare(application.client_secret, client_secret),
          :ok <- validate_redirect_uri_param(application, params),
          {:ok, scopes} <- client_credentials_scopes(params, application),
@@ -165,6 +171,7 @@ defmodule Egregoros.OAuth do
       {:ok, token}
     else
       nil -> {:error, :invalid_client}
+      true -> {:error, :unauthorized_client}
       false -> {:error, :invalid_client}
       {:error, _} = error -> error
       _ -> {:error, :invalid_request}
@@ -200,22 +207,16 @@ defmodule Egregoros.OAuth do
     |> enforce_application_policy()
   end
 
-  def revoke_token(%{
-        "token" => token,
-        "client_id" => client_id,
-        "client_secret" => client_secret
-      })
-      when is_binary(token) and is_binary(client_id) and is_binary(client_secret) do
+  def revoke_token(%{"token" => token, "client_id" => client_id} = params)
+      when is_binary(token) and is_binary(client_id) do
     token = String.trim(token)
 
     with %OAuthApplication{} = application <- get_application_by_client_id(client_id),
-         true <- Plug.Crypto.secure_compare(application.client_secret, client_secret) do
-      _ = revoke_token_record_for_token(application.id, token)
-      :ok
+         {:ok, client_auth} <- authenticate_token_client(application, params) do
+      revoke_authenticated_token(application, token, client_auth)
     else
       nil -> {:error, :invalid_client}
-      false -> {:error, :invalid_client}
-      _ -> {:error, :invalid_client}
+      {:error, _reason} -> {:error, :invalid_client}
     end
   end
 
@@ -229,20 +230,8 @@ defmodule Egregoros.OAuth do
     ttl_seconds = access_token_ttl_seconds()
     refresh_ttl_seconds = refresh_token_ttl_seconds()
 
-    expires_at =
-      case ttl_seconds do
-        seconds when is_integer(seconds) and seconds >= 1 -> DateTime.add(now, seconds, :second)
-        _ -> nil
-      end
-
-    refresh_expires_at =
-      case refresh_ttl_seconds do
-        seconds when is_integer(seconds) and seconds >= 1 ->
-          DateTime.add(now, seconds, :second)
-
-        _ ->
-          nil
-      end
+    expires_at = DateTime.add(now, ttl_seconds, :second)
+    refresh_expires_at = DateTime.add(now, refresh_ttl_seconds, :second)
 
     raw_token = generate_token(48)
     raw_refresh_token = generate_token(48)
@@ -274,20 +263,8 @@ defmodule Egregoros.OAuth do
     ttl_seconds = access_token_ttl_seconds()
     refresh_ttl_seconds = refresh_token_ttl_seconds()
 
-    expires_at =
-      case ttl_seconds do
-        seconds when is_integer(seconds) and seconds >= 1 -> DateTime.add(now, seconds, :second)
-        _ -> nil
-      end
-
-    refresh_expires_at =
-      case refresh_ttl_seconds do
-        seconds when is_integer(seconds) and seconds >= 1 ->
-          DateTime.add(now, seconds, :second)
-
-        _ ->
-          nil
-      end
+    expires_at = DateTime.add(now, ttl_seconds, :second)
+    refresh_expires_at = DateTime.add(now, refresh_ttl_seconds, :second)
 
     raw_token = generate_token(48)
     raw_refresh_token = generate_token(48)
@@ -313,23 +290,75 @@ defmodule Egregoros.OAuth do
     end
   end
 
-  defp exchange_authorization_code(application, code, redirect_uri, params) do
-    case Repo.transaction(fn ->
-           auth_code =
-             from(c in AuthorizationCode, where: c.code == ^code, lock: "FOR UPDATE")
-             |> Repo.one()
+  defp exchange_authorization_code(
+         application,
+         code,
+         redirect_uri,
+         params,
+         :confidential
+       ) do
+    exchange_authorization_code_locked(application, code, redirect_uri, params, nil)
+  end
 
-           with %AuthorizationCode{} <- auth_code,
-                true <- auth_code.application_id == application.id,
-                true <- auth_code.redirect_uri == redirect_uri,
-                true <- DateTime.compare(auth_code.expires_at, DateTime.utc_now()) == :gt,
-                :ok <- verify_pkce(auth_code, params),
-                {:ok, %Token{} = token} <-
-                  create_token(application, auth_code.user_id, auth_code.scopes),
-                {:ok, _deleted} <- Repo.delete(auth_code) do
-             token
-           else
-             _ -> Repo.rollback(:invalid_grant)
+  defp exchange_authorization_code(
+         %OAuthApplication{id: application_id} = application,
+         code,
+         redirect_uri,
+         params,
+         {:public, app_origin}
+       ) do
+    case get_authorization_code(code) do
+      %AuthorizationCode{application_id: ^application_id, user_id: user_id}
+      when is_binary(user_id) ->
+        exchange_authorization_code_locked(
+          application,
+          code,
+          redirect_uri,
+          params,
+          {user_id, app_origin}
+        )
+
+      _ ->
+        {:error, :invalid_grant}
+    end
+  end
+
+  defp exchange_authorization_code_locked(
+         application,
+         code,
+         redirect_uri,
+         params,
+         grant_lock
+       ) do
+    case Repo.transaction(fn ->
+           :ok = acquire_grant_lock(grant_lock)
+
+           case current_locked_application(application, grant_lock) do
+             {:ok, current_application} ->
+               auth_code =
+                 from(c in AuthorizationCode, where: c.code == ^code, lock: "FOR UPDATE")
+                 |> Repo.one()
+
+               with %AuthorizationCode{} <- auth_code,
+                    true <- auth_code.application_id == current_application.id,
+                    true <- grant_user_matches?(auth_code, grant_lock),
+                    true <- auth_code.redirect_uri == redirect_uri,
+                    true <- DateTime.compare(auth_code.expires_at, DateTime.utc_now()) == :gt,
+                    :ok <- verify_pkce(auth_code, params),
+                    {:ok, %Token{} = token} <-
+                      create_token(
+                        current_application,
+                        auth_code.user_id,
+                        auth_code.scopes
+                      ),
+                    {:ok, _deleted} <- Repo.delete(auth_code) do
+                 token
+               else
+                 _ -> Repo.rollback(:invalid_grant)
+               end
+
+             {:error, reason} ->
+               Repo.rollback(reason)
            end
          end) do
       {:ok, %Token{} = token} -> {:ok, token}
@@ -366,18 +395,54 @@ defmodule Egregoros.OAuth do
       String.match?(verifier, ~r/^[A-Za-z0-9._~-]+$/)
   end
 
-  defp rotate_refresh_token(application, refresh_token, params) do
+  defp rotate_refresh_token(application, refresh_token, params, :confidential) do
+    refresh_digest = digest_token(refresh_token)
+    rotate_refresh_token_locked(application, refresh_digest, params, nil)
+  end
+
+  defp rotate_refresh_token(
+         %OAuthApplication{id: application_id} = application,
+         refresh_token,
+         params,
+         {:public, app_origin}
+       ) do
     refresh_digest = digest_token(refresh_token)
 
-    case Repo.transaction(fn ->
-           old_token =
-             from(t in Token,
-               where: t.refresh_token_digest == ^refresh_digest,
-               lock: "FOR UPDATE"
-             )
-             |> Repo.one()
+    case token_by_refresh_digest(application_id, refresh_digest) do
+      %Token{user_id: user_id} when is_binary(user_id) ->
+        rotate_refresh_token_locked(
+          application,
+          refresh_digest,
+          params,
+          {user_id, app_origin}
+        )
 
-           rotate_locked_refresh_token(old_token, application, params)
+      _ ->
+        {:error, :invalid_grant}
+    end
+  end
+
+  defp rotate_refresh_token_locked(application, refresh_digest, params, grant_lock) do
+    expected_user_id = grant_lock_user_id(grant_lock)
+
+    case Repo.transaction(fn ->
+           :ok = acquire_grant_lock(grant_lock)
+
+           case current_locked_application(application, grant_lock) do
+             {:ok, current_application} ->
+               old_token =
+                 token_by_refresh_digest(current_application.id, refresh_digest, lock: true)
+
+               rotate_locked_refresh_token(
+                 old_token,
+                 current_application,
+                 params,
+                 expected_user_id
+               )
+
+             {:error, reason} ->
+               Repo.rollback(reason)
+           end
          end) do
       {:ok, {:ok, %Token{} = token}} -> {:ok, token}
       {:ok, {:error, reason}} -> {:error, reason}
@@ -385,28 +450,44 @@ defmodule Egregoros.OAuth do
     end
   end
 
-  defp rotate_locked_refresh_token(nil, _application, _params),
+  defp rotate_locked_refresh_token(nil, _application, _params, _expected_user_id),
     do: {:error, :invalid_grant}
 
   defp rotate_locked_refresh_token(
          %Token{application_id: token_application_id},
          %OAuthApplication{id: application_id},
-         _params
+         _params,
+         _expected_user_id
        )
        when token_application_id != application_id,
        do: {:error, :invalid_grant}
 
   defp rotate_locked_refresh_token(
+         %Token{user_id: token_user_id},
+         _application,
+         _params,
+         expected_user_id
+       )
+       when is_binary(expected_user_id) and token_user_id != expected_user_id,
+       do: {:error, :invalid_grant}
+
+  defp rotate_locked_refresh_token(
          %Token{consumed_at: consumed_at, revoked_at: revoked_at} = token,
          _application,
-         _params
+         _params,
+         _expected_user_id
        )
        when not is_nil(consumed_at) or not is_nil(revoked_at) do
     _ = revoke_token_family(token)
     {:error, :invalid_grant}
   end
 
-  defp rotate_locked_refresh_token(%Token{} = old_token, application, params) do
+  defp rotate_locked_refresh_token(
+         %Token{} = old_token,
+         application,
+         params,
+         _expected_user_id
+       ) do
     if refresh_token_active?(old_token) do
       with {:ok, scopes} <- refresh_scopes(params, old_token, application),
            :ok <- MiniAppOAuthRegistrations.validate_token_scopes(application, scopes),
@@ -428,8 +509,13 @@ defmodule Egregoros.OAuth do
     end
   end
 
-  defp revoke_token_family(%Token{family_id: family_id}) when is_binary(family_id) do
-    from(t in Token, where: t.family_id == ^family_id and is_nil(t.revoked_at))
+  defp revoke_token_family(%Token{application_id: application_id, family_id: family_id})
+       when is_binary(application_id) and is_binary(family_id) do
+    from(t in Token,
+      where:
+        t.application_id == ^application_id and t.family_id == ^family_id and
+          is_nil(t.revoked_at)
+    )
     |> Repo.update_all(set: [revoked_at: DateTime.utc_now()])
 
     :ok
@@ -501,6 +587,103 @@ defmodule Egregoros.OAuth do
     end
   end
 
+  defp revoke_authenticated_token(application, token, :confidential) do
+    _ = revoke_token_record_for_token(application.id, token)
+    :ok
+  end
+
+  defp revoke_authenticated_token(
+         %OAuthApplication{id: application_id},
+         token,
+         {:public, app_origin}
+       ) do
+    token_digest = digest_token(token)
+
+    case token_by_presented_digest(application_id, token_digest) do
+      %Token{user_id: user_id} when is_binary(user_id) ->
+        case Repo.transaction(fn ->
+               GrantLock.acquire(user_id, app_origin)
+
+               case token_by_presented_digest(application_id, token_digest, lock: true) do
+                 %Token{user_id: ^user_id} = token -> revoke_token_family(token)
+                 _ -> :ok
+               end
+             end) do
+          {:ok, :ok} -> :ok
+          {:error, reason} -> {:error, reason}
+        end
+
+      _ ->
+        :ok
+    end
+  end
+
+  defp token_by_presented_digest(application_id, token_digest, opts \\ []) do
+    query =
+      from(t in Token,
+        where:
+          t.application_id == ^application_id and
+            (t.token_digest == ^token_digest or t.refresh_token_digest == ^token_digest)
+      )
+
+    query
+    |> maybe_lock_query(opts)
+    |> Repo.one()
+  end
+
+  defp token_by_refresh_digest(application_id, refresh_digest, opts \\ []) do
+    query =
+      from(t in Token,
+        where:
+          t.application_id == ^application_id and
+            t.refresh_token_digest == ^refresh_digest
+      )
+
+    query
+    |> maybe_lock_query(opts)
+    |> Repo.one()
+  end
+
+  defp maybe_lock_query(query, opts) when is_list(opts) do
+    if Keyword.get(opts, :lock, false),
+      do: from(row in query, lock: "FOR UPDATE"),
+      else: query
+  end
+
+  defp acquire_grant_lock(nil), do: :ok
+
+  defp acquire_grant_lock({user_id, app_origin}) do
+    GrantLock.acquire(user_id, app_origin)
+  end
+
+  defp current_locked_application(%OAuthApplication{} = application, nil),
+    do: {:ok, application}
+
+  defp current_locked_application(
+         %OAuthApplication{id: application_id, client_id: client_id},
+         {_user_id, app_origin}
+       ) do
+    with %OAuthApplication{client_type: :public_mini_app, client_id: ^client_id} = current <-
+           Repo.get(OAuthApplication, application_id),
+         %OAuthRegistration{app_origin: ^app_origin} = registration <-
+           MiniAppOAuthRegistrations.get_by_application_id(application_id),
+         true <- MiniAppOAuthRegistrations.registration_allowed?(registration, current) do
+      {:ok, current}
+    else
+      _ -> {:error, :invalid_client}
+    end
+  end
+
+  defp grant_lock_user_id(nil), do: nil
+  defp grant_lock_user_id({user_id, _app_origin}), do: user_id
+
+  defp grant_user_matches?(_auth_code, nil), do: true
+
+  defp grant_user_matches?(%AuthorizationCode{user_id: user_id}, {user_id, _app_origin}),
+    do: true
+
+  defp grant_user_matches?(_auth_code, _grant_lock), do: false
+
   defp revoke_token_record_for_token(application_id, token)
        when is_binary(application_id) and is_binary(token) do
     now = DateTime.utc_now()
@@ -534,6 +717,39 @@ defmodule Egregoros.OAuth do
   end
 
   defp enforce_application_policy(%Token{} = token), do: token
+
+  defp authenticate_token_client(%OAuthApplication{} = application, params) when is_map(params) do
+    case application.client_type do
+      :public_mini_app ->
+        case MiniAppOAuthRegistrations.get_by_application_id(application.id) do
+          %OAuthRegistration{} = registration ->
+            if not Map.has_key?(params, "client_secret") and
+                 MiniAppOAuthRegistrations.registration_allowed?(registration, application),
+               do: {:ok, {:public, registration.app_origin}},
+               else: {:error, :invalid_client}
+
+          nil ->
+            {:error, :invalid_client}
+        end
+
+      :confidential ->
+        case Map.get(params, "client_secret") do
+          client_secret when is_binary(client_secret) ->
+            if MiniAppOAuthRegistrations.application_allowed?(application) and
+                 Plug.Crypto.secure_compare(application.client_secret, client_secret),
+               do: {:ok, :confidential},
+               else: {:error, :invalid_grant}
+
+          _ ->
+            {:error, :invalid_grant}
+        end
+
+      _ ->
+        {:error, :invalid_client}
+    end
+  end
+
+  defp authenticate_token_client(_application, _params), do: {:error, :invalid_client}
 
   defp pkce_attrs(application, opts) do
     challenge = normalize_optional_string(Keyword.get(opts, :code_challenge))
@@ -589,11 +805,23 @@ defmodule Egregoros.OAuth do
   defp normalize_optional_string(_value), do: nil
 
   defp access_token_ttl_seconds do
-    Egregoros.Config.get(:oauth_access_token_ttl_seconds, @default_access_token_ttl_seconds)
+    case Egregoros.Config.get(
+           :oauth_access_token_ttl_seconds,
+           @default_access_token_ttl_seconds
+         ) do
+      ttl when is_integer(ttl) and ttl >= 1 -> ttl
+      _invalid -> @default_access_token_ttl_seconds
+    end
   end
 
   defp refresh_token_ttl_seconds do
-    Egregoros.Config.get(:oauth_refresh_token_ttl_seconds, @default_refresh_token_ttl_seconds)
+    case Egregoros.Config.get(
+           :oauth_refresh_token_ttl_seconds,
+           @default_refresh_token_ttl_seconds
+         ) do
+      ttl when is_integer(ttl) and ttl >= 1 -> ttl
+      _invalid -> @default_refresh_token_ttl_seconds
+    end
   end
 
   defp parse_redirect_uris(nil), do: []

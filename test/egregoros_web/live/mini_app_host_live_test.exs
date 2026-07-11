@@ -18,8 +18,24 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
 
   setup do
     Timeline.reset()
-    previous_enabled = Application.get_env(:egregoros, :mini_apps_enabled, false)
-    on_exit(fn -> Application.put_env(:egregoros, :mini_apps_enabled, previous_enabled) end)
+
+    runtime_policy_keys = [
+      Egregoros.Config,
+      :mini_apps_enabled,
+      :mini_apps_domain_allowlist,
+      :mini_apps_domain_denylist
+    ]
+
+    previous_runtime_policy =
+      Map.new(runtime_policy_keys, &{&1, Application.fetch_env(:egregoros, &1)})
+
+    on_exit(fn ->
+      Enum.each(previous_runtime_policy, fn
+        {key, {:ok, value}} -> Application.put_env(:egregoros, key, value)
+        {key, :error} -> Application.delete_env(:egregoros, key)
+      end)
+    end)
+
     enable_mini_apps()
     {:ok, user} = Users.create_local_user("mini-app-host-user")
     %{user: user}
@@ -414,6 +430,207 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
 
     assert %{data: %{"source" => %{"content" => "Edited and explicitly submitted"}}} =
              Objects.get_by_ap_id(published_id)
+  end
+
+  test "compose revalidates the live OAuth grant at request and submit boundaries", %{
+    conn: conn,
+    user: user
+  } do
+    {:ok, note} =
+      Pipeline.ingest(
+        Note.build(user, ~s(<a href="https://app.example/shared/write">writer</a>)),
+        local: true
+      )
+
+    resolved = resolved_card(oauth?: true)
+    assert {:ok, registration} = OAuthRegistrations.register(resolved.manifest)
+    assert {:ok, _card} = Cards.put(note, resolved)
+
+    application =
+      Egregoros.Repo.get!(Egregoros.OAuth.Application, registration.oauth_application_id)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/?timeline=public")
+    view |> element("[data-role='open-mini-app']") |> render_click()
+
+    launch_id = :sys.get_state(view.pid).socket.assigns.mini_app_host.launch_id
+    render_hook(view, "mini_app_ready", %{"launch_id" => launch_id})
+
+    render_hook(view, "mini_app_auth_request", auth_params(launch_id, application.client_id))
+    first_token = complete_oauth_grant(application, user)
+
+    render_hook(view, "mini_app_auth_complete", %{
+      "launch_id" => launch_id,
+      "request_id" => "auth-1",
+      "status" => "success"
+    })
+
+    revoke_token_directly!(first_token)
+
+    draft = %{
+      "text" => "Must not escape a revoked grant",
+      "visibility" => "public",
+      "links" => []
+    }
+
+    render_hook(view, "mini_app_compose_request", %{
+      "launch_id" => launch_id,
+      "call_id" => "compose-stale-request",
+      "draft" => draft
+    })
+
+    assert_push_event(view, "mini_app_compose_response", %{
+      launch_id: ^launch_id,
+      call_id: "compose-stale-request",
+      status: "auth_required"
+    })
+
+    render_hook(
+      view,
+      "mini_app_auth_request",
+      auth_params(launch_id, application.client_id, "auth-2")
+    )
+
+    second_token = complete_oauth_grant(application, user)
+
+    render_hook(view, "mini_app_auth_complete", %{
+      "launch_id" => launch_id,
+      "request_id" => "auth-2",
+      "status" => "success"
+    })
+
+    render_hook(view, "mini_app_compose_request", %{
+      "launch_id" => launch_id,
+      "call_id" => "compose-stale-submit",
+      "draft" => draft
+    })
+
+    assert has_element?(view, "#mini-app-compose-sheet")
+    object_count = Egregoros.Repo.aggregate(Egregoros.Object, :count)
+    revoke_token_directly!(second_token)
+
+    view
+    |> form("#mini-app-compose-form", %{
+      "mini_app_post" => %{
+        "content" => "This must not be published",
+        "spoiler_text" => "",
+        "language" => "en",
+        "visibility" => "public"
+      }
+    })
+    |> render_submit()
+
+    assert has_element?(view, "#mini-app-compose-error")
+    refute_push_event(view, "mini_app_compose_published", %{launch_id: ^launch_id})
+    assert Egregoros.Repo.aggregate(Egregoros.Object, :count) == object_count
+  end
+
+  test "compose rechecks policy after waiting on the OAuth revocation boundary", %{
+    conn: conn,
+    user: user
+  } do
+    {:ok, note} =
+      Pipeline.ingest(
+        Note.build(user, ~s(<a href="https://app.example/shared/write">writer</a>)),
+        local: true
+      )
+
+    resolved = resolved_card(oauth?: true)
+    assert {:ok, registration} = OAuthRegistrations.register(resolved.manifest)
+    assert {:ok, _card} = Cards.put(note, resolved)
+
+    application =
+      Egregoros.Repo.get!(Egregoros.OAuth.Application, registration.oauth_application_id)
+
+    use_runtime_mini_apps_policy([])
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/?timeline=public")
+    view |> element("[data-role='open-mini-app']") |> render_click()
+
+    launch_id = :sys.get_state(view.pid).socket.assigns.mini_app_host.launch_id
+    render_hook(view, "mini_app_ready", %{"launch_id" => launch_id})
+    render_hook(view, "mini_app_auth_request", auth_params(launch_id, application.client_id))
+    insert_active_oauth_grant!(application, user)
+
+    render_hook(view, "mini_app_auth_complete", %{
+      "launch_id" => launch_id,
+      "request_id" => "auth-1",
+      "status" => "success"
+    })
+
+    render_hook(view, "mini_app_compose_request", %{
+      "launch_id" => launch_id,
+      "call_id" => "compose-revoke-race",
+      "draft" => %{
+        "text" => "Wait for the shared grant boundary",
+        "visibility" => "public",
+        "links" => []
+      }
+    })
+
+    assert has_element?(view, "#mini-app-compose-sheet")
+    object_count = Egregoros.Repo.aggregate(Egregoros.Object, :count)
+    [[compose_backend_pid]] = Egregoros.Repo.query!("SELECT pg_backend_pid()").rows
+    supervisor = start_supervised!(Task.Supervisor)
+    parent = self()
+
+    holder =
+      Task.Supervisor.async_nolink(supervisor, fn ->
+        :ok = Ecto.Adapters.SQL.Sandbox.checkout(Egregoros.Repo)
+
+        try do
+          Egregoros.Repo.transaction(fn ->
+            Egregoros.MiniApps.GrantLock.acquire(user.id, "https://app.example")
+            send(parent, {:compose_grant_lock_held, self()})
+
+            receive do
+              :release -> :released
+            end
+          end)
+        after
+          Ecto.Adapters.SQL.Sandbox.checkin(Egregoros.Repo)
+        end
+      end)
+
+    assert_receive {:compose_grant_lock_held, holder_pid}, 1_000
+
+    submitter =
+      Task.Supervisor.async_nolink(supervisor, fn ->
+        view
+        |> form("#mini-app-compose-form", %{
+          "mini_app_post" => %{
+            "content" => "This must not outlive the app policy",
+            "spoiler_text" => "",
+            "language" => "en",
+            "visibility" => "public"
+          }
+        })
+        |> render_submit()
+      end)
+
+    observer =
+      Task.Supervisor.async_nolink(supervisor, fn ->
+        :ok = Ecto.Adapters.SQL.Sandbox.checkout(Egregoros.Repo)
+
+        try do
+          wait_for_blocked_advisory_lock(
+            compose_backend_pid,
+            System.monotonic_time(:millisecond) + 2_000
+          )
+        after
+          Ecto.Adapters.SQL.Sandbox.checkin(Egregoros.Repo)
+        end
+      end)
+
+    assert :ok = Task.await(observer, 3_000)
+    use_runtime_mini_apps_policy(["app.example"])
+    send(holder_pid, :release)
+    assert {:ok, :released} = Task.await(holder, 3_000)
+    _html = Task.await(submitter, 3_000)
+
+    assert has_element?(view, "#mini-app-compose-error")
+    refute_push_event(view, "mini_app_compose_published", %{launch_id: ^launch_id})
+    assert Egregoros.Repo.aggregate(Egregoros.Object, :count) == object_count
   end
 
   test "notification permission requires OAuth and uses a host-owned decision dialog", %{
@@ -1065,15 +1282,71 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
                code_challenge_method: "S256"
              )
 
-    assert {:ok, _token} =
+    assert {:ok, token} =
              Egregoros.OAuth.exchange_code_for_token(%{
                "grant_type" => "authorization_code",
                "code" => code.code,
                "client_id" => application.client_id,
-               "client_secret" => application.client_secret,
                "redirect_uri" => "https://app.example/oauth/callback",
                "code_verifier" => verifier
              })
+
+    token
+  end
+
+  defp revoke_token_directly!(token) do
+    token
+    |> Ecto.Changeset.change(revoked_at: DateTime.utc_now())
+    |> Egregoros.Repo.update!()
+  end
+
+  defp insert_active_oauth_grant!(application, user) do
+    raw_token = Base.url_encode64(:crypto.strong_rand_bytes(48), padding: false)
+    raw_refresh_token = Base.url_encode64(:crypto.strong_rand_bytes(48), padding: false)
+
+    %Egregoros.OAuth.Token{}
+    |> Egregoros.OAuth.Token.changeset(%{
+      token_digest: token_digest(raw_token),
+      refresh_token_digest: token_digest(raw_refresh_token),
+      family_id: Ecto.UUID.generate(),
+      scopes: "read write",
+      user_id: user.id,
+      application_id: application.id,
+      expires_at: DateTime.add(DateTime.utc_now(), 3_600, :second),
+      refresh_expires_at: DateTime.add(DateTime.utc_now(), 86_400, :second)
+    })
+    |> Egregoros.Repo.insert!()
+  end
+
+  defp token_digest(token) do
+    token
+    |> then(&:crypto.hash(:sha256, &1))
+    |> Base.encode16(case: :lower)
+  end
+
+  defp wait_for_blocked_advisory_lock(backend_pid, deadline) do
+    [[waiting?]] =
+      Egregoros.Repo.query!(
+        """
+        SELECT EXISTS (
+          SELECT 1
+          FROM pg_locks
+          WHERE pid = $1 AND locktype = 'advisory' AND granted = false
+        )
+        """,
+        [backend_pid]
+      ).rows
+
+    cond do
+      waiting? ->
+        :ok
+
+      System.monotonic_time(:millisecond) < deadline ->
+        wait_for_blocked_advisory_lock(backend_pid, deadline)
+
+      true ->
+        {:error, :lock_not_observed}
+    end
   end
 
   defp enable_mini_apps do
@@ -1085,5 +1358,12 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
       :mini_apps_domain_denylist, [] -> []
       key, default -> Egregoros.Config.Stub.get(key, default)
     end)
+  end
+
+  defp use_runtime_mini_apps_policy(denylist) do
+    Application.put_env(:egregoros, Egregoros.Config, Egregoros.Config.Stub)
+    Application.put_env(:egregoros, :mini_apps_enabled, true)
+    Application.put_env(:egregoros, :mini_apps_domain_allowlist, [])
+    Application.put_env(:egregoros, :mini_apps_domain_denylist, denylist)
   end
 end

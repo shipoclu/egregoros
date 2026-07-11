@@ -43,7 +43,7 @@ defmodule Egregoros.RateLimiter.ETSTest do
     key = "key-" <> Ecto.UUID.generate()
 
     now_ms = System.monotonic_time(:millisecond)
-    current_window_id = div(now_ms, 1)
+    current_window_id = Integer.floor_div(now_ms, 1)
 
     :ets.insert(@table, {{:inbox, key, 1, current_window_id - 1}, 1, now_ms})
 
@@ -55,9 +55,12 @@ defmodule Egregoros.RateLimiter.ETSTest do
     assert is_pid(pid)
 
     %{entry_ttl_ms: ttl_ms} = :sys.get_state(ETS)
-    threshold_ms = System.monotonic_time(:millisecond) - ttl_ms
+    now_ms = System.monotonic_time(:millisecond)
+    threshold_ms = now_ms - ttl_ms
 
-    ets_key = {:inbox, "cleanup-" <> Ecto.UUID.generate(), 60_000, 0}
+    interval_ms = 60_000
+    expired_window_id = Integer.floor_div(now_ms, interval_ms) - 1
+    ets_key = {:inbox, "cleanup-" <> Ecto.UUID.generate(), interval_ms, expired_window_id}
     :ets.insert(@table, {ets_key, 1, threshold_ms - 1})
     assert :ets.lookup(@table, ets_key) != []
 
@@ -65,5 +68,27 @@ defmodule Egregoros.RateLimiter.ETSTest do
     _state = :sys.get_state(ETS)
 
     assert :ets.lookup(@table, ets_key) == []
+  end
+
+  test "cleanup never resets a counter inside its active fixed window" do
+    pid = Process.whereis(ETS)
+    assert is_pid(pid)
+
+    %{entry_ttl_ms: ttl_ms} = :sys.get_state(ETS)
+    now_ms = System.monotonic_time(:millisecond)
+    interval_ms = 3_600_000
+    window_id = Integer.floor_div(now_ms, interval_ms)
+    key = "long-window-" <> Ecto.UUID.generate()
+    ets_key = {:mini_app_registrations, key, interval_ms, window_id}
+
+    :ets.insert(@table, {ets_key, 20, now_ms - ttl_ms - 1})
+
+    send(pid, :cleanup)
+    _state = :sys.get_state(ETS)
+
+    assert [{^ets_key, 20, _last_seen}] = :ets.lookup(@table, ets_key)
+
+    assert {:error, :rate_limited} ==
+             ETS.allow?(:mini_app_registrations, key, 20, interval_ms)
   end
 end

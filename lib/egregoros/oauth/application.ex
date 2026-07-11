@@ -17,13 +17,17 @@ defmodule Egregoros.OAuth.Application do
     field :client_id, :string
     field :client_secret, :string
 
+    field :client_type, Ecto.Enum,
+      values: [:confidential, :public_mini_app],
+      default: :confidential
+
     timestamps(type: :utc_datetime_usec)
   end
 
   def changeset(application, attrs) do
     application
     |> cast(attrs, @required_fields ++ @optional_fields)
-    |> validate_required(@required_fields)
+    |> validate_required(@required_fields ++ [:client_type])
     |> validate_length(:name, max: 200)
     |> validate_length(:client_id, min: 10, max: 200)
     |> validate_length(:client_secret, min: 10, max: 200)

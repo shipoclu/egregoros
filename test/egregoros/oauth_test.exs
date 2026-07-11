@@ -508,6 +508,40 @@ defmodule Egregoros.OAuthTest do
     assert OAuth.get_user_by_token(token.token) == nil
   end
 
+  test "invalid token lifetime settings cannot create non-expiring credentials" do
+    stub(Egregoros.Config.Mock, :get, fn
+      :oauth_access_token_ttl_seconds, _default -> 0
+      :oauth_refresh_token_ttl_seconds, _default -> :infinity
+      key, default -> Egregoros.Config.Stub.get(key, default)
+    end)
+
+    issued_after = DateTime.utc_now()
+    app = create_app!(%{"scopes" => "read"})
+
+    assert {:ok, token} =
+             OAuth.exchange_code_for_token(%{
+               "grant_type" => "client_credentials",
+               "client_id" => app.client_id,
+               "client_secret" => app.client_secret
+             })
+
+    assert %DateTime{} = token.expires_at
+    assert %DateTime{} = token.refresh_expires_at
+    assert DateTime.compare(token.expires_at, DateTime.add(issued_after, 3_500, :second)) == :gt
+
+    assert DateTime.compare(
+             token.refresh_expires_at,
+             DateTime.add(issued_after, 31_535_900, :second)
+           ) == :gt
+
+    assert {:error, :invalid_client} =
+             OAuth.exchange_code_for_token(%{
+               "grant_type" => "client_credentials",
+               "client_id" => "unknown-client",
+               "client_secret" => "unknown-secret"
+             })
+  end
+
   test "client credentials grant rejects invalid scopes" do
     app = create_app!(%{"scopes" => "read"})
 

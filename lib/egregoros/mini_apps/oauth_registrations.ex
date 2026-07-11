@@ -5,8 +5,8 @@ defmodule Egregoros.MiniApps.OAuthRegistrations do
 
   alias Egregoros.MiniApps
   alias Egregoros.MiniApps.Declarations
+  alias Egregoros.MiniApps.GrantLock
   alias Egregoros.MiniApps.Manifest
-  alias Egregoros.MiniApps.NotificationConsents
   alias Egregoros.MiniApps.OAuthRegistration
   alias Egregoros.MiniApps.Permissions
   alias Egregoros.OAuth
@@ -52,19 +52,36 @@ defmodule Egregoros.MiniApps.OAuthRegistrations do
     Repo.get_by(OAuthRegistration, oauth_application_id: application_id)
   end
 
-  def application_allowed?(%OAuthApplication{} = application) do
-    case get_by_application_id(application.id) do
-      nil ->
-        true
+  def application_allowed?(%OAuthApplication{client_type: :confidential} = application) do
+    is_nil(get_by_application_id(application.id))
+  end
 
+  def application_allowed?(%OAuthApplication{client_type: :public_mini_app} = application) do
+    case get_by_application_id(application.id) do
       %OAuthRegistration{} = registration ->
-        origin_allowed?(registration.app_origin) and
-          registration.redirect_uris == application.redirect_uris and
-          exact_scopes?(application.scopes, registration.scopes)
+        registration_allowed?(registration, application)
+
+      nil ->
+        false
     end
   end
 
   def application_allowed?(_application), do: false
+
+  def registration_allowed?(
+        %OAuthRegistration{oauth_application_id: application_id} = registration,
+        %OAuthApplication{id: application_id, client_type: :public_mini_app} = application
+      ) do
+    origin_allowed?(registration.app_origin) and
+      registration.redirect_uris == application.redirect_uris and
+      exact_scopes?(application.scopes, registration.scopes)
+  end
+
+  def registration_allowed?(_registration, _application), do: false
+
+  def public_client?(%OAuthApplication{client_type: :public_mini_app}), do: true
+
+  def public_client?(_application), do: false
 
   def capability_allowed?(origin, capability)
       when is_binary(origin) and is_binary(capability) do
@@ -135,7 +152,7 @@ defmodule Egregoros.MiniApps.OAuthRegistrations do
         now = DateTime.utc_now()
 
         case Repo.transaction(fn ->
-               NotificationConsents.lock_delivery(user_id, origin)
+               GrantLock.acquire(user_id, origin)
 
                from(token in Token,
                  where:
@@ -169,11 +186,11 @@ defmodule Egregoros.MiniApps.OAuthRegistrations do
 
   def validate_authorization(%OAuthApplication{} = application, redirect_uri, scopes, opts)
       when is_binary(redirect_uri) and is_binary(scopes) and is_list(opts) do
-    case get_by_application_id(application.id) do
-      nil ->
+    case {application.client_type, get_by_application_id(application.id)} do
+      {:confidential, nil} ->
         :ok
 
-      %OAuthRegistration{} = registration ->
+      {:public_mini_app, %OAuthRegistration{} = registration} ->
         cond do
           not application_allowed?(application) -> {:error, :invalid_client}
           redirect_uri not in registration.redirect_uris -> {:error, :invalid_redirect_uri}
@@ -182,6 +199,9 @@ defmodule Egregoros.MiniApps.OAuthRegistrations do
           not is_binary(Keyword.get(opts, :code_challenge)) -> {:error, :pkce_required}
           true -> :ok
         end
+
+      _ ->
+        {:error, :invalid_client}
     end
   end
 
@@ -189,12 +209,15 @@ defmodule Egregoros.MiniApps.OAuthRegistrations do
     do: {:error, :invalid_request}
 
   def validate_token_scopes(%OAuthApplication{} = application, scopes) when is_binary(scopes) do
-    case get_by_application_id(application.id) do
-      nil ->
+    case {application.client_type, get_by_application_id(application.id)} do
+      {:confidential, nil} ->
         :ok
 
-      %OAuthRegistration{scopes: registered} ->
+      {:public_mini_app, %OAuthRegistration{scopes: registered}} ->
         if exact_scopes?(scopes, registered), do: :ok, else: {:error, :invalid_scope}
+
+      _ ->
+        {:error, :invalid_client}
     end
   end
 
@@ -224,7 +247,7 @@ defmodule Egregoros.MiniApps.OAuthRegistrations do
       "scopes" => Enum.join(oauth.scopes, " ")
     }
 
-    case OAuth.create_application(application_attrs) do
+    case OAuth.create_application(application_attrs, client_type: :public_mini_app) do
       {:ok, application} ->
         attrs = %{
           oauth_application_id: application.id,

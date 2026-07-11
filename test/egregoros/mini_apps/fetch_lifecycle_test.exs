@@ -169,6 +169,167 @@ defmodule Egregoros.MiniApps.FetchLifecycleTest do
              )
   end
 
+  test "rejects invalid lifecycle inputs and deadline options", context do
+    valid_fun = fn -> :ok end
+
+    for {origin, fun, opts} <- [
+          {nil, valid_fun, []},
+          {"https://app.example", :not_a_function, []},
+          {"https://app.example", fn _argument -> :ok end, []},
+          {"https://app.example", valid_fun, %{}},
+          {"https://app.example", valid_fun, timeout_ms: nil},
+          {"https://app.example", valid_fun, timeout_ms: 0},
+          {"https://app.example", valid_fun, timeout_ms: -1},
+          {"https://app.example", valid_fun, timeout_ms: 10_001},
+          {"https://app.example", valid_fun, timeout_ms: 1.5}
+        ] do
+      assert {:error, :invalid_fetch_lifecycle} = FetchLifecycle.run(origin, fun, opts)
+    end
+
+    assert :ok =
+             FetchLifecycle.run("https://app.example", valid_fun,
+               timeout_ms: 10_000,
+               gate: context.gate,
+               lifecycle_supervisor: context.lifecycle_supervisor,
+               worker_supervisor: context.worker_supervisor
+             )
+  end
+
+  test "contains raised, thrown, and exited worker failures and recovers capacity", context do
+    options = lifecycle_options(context)
+
+    assert {:error, :fetch_failed} =
+             FetchLifecycle.run(
+               "https://app.example",
+               fn -> raise "untrusted fetch failure" end,
+               options
+             )
+
+    assert {:error, :fetch_failed} =
+             FetchLifecycle.run(
+               "https://app.example",
+               fn -> throw(:untrusted_fetch_failure) end,
+               options
+             )
+
+    assert {:error, :fetch_unavailable} =
+             FetchLifecycle.run(
+               "https://app.example",
+               fn -> exit(:untrusted_fetch_failure) end,
+               options
+             )
+
+    assert_gate_idle(context.gate)
+
+    assert :capacity_recovered =
+             FetchLifecycle.run("https://app.example", fn -> :capacity_recovered end, options)
+  end
+
+  test "fails closed when either task supervisor is unavailable", context do
+    unavailable = {:global, {__MODULE__, make_ref()}}
+
+    assert {:error, :fetch_unavailable} =
+             FetchLifecycle.run("https://app.example", fn -> :not_run end,
+               timeout_ms: 250,
+               gate: context.gate,
+               lifecycle_supervisor: unavailable,
+               worker_supervisor: context.worker_supervisor
+             )
+
+    assert {:error, :fetch_unavailable} =
+             FetchLifecycle.run("https://app.example", fn -> :not_run end,
+               timeout_ms: 250,
+               gate: context.gate,
+               lifecycle_supervisor: context.lifecycle_supervisor,
+               worker_supervisor: unavailable
+             )
+
+    assert_gate_idle(context.gate)
+  end
+
+  test "preserves bounded gate errors without running the fetch", context do
+    parent = self()
+    unavailable = {:global, {__MODULE__, make_ref()}}
+
+    assert {:error, :fetch_gate_unavailable} =
+             FetchLifecycle.run("https://app.example", fn -> send(parent, :fetch_ran) end,
+               timeout_ms: 250,
+               gate: unavailable,
+               lifecycle_supervisor: context.lifecycle_supervisor,
+               worker_supervisor: context.worker_supervisor
+             )
+
+    assert {:error, :invalid_fetch_origin} =
+             FetchLifecycle.run(String.duplicate("x", 257), fn -> send(parent, :fetch_ran) end,
+               timeout_ms: 250,
+               gate: context.gate,
+               lifecycle_supervisor: context.lifecycle_supervisor,
+               worker_supervisor: context.worker_supervisor
+             )
+
+    refute_receive :fetch_ran
+    assert_gate_idle(context.gate)
+  end
+
+  test "uses the supervised production boundary when no options are supplied" do
+    origin = "https://default-#{Ecto.UUID.generate()}.example"
+
+    assert :defaults_work = FetchLifecycle.run(origin, fn -> :defaults_work end)
+  end
+
+  test "reports exhausted coordinator and worker supervisors without leaking permits", context do
+    exhausted_lifecycle = start_task_supervisor(max_children: 0)
+    exhausted_worker = start_task_supervisor(max_children: 0)
+
+    assert {:error, :fetch_capacity_exhausted} =
+             FetchLifecycle.run("https://app.example", fn -> :not_run end,
+               timeout_ms: 250,
+               gate: context.gate,
+               lifecycle_supervisor: exhausted_lifecycle,
+               worker_supervisor: context.worker_supervisor
+             )
+
+    assert {:error, :fetch_capacity_exhausted} =
+             FetchLifecycle.run("https://app.example", fn -> :not_run end,
+               timeout_ms: 250,
+               gate: context.gate,
+               lifecycle_supervisor: context.lifecycle_supervisor,
+               worker_supervisor: exhausted_worker
+             )
+
+    assert_gate_idle(context.gate)
+  end
+
+  test "contains a worker that terminates without returning and releases its gate permit",
+       context do
+    assert {:error, :fetch_failed} =
+             FetchLifecycle.run(
+               "https://app.example",
+               fn -> Process.exit(self(), :normal) end,
+               lifecycle_options(context)
+             )
+
+    assert_gate_idle(context.gate)
+  end
+
+  test "fails closed when an untrappable worker death takes down its coordinator", context do
+    assert {:error, :fetch_unavailable} =
+             FetchLifecycle.run(
+               "https://app.example",
+               fn -> Process.exit(self(), :kill) end,
+               lifecycle_options(context)
+             )
+
+    assert_gate_idle(context.gate)
+
+    assert :capacity_recovered =
+             FetchLifecycle.run(
+               "https://app.example",
+               fn -> :capacity_recovered end,
+               lifecycle_options(context)
+             )
+  end
+
   defp run_fetch(context, timeout_ms) do
     FetchLifecycle.run(
       "https://app.example",
@@ -190,6 +351,15 @@ defmodule Egregoros.MiniApps.FetchLifecycleTest do
       redirect: false,
       retry: false
     )
+  end
+
+  defp lifecycle_options(context) do
+    [
+      timeout_ms: 250,
+      gate: context.gate,
+      lifecycle_supervisor: context.lifecycle_supervisor,
+      worker_supervisor: context.worker_supervisor
+    ]
   end
 
   defp recv_request(socket, acc) do
@@ -249,7 +419,8 @@ defmodule Egregoros.MiniApps.FetchLifecycleTest do
     end
   end
 
-  defp start_task_supervisor do
-    start_supervised!(Supervisor.child_spec(Task.Supervisor, id: {Task.Supervisor, make_ref()}))
+  defp start_task_supervisor(opts \\ []) do
+    child_spec = {Task.Supervisor, opts}
+    start_supervised!(Supervisor.child_spec(child_spec, id: {Task.Supervisor, make_ref()}))
   end
 end

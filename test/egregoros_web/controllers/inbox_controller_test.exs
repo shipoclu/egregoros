@@ -1579,7 +1579,6 @@ defmodule EgregorosWeb.InboxControllerTest do
                "grant_type" => "authorization_code",
                "code" => code.code,
                "client_id" => application.client_id,
-               "client_secret" => application.client_secret,
                "redirect_uri" => origin <> "/oauth/callback",
                "code_verifier" => verifier
              })

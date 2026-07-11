@@ -116,7 +116,6 @@ defmodule EgregorosWeb.PrivacyLiveTest do
                "grant_type" => "authorization_code",
                "code" => code.code,
                "client_id" => application.client_id,
-               "client_secret" => application.client_secret,
                "redirect_uri" => "https://writer.example/oauth/callback",
                "code_verifier" => verifier
              })
@@ -139,8 +138,30 @@ defmodule EgregorosWeb.PrivacyLiveTest do
     conn: conn,
     alice: alice
   } do
-    assert {:ok, _declaration, :created} = Declarations.ensure(notification_manifest())
+    assert {:ok, registration} = OAuthRegistrations.register(notification_manifest())
     activate_mini_app_actor!("https://alerts.example")
+    application = Repo.get!(OAuthApplication, registration.oauth_application_id)
+    verifier = String.duplicate("n", 43)
+    challenge = :crypto.hash(:sha256, verifier) |> Base.url_encode64(padding: false)
+
+    assert {:ok, code} =
+             OAuth.create_authorization_code(
+               application,
+               alice,
+               "https://alerts.example/oauth/callback",
+               "read",
+               code_challenge: challenge,
+               code_challenge_method: "S256"
+             )
+
+    assert {:ok, _token} =
+             OAuth.exchange_code_for_token(%{
+               "grant_type" => "authorization_code",
+               "code" => code.code,
+               "client_id" => application.client_id,
+               "redirect_uri" => "https://alerts.example/oauth/callback",
+               "code_verifier" => verifier
+             })
 
     assert {:ok, consent} =
              NotificationConsents.decide(alice.id, "https://alerts.example", :granted)

@@ -61,6 +61,40 @@ defmodule Egregoros.MediaAccessTest do
              Endpoint.url() <> "/uploads/media/user/private-thumb.jpg"
   end
 
+  test "path access uses only the canonical local media object" do
+    {:ok, author} = Users.create_local_user("media-path-owner")
+    path = "/uploads/media/#{author.id}/private.png"
+    {:ok, _local_media} = create_media(author, path)
+
+    imposter_ap_id = "https://remote.example/objects/" <> Ecto.UUID.generate()
+
+    assert {:ok, _imposter} =
+             Objects.create_object(%{
+               ap_id: imposter_ap_id,
+               type: "Image",
+               actor: author.ap_id,
+               local: false,
+               data: %{"id" => imposter_ap_id, "type" => "Image"},
+               internal: %{
+                 "media" => %{"paths" => [path], "public" => true, "post_ap_ids" => []}
+               }
+             })
+
+    assert Media.access_for_path(path) == :denied
+  end
+
+  test "media path index predicate stays independent of parameterized media types" do
+    [[predicate]] =
+      Repo.query!("""
+      SELECT pg_get_expr(index.indpred, index.indrelid)
+      FROM pg_index AS index
+      JOIN pg_class AS relation ON relation.oid = index.indexrelid
+      WHERE relation.relname = 'objects_local_media_paths_internal_gin_index'
+      """).rows
+
+    assert predicate in ["local", "(local = true)"]
+  end
+
   defp create_media(author, path) do
     ap_id = Endpoint.url() <> "/objects/" <> Ecto.UUID.generate()
 

@@ -439,8 +439,9 @@ Server Metadata (RFC 8414), with a mini-app profile that makes the following
 normative:
 
 1. Registration occurs **server-to-server from the mini-app developer's
-   backend**, never from the iframe. The backend safely retains the returned
-   client credentials.
+   backend**, never from the iframe. The response is a public OAuth client:
+   it returns a stable `client_id`, declares
+   `token_endpoint_auth_method: "none"`, and never returns a client secret.
 2. The registration cache key is `(authorization_server_issuer,
    canonical_manifest_url)`. A conforming app MUST reuse that client
    registration for every user of that app on that Egregoros instance and MUST
@@ -452,10 +453,21 @@ normative:
 4. A registration contains fixed app metadata—canonical manifest URL, name,
    website, redirect URIs, requested scopes, and OAuth grant/response types.
    It has no user identity, note context, or per-user fields.
-5. Egregoros deduplicates an equivalent registration for a bounded period,
+5. Egregoros permanently deduplicates an equivalent registration while that
+   app identity exists, idempotently returns the same public `client_id`,
    rate-limits/abuse-monitors anonymous registration, and allows instance
-   operators to disable it. It may reject registrations whose manifest cannot
-   be securely fetched and validated.
+   operators to disable it. It rejects registrations whose manifest cannot be
+   securely fetched and validated. A conflicting immutable manifest returns
+   an error rather than a second client.
+
+The registration endpoint is `POST /oauth/mini-app/register` with the single
+`manifest_url` field. The first equivalent request returns `201`; later
+equivalent requests return `200` with the same public metadata. This removes
+the first-caller secret-capture race inherent in anonymous confidential-client
+registration. Mini-app public clients MUST omit `client_secret` during code
+exchange, refresh, and revocation. The instance requires S256 PKCE for every
+authorization code and explicitly rejects `client_credentials` for these
+clients.
 
 This prevents an ordinary app launch from producing a client per user. It does
 not make an anonymous registration endpoint cost-free: instances still need
@@ -695,8 +707,9 @@ For every outbound request Egregoros MUST:
 - pin the validated address for the connection while still validating the TLS
   certificate and SNI against the original hostname, preventing a DNS
   rebinding/TOCTOU change between validation and connection;
-- disable redirects for manifests, pages, images, and proxy requests in v1.
-  Apps must serve the canonical resource directly;
+- follow at most two redirects for manifests, actors, pages, and images; every
+  hop MUST remain on the exact original origin and repeat URL-shape, domain
+  policy, DNS, public-IP, and pinned-connection validation before connecting;
 - apply an egress firewall that independently blocks internal networks, Unix
   sockets, and cloud metadata endpoints even if application validation fails;
 - enforce connection, first-byte, and total timeouts; decompressed response-size
@@ -837,8 +850,9 @@ handoff values, access tokens, and refresh tokens MUST be redacted from logs,
 error reporting, analytics, URLs shown to other origins, and browser history
 where possible.
 
-Dynamic registration occurs only from the app backend. Client secrets and
-refresh/access tokens MUST never enter the iframe or host message channel.
+Dynamic registration occurs only from the app backend. Egregoros registers a
+mini app as a public client and never issues it a client secret. Refresh/access
+tokens MUST never enter the iframe or host message channel.
 Registration, authorization, token exchange, refresh, revocation, and every
 bearer-token API request MUST re-check the current exact app origin, immutable
 scope set, and operator domain policy. Refresh tokens require rotation/replay
@@ -1135,8 +1149,8 @@ example with optional wallet support lives at `examples/fediverse-miniapp/`;
 its manifest is parsed by the Elixir suite and its SDK transport is exercised
 through the same-origin broker, nested sandbox, and transferred ports by the
 asset interoperability suite. The example intentionally omits an OAuth backend
-because client secrets, registration, code exchange, refresh, and bearer-token
-API calls are server-to-server responsibilities.
+because registration, code exchange, refresh, and bearer-token API calls are
+server-to-server responsibilities.
 
 ## Domain paths and cards
 

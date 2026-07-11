@@ -30,7 +30,8 @@ Before deploying:
 
 The reference intentionally has no backend and therefore does not demonstrate
 dynamic OAuth registration or token exchange. Those operations belong on an
-app backend; bearer tokens and client secrets must never enter iframe
-JavaScript. The SDK's bootstrap gives that backend the exact issuer, OAuth
+app backend; bearer and refresh tokens must never enter iframe JavaScript.
+Mini apps use stable public client IDs and Egregoros never returns them a client
+secret. The SDK's bootstrap gives that backend the exact issuer, OAuth
 metadata URL, opener-free authorization-result relay URL, and launch ID needed
 to validate and bind the flow to OAuth state.

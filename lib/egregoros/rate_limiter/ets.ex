@@ -44,7 +44,7 @@ defmodule Egregoros.RateLimiter.ETS do
 
       true ->
         now_ms = System.monotonic_time(:millisecond)
-        window_id = div(now_ms, interval_ms)
+        window_id = Integer.floor_div(now_ms, interval_ms)
         ets_key = {bucket, key, interval_ms, window_id}
         new_count = bump_counter(ets_key, now_ms)
 
@@ -60,8 +60,9 @@ defmodule Egregoros.RateLimiter.ETS do
 
   @impl GenServer
   def handle_info(:cleanup, %{entry_ttl_ms: ttl_ms} = state) do
-    threshold_ms = System.monotonic_time(:millisecond) - ttl_ms
-    _ = cleanup_old_entries(threshold_ms)
+    now_ms = System.monotonic_time(:millisecond)
+    threshold_ms = now_ms - ttl_ms
+    _ = cleanup_old_entries(now_ms, threshold_ms)
     schedule_cleanup()
     {:noreply, state}
   end
@@ -72,11 +73,14 @@ defmodule Egregoros.RateLimiter.ETS do
     count
   end
 
-  defp cleanup_old_entries(threshold_ms) when is_integer(threshold_ms) do
+  defp cleanup_old_entries(now_ms, threshold_ms)
+       when is_integer(now_ms) and is_integer(threshold_ms) do
     match_spec = [
       {
-        {:"$1", :"$2", :"$3"},
-        [{:<, :"$3", threshold_ms}],
+        {{:"$1", :"$2", :"$3", :"$4"}, :"$5", :"$6"},
+        [
+          {:andalso, {:<, :"$6", threshold_ms}, {:"=<", {:*, {:+, :"$4", 1}, :"$3"}, now_ms}}
+        ],
         [true]
       }
     ]

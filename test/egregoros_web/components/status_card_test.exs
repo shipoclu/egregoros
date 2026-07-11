@@ -27,6 +27,7 @@ defmodule EgregorosWeb.StatusCardTest do
           reactions: %{},
           mini_app_card: %{
             id: "card-1",
+            resolution_token: "00000000-0000-0000-0000-000000000001",
             source_url: "https://app.example/shared",
             app_origin: "https://app.example",
             app_name: "Reader",
@@ -54,6 +55,10 @@ defmodule EgregorosWeb.StatusCardTest do
 
     assert LazyHTML.attribute(open_button, "data-mini-app-origin") == ["https://app.example"]
 
+    assert LazyHTML.attribute(open_button, "data-mini-app-resolution-token") == [
+             "00000000-0000-0000-0000-000000000001"
+           ]
+
     assert LazyHTML.attribute(open_button, "data-mini-app-launch-url") ==
              ["https://app.example/book/chapter-2"]
 
@@ -64,7 +69,9 @@ defmodule EgregorosWeb.StatusCardTest do
     assert LazyHTML.attribute(
              LazyHTML.query(document, "#post-mini-app-mini-app img"),
              "src"
-           ) == ["/mini-app-assets/card-1/image"]
+           ) == [
+             "/mini-app-assets/card-1/image?resolution_token=00000000-0000-0000-0000-000000000001"
+           ]
   end
 
   test "renders a post with attachments and actions" do

@@ -18,33 +18,25 @@ defmodule EgregorosWeb.MiniAppRegistrationController do
 
     with {:ok, origin} <- Origin.from_manifest_url(manifest_url),
          {:ok, manifest} <- MiniApps.fetch_manifest(origin),
-         {:ok, registration, :created} <- OAuthRegistrations.register_with_status(manifest),
+         {:ok, registration, registration_status} <-
+           OAuthRegistrations.register_with_status(manifest),
          %OAuthApplication{} = application <-
            Repo.get(OAuthApplication, registration.oauth_application_id) do
       conn
-      |> put_status(:created)
+      |> put_status(if(registration_status == :created, do: :created, else: :ok))
       |> json(%{
         "client_id" => application.client_id,
-        "client_secret" => application.client_secret,
         "client_name" => application.name,
         "client_uri" => application.website,
         "redirect_uris" => registration.redirect_uris,
         "scope" => Enum.join(registration.scopes, " "),
         "grant_types" => ["authorization_code", "refresh_token"],
         "response_types" => ["code"],
-        "token_endpoint_auth_method" => "client_secret_post"
+        "token_endpoint_auth_method" => "none"
       })
     else
       {:error, :invalid_manifest_url} ->
         registration_error(conn, 422, "invalid_manifest_url", "Use the canonical well-known URL")
-
-      {:ok, _registration, :existing} ->
-        registration_error(
-          conn,
-          409,
-          "already_registered",
-          "Reuse the existing registration for this issuer"
-        )
 
       {:error, :oauth_not_declared} ->
         registration_error(conn, 422, "oauth_not_declared", "The manifest does not declare OAuth")

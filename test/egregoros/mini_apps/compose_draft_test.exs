@@ -62,6 +62,11 @@ defmodule Egregoros.MiniApps.ComposeDraftTest do
     assert {:error, :invalid_link} =
              ComposeDraft.prepare(card, %{"links" => ["http://app.example/result"]})
 
+    assert {:error, :invalid_link} =
+             ComposeDraft.prepare(card, %{
+               "links" => ["https://app.example/result%0d%0aInjected"]
+             })
+
     assert {:error, :invalid_visibility} =
              ComposeDraft.prepare(card, %{"visibility" => "private"})
 

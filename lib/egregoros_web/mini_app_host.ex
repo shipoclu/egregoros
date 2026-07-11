@@ -10,6 +10,7 @@ defmodule EgregorosWeb.MiniAppHost do
   alias Egregoros.MiniApps.ContextConsents
   alias Egregoros.MiniApps.Declarations
   alias Egregoros.MiniApps.ExternalURL
+  alias Egregoros.MiniApps.GrantLock
   alias Egregoros.MiniApps.LaunchContext
   alias Egregoros.MiniApps.OAuthRegistrations
   alias Egregoros.MiniApps.NotificationConsents
@@ -17,6 +18,7 @@ defmodule EgregorosWeb.MiniAppHost do
   alias Egregoros.MiniApps.WalletConnections
   alias Egregoros.MiniApps.WalletRequest
   alias Egregoros.Publish
+  alias Egregoros.Repo
   alias Egregoros.User
   alias Egregoros.Users
 
@@ -926,7 +928,8 @@ defmodule EgregorosWeb.MiniAppHost do
       not compose_request_base_allowed?(state, launch_id, call_id) ->
         {:halt, socket}
 
-      not state.oauth_authenticated? ->
+      not current_compose_grant?(socket, state) ->
+        socket = assign_oauth_authenticated(socket, false)
         {:halt, push_compose_response(socket, call_id, "auth_required")}
 
       not OAuthRegistrations.capability_allowed?(state.card.app_origin, "compose_note") ->
@@ -1985,31 +1988,72 @@ defmodule EgregorosWeb.MiniAppHost do
     state = socket.assigns.mini_app_host
 
     with %{request_id: request_id} = request <- state.compose_request,
-         true <- state.oauth_authenticated?,
-         true <- active_card?(state.card),
-         true <- OAuthRegistrations.capability_allowed?(state.card.app_origin, "compose_note"),
-         %User{} = user <- Users.get(socket.assigns.mini_app_user_id),
-         :ok <- reply_target_still_allowed(state.card, request.in_reply_to),
-         {:ok, publish} <- ComposeDraft.validate_form(params),
-         {:ok, create} <-
-           Publish.post_note(user, publish.content,
-             visibility: publish.visibility,
-             spoiler_text: publish.spoiler_text,
-             language: publish.language,
-             in_reply_to: request.in_reply_to
-           ),
-         id when is_binary(id) <- create.object do
+         user_id when is_binary(user_id) <- socket.assigns.mini_app_user_id,
+         {:ok, id, scope} <- publish_compose(socket, state, request, params, user_id) do
       socket
       |> Phoenix.Component.assign(:mini_app_host, %{state | compose_request: nil})
       |> Phoenix.LiveView.push_event("mini_app_compose_published", %{
         launch_id: state.launch_id,
         request_id: request_id,
         id: id,
-        scope: publish.scope
+        scope: scope
       })
     else
-      _ -> put_compose_error(socket, "Could not post. Review the draft and try again.")
+      {:error, :oauth_grant} ->
+        socket
+        |> assign_oauth_authenticated(false)
+        |> put_compose_error("Authorization expired. Authenticate again before posting.")
+
+      _ ->
+        put_compose_error(socket, "Could not post. Review the draft and try again.")
     end
+  end
+
+  defp publish_compose(socket, state, request, params, user_id) do
+    Repo.transaction(fn ->
+      GrantLock.acquire(user_id, state.card.app_origin)
+
+      with {:oauth_grant, true} <- {:oauth_grant, current_compose_grant?(socket, state)},
+           true <- active_card?(state.card),
+           true <- OAuthRegistrations.capability_allowed?(state.card.app_origin, "compose_note"),
+           %User{} = user <- Users.get(user_id),
+           :ok <- reply_target_still_allowed(state.card, request.in_reply_to),
+           {:ok, publish} <- ComposeDraft.validate_form(params),
+           {:ok, create} <-
+             Publish.post_note(user, publish.content,
+               visibility: publish.visibility,
+               spoiler_text: publish.spoiler_text,
+               language: publish.language,
+               in_reply_to: request.in_reply_to
+             ),
+           id when is_binary(id) <- create.object do
+        {:ok, id, publish.scope}
+      else
+        {:oauth_grant, false} -> {:error, :oauth_grant}
+        _error -> {:error, :publish_failed}
+      end
+    end)
+    |> case do
+      {:ok, result} -> result
+      {:error, _reason} -> {:error, :publish_failed}
+    end
+  end
+
+  defp current_compose_grant?(socket, state) do
+    state.oauth_authenticated? and
+      OAuthRegistrations.active_user_grant?(
+        state.card.app_origin,
+        socket.assigns.mini_app_user_id
+      )
+  end
+
+  defp assign_oauth_authenticated(socket, authenticated?) when is_boolean(authenticated?) do
+    state = socket.assigns.mini_app_host
+
+    Phoenix.Component.assign(socket, :mini_app_host, %{
+      state
+      | oauth_authenticated?: authenticated?
+    })
   end
 
   defp reply_target_still_allowed(_card, nil), do: :ok

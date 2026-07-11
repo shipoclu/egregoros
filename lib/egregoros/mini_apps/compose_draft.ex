@@ -2,6 +2,7 @@ defmodule Egregoros.MiniApps.ComposeDraft do
   @moduledoc false
 
   alias Egregoros.MiniApps.Card
+  alias Egregoros.MiniApps.ExternalURL
   alias Egregoros.MiniApps.LaunchContext
 
   @draft_fields ~w(text spoilerText language visibility inReplyTo links)
@@ -93,10 +94,7 @@ defmodule Egregoros.MiniApps.ComposeDraft do
   defp links(_values), do: {:error, :invalid_link}
 
   defp valid_link?(value) when is_binary(value) and byte_size(value) <= @max_url_bytes do
-    case URI.parse(value) do
-      %URI{scheme: "https", host: host, userinfo: nil} when is_binary(host) and host != "" -> true
-      _ -> false
-    end
+    match?({:ok, ^value}, ExternalURL.validate(value))
   end
 
   defp valid_link?(_value), do: false
