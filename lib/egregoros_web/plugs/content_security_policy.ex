@@ -22,6 +22,20 @@ defmodule EgregorosWeb.Plugs.ContentSecurityPolicy do
           |> Enum.join("; ")
           |> Kernel.<>(";")
 
+  @permissions_policy [
+                        "camera=()",
+                        "microphone=()",
+                        "geolocation=()",
+                        "payment=()",
+                        "usb=()",
+                        "serial=()",
+                        "bluetooth=()",
+                        "hid=()",
+                        "midi=()",
+                        "display-capture=()"
+                      ]
+                      |> Enum.join(", ")
+
   @impl Plug
   def init(opts), do: opts
 
@@ -37,6 +51,8 @@ defmodule EgregorosWeb.Plugs.ContentSecurityPolicy do
         "content-security-policy"
       end
 
-    put_resp_header(conn, header, policy)
+    conn
+    |> put_resp_header(header, policy)
+    |> put_resp_header("permissions-policy", @permissions_policy)
   end
 end

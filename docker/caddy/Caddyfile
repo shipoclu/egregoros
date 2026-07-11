@@ -19,13 +19,29 @@
   reverse_proxy pl_fe:80
 }
 
+# CSP is intentionally absent here. Egregoros emits route-specific policies:
+# the main UI may frame only its same-origin broker, and each broker may frame
+# one validated mini-app origin. A static proxy CSP would weaken or break that
+# boundary.
+(security_headers) {
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    X-Content-Type-Options "nosniff"
+    Referrer-Policy "strict-origin-when-cross-origin"
+    Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), bluetooth=(), hid=(), midi=(), display-capture=()"
+    -Server
+  }
+}
+
 {$EGREGOROS_DOMAIN} {
   encode zstd gzip
+  import security_headers
   import proxy_to_web
 }
 
 i.{$EGREGOROS_DOMAIN} {
   encode zstd gzip
+  import security_headers
 
   @uploads path /uploads/*
   handle @uploads {
@@ -39,10 +55,12 @@ i.{$EGREGOROS_DOMAIN} {
 
 fe.{$EGREGOROS_DOMAIN} {
   encode zstd gzip
+  import security_headers
   import proxy_to_pleroma_fe
 }
 
 pl-fe.{$EGREGOROS_DOMAIN} {
   encode zstd gzip
+  import security_headers
   import proxy_to_pl_fe
 }

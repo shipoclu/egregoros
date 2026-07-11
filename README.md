@@ -132,6 +132,10 @@ DNS is expected to point at the server for:
 - `pl-fe.EGREGOROS_DOMAIN` (pl-fe)
 
 You can customize routing/TLS options by editing `docker/caddy/Caddyfile`.
+The application emits route-specific CSP for the LiveView host and mini-app
+broker; the proxy must preserve it. See
+[`deploy/SECURITY_HEADERS.md`](deploy/SECURITY_HEADERS.md) before changing
+Caddy, adding nginx, or placing a CDN in front of Egregoros.
 
 Uploads are stored on the `egregoros_uploads` named volume (mounted at `/data/uploads` in the `web` container).
 In the standalone setup, uploads are served from `https://i.${EGREGOROS_DOMAIN}` by default.

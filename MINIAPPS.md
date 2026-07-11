@@ -653,6 +653,12 @@ Neither the main document nor broker CSP may broadly allow `https:` frames.
 The broker MUST retain sole control of the external iframe `src`; same-origin
 path navigation is permitted, but an observed cross-origin navigation
 invalidates the channel and tears down the iframe.
+
+Deployment proxies MUST preserve these route-specific CSP headers rather than
+installing a single static CSP for the whole origin. The normative operator
+configuration, including Caddy and nginx examples, HSTS, Permissions Policy,
+forwarded-header trust, and verification commands, is documented in
+[`deploy/SECURITY_HEADERS.md`](deploy/SECURITY_HEADERS.md).
 External navigation goes only through the host's gesture-bound confirmation.
 The app cannot hide or draw over the host-owned header, domain label, close,
 collapse, permission, OAuth, compose, external-navigation, or wallet surfaces.

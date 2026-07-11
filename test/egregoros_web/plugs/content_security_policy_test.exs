@@ -33,11 +33,23 @@ defmodule EgregorosWeb.Plugs.ContentSecurityPolicyTest do
     assert policy =~ "frame-ancestors 'none'"
   end
 
+  test "denies browser capabilities that mini apps may only access through the host" do
+    conn = policy_conn()
+
+    assert get_resp_header(conn, "permissions-policy") == [
+             "camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), bluetooth=(), hid=(), midi=(), display-capture=()"
+           ]
+  end
+
   defp policy_header do
+    conn = policy_conn()
+    [policy] = get_resp_header(conn, "content-security-policy")
+    policy
+  end
+
+  defp policy_conn do
     Egregoros.Config.with_impl(Egregoros.Config.Stub, fn ->
-      conn = ContentSecurityPolicy.call(conn(:get, "/"), [])
-      [policy] = get_resp_header(conn, "content-security-policy")
-      policy
+      ContentSecurityPolicy.call(conn(:get, "/"), [])
     end)
   end
 end
