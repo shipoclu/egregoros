@@ -87,6 +87,7 @@ defmodule EgregorosWeb.Router do
     post "/settings/account", SettingsController, :update_account
     post "/settings/password", SettingsController, :update_password
     post "/logout", RegistrationController, :logout
+    get "/mini-apps/broker/:card_id", MiniAppBrokerController, :show
     get "/mini-app-assets/:card_id/image", MiniAppAssetController, :image
 
     live_session :mini_app_host,

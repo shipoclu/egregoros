@@ -26,7 +26,7 @@ const iframeFixture = () => {
   }
 }
 
-test("broker transfers one capability port to the exact app origin", () => {
+test("broker transfers one capability port only to the exact same-origin frame relay", () => {
   const fixture = iframeFixture()
 
   const broker = createMiniAppBroker({
@@ -40,17 +40,21 @@ test("broker transfers one capability port to the exact app origin", () => {
   fixture.load()
 
   assert.equal(fixture.posts.length, 1)
-  assert.equal(fixture.posts[0].targetOrigin, "https://app.example")
+  assert.equal(fixture.posts[0].targetOrigin, "https://social.example")
   assert.equal(fixture.posts[0].transfer.length, 1)
   assert.deepEqual(fixture.posts[0].message, {
-    type: "fediverse-miniapp:bootstrap",
-    version: "1",
-    launchId: "launch-1",
-    hostOrigin: "https://social.example",
-    issuer: "https://social.example",
-    authorizationServerMetadata:
-      "https://social.example/.well-known/oauth-authorization-server",
-    capabilities: [],
+    type: "fediverse-miniapp:host-bootstrap",
+    appOrigin: "https://app.example",
+    bootstrap: {
+      type: "fediverse-miniapp:bootstrap",
+      version: "1",
+      launchId: "launch-1",
+      hostOrigin: "https://social.example",
+      issuer: "https://social.example",
+      authorizationServerMetadata:
+        "https://social.example/.well-known/oauth-authorization-server",
+      capabilities: [],
+    },
   })
   assert.equal("context" in fixture.posts[0].message, false)
   assert.equal("user" in fixture.posts[0].message, false)
@@ -309,7 +313,7 @@ test("wallet discovery and connection requests use a strict, replay-safe schema"
   })
 
   fixture.load()
-  assert.deepEqual(fixture.posts[0].message.capabilities, ["wallet.evm"])
+  assert.deepEqual(fixture.posts[0].message.bootstrap.capabilities, ["wallet.evm"])
   const appPort = fixture.posts[0].transfer[0]
 
   appPort.postMessage({

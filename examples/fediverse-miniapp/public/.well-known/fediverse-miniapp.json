@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "name": "Fediverse Mini App Reference",
+  "publisher": {
+    "name": "Example Publisher",
+    "url": "https://miniapp.example/about"
+  },
+  "homeUrl": "https://miniapp.example/",
+  "wallet": {
+    "evm": {
+      "enabled": true,
+      "required": false,
+      "requiredChains": []
+    }
+  },
+  "capabilities": [],
+  "cacheTtlSeconds": 300
+}

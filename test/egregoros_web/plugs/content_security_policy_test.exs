@@ -21,12 +21,13 @@ defmodule EgregorosWeb.Plugs.ContentSecurityPolicyTest do
     refute policy =~ "frame-src https:"
   end
 
-  test "allows HTTPS frames only when mini apps are explicitly enabled" do
+  test "allows only the trusted same-origin broker when mini apps are enabled" do
     Application.put_env(:egregoros, :mini_apps_enabled, true)
 
     policy = policy_header()
 
-    assert policy =~ "frame-src https:"
+    assert policy =~ "frame-src 'self'"
+    refute policy =~ "frame-src https:"
     refute policy =~ "frame-src 'none'"
     assert policy =~ "object-src 'none'"
     assert policy =~ "frame-ancestors 'none'"

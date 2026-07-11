@@ -27,7 +27,7 @@ defmodule EgregorosWeb.Plugs.ContentSecurityPolicy do
 
   @impl Plug
   def call(conn, _opts) do
-    frame_sources = if Egregoros.MiniApps.enabled?(), do: "https:", else: "'none'"
+    frame_sources = if Egregoros.MiniApps.enabled?(), do: "'self'", else: "'none'"
     policy = String.replace(@policy, "__MINI_APP_FRAMES__", frame_sources)
 
     header =

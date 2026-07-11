@@ -80,6 +80,12 @@ config :esbuild,
       ~w(js/lib/fediverse_miniapp_sdk.mjs --bundle --format=esm --target=es2022 --outfile=../priv/static/assets/js/fediverse-miniapp-sdk-v1.js),
     cd: Path.expand("../assets", __DIR__),
     env: %{"NODE_PATH" => [Path.expand("../deps", __DIR__), Mix.Project.build_path()]}
+  ],
+  mini_app_frame: [
+    args:
+      ~w(js/mini_app_frame.js --bundle --target=es2022 --outfile=../priv/static/assets/js/mini-app-frame-relay.js),
+    cd: Path.expand("../assets", __DIR__),
+    env: %{"NODE_PATH" => [Path.expand("../deps", __DIR__), Mix.Project.build_path()]}
   ]
 
 # Configure tailwind (the version is required)

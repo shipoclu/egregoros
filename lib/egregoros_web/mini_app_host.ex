@@ -573,10 +573,8 @@ defmodule EgregorosWeb.MiniAppHost do
           <iframe
             id="mini-app-frame"
             title={@state.card.app_name <> " mini app"}
-            src={@state.card.launch_url}
-            sandbox="allow-scripts allow-forms allow-same-origin"
+            src={~p"/mini-apps/broker/#{@state.card.id}?launch_id=#{@state.launch_id}"}
             referrerpolicy="no-referrer"
-            allow="camera 'none'; microphone 'none'; geolocation 'none'; clipboard-read 'none'; clipboard-write 'none'"
             class={[
               "h-full w-full border-0 transition-opacity duration-200",
               if(@state.ready?, do: "opacity-100", else: "opacity-0")

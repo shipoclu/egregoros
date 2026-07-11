@@ -33,6 +33,23 @@ defmodule Egregoros.MiniApps.ManifestTest do
     assert manifest.oauth == nil
   end
 
+  test "the deployable reference app ships a valid optional-wallet manifest" do
+    path =
+      Path.expand(
+        "../../../examples/fediverse-miniapp/public/.well-known/fediverse-miniapp.json",
+        __DIR__
+      )
+
+    assert {:ok, manifest} =
+             path
+             |> File.read!()
+             |> Manifest.decode("https://miniapp.example/.well-known/fediverse-miniapp.json")
+
+    assert manifest.oauth == nil
+    assert manifest.wallet.evm.enabled
+    refute manifest.wallet.evm.required
+  end
+
   test "rejects duplicate json keys at every depth" do
     duplicate_top =
       ~s|{"version":"1","version":"1","name":"Reader","homeUrl":"https://app.example/","capabilities":[]}|

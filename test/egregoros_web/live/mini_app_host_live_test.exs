@@ -50,8 +50,10 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
 
     assert has_element?(
              view,
-             ~s(#mini-app-host iframe[src="https://app.example/book/chapter-2"][sandbox="allow-scripts allow-forms allow-same-origin"])
+             ~s(#mini-app-host iframe[src^="/mini-apps/broker/#{card.id}?launch_id="])
            )
+
+    refute render(view) =~ ~s(src="https://app.example/book/chapter-2")
 
     assert has_element?(view, "#mini-app-host[data-app-origin='https://app.example']")
     assert has_element?(view, "#mini-app-host[phx-hook='MiniAppHost']")

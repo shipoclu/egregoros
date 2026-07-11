@@ -273,8 +273,7 @@ export const createMiniAppBroker = ({
 
     hostPort.start?.()
 
-    targetWindow.postMessage(
-      {
+    const bootstrap = {
         type: "fediverse-miniapp:bootstrap",
         version: protocolVersion,
         launchId,
@@ -282,8 +281,15 @@ export const createMiniAppBroker = ({
         issuer: hostOrigin,
         authorizationServerMetadata: `${hostOrigin}/.well-known/oauth-authorization-server`,
         capabilities: [...capabilities],
+      }
+
+    targetWindow.postMessage(
+      {
+        type: "fediverse-miniapp:host-bootstrap",
+        appOrigin,
+        bootstrap,
       },
-      appOrigin,
+      hostOrigin,
       [channel.port2]
     )
   }

@@ -1,8 +1,10 @@
-# Fediverse Mini Apps — Design Draft
+# Fediverse Mini Apps — V1 Design and Reference Implementation
 
-> Status: v1 product and protocol design draft. Security requirements in this
-> document are release gates and require implementation review and adversarial
-> testing before the feature is enabled.
+> Status: v1 implementation candidate on the `miniapps` branch. The feature is
+> disabled by default. Automated protocol, authorization, wallet, broker, and
+> interoperability gates pass; production enablement still requires a
+> deployment-specific browser/PWA matrix and adversarial review of the release
+> build and egress controls.
 
 ## Goal
 
@@ -947,16 +949,18 @@ The choices are:
    actions.
 5. **Composition, wallet, and controls.** Implement prefill-only `composeNote`,
    correlated minimal receipts, the injected-wallet adapter/EIP-1193 bridge,
-   per-app wallet confirmations, user disconnect controls, operator policy UI,
+   per-app wallet confirmations, user disconnect controls, operator policy
+   configuration,
    explicit external-navigation confirmation, and framing-error UX. Keep the
    JAW adapter behind the same interface and out of this implementation phase.
-6. **Hardening and interoperability.** Test a reference mini app across
-   desktop and installed PWA/mobile browsers, including cookie-blocking modes,
-   all OAuth and `postMessage` failure paths, public federation cards, scope
-   revocation, domain-policy changes, and no leakage of derived data into
-   ActivityPub objects.
+6. **Hardening and interoperability.** Automate the complete trusted
+   broker↔SDK channel against the deployable reference mini app. Before each
+   production release, run the documented desktop and installed PWA/mobile
+   browser matrix, including cookie-blocking modes, OAuth and `postMessage`
+   failure paths, public federation cards, scope revocation, domain-policy
+   changes, and checks that derived state never enters ActivityPub objects.
 
-The feature is ready for implementation only when tests demonstrate that an
+The feature is ready for release only when tests demonstrate that an
 untrusted app cannot obtain user identity or auth-gated actions without OAuth,
 cannot obtain note context before the separate context disclosure, cannot
 increase scopes or capabilities, redeem a host-visible handoff code without the
@@ -975,11 +979,21 @@ Future work should treat wallet delegation, transaction batching, other wallet
 types, notifications, device permissions, an app directory, and non-public
 note launches as new design efforts rather than implicit extensions.
 
+The first-party SDK source and declarations live at
+`assets/js/lib/fediverse_miniapp_sdk.{mjs,d.ts}`. Builds publish matching
+`fediverse-miniapp-sdk-v1.{js,d.ts}` artifacts. A deployable public/read-only
+example with optional wallet support lives at `examples/fediverse-miniapp/`;
+its manifest is parsed by the Elixir suite and its SDK transport is exercised
+through the same-origin broker, nested sandbox, and transferred ports by the
+asset interoperability suite. The example intentionally omits an OAuth backend
+because client secrets, registration, code exchange, refresh, and bearer-token
+API calls are server-to-server responsibilities.
+
 ## Domain paths and cards
 
-## Proposed v1 wire format
+## V1 wire format
 
-The following is the proposed strict JSON shape. V1 rejects unknown fields,
+The following is the strict JSON shape. V1 rejects unknown fields,
 duplicate keys, and ambiguous encodings rather than allowing different host
 implementations to interpret the same manifest differently. Additions require a
 documented protocol revision. Fields that influence identity, OAuth, scopes,
