@@ -13,6 +13,9 @@ defmodule Egregoros.MiniApps.Declaration do
     field :wallet_evm_enabled, :boolean, default: false
     field :wallet_evm_required, :boolean, default: false
     field :wallet_evm_required_chains, {:array, :string}, default: []
+    field :activity_pub_actor_url, :string
+    field :activity_pub_public_notes, :boolean, default: false
+    field :activity_pub_transactional_mentions, :boolean, default: false
     field :manifest_fingerprint, :binary
     field :declared_at, :utc_datetime_usec
 
@@ -29,11 +32,15 @@ defmodule Egregoros.MiniApps.Declaration do
       :wallet_evm_enabled,
       :wallet_evm_required,
       :wallet_evm_required_chains,
+      :activity_pub_actor_url,
+      :activity_pub_public_notes,
+      :activity_pub_transactional_mentions,
       :manifest_fingerprint,
       :declared_at
     ])
     |> validate_required([:app_origin, :manifest_fingerprint, :declared_at])
     |> validate_length(:app_origin, max: 255)
+    |> validate_length(:activity_pub_actor_url, max: 2_048)
     |> unique_constraint(:app_origin)
   end
 end

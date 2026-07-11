@@ -357,9 +357,11 @@ authoritative recipient/app-actor binding. Egregoros rechecks current consent
 when the signed direct mention arrives, so revocation suppresses user-visible
 delivery even when the sender has stale state.
 
-This extension is not implemented by the current strict v1 manifest, SDK, or
-host. Public ActivityPub publishing requires no mini-app extension and can be
-implemented independently; Egregoros-enforced transactional consent cannot.
+The current v1 manifest strictly parses and immutably persists the actor
+declaration, and Egregoros has actor-bound consent storage. The SDK permission
+surface, actor-document activation, backend check, host UI, and inbound
+enforcement remain unimplemented. Public ActivityPub publishing requires no
+mini-app host extension and can be implemented independently.
 
 #### Dynamic registration
 
@@ -1060,6 +1062,11 @@ Published as `https://{app-origin}/.well-known/fediverse-miniapp.json`:
       "requiredChains": ["eip155:8453"]
     }
   },
+  "activityPub": {
+    "actorUrl": "https://app.example/ap/actor",
+    "publicNotes": true,
+    "transactionalMentions": true
+  },
   "capabilities": ["compose_note"],
   "cacheTtlSeconds": 3600
 }
@@ -1071,9 +1078,17 @@ Required fields are `version`, `name`, `homeUrl`, and `capabilities`. The
 the manifest's exact HTTPS origin. An OAuth-enabled manifest's `oauth.scopes`
 must include `read`. Its `scopes` and all manifests' `capabilities` arrays are
 de-duplicated, bounded, and immutable after first registration/observation. The
-`wallet` object is optional and immutable when present. The current one-hour
-cache default applies when `cacheTtlSeconds` is absent; an explicit shorter TTL
-is honored.
+`wallet` and `activityPub` objects are optional and immutable when present. An
+ActivityPub actor URL must use the exact origin, have a non-root path, and have
+no query or fragment. At least one publishing mode must be enabled;
+`transactionalMentions` additionally requires OAuth. The current one-hour cache
+default applies when `cacheTtlSeconds` is absent; an explicit shorter TTL is
+honored.
+
+The normative JSON Schema is
+[`docs/schemas/fediverse-miniapp-manifest-v1.schema.json`](docs/schemas/fediverse-miniapp-manifest-v1.schema.json).
+The schema cannot express equality with the origin from which it was fetched,
+so hosts must still perform the exact-origin validation described here.
 
 ### Page card metadata
 

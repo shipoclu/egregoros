@@ -18,12 +18,18 @@ defmodule Egregoros.MiniApps.DeclarationsTest do
     assert first.id == second.id
     assert first.app_origin == "https://wallet.example"
     assert first.capabilities == []
-    assert first.oauth_redirect_uris == []
-    assert first.oauth_scopes == []
+    assert first.oauth_redirect_uris == ["https://wallet.example/oauth/callback"]
+    assert first.oauth_scopes == ["read"]
     assert first.wallet_evm_enabled
     refute first.wallet_evm_required
     assert first.wallet_evm_required_chains == ["eip155:8453"]
+    assert first.activity_pub_actor_url == "https://wallet.example/ap/actor"
+    assert first.activity_pub_public_notes
+    assert first.activity_pub_transactional_mentions
     assert Declarations.get_by_origin("https://wallet.example").id == first.id
+
+    assert Declarations.notification_actor("https://wallet.example") ==
+             {:ok, "https://wallet.example/ap/actor"}
   end
 
   test "rejects later wallet, OAuth, or capability mutations" do
@@ -33,11 +39,20 @@ defmodule Egregoros.MiniApps.DeclarationsTest do
     refute_manifest_change(%{"requiredChains" => ["eip155:1"]})
     refute_manifest_change(%{"enabled" => false, "requiredChains" => []})
 
-    changed_oauth = manifest_fixture(oauth?: true)
+    changed_oauth = manifest_fixture(oauth_scopes: ["read", "write"])
     assert {:error, :manifest_changed} = Declarations.ensure(changed_oauth)
 
     changed_capabilities = %{changed_oauth | capabilities: ["compose_note"]}
     assert {:error, :manifest_changed} = Declarations.ensure(changed_capabilities)
+
+    original = manifest_fixture()
+
+    changed_activity_pub = %{
+      original
+      | activity_pub: %{original.activity_pub | actor_url: "https://wallet.example/ap/other"}
+    }
+
+    assert {:error, :manifest_changed} = Declarations.ensure(changed_activity_pub)
   end
 
   test "rechecks current operator policy" do
@@ -64,7 +79,8 @@ defmodule Egregoros.MiniApps.DeclarationsTest do
   defp manifest_fixture(options \\ [])
 
   defp manifest_fixture(options) when is_list(options) do
-    oauth? = Keyword.get(options, :oauth?, false)
+    oauth? = Keyword.get(options, :oauth?, true)
+    oauth_scopes = Keyword.get(options, :oauth_scopes, ["read"])
 
     attrs = %{
       "version" => "1",
@@ -77,6 +93,11 @@ defmodule Egregoros.MiniApps.DeclarationsTest do
           "requiredChains" => ["eip155:8453"]
         }
       },
+      "activityPub" => %{
+        "actorUrl" => "https://wallet.example/ap/actor",
+        "publicNotes" => true,
+        "transactionalMentions" => true
+      },
       "capabilities" => []
     }
 
@@ -84,7 +105,7 @@ defmodule Egregoros.MiniApps.DeclarationsTest do
       if oauth? do
         Map.put(attrs, "oauth", %{
           "redirectUris" => ["https://wallet.example/oauth/callback"],
-          "scopes" => ["read", "write"]
+          "scopes" => oauth_scopes
         })
       else
         attrs

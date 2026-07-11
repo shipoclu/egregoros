@@ -32,6 +32,24 @@ defmodule Egregoros.MiniApps.Declarations do
 
   def wallet_enabled?(_origin), do: false
 
+  def notification_actor(origin) when is_binary(origin) do
+    case get_by_origin(origin) do
+      %Declaration{
+        activity_pub_actor_url: actor_url,
+        activity_pub_transactional_mentions: true
+      }
+      when is_binary(actor_url) ->
+        if origin_allowed?(origin),
+          do: {:ok, actor_url},
+          else: {:error, :notifications_not_declared}
+
+      _ ->
+        {:error, :notifications_not_declared}
+    end
+  end
+
+  def notification_actor(_origin), do: {:error, :notifications_not_declared}
+
   defp ensure_locked(manifest) do
     lock_origin(manifest.origin)
     fingerprint = fingerprint(manifest)
@@ -51,6 +69,7 @@ defmodule Egregoros.MiniApps.Declarations do
   defp create_declaration(manifest, fingerprint) do
     oauth = manifest.oauth || %{redirect_uris: [], scopes: []}
     evm = get_in(manifest.wallet || %{}, [:evm]) || disabled_wallet()
+    activity_pub = manifest.activity_pub || disabled_activity_pub()
 
     attrs = %{
       app_origin: manifest.origin,
@@ -60,6 +79,9 @@ defmodule Egregoros.MiniApps.Declarations do
       wallet_evm_enabled: evm.enabled,
       wallet_evm_required: evm.required,
       wallet_evm_required_chains: evm.required_chains,
+      activity_pub_actor_url: activity_pub.actor_url,
+      activity_pub_public_notes: activity_pub.public_notes,
+      activity_pub_transactional_mentions: activity_pub.transactional_mentions,
       manifest_fingerprint: fingerprint,
       declared_at: DateTime.utc_now()
     }
@@ -73,15 +95,21 @@ defmodule Egregoros.MiniApps.Declarations do
   defp fingerprint(manifest) do
     oauth = manifest.oauth || %{redirect_uris: [], scopes: []}
     evm = get_in(manifest.wallet || %{}, [:evm]) || disabled_wallet()
+    activity_pub = manifest.activity_pub || disabled_activity_pub()
 
     {oauth.redirect_uris, oauth.scopes, manifest.capabilities,
-     {evm.enabled, evm.required, evm.required_chains}}
+     {evm.enabled, evm.required, evm.required_chains},
+     {activity_pub.actor_url, activity_pub.public_notes, activity_pub.transactional_mentions}}
     |> :erlang.term_to_binary()
     |> then(&:crypto.hash(:sha256, &1))
   end
 
   defp disabled_wallet do
     %{enabled: false, required: false, required_chains: []}
+  end
+
+  defp disabled_activity_pub do
+    %{actor_url: nil, public_notes: false, transactional_mentions: false}
   end
 
   defp lock_origin(origin) do

@@ -50,6 +50,86 @@ defmodule Egregoros.MiniApps.ManifestTest do
     refute manifest.wallet.evm.required
   end
 
+  test "accepts an exact-origin ActivityPub actor declaration" do
+    json =
+      valid_manifest()
+      |> Map.put("activityPub", %{
+        "actorUrl" => "https://app.example/ap/actor",
+        "publicNotes" => true,
+        "transactionalMentions" => true
+      })
+      |> Jason.encode!()
+
+    assert {:ok, manifest} = Manifest.decode(json, @manifest_url)
+
+    assert manifest.activity_pub == %{
+             actor_url: "https://app.example/ap/actor",
+             public_notes: true,
+             transactional_mentions: true
+           }
+  end
+
+  test "strictly validates ActivityPub declarations and transactional OAuth" do
+    base = valid_manifest()
+
+    invalid = [
+      Map.put(base, "activityPub", %{
+        "actorUrl" => "https://other.example/ap/actor",
+        "publicNotes" => true,
+        "transactionalMentions" => false
+      }),
+      Map.put(base, "activityPub", %{
+        "actorUrl" => "https://app.example/ap/actor?mutable=yes",
+        "publicNotes" => true,
+        "transactionalMentions" => false
+      }),
+      Map.put(base, "activityPub", %{
+        "actorUrl" => "https://app.example/ap/actor",
+        "publicNotes" => false,
+        "transactionalMentions" => false
+      }),
+      Map.put(base, "activityPub", %{
+        "actorUrl" => "https://app.example/ap/actor",
+        "publicNotes" => true,
+        "transactionalMentions" => "yes"
+      }),
+      Map.put(base, "activityPub", %{
+        "actorUrl" => "https://app.example/ap/actor",
+        "publicNotes" => true,
+        "transactionalMentions" => false,
+        "extra" => true
+      }),
+      base
+      |> Map.delete("oauth")
+      |> Map.put("activityPub", %{
+        "actorUrl" => "https://app.example/ap/actor",
+        "publicNotes" => false,
+        "transactionalMentions" => true
+      })
+    ]
+
+    for attrs <- invalid do
+      assert {:error, _reason} = Manifest.decode(Jason.encode!(attrs), @manifest_url)
+    end
+  end
+
+  test "ships a machine-readable closed JSON Schema for manifests" do
+    schema =
+      Path.expand("../../../docs/schemas/fediverse-miniapp-manifest-v1.schema.json", __DIR__)
+      |> File.read!()
+      |> Jason.decode!()
+
+    assert schema["$schema"] == "https://json-schema.org/draft/2020-12/schema"
+    assert schema["additionalProperties"] == false
+    assert schema["required"] == ["version", "name", "homeUrl", "capabilities"]
+    assert get_in(schema, ["properties", "version", "const"]) == "1"
+
+    assert get_in(schema, ["properties", "activityPub", "$ref"]) == "#/$defs/activityPub"
+    activity_pub = get_in(schema, ["$defs", "activityPub"])
+    assert activity_pub["additionalProperties"] == false
+    assert activity_pub["required"] == ["actorUrl", "publicNotes", "transactionalMentions"]
+  end
+
   test "rejects duplicate json keys at every depth" do
     duplicate_top =
       ~s|{"version":"1","version":"1","name":"Reader","homeUrl":"https://app.example/","capabilities":[]}|

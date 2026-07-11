@@ -8,7 +8,8 @@ defmodule Egregoros.MiniApps.Permissions do
   def subscribe(_user_id), do: :ok
 
   def notify_revoked(user_id, app_origin, kind)
-      when is_binary(user_id) and is_binary(app_origin) and kind in [:context, :oauth, :wallet] do
+      when is_binary(user_id) and is_binary(app_origin) and
+             kind in [:context, :notifications, :oauth, :wallet] do
     Phoenix.PubSub.broadcast(
       Egregoros.PubSub,
       topic(user_id),

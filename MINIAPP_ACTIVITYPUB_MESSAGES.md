@@ -1,9 +1,10 @@
 # Mini-app ActivityPub messages: implementer's guide
 
 > Status: public ActivityPub publishing can be implemented independently today.
-> The mini-app manifest declaration, SDK notification-permission methods, and
-> Egregoros consent enforcement described below are a proposed protocol
-> extension and are **not implemented** by the current v1 SDK or host.
+> Egregoros parses and immutably persists the mini-app actor declaration and
+> notification-consent decisions. The SDK permission methods, actor-document
+> activation, backend permission endpoint, and inbound consent enforcement are
+> not yet implemented.
 
 This guide defines the smallest useful ActivityPub service a mini-app developer
 can operate for two distinct purposes:
@@ -112,7 +113,7 @@ an individualized alert uses the transactional flow below.
 
 ## 3. Declare transactional-message support
 
-A future manifest revision should add one immutable declaration:
+The v1 manifest accepts one immutable declaration:
 
 ```json
 "activityPub": {
@@ -132,8 +133,14 @@ resources and verify that:
 - its inbox, outbox, followers, and key URLs are HTTPS and pass URL policy; and
 - the declaration remains immutable for the app identity.
 
-The current strict v1 manifest rejects this field. Implementers must not add it
-to a production v1 manifest until the host and SDK extension ship together.
+The complete machine-readable definition is
+[`docs/schemas/fediverse-miniapp-manifest-v1.schema.json`](docs/schemas/fediverse-miniapp-manifest-v1.schema.json).
+JSON Schema cannot compare URL origins, so the Egregoros parser remains
+authoritative for exact-origin checks.
+
+The declaration is accepted and pinned now, but does not enable transactional
+delivery until the host and SDK permission extension ships. Applications may
+publish ordinary public ActivityPub notes independently.
 
 ## 4. Consent is a separate capability
 
@@ -315,18 +322,18 @@ necessary but never sufficient to bypass moderation or abuse controls.
 
 ## 9. What remains to implement in Egregoros
 
-This guide does not make the proposed consent profile available. A complete
-Egregoros implementation still needs:
+The manifest declaration, immutable persistence, and consent decision data
+model are implemented. A complete Egregoros flow still needs:
 
-1. a versioned manifest schema for the immutable app actor declaration;
-2. actor-document validation and declaration persistence;
-3. per-user/app/actor notification-consent storage and revocation UI;
-4. broker and SDK `getPermission`/`requestPermission` messages and TypeScript
+1. SSRF-safe actor-document validation before activating the declaration;
+2. host-owned consent and revocation UI over the existing consent storage;
+3. broker and SDK `getPermission`/`requestPermission` messages and TypeScript
    declarations;
-5. the OAuth-authenticated backend permission endpoint;
-6. inbound transactional-mention recognition and consent enforcement;
-7. immediate cross-tab revocation behavior and audit events; and
-8. protocol, federation, UI, SDK, security, and interoperability tests.
+4. the OAuth-authenticated backend permission endpoint;
+5. inbound transactional-mention recognition and consent enforcement;
+6. immediate cross-tab revocation behavior and audit events; and
+7. protocol, federation, UI, SDK, security, and interoperability tests.
 
-Until those pieces ship, an app may publish ordinary public ActivityPub notes,
-but it must not claim Egregoros-enforced consent for transactional mentions.
+Until those pieces ship, an app may declare its actor and publish ordinary
+public ActivityPub notes, but it must not claim Egregoros-enforced consent for
+transactional mentions.

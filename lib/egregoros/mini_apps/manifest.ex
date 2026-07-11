@@ -12,12 +12,13 @@ defmodule Egregoros.MiniApps.Manifest do
 
   @max_bytes 65_536
   @default_cache_ttl_seconds 3_600
-  @allowed_fields ~w(version name publisher homeUrl iconUrl splash oauth wallet capabilities cacheTtlSeconds)
+  @allowed_fields ~w(version name publisher homeUrl iconUrl splash oauth wallet activityPub capabilities cacheTtlSeconds)
   @publisher_fields ~w(name url)
   @splash_fields ~w(imageUrl backgroundColor)
   @oauth_fields ~w(redirectUris scopes)
   @wallet_fields ~w(evm)
   @evm_fields ~w(enabled required requiredChains)
+  @activity_pub_fields ~w(actorUrl publicNotes transactionalMentions)
   @supported_capabilities ~w(compose_note)
 
   @enforce_keys [:version, :name, :origin, :home_url, :capabilities, :cache_ttl_seconds]
@@ -31,6 +32,7 @@ defmodule Egregoros.MiniApps.Manifest do
     :splash,
     :oauth,
     :wallet,
+    :activity_pub,
     :capabilities,
     :cache_ttl_seconds
   ]
@@ -54,6 +56,7 @@ defmodule Egregoros.MiniApps.Manifest do
          {:ok, splash} <- splash(attrs["splash"], origin),
          {:ok, oauth} <- oauth(attrs["oauth"], origin),
          {:ok, wallet} <- wallet(attrs["wallet"]),
+         {:ok, activity_pub} <- activity_pub(attrs["activityPub"], origin, oauth),
          {:ok, capabilities} <- capabilities(attrs["capabilities"]),
          :ok <- validate_capability_prerequisites(capabilities, oauth),
          {:ok, cache_ttl_seconds} <- cache_ttl(attrs) do
@@ -68,6 +71,7 @@ defmodule Egregoros.MiniApps.Manifest do
          splash: splash,
          oauth: oauth,
          wallet: wallet,
+         activity_pub: activity_pub,
          capabilities: capabilities,
          cache_ttl_seconds: cache_ttl_seconds
        }}
@@ -154,6 +158,44 @@ defmodule Egregoros.MiniApps.Manifest do
   end
 
   defp evm_wallet(_attrs), do: {:error, :invalid_wallet}
+
+  defp activity_pub(nil, _origin, _oauth), do: {:ok, nil}
+
+  defp activity_pub(attrs, origin, oauth) when is_map(attrs) do
+    with :ok <- only_fields(attrs, @activity_pub_fields),
+         {:ok, actor_url} <- exact_origin_url(attrs, "actorUrl", origin),
+         :ok <- stable_actor_url(actor_url),
+         public_notes when is_boolean(public_notes) <- attrs["publicNotes"],
+         transactional_mentions when is_boolean(transactional_mentions) <-
+           attrs["transactionalMentions"],
+         true <- public_notes or transactional_mentions or {:error, :invalid_activity_pub},
+         true <-
+           not transactional_mentions or not is_nil(oauth) or
+             {:error, :oauth_required_for_transactional_mentions} do
+      {:ok,
+       %{
+         actor_url: actor_url,
+         public_notes: public_notes,
+         transactional_mentions: transactional_mentions
+       }}
+    else
+      {:error, _reason} = error -> error
+      _ -> {:error, :invalid_activity_pub}
+    end
+  end
+
+  defp activity_pub(_attrs, _origin, _oauth), do: {:error, :invalid_activity_pub}
+
+  defp stable_actor_url(actor_url) do
+    case URI.parse(actor_url) do
+      %URI{path: path, query: query}
+      when is_binary(path) and path not in ["", "/"] and query in [nil, ""] ->
+        :ok
+
+      _ ->
+        {:error, :invalid_activity_pub_actor_url}
+    end
+  end
 
   defp capabilities(value) do
     with {:ok, capabilities} <- string_list(value, 0, 16),

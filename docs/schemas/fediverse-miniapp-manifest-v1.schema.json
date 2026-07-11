@@ -1,0 +1,258 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:fediverse-miniapp:schema:manifest:1",
+  "title": "Fediverse Mini App Manifest v1",
+  "description": "The strict domain manifest served at /.well-known/fediverse-miniapp.json. The host must additionally enforce that every declared URL uses the manifest's exact scheme, host, and effective port.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "name", "homeUrl", "capabilities"],
+  "properties": {
+    "version": {
+      "const": "1"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "publisher": {
+      "$ref": "#/$defs/publisher"
+    },
+    "homeUrl": {
+      "$ref": "#/$defs/exactOriginHttpsUrl"
+    },
+    "iconUrl": {
+      "$ref": "#/$defs/exactOriginHttpsUrl"
+    },
+    "splash": {
+      "$ref": "#/$defs/splash"
+    },
+    "oauth": {
+      "$ref": "#/$defs/oauth"
+    },
+    "wallet": {
+      "$ref": "#/$defs/wallet"
+    },
+    "activityPub": {
+      "$ref": "#/$defs/activityPub"
+    },
+    "capabilities": {
+      "type": "array",
+      "maxItems": 16,
+      "uniqueItems": true,
+      "items": {
+        "enum": ["compose_note"]
+      }
+    },
+    "cacheTtlSeconds": {
+      "type": "integer",
+      "minimum": 60,
+      "maximum": 3600,
+      "default": 3600
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "capabilities": {
+            "contains": {
+              "const": "compose_note"
+            }
+          }
+        },
+        "required": ["capabilities"]
+      },
+      "then": {
+        "required": ["oauth"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "activityPub": {
+            "properties": {
+              "transactionalMentions": {
+                "const": true
+              }
+            },
+            "required": ["transactionalMentions"]
+          }
+        },
+        "required": ["activityPub"]
+      },
+      "then": {
+        "required": ["oauth"]
+      }
+    }
+  ],
+  "$defs": {
+    "exactOriginHttpsUrl": {
+      "$comment": "JSON Schema cannot compare origins. Implementations must require the manifest's exact scheme, host, and effective port and must reject credentials and fragments.",
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://",
+      "maxLength": 2048
+    },
+    "publisher": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "url"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "url": {
+          "$ref": "#/$defs/exactOriginHttpsUrl"
+        }
+      }
+    },
+    "splash": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["imageUrl", "backgroundColor"],
+      "properties": {
+        "imageUrl": {
+          "$ref": "#/$defs/exactOriginHttpsUrl"
+        },
+        "backgroundColor": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        }
+      }
+    },
+    "oauth": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["redirectUris", "scopes"],
+      "properties": {
+        "redirectUris": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/exactOriginHttpsUrl"
+          }
+        },
+        "scopes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "uniqueItems": true,
+          "contains": {
+            "const": "read"
+          },
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[a-z][a-z0-9:_-]*$"
+          }
+        }
+      }
+    },
+    "wallet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evm"],
+      "properties": {
+        "evm": {
+          "$ref": "#/$defs/evmWallet"
+        }
+      }
+    },
+    "evmWallet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled"],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "required": {
+          "type": "boolean",
+          "default": false
+        },
+        "requiredChains": {
+          "type": "array",
+          "maxItems": 16,
+          "uniqueItems": true,
+          "default": [],
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^eip155:[1-9][0-9]*$"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "enabled": {
+                "const": false
+              }
+            },
+            "required": ["enabled"]
+          },
+          "then": {
+            "properties": {
+              "required": {
+                "const": false
+              },
+              "requiredChains": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "activityPub": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["actorUrl", "publicNotes", "transactionalMentions"],
+      "properties": {
+        "actorUrl": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/exactOriginHttpsUrl"
+            },
+            {
+              "$comment": "The actor URL must have a non-root path and no query string.",
+              "pattern": "^https://[^/?#]+(?::[0-9]+)?/[^?#]+$"
+            }
+          ]
+        },
+        "publicNotes": {
+          "type": "boolean"
+        },
+        "transactionalMentions": {
+          "type": "boolean"
+        }
+      },
+      "anyOf": [
+        {
+          "properties": {
+            "publicNotes": {
+              "const": true
+            }
+          },
+          "required": ["publicNotes"]
+        },
+        {
+          "properties": {
+            "transactionalMentions": {
+              "const": true
+            }
+          },
+          "required": ["transactionalMentions"]
+        }
+      ]
+    }
+  }
+}
