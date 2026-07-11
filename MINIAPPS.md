@@ -367,8 +367,10 @@ token's registered client and returns the canonical recipient actor only for a
 current grant. Inbound enforcement requires one exact local recipient and
 matching mention plus current notification and OAuth grants; invalid or revoked
 deliveries are acknowledged without persistence. Actor-document activation
-remains unimplemented. Public ActivityPub publishing requires no mini-app host
-extension and can be implemented independently.
+uses a unique background job and keeps the capability disabled until the exact
+actor identity, same-origin endpoints, key ownership, and RSA key fingerprint
+are validated and pinned. Public ActivityPub publishing requires no mini-app
+host extension and can be implemented independently.
 
 #### Dynamic registration
 

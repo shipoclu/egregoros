@@ -30,6 +30,7 @@ defmodule EgregorosWeb.ConnCase do
       import Plug.Conn
       import Phoenix.ConnTest
       import EgregorosWeb.ConnCase
+      import Egregoros.DataCase, only: [activate_mini_app_actor!: 1]
       import Mox
     end
   end

@@ -5,8 +5,8 @@
 > notification-consent decisions. The SDK and broker implement the typed
 > permission transport, and the host implements OAuth-gated state reads,
 > confirmation, persistence, and revocation UI. The OAuth-authenticated backend
-> permission endpoint and inbound transactional-message consent enforcement are
-> available. Actor-document activation is not yet implemented.
+> permission endpoint, actor-document activation, and inbound
+> transactional-message consent enforcement are available.
 
 This guide defines the smallest useful ActivityPub service a mini-app developer
 can operate for two distinct purposes:
@@ -140,9 +140,14 @@ The complete machine-readable definition is
 JSON Schema cannot compare URL origins, so the Egregoros parser remains
 authoritative for exact-origin checks.
 
-The declaration is accepted and pinned now, but does not enable transactional
-delivery until the host and SDK permission extension ships. Applications may
-publish ordinary public ActivityPub notes independently.
+The declaration is persisted inactive. A unique background job fetches the
+actor with public-DNS pinning, no redirects, a 64 KiB limit, and an
+ActivityStreams JSON content type. It accepts only an `Application` or `Service`
+with the exact declared ID, same-origin inbox/outbox/followers/key URLs, an exact
+key owner, and a valid RSA public key of at least 2048 bits. A SHA-256
+fingerprint of those security fields is then pinned; later declaration checks
+do not silently refetch or repin it. Transactional permission and inbound
+delivery remain disabled until activation succeeds.
 
 ## 4. Consent is a separate capability
 
@@ -310,7 +315,7 @@ necessary but never sufficient to bypass moderation or abuse controls.
 ### Transactional mentions
 
 - [ ] Everything required for the actor and signed delivery boundary above.
-- [ ] Future immutable mini-app actor declaration supported by host and SDK.
+- [x] Immutable mini-app actor declaration and host-side actor activation.
 - [ ] OAuth `read` grant used server-side to identify the recipient.
 - [ ] Separate host-owned notification confirmation completed from a gesture.
 - [ ] Authoritative backend permission check returns `granted` before enqueue.
@@ -329,11 +334,10 @@ The manifest declaration, immutable persistence, consent decision data model,
 and receiver-side suppression are implemented. A complete Egregoros flow still
 needs:
 
-1. SSRF-safe actor-document validation before activating the declaration;
-2. notification-specific audit events; and
-3. federation, security, and browser interoperability tests for the completed
+1. notification-specific audit events; and
+2. federation, security, and browser interoperability tests for the completed
    end-to-end flow.
 
-Until actor activation ships, declarations are not cryptographically tied to
-the actor document and transactional delivery must remain an experimental,
-operator-controlled feature.
+The remaining hardening work must verify signed delivery end to end against the
+pinned actor identity and exercise the complete flow across real federation and
+browser boundaries.

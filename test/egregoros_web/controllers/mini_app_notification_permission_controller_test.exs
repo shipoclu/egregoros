@@ -13,6 +13,7 @@ defmodule EgregorosWeb.MiniAppNotificationPermissionControllerTest do
     enable_mini_apps()
     {:ok, user} = Users.create_local_user("mini-app-notification-api-user")
     {:ok, registration} = OAuthRegistrations.register(manifest_fixture())
+    activate_mini_app_actor!("https://app.example")
     application = Repo.get!(OAuthApplication, registration.oauth_application_id)
     token = oauth_token(application, user)
     %{user: user, token: token}

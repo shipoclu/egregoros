@@ -74,6 +74,18 @@ defmodule Egregoros.DataCase do
     {:ok, _pid} = Supervisor.start_child(sup, spec)
   end
 
+  def activate_mini_app_actor!(origin) when is_binary(origin) do
+    declaration =
+      Egregoros.Repo.get_by!(Egregoros.MiniApps.Declaration, app_origin: origin)
+
+    declaration
+    |> Ecto.Changeset.change(%{
+      activity_pub_actor_fingerprint: :crypto.hash(:sha256, declaration.activity_pub_actor_url),
+      activity_pub_actor_activated_at: DateTime.utc_now()
+    })
+    |> Egregoros.Repo.update!()
+  end
+
   @doc """
   A helper that transforms changeset errors into a map of messages.
 

@@ -6,12 +6,12 @@ defmodule Egregoros.MiniApps.Fetcher do
   pinning, redirect refusal, MIME checks, and resource-specific response limits.
   """
 
-  @type kind :: :manifest | :page | :asset
+  @type kind :: :manifest | :page | :asset | :actor
   @type response :: %{status: 200, body: binary(), headers: [{binary(), binary()}]}
 
   @callback get(String.t(), kind()) :: {:ok, response()} | {:error, term()}
 
-  def get(url, kind) when is_binary(url) and kind in [:manifest, :page, :asset] do
+  def get(url, kind) when is_binary(url) and kind in [:manifest, :page, :asset, :actor] do
     impl().get(url, kind)
   end
 

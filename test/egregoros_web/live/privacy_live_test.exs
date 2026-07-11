@@ -140,6 +140,7 @@ defmodule EgregorosWeb.PrivacyLiveTest do
     alice: alice
   } do
     assert {:ok, _declaration, :created} = Declarations.ensure(notification_manifest())
+    activate_mini_app_actor!("https://alerts.example")
 
     assert {:ok, consent} =
              NotificationConsents.decide(alice.id, "https://alerts.example", :granted)

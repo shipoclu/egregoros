@@ -43,6 +43,9 @@ defmodule EgregorosWeb.MiniAppNotificationPermissionController do
 
       {:error, :notifications_not_declared} ->
         error(conn, 403, "notifications_not_declared")
+
+      {:error, :actor_not_activated} ->
+        error(conn, 403, "actor_not_activated")
     end
   end
 

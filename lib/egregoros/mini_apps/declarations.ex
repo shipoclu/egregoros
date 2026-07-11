@@ -7,12 +7,17 @@ defmodule Egregoros.MiniApps.Declarations do
   alias Egregoros.MiniApps.Declaration
   alias Egregoros.MiniApps.Manifest
   alias Egregoros.Repo
+  alias Egregoros.Workers.ActivateMiniAppActor
 
   def ensure(%Manifest{} = manifest) do
     with :ok <- require_origin_allowed(manifest.origin) do
       case Repo.transaction(fn -> ensure_locked(manifest) end) do
-        {:ok, {%Declaration{} = declaration, status}} -> {:ok, declaration, status}
-        {:error, reason} -> {:error, reason}
+        {:ok, {%Declaration{} = declaration, status}} ->
+          _ = ActivateMiniAppActor.maybe_enqueue(declaration)
+          {:ok, declaration, status}
+
+        {:error, reason} ->
+          {:error, reason}
       end
     end
   end
@@ -38,12 +43,21 @@ defmodule Egregoros.MiniApps.Declarations do
     case get_by_origin(origin) do
       %Declaration{
         activity_pub_actor_url: actor_url,
-        activity_pub_transactional_mentions: true
+        activity_pub_transactional_mentions: true,
+        activity_pub_actor_fingerprint: fingerprint,
+        activity_pub_actor_activated_at: %DateTime{}
       }
-      when is_binary(actor_url) ->
+      when is_binary(actor_url) and is_binary(fingerprint) ->
         if origin_allowed?(origin),
           do: {:ok, actor_url},
           else: {:error, :notifications_not_declared}
+
+      %Declaration{
+        activity_pub_actor_url: actor_url,
+        activity_pub_transactional_mentions: true
+      }
+      when is_binary(actor_url) ->
+        {:error, :actor_not_activated}
 
       _ ->
         {:error, :notifications_not_declared}
@@ -63,11 +77,21 @@ defmodule Egregoros.MiniApps.Declarations do
       |> Repo.all()
 
     case declarations do
-      [%Declaration{app_origin: origin}] ->
+      [
+        %Declaration{
+          app_origin: origin,
+          activity_pub_actor_fingerprint: fingerprint,
+          activity_pub_actor_activated_at: %DateTime{}
+        }
+      ]
+      when is_binary(fingerprint) ->
         if origin_allowed?(origin), do: {:ok, origin}, else: {:error, :domain_denied}
 
       [] ->
         :not_declared
+
+      [%Declaration{}] ->
+        {:error, :actor_not_activated}
 
       _ ->
         {:error, :ambiguous_actor}

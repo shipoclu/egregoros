@@ -15,6 +15,11 @@ defmodule Egregoros.MiniApps.Fetcher.Req do
   ]
 
   @resource_config %{
+    actor: %{
+      accept: "application/activity+json,application/ld+json,application/json",
+      content_types: ["application/activity+json", "application/ld+json", "application/json"],
+      max_bytes: 65_536
+    },
     manifest: %{
       accept: "application/json",
       content_types: ["application/json"],

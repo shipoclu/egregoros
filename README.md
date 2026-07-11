@@ -70,7 +70,9 @@ consent-gated transactional mentions, see
 manifest declaration, consent data model, and typed SDK/broker transport are
 implemented together with host-owned consent and revocation UI; the backend
 permission endpoint and inbound transactional enforcement are also
-implemented. Actor-document activation remains future work.
+implemented. Declared ActivityPub actors remain disabled until a bounded,
+SSRF-safe background fetch validates and pins their identity, endpoints, and
+signing key.
 
 ## Architecture (quick tour)
 

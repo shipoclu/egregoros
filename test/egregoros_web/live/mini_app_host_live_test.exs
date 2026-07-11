@@ -368,6 +368,7 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
     resolved = resolved_card(oauth?: true, notifications?: true)
     assert {:ok, registration} = OAuthRegistrations.register(resolved.manifest)
     assert {:ok, _card} = Cards.put(note, resolved)
+    activate_mini_app_actor!("https://app.example")
 
     application =
       Egregoros.Repo.get!(Egregoros.OAuth.Application, registration.oauth_application_id)

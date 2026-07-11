@@ -10,6 +10,7 @@ defmodule Egregoros.MiniApps.NotificationConsentsTest do
   setup do
     enable_mini_apps()
     {:ok, _declaration, :created} = Declarations.ensure(manifest_fixture())
+    activate_mini_app_actor!("https://app.example")
     {:ok, user} = Users.create_local_user("mini-app-notification-consent-user")
     %{user: user}
   end

@@ -47,6 +47,23 @@ defmodule Egregoros.MiniApps.Fetcher.ReqTest do
              Fetcher.Req.get("https://app.example/page", :page)
   end
 
+  test "fetches bounded ActivityStreams actor documents without redirects" do
+    Req.Test.stub(Fetcher.Req, fn conn ->
+      assert get_req_header(conn, "accept") == [
+               "application/activity+json,application/ld+json,application/json"
+             ]
+
+      conn
+      |> put_resp_content_type("application/activity+json")
+      |> send_resp(200, ~s|{"id":"https://app.example/ap/actor"}|)
+    end)
+
+    assert {:ok, %{body: body}} =
+             Fetcher.Req.get("https://app.example/ap/actor", :actor)
+
+    assert byte_size(body) < 65_536
+  end
+
   test "fetches only bounded raster image assets" do
     png = <<137, 80, 78, 71, 13, 10, 26, 10>>
 

@@ -21,6 +21,7 @@ defmodule Egregoros.MiniApps.TransactionalMessagesTest do
     enable_mini_apps()
     {:ok, user} = Users.create_local_user("mini-app-transactional-recipient")
     {:ok, registration} = OAuthRegistrations.register(manifest_fixture())
+    activate_mini_app_actor!(@origin)
     application = Repo.get!(OAuthApplication, registration.oauth_application_id)
     authorize!(application, user)
     %{user: user}

@@ -28,6 +28,8 @@ defmodule Egregoros.MiniApps.DeclarationsTest do
     assert first.activity_pub_transactional_mentions
     assert Declarations.get_by_origin("https://wallet.example").id == first.id
 
+    activate_mini_app_actor!("https://wallet.example")
+
     assert Declarations.notification_actor("https://wallet.example") ==
              {:ok, "https://wallet.example/ap/actor"}
   end

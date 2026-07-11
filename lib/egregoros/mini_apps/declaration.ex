@@ -16,6 +16,8 @@ defmodule Egregoros.MiniApps.Declaration do
     field :activity_pub_actor_url, :string
     field :activity_pub_public_notes, :boolean, default: false
     field :activity_pub_transactional_mentions, :boolean, default: false
+    field :activity_pub_actor_fingerprint, :binary
+    field :activity_pub_actor_activated_at, :utc_datetime_usec
     field :manifest_fingerprint, :binary
     field :declared_at, :utc_datetime_usec
 
@@ -35,6 +37,8 @@ defmodule Egregoros.MiniApps.Declaration do
       :activity_pub_actor_url,
       :activity_pub_public_notes,
       :activity_pub_transactional_mentions,
+      :activity_pub_actor_fingerprint,
+      :activity_pub_actor_activated_at,
       :manifest_fingerprint,
       :declared_at
     ])
