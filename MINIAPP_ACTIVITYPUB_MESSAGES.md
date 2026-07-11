@@ -125,6 +125,10 @@ The v1 manifest accepts one immutable declaration:
 }
 ```
 
+This is the currently implemented draft shape. The provenance/purpose revision
+below replaces `transactionalMentions` with immutable `mentionPurposes`; the
+legacy Boolean maps only to the transactional purpose.
+
 `actorUrl` must be an HTTPS URL on the manifest's exact origin. Egregoros must
 fetch it through the same SSRF-safe fetch boundary used for other mini-app
 resources and verify that:
@@ -149,6 +153,205 @@ fingerprint of those security fields is then pinned; later declaration checks
 do not silently refetch or repin it. Transactional permission and inbound
 delivery remain disabled until activation succeeds.
 
+### 3.1 Mini-app provenance and message purpose wire profile
+
+> Design status: normative proposal for the next protocol revision; the current
+> parser, manifest schema, SDK, permission storage, and endpoint do not
+> implement this revision yet. The final namespace IRI must be assigned before
+> release. Examples use the reserved `fediverse.example` domain as a
+> placeholder.
+
+An ActivityStreams object produced by a mini app carries an explicit mini-app
+provenance marker. The marker is independent of whether the object is a direct
+notification:
+
+```json
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    {
+      "fma": "https://fediverse.example/ns/miniapps#"
+    }
+  ],
+  "fma:miniApp": {
+    "id": "https://weather.example/.well-known/fediverse-miniapp.json"
+  }
+}
+```
+
+`fma:miniApp` identifies the app by its canonical well-known manifest URL, not
+by display name, `homeUrl`, launch URL, or an arbitrary publisher URL. The
+inline `fma` mapping is self-contained; it is not a remote context URL and
+receivers must not fetch the namespace IRI while processing an activity.
+The wire profile requires this exact prefix mapping. A conflicting `fma`
+mapping, a remote context substituted for it, or a merely JSON-LD-equivalent
+alternate spelling is invalid; this keeps validation deterministic for
+ActivityPub implementations that process ordinary JSON.
+
+The marker is a claim, not proof. Egregoros treats an object as app-produced
+only when all of these independently agree:
+
+- `fma:miniApp.id` is the exact canonical manifest URL for a persisted
+  declaration;
+- the activity and object actor are the exact actor declared by that manifest;
+- the HTTP signature matches the declaration's activated key ID and key
+  fingerprint;
+- the manifest origin and actor remain permitted by current instance policy;
+  and
+- the `Create` and embedded object contain identical markers.
+
+A third-party actor cannot become a mini app merely by copying the context or
+marker. Missing, malformed, conflicting, array-valued, redirected, or
+non-canonical markers fail closed for features that require mini-app
+provenance.
+
+For v1, Egregoros recognizes the marker on app-authored `Note` objects and
+their enclosing `Create` activities. The vocabulary may later apply to other
+ActivityStreams objects, but that does not automatically authorize new object
+types or side effects. When a `Note` is dereferenced independently, its
+standalone representation includes the same ActivityStreams and inline `fma`
+context.
+
+#### Optional notification purpose
+
+An app-produced object may additionally carry exactly one purpose label:
+
+```json
+"fma:notificationPurpose": "transactional"
+```
+
+or:
+
+```json
+"fma:notificationPurpose": "promotional"
+```
+
+The field is a scalar closed enum. It cannot contain an array, both values, a
+custom value, or a default inferred from content. `Create` and embedded `Note`
+must either both omit it or contain the same value.
+
+The classifications are:
+
+- `transactional`: caused by a user action, configured subscription, requested
+  job, or necessary account/service event;
+- `promotional`: intended to advertise, recommend, announce, re-engage, or
+  drive a new action; and
+- absent: app-produced content that is not a direct mini-app notification.
+
+Content combining operational and promotional material must be labeled
+`promotional`. Egregoros does not attempt to infer or verify this semantic
+classification from prose. The label selects a permission and supplies
+moderation evidence; user reports and instance policy determine whether a
+sender is abusing it.
+
+Purpose and addressing rules are strict:
+
+- a public app-authored note with no individual recipient or `Mention` has the
+  provenance marker and omits `fma:notificationPurpose`;
+- a note with either purpose is non-public, has exactly one recipient and one
+  matching `Mention`, and is delivered to that actor's personal inbox;
+- a direct mini-app mention without a recognized purpose is suppressed;
+- a public mini-app note containing an individual `Mention` is suppressed;
+- transactional permission never implies promotional permission, and
+  promotional permission never implies transactional permission; and
+- following the app actor grants neither direct-message permission.
+
+Complete public example:
+
+```json
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    {
+      "fma": "https://fediverse.example/ns/miniapps#"
+    }
+  ],
+  "id": "https://weather.example/ap/activities/01JPUBLIC",
+  "type": "Create",
+  "actor": "https://weather.example/ap/actor",
+  "to": ["https://www.w3.org/ns/activitystreams#Public"],
+  "cc": ["https://weather.example/ap/followers"],
+  "fma:miniApp": {
+    "id": "https://weather.example/.well-known/fediverse-miniapp.json"
+  },
+  "object": {
+    "id": "https://weather.example/ap/notes/01JPUBLIC",
+    "type": "Note",
+    "attributedTo": "https://weather.example/ap/actor",
+    "to": ["https://www.w3.org/ns/activitystreams#Public"],
+    "cc": ["https://weather.example/ap/followers"],
+    "fma:miniApp": {
+      "id": "https://weather.example/.well-known/fediverse-miniapp.json"
+    },
+    "content": "<p>Heavy rain is expected across the region.</p>"
+  }
+}
+```
+
+Complete direct example:
+
+```json
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    {
+      "fma": "https://fediverse.example/ns/miniapps#"
+    }
+  ],
+  "id": "https://weather.example/ap/activities/01JTXN",
+  "type": "Create",
+  "actor": "https://weather.example/ap/actor",
+  "to": ["https://social.example/users/alice"],
+  "fma:miniApp": {
+    "id": "https://weather.example/.well-known/fediverse-miniapp.json"
+  },
+  "fma:notificationPurpose": "transactional",
+  "object": {
+    "id": "https://weather.example/ap/notes/01JTXN",
+    "type": "Note",
+    "attributedTo": "https://weather.example/ap/actor",
+    "to": ["https://social.example/users/alice"],
+    "fma:miniApp": {
+      "id": "https://weather.example/.well-known/fediverse-miniapp.json"
+    },
+    "fma:notificationPurpose": "transactional",
+    "content": "<p>Heavy rain is expected near you in 30 minutes.</p>",
+    "tag": [{
+      "type": "Mention",
+      "href": "https://social.example/users/alice",
+      "name": "@alice@social.example"
+    }]
+  }
+}
+```
+
+The same shape with `promotional` requires the separate promotional grant.
+
+#### Manifest declaration and permissions
+
+The purpose split replaces the single-purpose Boolean in the next manifest
+revision:
+
+```json
+"activityPub": {
+  "actorUrl": "https://weather.example/ap/actor",
+  "publicNotes": true,
+  "mentionPurposes": ["transactional", "promotional"]
+}
+```
+
+`mentionPurposes` is a de-duplicated immutable subset of the two known values.
+An app cannot request or send a purpose it did not declare. Each declared
+purpose has an independent SDK permission, backend permission check, stored
+user decision, revocation control, operator override, and audit value. Delivery
+audits record both the sender-declared purpose and the effective purpose after
+any administrator override.
+
+The permission API always takes an explicit purpose. Missing or unknown
+purposes fail closed and never fall back to `transactional`. Existing draft
+`transactionalMentions: true` data is equivalent only to
+`mentionPurposes: ["transactional"]`; it never grants promotional permission.
+
 ## 4. Consent is a separate capability
 
 Notification consent must not be inserted into `getContext()`. Launch context
@@ -160,14 +363,21 @@ The proposed SDK instead exposes a separate surface:
 
 ```ts
 type NotificationPermissionState = "prompt" | "granted" | "denied"
+type NotificationPurpose = "transactional" | "promotional"
 
-sdk.notifications.getPermission(): Promise<{
+sdk.notifications.getPermission({
+  purpose: "transactional"
+}): Promise<{
   state: NotificationPermissionState
+  purpose: NotificationPurpose
   actorUrl: string
 }>
 
-sdk.notifications.requestPermission(): Promise<{
+sdk.notifications.requestPermission({
+  purpose: "transactional"
+}): Promise<{
   state: "granted" | "denied"
+  purpose: NotificationPurpose
   actorUrl: string
 }>
 ```
@@ -181,17 +391,18 @@ authentication-required error rather than revealing permission state.
 `requestPermission()` requires all of the following:
 
 - a currently authenticated mini-app OAuth grant;
-- the manifest's immutable `transactionalMentions` declaration;
+- the requested purpose in the manifest's immutable `mentionPurposes`
+  declaration;
 - a current iframe user gesture;
 - an active exact-origin broker channel; and
 - a host-owned confirmation that names both the app domain and ActivityPub
   actor.
 
-The grant is stored by Egregoros against the local user, exact app origin, and
-exact declared actor URL. It is independent of launch-context, OAuth, compose,
-and wallet consent and has its own revoke control. OAuth revocation, app-domain
-denial, actor-declaration invalidation, or account deletion also disables it.
-
+Each grant is stored by Egregoros against the local user, exact app origin,
+exact declared actor URL, and exact purpose. Transactional and promotional
+decisions are independent of each other and of launch-context, OAuth, compose,
+and wallet consent. OAuth revocation, app-domain denial, actor-declaration
+invalidation, or account deletion also disables both message permissions.
 The SDK response intentionally contains no user actor URL, inbox URL, bearer
 token, signing secret, or reusable proof. It is suitable for rendering iframe
 UI, not for authorizing backend delivery.
@@ -203,7 +414,7 @@ After the host-owned SDK confirmation, it calls the Egregoros endpoint
 with that user's bearer token:
 
 ```http
-GET /api/v1/mini-apps/notification-permission
+GET /api/v1/mini-apps/notification-permission?purpose=transactional
 Authorization: Bearer ACCESS_TOKEN
 ```
 
@@ -212,39 +423,55 @@ An authorized response is deliberately small:
 ```json
 {
   "state": "granted",
+  "purpose": "transactional",
   "recipientActor": "https://social.example/users/alice",
   "appActor": "https://weather.example/ap/actor"
 }
 ```
 
 The endpoint derives the app identity from the OAuth client registration; the
-caller cannot select another mini-app origin or actor. It returns
-`state: "denied"` without a recipient actor when no current grant exists.
+caller cannot select another mini-app origin or actor. It returns the requested
+purpose and `state: "denied"` without a recipient actor when no current grant
+exists. Missing or unknown purposes are invalid requests.
 
-Before enqueueing a transactional message, the backend must have observed a
-current `granted` result for that recipient. A short cache may reduce requests,
-but it creates a revocation window; the receiving Egregoros instance therefore
-enforces the grant again at inbox processing time. No webhook or push token is
-required for the minimum design.
+Before enqueueing a purpose-labeled message, the backend must have observed a
+current `granted` result for that recipient and exact purpose. A short cache may
+reduce requests, but it creates a revocation window; the receiving Egregoros
+instance therefore enforces the grant again at inbox processing time. No
+webhook or push token is required for the minimum design.
 
-## 6. Transactional messages
+## 6. Purpose-labeled direct messages
 
-A transactional message is a non-public `Create(Note)` addressed to exactly
-one consenting actor. It includes exactly one matching `Mention` tag:
+A transactional or promotional message is a non-public `Create(Note)`
+addressed to exactly one actor who granted that purpose. It includes exactly
+one matching `Mention` tag. This example is transactional:
 
 ```json
 {
-  "@context": "https://www.w3.org/ns/activitystreams",
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    {
+      "fma": "https://fediverse.example/ns/miniapps#"
+    }
+  ],
   "id": "https://weather.example/ap/activities/01JTXN",
   "type": "Create",
   "actor": "https://weather.example/ap/actor",
   "to": ["https://social.example/users/alice"],
+  "fma:miniApp": {
+    "id": "https://weather.example/.well-known/fediverse-miniapp.json"
+  },
+  "fma:notificationPurpose": "transactional",
   "published": "2026-07-11T12:30:00Z",
   "object": {
     "id": "https://weather.example/ap/notes/01JTXN",
     "type": "Note",
     "attributedTo": "https://weather.example/ap/actor",
     "to": ["https://social.example/users/alice"],
+    "fma:miniApp": {
+      "id": "https://weather.example/.well-known/fediverse-miniapp.json"
+    },
+    "fma:notificationPurpose": "transactional",
     "published": "2026-07-11T12:30:00Z",
     "content": "<p><a href=\"https://social.example/@alice\">@alice</a> Heavy rain is expected near you in 30 minutes.</p>",
     "tag": [{
@@ -256,10 +483,12 @@ one consenting actor. It includes exactly one matching `Mention` tag:
 }
 ```
 
-Transactional constraints are strict:
+Direct-message constraints are strict:
 
 - no ActivityStreams Public audience in `to`, `cc`, `bto`, or `bcc`;
 - exactly one recipient and one matching mention;
+- identical canonical mini-app marker and recognized purpose on `Create` and
+  `Note`;
 - the sender is the exact actor declared by the mini app;
 - content and link targets are bounded and human-readable;
 - the destination is the recipient's personal inbox, not a shared inbox;
@@ -302,6 +531,25 @@ The receiving host must apply normal federation signature, actor, content,
 size, rate, block, and domain-policy checks before its consent check. Consent is
 necessary but never sufficient to bypass moderation or abuse controls.
 
+### Reporting mislabeled messages
+
+Purpose is sender-declared and cannot be proven from message content. Every
+accepted purpose-labeled message therefore exposes a **Report mini-app
+message** action. A report contains the exact app origin, manifest URL, actor,
+declared purpose, local object reference, user-selected reason, and optional
+comment. Message content is shared with the local administrator only because
+the user explicitly submits that report; it is never copied into automatic
+notification audits.
+
+Instances define their own classification and abuse rules. An administrator
+may dismiss or record the report, disable one purpose, disable all direct
+mentions, block the actor or app domain, or apply an origin-level override that
+treats messages labeled `transactional` as `promotional`. That override is
+monotonic: it may require the stronger/different promotional grant, but it must
+never let a promotional message use transactional consent. Reports do not
+automatically punish an app, and users may independently revoke either purpose
+at any time.
+
 ## 8. Minimal implementation checklist
 
 ### Public-only producer
@@ -314,13 +562,16 @@ necessary but never sufficient to bypass moderation or abuse controls.
 - [ ] Public activity and note dereferencing.
 - [ ] Mute/block compatibility and operator contact information.
 
-### Transactional mentions
+### Purpose-labeled mentions
 
 - [ ] Everything required for the actor and signed delivery boundary above.
 - [x] Immutable mini-app actor declaration and host-side actor activation.
 - [ ] OAuth `read` grant used server-side to identify the recipient.
 - [ ] Separate host-owned notification confirmation completed from a gesture.
 - [ ] Authoritative backend permission check returns `granted` before enqueue.
+- [ ] Independent transactional and promotional decisions and revocation.
+- [ ] Exact mini-app provenance marker on `Create` and `Note`.
+- [ ] Exact matching purpose on `Create` and `Note`.
 - [ ] Exactly one non-public recipient and matching `Mention` tag.
 - [ ] Delivery to the personal inbox only.
 - [ ] Private activity/note IDs do not disclose content publicly.
@@ -334,9 +585,10 @@ necessary but never sufficient to bypass moderation or abuse controls.
 
 The manifest declaration, actor activation and key pin, consent model, backend
 permission check, receiver-side suppression, and notification-specific audit
-events are implemented. Audits contain only user ID, app origin, app actor,
-event, bounded reason code, and time—never note content, activity/note IDs,
-recipient actor URLs, OAuth data, or signing material.
+events are implemented. The purpose revision extends audits with declared and
+effective purpose. Audits otherwise contain only user ID, app origin, app
+actor, event, bounded reason code, and time—never note content, activity/note
+IDs, recipient actor URLs, OAuth data, or signing material.
 
 Automated coverage exercises the complete signed personal-inbox path through
 OAuth, consent, persistence, revocation, silent suppression, and audit output,

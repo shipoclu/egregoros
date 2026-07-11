@@ -372,6 +372,26 @@ actor identity, same-origin endpoints, key ownership, and RSA key fingerprint
 are validated and pinned. Public ActivityPub publishing requires no mini-app
 host extension and can be implemented independently.
 
+The next protocol revision adds a self-contained inline `fma` namespace and
+two independent properties on app-authored `Create(Note)` payloads:
+
+- `fma:miniApp` links both the activity and object to the exact canonical
+  well-known manifest URL; and
+- optional `fma:notificationPurpose` is the closed scalar enum
+  `transactional` or `promotional`.
+
+The provenance marker is required for an object to claim mini-app production,
+but is trusted only when its manifest, declared actor, activated signing-key
+pin, and current domain policy all agree. Public app notes with no individual
+recipient or mention carry the marker and omit purpose. Direct mentions must be
+non-public, carry one purpose on both activity and object, and have an
+independent user grant for that exact purpose. Missing, unknown, conflicting,
+or array-valued purposes are suppressed; mixed operational and promotional
+content is labeled promotional. Classification is sender-declared moderation
+evidence rather than something Egregoros infers from prose. The complete wire
+profile is normative in
+[`MINIAPP_ACTIVITYPUB_MESSAGES.md`](MINIAPP_ACTIVITYPUB_MESSAGES.md#31-mini-app-provenance-and-message-purpose-wire-profile).
+
 #### Dynamic registration
 
 Any OAuth-enabled developer may anonymously register their app with a calling
@@ -855,6 +875,9 @@ URLs, OAuth credentials, or key material. Signed inbox requests from a declared
 actor additionally must match the activated key ID and RSA-key fingerprint
 before ordinary signature verification can authorize delivery.
 
+The purpose-label revision adds declared and effective purpose to that audit;
+it does not add message content or identifiers.
+
 ### Required adversarial tests
 
 Before release, automated tests MUST cover at least:
@@ -1099,6 +1122,11 @@ Published as `https://{app-origin}/.well-known/fediverse-miniapp.json`:
   "cacheTtlSeconds": 3600
 }
 ```
+
+This example is the currently implemented manifest shape. The next
+provenance/purpose revision replaces `transactionalMentions` with immutable
+`mentionPurposes`; `transactionalMentions: true` maps only to
+`["transactional"]` and never grants promotional messaging.
 
 Required fields are `version`, `name`, `homeUrl`, and `capabilities`. The
 `oauth` object is optional; when present, `oauth.redirectUris` and
