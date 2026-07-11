@@ -74,6 +74,12 @@ config :esbuild,
       ~w(js/app.js --bundle --target=es2022 --outdir=../priv/static/assets/js --external:/fonts/* --external:/images/* --alias:@=.),
     cd: Path.expand("../assets", __DIR__),
     env: %{"NODE_PATH" => [Path.expand("../deps", __DIR__), Mix.Project.build_path()]}
+  ],
+  mini_app_sdk: [
+    args:
+      ~w(js/lib/fediverse_miniapp_sdk.mjs --bundle --format=esm --target=es2022 --outfile=../priv/static/assets/js/fediverse-miniapp-sdk-v1.js),
+    cd: Path.expand("../assets", __DIR__),
+    env: %{"NODE_PATH" => [Path.expand("../deps", __DIR__), Mix.Project.build_path()]}
   ]
 
 # Configure tailwind (the version is required)

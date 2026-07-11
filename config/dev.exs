@@ -26,6 +26,7 @@ config :egregoros, EgregorosWeb.Endpoint,
   secret_key_base: "RFrrbzD+3YXGdoOfCLlOGUA78V2NSQMEbnt55tOwAkxHFX/VmxeFjDEe49ujX8xW",
   watchers: [
     esbuild: {Esbuild, :install_and_run, [:egregoros, ~w(--sourcemap=inline --watch)]},
+    mini_app_sdk: {Esbuild, :install_and_run, [:mini_app_sdk, ~w(--sourcemap=inline --watch)]},
     tailwind: {Tailwind, :install_and_run, [:egregoros, ~w(--watch)]}
   ]
 

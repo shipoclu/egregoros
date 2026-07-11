@@ -5,8 +5,22 @@ const protocolVersion = "1"
 const validReadyMessage = (message, launchId) =>
   !!message &&
   typeof message === "object" &&
+  !Array.isArray(message) &&
+  Object.keys(message).length === 3 &&
   message.type === "ready" &&
+  message.version === protocolVersion &&
   message.launchId === launchId
+
+const validContextRequest = (message, launchId) =>
+  !!message &&
+  typeof message === "object" &&
+  !Array.isArray(message) &&
+  Object.keys(message).length === 4 &&
+  Object.keys(message).every(key => ["type", "version", "launchId", "requestId"].includes(key)) &&
+  message.type === "getContext" &&
+  message.version === protocolVersion &&
+  message.launchId === launchId &&
+  validRequestId(message.requestId)
 
 const validRequestId = requestId =>
   typeof requestId === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(requestId)
@@ -157,6 +171,7 @@ const validWalletRequest = (message, launchId) =>
 export const createMiniAppBroker = ({
   iframe,
   appOrigin,
+  hostOrigin,
   launchId,
   capabilities = [],
   onLoading,
@@ -207,9 +222,7 @@ export const createMiniAppBroker = ({
       }
 
       if (
-        message?.type === "getContext" &&
-        message?.launchId === launchId &&
-        validRequestId(message?.requestId) &&
+        validContextRequest(message, launchId) &&
         acceptOnce(`context:${message.requestId}`)
       ) {
         onContextRequest?.(message.requestId)
@@ -265,6 +278,9 @@ export const createMiniAppBroker = ({
         type: "fediverse-miniapp:bootstrap",
         version: protocolVersion,
         launchId,
+        hostOrigin,
+        issuer: hostOrigin,
+        authorizationServerMetadata: `${hostOrigin}/.well-known/oauth-authorization-server`,
         capabilities: [...capabilities],
       },
       appOrigin,

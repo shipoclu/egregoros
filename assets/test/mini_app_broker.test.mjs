@@ -32,6 +32,7 @@ test("broker transfers one capability port to the exact app origin", () => {
   const broker = createMiniAppBroker({
     iframe: fixture.iframe,
     appOrigin: "https://app.example",
+    hostOrigin: "https://social.example",
     launchId: "launch-1",
     onReady: () => {},
   })
@@ -45,6 +46,10 @@ test("broker transfers one capability port to the exact app origin", () => {
     type: "fediverse-miniapp:bootstrap",
     version: "1",
     launchId: "launch-1",
+    hostOrigin: "https://social.example",
+    issuer: "https://social.example",
+    authorizationServerMetadata:
+      "https://social.example/.well-known/oauth-authorization-server",
     capabilities: [],
   })
   assert.equal("context" in fixture.posts[0].message, false)
@@ -68,13 +73,14 @@ test("ready is accepted only through the transferred port for the active launch"
   fixture.load()
   const appPort = fixture.posts[0].transfer[0]
 
-  appPort.postMessage({type: "ready", launchId: "wrong"})
+  appPort.postMessage({type: "ready", version: "1", launchId: "wrong"})
   appPort.postMessage({type: "unknown", launchId: "launch-2"})
+  appPort.postMessage({type: "ready", launchId: "launch-2"})
   await tick()
   assert.equal(readyCount, 0)
 
-  appPort.postMessage({type: "ready", launchId: "launch-2"})
-  appPort.postMessage({type: "ready", launchId: "launch-2"})
+  appPort.postMessage({type: "ready", version: "1", launchId: "launch-2"})
+  appPort.postMessage({type: "ready", version: "1", launchId: "launch-2"})
   await tick()
   assert.equal(readyCount, 1)
 
@@ -99,9 +105,10 @@ test("context requests are correlated and host responses return through the priv
   appPort.onmessage = event => responses.push(event.data)
   appPort.start?.()
 
-  appPort.postMessage({type: "getContext", launchId: "wrong", requestId: "ctx-1"})
-  appPort.postMessage({type: "getContext", launchId: "launch-3", requestId: "bad request"})
-  appPort.postMessage({type: "getContext", launchId: "launch-3", requestId: "ctx-1"})
+  appPort.postMessage({type: "getContext", version: "1", launchId: "wrong", requestId: "ctx-1"})
+  appPort.postMessage({type: "getContext", version: "1", launchId: "launch-3", requestId: "bad request"})
+  appPort.postMessage({type: "getContext", version: "1", launchId: "launch-3", requestId: "ctx-extra", extra: true})
+  appPort.postMessage({type: "getContext", version: "1", launchId: "launch-3", requestId: "ctx-1"})
   await tick()
   assert.deepEqual(requests, ["ctx-1"])
 

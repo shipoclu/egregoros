@@ -86,6 +86,7 @@ const MiniAppHost = {
 
       this.broker?.send({
         type: "contextResult",
+        version: "1",
         launchId: payload.launch_id,
         requestId: payload.request_id,
         status: payload.status,
@@ -299,6 +300,7 @@ const MiniAppHost = {
     this.broker = createMiniAppBroker({
       iframe: frame,
       appOrigin,
+      hostOrigin: window.location.origin,
       launchId,
       capabilities,
       onLoading: () => {

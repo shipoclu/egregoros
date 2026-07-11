@@ -391,8 +391,49 @@ origin-checked `postMessage` handshake. Initial candidate methods:
 - `getContext()` — non-authoritative launch context, app/client protocol
   versions, locale/theme, the exact launch URL, and (when launched from a
   note) the author, note identifier, content, mentions, and link URL; and
-- `requestAuth({scopes})`, `close()`, and `openExternal(url)` —
-  host-mediated actions.
+- `requestAuth(backendPreparedAuthorization)`, `close()`, and
+  `openExternal(url)` — host-mediated actions.
+
+The v1 reference module is built as
+`/assets/js/fediverse-miniapp-sdk-v1.js`. A mini app should vendor and serve a
+pinned copy from its own origin rather than hot-linking an arbitrary user's
+instance. Construction requires an `allowedHostOrigin(origin)` callback; there
+is deliberately no accept-any-host default. The app can allow a known instance
+exactly or validate an instance through its own discovery/trust policy before
+returning `true`. The connected SDK exposes a frozen `bootstrap` containing
+`hostOrigin`, OAuth `issuer`, `authorizationServerMetadata`, protocol version,
+launch ID, and the currently available capability names.
+
+The reference API is promise-based:
+
+```js
+import {createFediverseMiniAppSDK} from "./fediverse-miniapp-sdk-v1.js"
+
+const sdk = createFediverseMiniAppSDK({
+  allowedHostOrigin: origin => trustedInstances.has(origin),
+})
+
+const bootstrap = await sdk.connect()
+await sdk.ready()
+const context = await sdk.getContext()
+
+button.addEventListener("click", async () => {
+  await sdk.openExternal("https://docs.example/chapter/1")
+})
+
+const ethereum = sdk.wallet.getProvider()
+const accounts = await ethereum.request({method: "eth_requestAccounts", params: []})
+```
+
+`requestAuth` accepts the backend-prepared dynamic client ID, exact redirect
+URI, fixed scope list, PKCE state/challenge, and one-time handoff challenge;
+the SDK fixes the method to `S256`. `composeNote(draft)` resolves when the host
+accepts or rejects the draft and `on("composeNotePublished", callback)` emits
+the later publication receipt. `wallet.getProvider()` returns a narrow
+EIP-1193-compatible provider only when `wallet.evm` appears in bootstrap
+capabilities. Calls time out, are correlated by random IDs, and reject with a
+stable `error.code`. Destroying the SDK closes the private port and rejects all
+pending calls.
 
 | Access class | V1 methods | Prerequisite |
 | --- | --- | --- |
@@ -450,9 +491,9 @@ available without OAuth after the separately consented launch-context
 permission; note data is not implied by an OAuth API scope.
 
 The handshake always exposes a `bootstrap` object with the exact Egregoros host
-origin and SDK protocol version. For OAuth-enabled apps it also includes the
-authorization-server issuer/metadata URL, letting the app backend reuse or
-create its dynamic registration and form a PKCE request. Bootstrap contains no
+origin, SDK protocol version, and authorization-server issuer/metadata URL,
+letting an OAuth-enabled app backend reuse or create its dynamic registration
+and form a PKCE request. Bootstrap contains no
 current-user identity. Apps may obtain locale/theme and public launch context
 through `getContext()` after the separate context disclosure, whether or not
 they authenticate with OAuth.

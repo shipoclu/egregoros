@@ -114,10 +114,16 @@ defmodule Egregoros.MixProject do
       test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
       "assets.test": ["cmd --cd assets node --test"],
-      "assets.build": ["compile", "tailwind egregoros", "esbuild egregoros"],
+      "assets.build": [
+        "compile",
+        "tailwind egregoros",
+        "esbuild egregoros",
+        "esbuild mini_app_sdk"
+      ],
       "assets.deploy": [
         "tailwind egregoros --minify",
         "esbuild egregoros --minify",
+        "esbuild mini_app_sdk --minify",
         "phx.digest"
       ],
       precommit: [

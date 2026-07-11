@@ -1,0 +1,259 @@
+import assert from "node:assert/strict"
+import test from "node:test"
+
+import {createFediverseMiniAppSDK} from "../js/lib/fediverse_miniapp_sdk.mjs"
+
+const launchId = "abcdefghijklmnopqrstuvwxyzABCDEFGH123456789"
+
+const fixture = () => {
+  const listeners = new Map()
+  const parentWindow = {}
+  let random = 0
+  const windowObject = {
+    parent: parentWindow,
+    addEventListener: (name, callback) => listeners.set(name, callback),
+    removeEventListener: (name, callback) => {
+      if (listeners.get(name) === callback) listeners.delete(name)
+    },
+  }
+  const cryptoObject = {
+    getRandomValues: bytes => {
+      bytes.fill(++random)
+      return bytes
+    },
+  }
+
+  return {
+    parentWindow,
+    windowObject,
+    cryptoObject,
+    bootstrap: ({origin = "https://social.example", source = parentWindow, message = {}} = {}) => {
+      const channel = new MessageChannel()
+      listeners.get("message")?.({
+        origin,
+        source,
+        ports: [channel.port2],
+        data: {
+          type: "fediverse-miniapp:bootstrap",
+          version: "1",
+          launchId,
+          hostOrigin: "https://social.example",
+          issuer: "https://social.example",
+          authorizationServerMetadata:
+            "https://social.example/.well-known/oauth-authorization-server",
+          capabilities: ["wallet.evm"],
+          ...message,
+        },
+      })
+      channel.port1.start?.()
+      return channel.port1
+    },
+  }
+}
+
+const nextMessage = port =>
+  new Promise(resolve => port.addEventListener("message", event => resolve(event.data), {once: true}))
+
+test("pins the exact bootstrap origin and exposes immutable bootstrap data", async () => {
+  const f = fixture()
+  const sdk = createFediverseMiniAppSDK({
+    windowObject: f.windowObject,
+    parentWindow: f.parentWindow,
+    cryptoObject: f.cryptoObject,
+    allowedHostOrigin: origin => origin === "https://social.example",
+  })
+
+  f.bootstrap({origin: "https://evil.example"}).close()
+  f.bootstrap({source: {}}).close()
+  const hostPort = f.bootstrap()
+
+  assert.deepEqual(await sdk.connect(), {
+    version: "1",
+    launchId,
+    hostOrigin: "https://social.example",
+    issuer: "https://social.example",
+    authorizationServerMetadata:
+      "https://social.example/.well-known/oauth-authorization-server",
+    capabilities: ["wallet.evm"],
+  })
+  assert.equal(Object.isFrozen(sdk.bootstrap), true)
+
+  const ready = nextMessage(hostPort)
+  await sdk.ready()
+  assert.deepEqual(await ready, {type: "ready", version: "1", launchId})
+  sdk.destroy()
+  hostPort.close()
+})
+
+test("correlates context and external action promises over the private port", async () => {
+  const f = fixture()
+  const sdk = createFediverseMiniAppSDK({
+    windowObject: f.windowObject,
+    parentWindow: f.parentWindow,
+    cryptoObject: f.cryptoObject,
+    navigatorObject: {userActivation: {isActive: true}},
+    allowedHostOrigin: () => true,
+  })
+  const hostPort = f.bootstrap()
+  await sdk.connect()
+
+  const contextMessage = nextMessage(hostPort)
+  const contextPromise = sdk.getContext()
+  const contextRequest = await contextMessage
+  assert.equal(contextRequest.type, "getContext")
+  assert.equal(contextRequest.version, "1")
+  hostPort.postMessage({
+    type: "contextResult",
+    version: "1",
+    launchId,
+    requestId: contextRequest.requestId,
+    status: "ok",
+    context: {launchUrl: "https://evil.example"},
+    accessToken: "must-be-rejected",
+  })
+  hostPort.postMessage({
+    type: "contextResult",
+    version: "1",
+    launchId,
+    requestId: contextRequest.requestId,
+    status: "ok",
+    context: {launchUrl: "https://app.example/page"},
+  })
+  assert.deepEqual(await contextPromise, {launchUrl: "https://app.example/page"})
+
+  const externalMessage = nextMessage(hostPort)
+  const externalPromise = sdk.openExternal("https://docs.example/page")
+  const externalRequest = await externalMessage
+  assert.equal(externalRequest.userActivation, true)
+  hostPort.postMessage({
+    type: "openExternalResult",
+    version: "1",
+    launchId,
+    requestId: externalRequest.requestId,
+    status: "approved",
+  })
+  assert.deepEqual(await externalPromise, {status: "approved"})
+  sdk.destroy()
+  hostPort.close()
+})
+
+test("provides OAuth, compose receipts, and an EIP-1193-compatible provider", async () => {
+  const f = fixture()
+  const sdk = createFediverseMiniAppSDK({
+    windowObject: f.windowObject,
+    parentWindow: f.parentWindow,
+    cryptoObject: f.cryptoObject,
+    navigatorObject: {userActivation: {isActive: true}},
+    allowedHostOrigin: () => true,
+  })
+  const hostPort = f.bootstrap()
+  await sdk.connect()
+
+  const authMessage = nextMessage(hostPort)
+  const authPromise = sdk.requestAuth({
+    clientId: "client_1234567890",
+    redirectUri: "https://app.example/oauth/callback",
+    scopes: ["read"],
+    state: "s".repeat(43),
+    codeChallenge: "c".repeat(43),
+    handoffChallenge: "h".repeat(43),
+  })
+  const authRequest = await authMessage
+  hostPort.postMessage({
+    type: "authResult",
+    version: "1",
+    launchId,
+    requestId: authRequest.requestId,
+    status: "success",
+    handoffCode: "handoff_code_1234567890",
+  })
+  assert.equal((await authPromise).handoffCode, "handoff_code_1234567890")
+
+  const published = []
+  sdk.on("composeNotePublished", receipt => published.push(receipt))
+  const composeMessage = nextMessage(hostPort)
+  const composePromise = sdk.composeNote({text: "hello", visibility: "public"})
+  const composeRequest = await composeMessage
+  hostPort.postMessage({
+    type: "composeNoteResult",
+    version: "1",
+    launchId,
+    callId: composeRequest.callId,
+    requestId: "host-compose-1",
+    status: "accepted",
+  })
+  assert.deepEqual(await composePromise, {status: "accepted", requestId: "host-compose-1"})
+  hostPort.postMessage({
+    type: "composeNotePublished",
+    version: "1",
+    launchId,
+    requestId: "host-compose-1",
+    id: "https://social.example/objects/1",
+    scope: "public",
+  })
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(published[0].id, "https://social.example/objects/1")
+
+  const walletMessage = nextMessage(hostPort)
+  const walletPromise = sdk.wallet.getProvider().request({method: "eth_chainId", params: []})
+  const walletRequest = await walletMessage
+  hostPort.postMessage({
+    type: "walletResult",
+    version: "1",
+    launchId,
+    requestId: walletRequest.requestId,
+    result: "0x2105",
+  })
+  assert.equal(await walletPromise, "0x2105")
+  sdk.destroy()
+  hostPort.close()
+})
+
+test("rejects unavailable capabilities, wallet errors, timeouts, and destroyed requests", async () => {
+  const f = fixture()
+  const sdk = createFediverseMiniAppSDK({
+    windowObject: f.windowObject,
+    parentWindow: f.parentWindow,
+    cryptoObject: f.cryptoObject,
+    navigatorObject: {userActivation: {isActive: true}},
+    allowedHostOrigin: () => true,
+    timeoutMs: 5,
+  })
+  const hostPort = f.bootstrap({message: {capabilities: []}})
+  await sdk.connect()
+
+  await assert.rejects(
+    sdk.wallet.getProvider().request({method: "eth_chainId", params: []}),
+    error => error.code === 4200
+  )
+  await assert.rejects(sdk.getContext(), error => error.code === "TIMEOUT")
+
+  const pending = sdk.openExternal("https://docs.example")
+  sdk.destroy()
+  await assert.rejects(pending, error => error.code === "DESTROYED")
+  hostPort.close()
+})
+
+test("requires a current user gesture before privileged host actions", async () => {
+  const f = fixture()
+  const sdk = createFediverseMiniAppSDK({
+    windowObject: f.windowObject,
+    parentWindow: f.parentWindow,
+    cryptoObject: f.cryptoObject,
+    navigatorObject: {userActivation: {isActive: false}},
+    allowedHostOrigin: () => true,
+  })
+  const hostPort = f.bootstrap()
+  await sdk.connect()
+
+  await assert.rejects(
+    sdk.openExternal("https://docs.example"),
+    error => error.code === "USER_ACTIVATION_REQUIRED"
+  )
+  await assert.rejects(
+    sdk.wallet.getProvider().request({method: "eth_requestAccounts", params: []}),
+    error => error.code === "USER_ACTIVATION_REQUIRED"
+  )
+  sdk.destroy()
+  hostPort.close()
+})

@@ -1062,7 +1062,7 @@ defmodule EgregorosWeb.MiniAppHost do
   defp active_card?(_card), do: false
 
   defp launch_id do
-    16
+    32
     |> :crypto.strong_rand_bytes()
     |> Base.url_encode64(padding: false)
   end
