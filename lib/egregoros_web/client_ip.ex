@@ -37,6 +37,12 @@ defmodule EgregorosWeb.ClientIP do
 
   def address(_conn), do: "unknown"
 
+  def trusted_proxy?(%Plug.Conn{remote_ip: remote_ip}) when is_tuple(remote_ip) do
+    trusted?(remote_ip, trusted_ranges())
+  end
+
+  def trusted_proxy?(_conn), do: false
+
   defp trusted_ranges do
     Config.get(:trusted_proxies, [])
     |> List.wrap()

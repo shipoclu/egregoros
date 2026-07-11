@@ -40,6 +40,7 @@ defmodule Egregoros.MiniApps.ActorActivationTest do
     assert byte_size(activated.activity_pub_actor_fingerprint) == 32
     assert activated.activity_pub_actor_key_id == @actor <> "#main-key"
     assert byte_size(activated.activity_pub_actor_key_fingerprint) == 32
+    assert activated.activity_pub_actor_public_key_pem == public_key
     assert {:ok, @actor} = Declarations.notification_actor(@origin)
 
     [entry] = :public_key.pem_decode(public_key)
@@ -47,6 +48,9 @@ defmodule Egregoros.MiniApps.ActorActivationTest do
 
     assert :ok =
              ActorActivation.authorize_signing_key(@actor, @actor <> "#main-key", key)
+
+    assert {:ok, ^key} =
+             ActorActivation.pinned_signing_key(@actor, @actor <> "#main-key")
 
     {other_public_key, _other_private_key} = Keys.generate_rsa_keypair()
     [other_entry] = :public_key.pem_decode(other_public_key)
@@ -73,6 +77,16 @@ defmodule Egregoros.MiniApps.ActorActivationTest do
     assert second.activity_pub_actor_activated_at == first.activity_pub_actor_activated_at
   end
 
+  test "a declared actor never falls back to a signature-triggered network fetch" do
+    assert {:ok, _declaration, :created} = Declarations.ensure(manifest_fixture())
+
+    assert {:error, :mini_app_actor_not_activated} =
+             ActorActivation.pinned_signing_key(@actor, @actor <> "#main-key")
+
+    assert {:error, :mini_app_actor_not_activated} =
+             ActorActivation.pinned_signing_key(@actor, @actor <> "#other-key")
+  end
+
   test "backfills a legacy activation only when the pinned actor fingerprint is unchanged", %{
     public_key: public_key
   } do
@@ -83,7 +97,8 @@ defmodule Egregoros.MiniApps.ActorActivationTest do
     activated
     |> Ecto.Changeset.change(%{
       activity_pub_actor_key_id: nil,
-      activity_pub_actor_key_fingerprint: nil
+      activity_pub_actor_key_fingerprint: nil,
+      activity_pub_actor_public_key_pem: nil
     })
     |> Repo.update!()
 
@@ -106,7 +121,9 @@ defmodule Egregoros.MiniApps.ActorActivationTest do
       :cross_origin_followers,
       :cross_origin_key,
       :unbound_key,
-      :invalid_key
+      :invalid_key,
+      :oversized_key,
+      :even_modulus_key
     ]
 
     Enum.with_index(invalid_kinds, fn invalid_kind, index ->
@@ -215,6 +232,22 @@ defmodule Egregoros.MiniApps.ActorActivationTest do
 
   defp invalidate(document, :invalid_key, _origin, _actor),
     do: put_in(document, ["publicKey", "publicKeyPem"], "not a PEM key")
+
+  defp invalidate(document, :oversized_key, _origin, _actor) do
+    modulus = :erlang.bsl(1, 9_000) + 1
+    der = :public_key.der_encode(:RSAPublicKey, {:RSAPublicKey, modulus, 65_537})
+    entry = :public_key.pem_entry_encode(:RSAPublicKey, {:RSAPublicKey, modulus, 65_537})
+    true = byte_size(der) < 16_384
+
+    put_in(document, ["publicKey", "publicKeyPem"], :public_key.pem_encode([entry]))
+  end
+
+  defp invalidate(document, :even_modulus_key, _origin, _actor) do
+    modulus = :erlang.bsl(1, 2_047) + 2
+    entry = :public_key.pem_entry_encode(:RSAPublicKey, {:RSAPublicKey, modulus, 65_537})
+
+    put_in(document, ["publicKey", "publicKeyPem"], :public_key.pem_encode([entry]))
+  end
 
   defp manifest_fixture(origin \\ @origin, actor \\ @actor) do
     attrs = %{

@@ -4,16 +4,22 @@ defmodule Egregoros.Signature.HTTP do
   alias Egregoros.Config
   alias Egregoros.HTTPDate
   alias Egregoros.MiniApps.ActorActivation
+  alias Egregoros.PublicHostPolicy
   alias Egregoros.User
   alias Egregoros.Users
+  alias EgregorosWeb.ClientIP
 
   @default_headers ["(request-target)", "host", "date", "digest", "content-length"]
+  @signature_param_names MapSet.new(["keyId", "algorithm", "headers", "signature"])
+  @max_request_headers 128
+  @max_header_value_bytes 16_384
+  @max_total_header_bytes 65_536
 
   @impl true
   def verify_request(conn) do
-    headers = normalize_headers(conn.req_headers)
-
-    with {:ok, key_id, signature, headers_param} <- parse_signature(headers),
+    with {:ok, headers} <- normalize_headers(conn.req_headers),
+         {:ok, request_host} <- verified_request_host(conn),
+         {:ok, key_id, signature, headers_param} <- parse_signature(headers),
          signer_ap_id when is_binary(signer_ap_id) <- signer_ap_id_from_key_id(key_id),
          {:ok, key} <- public_key_for_key_id(key_id),
          :ok <- ActorActivation.authorize_signing_key(signer_ap_id, key_id, key),
@@ -22,7 +28,7 @@ defmodule Egregoros.Signature.HTTP do
          :ok <- validate_required_signature_headers(headers_param, method),
          :ok <- validate_digest(headers, conn, headers_param) do
       headers_param = normalize_header_names(headers_param)
-      headers = augment_headers(headers, conn, headers_param)
+      headers = augment_headers(headers, conn, headers_param, request_host)
 
       request_targets(conn, method)
       |> Enum.any?(fn request_target ->
@@ -82,24 +88,40 @@ defmodule Egregoros.Signature.HTTP do
     end
   end
 
-  defp normalize_headers(headers) do
-    Enum.into(headers, %{}, fn {key, value} -> {String.downcase(key), value} end)
+  defp normalize_headers(headers)
+       when is_list(headers) and length(headers) <= @max_request_headers do
+    headers
+    |> Enum.reduce_while({:ok, %{}, 0}, fn
+      {key, value}, {:ok, normalized, total_bytes}
+      when is_binary(key) and is_binary(value) ->
+        key = String.downcase(key)
+        entry_bytes = byte_size(key) + byte_size(value)
+
+        if key != "" and byte_size(value) <= @max_header_value_bytes and
+             total_bytes + entry_bytes <= @max_total_header_bytes and
+             not Map.has_key?(normalized, key) do
+          {:cont, {:ok, Map.put(normalized, key, value), total_bytes + entry_bytes}}
+        else
+          {:halt, {:error, :invalid_signature}}
+        end
+
+      _header, _acc ->
+        {:halt, {:error, :invalid_signature}}
+    end)
+    |> case do
+      {:ok, normalized, _total_bytes} -> {:ok, normalized}
+      {:error, _reason} = error -> error
+    end
   end
 
+  defp normalize_headers(_headers), do: {:error, :invalid_signature}
+
   defp parse_signature(headers) do
-    cond do
-      is_binary(Map.get(headers, "signature")) ->
-        headers
-        |> Map.get("signature")
-        |> parse_signature_value()
-
-      is_binary(Map.get(headers, "authorization")) ->
-        headers
-        |> Map.get("authorization")
-        |> parse_signature_value()
-
-      true ->
-        {:error, :missing_signature}
+    case {Map.get(headers, "signature"), Map.get(headers, "authorization")} do
+      {signature, nil} when is_binary(signature) -> parse_signature_value(signature)
+      {nil, authorization} when is_binary(authorization) -> parse_signature_value(authorization)
+      {nil, nil} -> {:error, :missing_signature}
+      _ -> {:error, :invalid_signature}
     end
   end
 
@@ -107,44 +129,89 @@ defmodule Egregoros.Signature.HTTP do
   defp parse_signature_value(rest) when is_binary(rest), do: parse_signature_params(rest)
   defp parse_signature_value(_), do: {:error, :invalid_signature}
 
-  defp parse_signature_params(rest) when is_binary(rest) do
-    params =
-      rest
-      |> String.split(",")
-      |> Enum.map(&String.trim/1)
-      |> Enum.reduce(%{}, fn part, acc ->
-        case String.split(part, "=", parts: 2) do
-          [key, value] ->
-            Map.put(acc, key, value |> String.trim("\""))
-
-          _ ->
-            acc
-        end
-      end)
-
-    with key_id when is_binary(key_id) <- Map.get(params, "keyId"),
-         signature_b64 when is_binary(signature_b64) <- Map.get(params, "signature") do
-      headers_param =
-        params
-        |> Map.get("headers", "(request-target) date")
-        |> String.split()
-        |> Enum.map(&String.downcase/1)
-
-      case Base.decode64(signature_b64) do
-        {:ok, decoded} ->
-          {:ok, key_id, decoded, headers_param}
-
-        :error ->
-          {:error, :invalid_signature}
-      end
+  defp parse_signature_params(rest)
+       when is_binary(rest) and byte_size(rest) in 1..@max_header_value_bytes do
+    with {:ok, params} <- strict_signature_params(rest),
+         :ok <- validate_signature_algorithm(Map.get(params, "algorithm")),
+         key_id when is_binary(key_id) <- Map.get(params, "keyId"),
+         true <- byte_size(key_id) in 1..2_048,
+         signature_b64 when is_binary(signature_b64) <- Map.get(params, "signature"),
+         {:ok, decoded} <- Base.decode64(signature_b64),
+         true <- byte_size(decoded) in 1..2_048,
+         {:ok, headers_param} <- signature_header_names(Map.get(params, "headers")) do
+      {:ok, key_id, decoded, headers_param}
     else
       _ -> {:error, :invalid_signature}
     end
   end
 
+  defp parse_signature_params(_rest), do: {:error, :invalid_signature}
+
+  defp strict_signature_params(rest) do
+    rest
+    |> String.split(",")
+    |> Enum.reduce_while({:ok, %{}}, fn part, {:ok, params} ->
+      case Regex.run(~r/\A([A-Za-z][A-Za-z0-9_-]*)="([^"\\]*)"\z/, String.trim(part)) do
+        [_, key, value] ->
+          if MapSet.member?(@signature_param_names, key) and not Map.has_key?(params, key) do
+            {:cont, {:ok, Map.put(params, key, value)}}
+          else
+            {:halt, {:error, :invalid_signature}}
+          end
+
+        _ ->
+          {:halt, {:error, :invalid_signature}}
+      end
+    end)
+  end
+
+  defp validate_signature_algorithm(nil), do: :ok
+
+  defp validate_signature_algorithm(algorithm) when is_binary(algorithm) do
+    if String.downcase(algorithm) in ["rsa-sha256", "hs2019"],
+      do: :ok,
+      else: {:error, :invalid_signature}
+  end
+
+  defp validate_signature_algorithm(_algorithm), do: {:error, :invalid_signature}
+
+  defp signature_header_names(nil), do: {:ok, ["(request-target)", "date"]}
+
+  defp signature_header_names(value) when is_binary(value) and byte_size(value) in 1..2_048 do
+    names = value |> String.split() |> Enum.map(&String.downcase/1)
+
+    if names != [] and length(names) <= 32 and length(names) == length(Enum.uniq(names)) and
+         Enum.all?(names, &valid_signature_header_name?/1) do
+      {:ok, names}
+    else
+      {:error, :invalid_signature}
+    end
+  end
+
+  defp signature_header_names(_value), do: {:error, :invalid_signature}
+
+  defp valid_signature_header_name?(name)
+       when name in ["(request-target)", "@request-target"],
+       do: true
+
+  defp valid_signature_header_name?(name) when is_binary(name),
+    do: String.match?(name, ~r/\A[a-z0-9][a-z0-9-]{0,63}\z/)
+
+  defp valid_signature_header_name?(_name), do: false
+
   defp public_key_for_key_id(key_id) when is_binary(key_id) do
     ap_id = actor_ap_id_from_key_id(key_id)
 
+    case ActorActivation.pinned_signing_key(ap_id, key_id) do
+      {:ok, key} -> {:ok, key}
+      :not_declared -> public_key_for_federated_actor(ap_id)
+      {:error, _reason} = error -> error
+    end
+  end
+
+  defp public_key_for_key_id(_), do: {:error, :invalid_signature}
+
+  defp public_key_for_federated_actor(ap_id) when is_binary(ap_id) do
     case Users.get_by_ap_id(ap_id) do
       %{} = user ->
         case :public_key.pem_decode(user.public_key) do
@@ -164,7 +231,7 @@ defmodule Egregoros.Signature.HTTP do
     end
   end
 
-  defp public_key_for_key_id(_), do: {:error, :invalid_signature}
+  defp public_key_for_federated_actor(_ap_id), do: {:error, :unknown_key}
 
   defp signer_ap_id_from_key_id(key_id) when is_binary(key_id) do
     case actor_ap_id_from_key_id(key_id) do
@@ -355,18 +422,18 @@ defmodule Egregoros.Signature.HTTP do
     |> Enum.map(&String.downcase/1)
   end
 
-  defp augment_headers(headers, conn, headers_param) do
+  defp augment_headers(headers, conn, headers_param, request_host) do
     headers_param_set = MapSet.new(headers_param)
 
     headers
-    |> maybe_put_host(conn, headers_param_set)
+    |> maybe_put_host(request_host, headers_param_set)
     |> maybe_put_content_length(conn, headers_param_set)
     |> maybe_put_digest(conn, headers_param_set)
   end
 
-  defp maybe_put_host(headers, conn, headers_param_set) do
-    if MapSet.member?(headers_param_set, "host") and not Map.has_key?(headers, "host") do
-      Map.put(headers, "host", host_header_for_conn(conn))
+  defp maybe_put_host(headers, request_host, headers_param_set) do
+    if MapSet.member?(headers_param_set, "host") do
+      Map.put(headers, "host", request_host)
     else
       headers
     end
@@ -398,56 +465,85 @@ defmodule Egregoros.Signature.HTTP do
     "SHA-256=" <> (:crypto.hash(:sha256, body) |> Base.encode64())
   end
 
-  defp host_header_for_conn(conn) do
-    forwarded_host = conn |> Plug.Conn.get_req_header("x-forwarded-host") |> List.first()
-    forwarded_port = conn |> Plug.Conn.get_req_header("x-forwarded-port") |> List.first()
-    forwarded_proto = conn |> Plug.Conn.get_req_header("x-forwarded-proto") |> List.first()
-
-    host =
-      forwarded_host
-      |> first_forwarded_value()
-      |> case do
-        nil -> conn.host
-        value -> value
+  defp verified_request_host(conn) do
+    with {:ok, host, scheme, port} <- effective_authority(conn),
+         {:ok, normalized_host} <- PublicHostPolicy.normalize_host(host),
+         true <- PublicHostPolicy.public_host?(normalized_host) do
+      if is_nil(port) or port == default_port_for_scheme(scheme) do
+        {:ok, normalized_host}
+      else
+        {:ok, "#{normalized_host}:#{port}"}
       end
-
-    scheme =
-      case forwarded_proto do
-        "https" -> :https
-        "http" -> :http
-        _ -> conn.scheme
-      end
-
-    port =
-      case parse_forwarded_port(forwarded_port) do
-        {:ok, port} ->
-          port
-
-        :error ->
-          if is_binary(forwarded_proto) do
-            default_port_for_scheme(scheme)
-          else
-            conn.port
-          end
-      end
-
-    if host_has_port?(host) or is_nil(port) or port == default_port_for_scheme(scheme) do
-      host
     else
-      "#{host}:#{port}"
+      _ -> {:error, :invalid_host}
     end
   end
 
-  defp first_forwarded_value(nil), do: nil
+  defp effective_authority(conn) do
+    if ClientIP.trusted_proxy?(conn) do
+      with {:ok, forwarded_host} <- optional_forwarded_header(conn, "x-forwarded-host"),
+           {:ok, forwarded_proto} <- optional_forwarded_header(conn, "x-forwarded-proto"),
+           {:ok, forwarded_port} <- optional_forwarded_header(conn, "x-forwarded-port"),
+           {:ok, scheme} <- forwarded_scheme(forwarded_proto, conn.scheme),
+           {:ok, port} <-
+             authority_port(forwarded_host, forwarded_port, scheme, forwarded_proto, conn.port) do
+        {:ok, forwarded_host || conn.host, scheme, port}
+      end
+    else
+      {:ok, conn.host, conn.scheme, conn.port}
+    end
+  end
 
-  defp first_forwarded_value(value) when is_binary(value) do
-    value
-    |> String.split(",", parts: 2)
-    |> List.first()
-    |> String.trim()
-    |> case do
-      "" -> nil
-      trimmed -> trimmed
+  defp optional_forwarded_header(conn, name) do
+    case Plug.Conn.get_req_header(conn, name) do
+      [] ->
+        {:ok, nil}
+
+      [value] when is_binary(value) ->
+        value = String.trim(value)
+
+        if value != "" and not String.contains?(value, ","),
+          do: {:ok, value},
+          else: {:error, :invalid_host}
+
+      _ ->
+        {:error, :invalid_host}
+    end
+  end
+
+  defp forwarded_scheme(nil, fallback), do: {:ok, fallback}
+  defp forwarded_scheme("https", _fallback), do: {:ok, :https}
+  defp forwarded_scheme("http", _fallback), do: {:ok, :http}
+  defp forwarded_scheme(_value, _fallback), do: {:error, :invalid_host}
+
+  defp authority_port(forwarded_host, forwarded_port, scheme, forwarded_proto, direct_port) do
+    case parse_forwarded_port(forwarded_port) do
+      {:ok, port} ->
+        {:ok, port}
+
+      :error when not is_nil(forwarded_port) ->
+        {:error, :invalid_host}
+
+      :error ->
+        host_port = explicit_host_port(forwarded_host)
+
+        cond do
+          is_integer(host_port) -> {:ok, host_port}
+          is_binary(forwarded_proto) -> {:ok, default_port_for_scheme(scheme)}
+          true -> {:ok, direct_port}
+        end
+    end
+  end
+
+  defp explicit_host_port(nil), do: nil
+
+  defp explicit_host_port(host) do
+    case URI.parse("https://" <> host) do
+      %URI{authority: authority, port: port} when is_binary(authority) ->
+        if String.contains?(authority, ":"), do: port
+
+      _ ->
+        nil
     end
   end
 
@@ -455,21 +551,13 @@ defmodule Egregoros.Signature.HTTP do
 
   defp parse_forwarded_port(value) when is_binary(value) do
     case Integer.parse(String.trim(value)) do
-      {port, ""} when port > 0 -> {:ok, port}
+      {port, ""} when port in 1..65_535 -> {:ok, port}
       _ -> :error
     end
   end
 
   defp default_port_for_scheme(:https), do: 443
   defp default_port_for_scheme(_), do: 80
-
-  defp host_has_port?("[" <> rest) do
-    String.contains?(rest, "]:")
-  end
-
-  defp host_has_port?(host) when is_binary(host) do
-    String.contains?(host, ":")
-  end
 
   defp host_header_for_uri(%URI{} = uri) do
     default_port = URI.default_port(uri.scheme)

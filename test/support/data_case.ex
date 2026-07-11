@@ -84,6 +84,7 @@ defmodule Egregoros.DataCase do
       activity_pub_actor_key_id: declaration.activity_pub_actor_url <> "#main-key",
       activity_pub_actor_key_fingerprint:
         :crypto.hash(:sha256, declaration.activity_pub_actor_url <> "#test-key"),
+      activity_pub_actor_public_key_pem: "test-only-pinned-public-key",
       activity_pub_actor_activated_at: DateTime.utc_now()
     })
     |> Egregoros.Repo.update!()

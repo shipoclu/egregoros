@@ -191,6 +191,63 @@ defmodule Egregoros.FollowRequestsTest do
     refute Relationships.get_by_type_actor_object("Follow", alice.ap_id, bob.ap_id)
   end
 
+  test "a mislabeled embedded object cannot bypass pending Follow acceptance authorization" do
+    {:ok, alice} = Users.create_local_user("alice-mislabeled-accept")
+
+    {:ok, bob} =
+      Users.create_user(%{
+        nickname: "bob-mislabeled-accept",
+        ap_id: "https://remote.example/users/bob-mislabeled-accept",
+        inbox: "https://remote.example/users/bob-mislabeled-accept/inbox",
+        outbox: "https://remote.example/users/bob-mislabeled-accept/outbox",
+        public_key: "remote-key",
+        local: false
+      })
+
+    {:ok, follow} = Pipeline.ingest(Follow.build(alice, bob), local: true)
+
+    forged_accept = %{
+      "id" => "https://mallory.example/activities/accept/mislabeled",
+      "type" => "Accept",
+      "actor" => "https://mallory.example/users/mallory",
+      "object" => Map.put(follow.data, "type", "Offer")
+    }
+
+    assert {:error, :uncorrelated_follow_response} =
+             Pipeline.ingest(forged_accept, local: false)
+
+    assert Relationships.get_by_type_actor_object("FollowRequest", alice.ap_id, bob.ap_id)
+    refute Relationships.get_by_type_actor_object("Follow", alice.ap_id, bob.ap_id)
+  end
+
+  test "a multi-type embedded object cannot bypass pending Follow rejection authorization" do
+    {:ok, alice} = Users.create_local_user("alice-multitype-reject")
+
+    {:ok, bob} =
+      Users.create_user(%{
+        nickname: "bob-multitype-reject",
+        ap_id: "https://remote.example/users/bob-multitype-reject",
+        inbox: "https://remote.example/users/bob-multitype-reject/inbox",
+        outbox: "https://remote.example/users/bob-multitype-reject/outbox",
+        public_key: "remote-key",
+        local: false
+      })
+
+    {:ok, follow} = Pipeline.ingest(Follow.build(alice, bob), local: true)
+
+    forged_reject = %{
+      "id" => "https://mallory.example/activities/reject/multitype",
+      "type" => "Reject",
+      "actor" => "https://mallory.example/users/mallory",
+      "object" => Map.put(follow.data, "type", ["Offer", "Follow"])
+    }
+
+    assert {:error, :uncorrelated_follow_response} =
+             Pipeline.ingest(forged_reject, local: false)
+
+    assert Relationships.get_by_type_actor_object("FollowRequest", alice.ap_id, bob.ap_id)
+  end
+
   test "Reject cannot remove an established Follow without a pending request" do
     {:ok, alice} = Users.create_local_user("alice-established-follow")
 

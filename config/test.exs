@@ -78,6 +78,7 @@ config :egregoros, :password_iterations, 1_000
 
 config :egregoros, :req_options, plug: {Req.Test, Egregoros.HTTP.Req}
 config :egregoros, :mini_apps_req_options, plug: {Req.Test, Egregoros.MiniApps.Fetcher.Req}
+config :egregoros, :public_host_aliases, ["www.example.com", "local.example", "forwarded.example"]
 
 config :egregoros, Oban, testing: :manual
 

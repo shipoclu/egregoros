@@ -47,10 +47,11 @@ defmodule Egregoros.MiniApps.Declarations do
         activity_pub_actor_fingerprint: fingerprint,
         activity_pub_actor_key_id: key_id,
         activity_pub_actor_key_fingerprint: key_fingerprint,
+        activity_pub_actor_public_key_pem: public_key_pem,
         activity_pub_actor_activated_at: %DateTime{}
       }
       when is_binary(actor_url) and is_binary(fingerprint) and is_binary(key_id) and
-             is_binary(key_fingerprint) ->
+             is_binary(key_fingerprint) and is_binary(public_key_pem) ->
         if origin_allowed?(origin),
           do: {:ok, actor_url},
           else: {:error, :notifications_not_declared}
@@ -197,9 +198,11 @@ defmodule Egregoros.MiniApps.Declarations do
          activity_pub_actor_fingerprint: fingerprint,
          activity_pub_actor_key_id: key_id,
          activity_pub_actor_key_fingerprint: key_fingerprint,
+         activity_pub_actor_public_key_pem: public_key_pem,
          activity_pub_actor_activated_at: %DateTime{}
        })
-       when is_binary(fingerprint) and is_binary(key_id) and is_binary(key_fingerprint),
+       when is_binary(fingerprint) and is_binary(key_id) and is_binary(key_fingerprint) and
+              is_binary(public_key_pem),
        do: true
 
   defp actor_activated?(%Declaration{}), do: false

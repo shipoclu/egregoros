@@ -22,6 +22,9 @@ defmodule Egregoros.PublicHostPolicy do
 
   def cookie_host?(_candidate, _request_host), do: false
 
+  def public_host?(candidate) when is_binary(candidate), do: cookie_host?(candidate)
+  def public_host?(_candidate), do: false
+
   def public_hosts(request_host \\ nil) do
     endpoint_host = Endpoint.url() |> URI.parse() |> Map.get(:host)
     aliases = Config.get(:public_host_aliases, [])
@@ -39,14 +42,20 @@ defmodule Egregoros.PublicHostPolicy do
   def normalize_host(value) when is_binary(value) do
     value = String.trim(value)
 
-    host =
-      cond do
-        value == "" -> nil
-        String.contains?(value, "://") -> URI.parse(value).host
-        true -> URI.parse("https://" <> value).host
-      end
+    candidate = if String.contains?(value, "://"), do: value, else: "https://" <> value
 
-    DomainPolicy.normalize_domain(host)
+    with true <- value != "",
+         {:ok, %URI{} = uri} <- URI.new(candidate),
+         true <- uri.scheme == "https",
+         true <- uri.userinfo in [nil, ""],
+         true <- uri.path in [nil, ""],
+         true <- uri.query in [nil, ""],
+         true <- uri.fragment in [nil, ""],
+         host when is_binary(host) <- uri.host do
+      DomainPolicy.normalize_domain(host)
+    else
+      _ -> {:error, :invalid_domain}
+    end
   end
 
   def normalize_host(_value), do: {:error, :invalid_domain}

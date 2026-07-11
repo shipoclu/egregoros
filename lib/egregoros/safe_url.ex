@@ -184,7 +184,19 @@ defmodule Egregoros.SafeURL do
 
   defp globally_routable?({0, 0, 0, 0, 0, 65535, _, _}), do: false
   defp globally_routable?({0, 0, 0, 0, 0, 0, _, _}), do: false
+  # IETF protocol assignments, benchmarking, and ORCHID are not ordinary
+  # globally reachable application destinations.
+  defp globally_routable?({0x2001, second, _, _, _, _, _, _}) when second in 0x0000..0x002F,
+    do: false
+
   defp globally_routable?({0x2001, 0x0DB8, _, _, _, _, _, _}), do: false
+  # 6to4 embeds an IPv4 destination and can bypass the IPv4 policy through a
+  # locally configured transition relay.
+  defp globally_routable?({0x2002, _, _, _, _, _, _, _}), do: false
+  # IANA currently reserves 3f00::/8, including retired 6bone space and the
+  # RFC 9637 documentation prefix.
+  defp globally_routable?({first, _, _, _, _, _, _, _}) when first in 0x3F00..0x3FFF,
+    do: false
 
   defp globally_routable?({first, _, _, _, _, _, _, _})
        when (first &&& 0xE000) == 0x2000,

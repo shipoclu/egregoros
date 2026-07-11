@@ -142,6 +142,19 @@ defmodule Egregoros.SafeURLTest do
     assert :ok == SafeURL.validate_http_url("http://[2001:4860:4860::8888]/users/alice")
   end
 
+  test "rejects IPv6 transition and special-purpose ranges" do
+    for url <- [
+          "http://[2001::1]/object",
+          "http://[2001:20::1]/object",
+          "http://[2002:0a00:0001::1]/object",
+          "http://[3f00::1]/object",
+          "http://[3ffe::1]/object",
+          "http://[3fff::1]/object"
+        ] do
+      assert {:error, :unsafe_url} == SafeURL.validate_http_url(url)
+    end
+  end
+
   test "rejects hostnames that resolve to private ips" do
     Egregoros.DNS.Mock
     |> expect(:lookup_ips, fn "private.example" ->

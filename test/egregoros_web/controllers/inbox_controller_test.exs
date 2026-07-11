@@ -117,7 +117,8 @@ defmodule EgregorosWeb.InboxControllerTest do
       activity_pub_actor_fingerprint: :crypto.hash(:sha256, "actor-document"),
       activity_pub_actor_activated_at: DateTime.utc_now(),
       activity_pub_actor_key_id: actor <> "#main-key",
-      activity_pub_actor_key_fingerprint: rsa_key_fingerprint(public_key)
+      activity_pub_actor_key_fingerprint: rsa_key_fingerprint(public_key),
+      activity_pub_actor_public_key_pem: public_key
     })
     |> Repo.update!()
 
@@ -213,7 +214,8 @@ defmodule EgregorosWeb.InboxControllerTest do
       activity_pub_actor_fingerprint: :crypto.hash(:sha256, "signed-alerts-actor"),
       activity_pub_actor_activated_at: DateTime.utc_now(),
       activity_pub_actor_key_id: actor <> "#main-key",
-      activity_pub_actor_key_fingerprint: rsa_key_fingerprint(public_key)
+      activity_pub_actor_key_fingerprint: rsa_key_fingerprint(public_key),
+      activity_pub_actor_public_key_pem: public_key
     })
     |> Repo.update!()
 
@@ -1074,6 +1076,12 @@ defmodule EgregorosWeb.InboxControllerTest do
        %{
          conn: conn
        } do
+    stub(Egregoros.Config.Mock, :get, fn
+      :public_host_aliases, [] -> ["egregoros.ngrok.dev"]
+      :trusted_proxies, [] -> ["10.0.0.0/8"]
+      key, default -> Egregoros.Config.Stub.get(key, default)
+    end)
+
     {:ok, frank} = Users.create_local_user("frank")
     {public_key, private_key} = Egregoros.Keys.generate_rsa_keypair()
 
@@ -1137,6 +1145,7 @@ defmodule EgregorosWeb.InboxControllerTest do
       |> Map.put(:scheme, :http)
       |> Map.put(:host, host)
       |> Map.put(:port, 4000)
+      |> Map.put(:remote_ip, {10, 0, 0, 2})
       |> put_req_header("x-forwarded-proto", "https")
       |> put_req_header("x-forwarded-port", "443")
       |> put_req_header("content-type", "application/activity+json")

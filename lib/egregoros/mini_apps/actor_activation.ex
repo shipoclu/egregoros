@@ -20,9 +20,11 @@ defmodule Egregoros.MiniApps.ActorActivation do
       %Declaration{
         activity_pub_actor_fingerprint: fingerprint,
         activity_pub_actor_key_id: key_id,
-        activity_pub_actor_key_fingerprint: key_fingerprint
+        activity_pub_actor_key_fingerprint: key_fingerprint,
+        activity_pub_actor_public_key_pem: public_key_pem
       } = declaration
-      when is_binary(fingerprint) and is_binary(key_id) and is_binary(key_fingerprint) ->
+      when is_binary(fingerprint) and is_binary(key_id) and is_binary(key_fingerprint) and
+             is_binary(public_key_pem) ->
         {:ok, declaration}
 
       %Declaration{activity_pub_actor_url: actor_url} = declaration when is_binary(actor_url) ->
@@ -74,6 +76,54 @@ defmodule Egregoros.MiniApps.ActorActivation do
   def authorize_signing_key(_actor_url, _key_id, _key),
     do: {:error, :mini_app_actor_key_mismatch}
 
+  def pinned_signing_key(actor_url, key_id)
+      when is_binary(actor_url) and is_binary(key_id) do
+    declarations =
+      from(declaration in Declaration,
+        where: declaration.activity_pub_actor_url == ^actor_url
+      )
+      |> Repo.all()
+
+    case declarations do
+      [] ->
+        :not_declared
+
+      [%Declaration{activity_pub_actor_key_id: pinned_key_id}]
+      when is_binary(pinned_key_id) and pinned_key_id != key_id ->
+        {:error, :mini_app_actor_key_mismatch}
+
+      [
+        %Declaration{
+          app_origin: origin,
+          activity_pub_actor_fingerprint: fingerprint,
+          activity_pub_actor_key_id: ^key_id,
+          activity_pub_actor_key_fingerprint: key_fingerprint,
+          activity_pub_actor_public_key_pem: public_key_pem,
+          activity_pub_actor_activated_at: %DateTime{}
+        }
+      ]
+      when is_binary(fingerprint) and is_binary(key_fingerprint) and
+             is_binary(public_key_pem) ->
+        with :ok <- require_current_policy(origin),
+             {:ok, key} <- decode_rsa_public_key(public_key_pem),
+             true <- valid_rsa_parameters?(key),
+             ^key_fingerprint <- public_key_fingerprint(key) do
+          {:ok, key}
+        else
+          _ -> {:error, :mini_app_actor_key_mismatch}
+        end
+
+      [%Declaration{}] ->
+        {:error, :mini_app_actor_not_activated}
+
+      _ ->
+        {:error, :mini_app_actor_key_mismatch}
+    end
+  end
+
+  def pinned_signing_key(_actor_url, _key_id),
+    do: {:error, :mini_app_actor_key_mismatch}
+
   defp activate_declaration(declaration, actor_url) do
     with :ok <- require_current_policy(declaration.app_origin),
          {:ok, %{body: body}} <- Fetcher.get(actor_url, :actor),
@@ -113,7 +163,8 @@ defmodule Egregoros.MiniApps.ActorActivation do
        %{
          fingerprint: fingerprint(actor, public_key),
          key_id: Map.fetch!(public_key, "id"),
-         key_fingerprint: public_key_fingerprint(key)
+         key_fingerprint: public_key_fingerprint(key),
+         public_key_pem: pem
        }}
     else
       _ -> {:error, :invalid_actor_document}
@@ -160,10 +211,8 @@ defmodule Egregoros.MiniApps.ActorActivation do
 
   defp validate_rsa_public_key(pem)
        when is_binary(pem) and byte_size(pem) > 0 and byte_size(pem) <= @max_pem_bytes do
-    with [entry] <- :public_key.pem_decode(pem),
-         {:RSAPublicKey, modulus, exponent} <- :public_key.pem_entry_decode(entry),
-         true <- is_integer(modulus) and integer_bit_size(modulus) >= 2_048,
-         true <- is_integer(exponent) and exponent >= 3 do
+    with {:ok, key} <- decode_rsa_public_key(pem),
+         true <- valid_rsa_parameters?(key) do
       :ok
     else
       _ -> {:error, :invalid_actor_document}
@@ -173,6 +222,30 @@ defmodule Egregoros.MiniApps.ActorActivation do
   end
 
   defp validate_rsa_public_key(_pem), do: {:error, :invalid_actor_document}
+
+  defp decode_rsa_public_key(pem)
+       when is_binary(pem) and byte_size(pem) > 0 and byte_size(pem) <= @max_pem_bytes do
+    with [entry] <- :public_key.pem_decode(pem),
+         {:RSAPublicKey, _modulus, _exponent} = key <- :public_key.pem_entry_decode(entry) do
+      {:ok, key}
+    else
+      _ -> {:error, :invalid_actor_document}
+    end
+  rescue
+    _ -> {:error, :invalid_actor_document}
+  end
+
+  defp decode_rsa_public_key(_pem), do: {:error, :invalid_actor_document}
+
+  defp valid_rsa_parameters?({:RSAPublicKey, modulus, exponent}) do
+    modulus_bits = integer_bit_size(modulus)
+
+    is_integer(modulus) and modulus_bits in 2_048..8_192 and rem(modulus, 2) == 1 and
+      is_integer(exponent) and exponent >= 3 and exponent <= 0xFFFF_FFFF and
+      rem(exponent, 2) == 1
+  end
+
+  defp valid_rsa_parameters?(_key), do: false
 
   defp integer_bit_size(integer) when is_integer(integer) and integer > 0 do
     <<first, rest::binary>> = :binary.encode_unsigned(integer)
@@ -203,7 +276,8 @@ defmodule Egregoros.MiniApps.ActorActivation do
   defp pin_activation(declaration, %{
          fingerprint: fingerprint,
          key_id: key_id,
-         key_fingerprint: key_fingerprint
+         key_fingerprint: key_fingerprint,
+         public_key_pem: public_key_pem
        }) do
     activated_at = DateTime.utc_now()
 
@@ -211,7 +285,7 @@ defmodule Egregoros.MiniApps.ActorActivation do
       {count, _rows} =
         from(candidate in Declaration,
           where: candidate.id == ^declaration.id,
-          where: is_nil(candidate.activity_pub_actor_key_fingerprint)
+          where: is_nil(candidate.activity_pub_actor_public_key_pem)
         )
         |> Repo.update_all(
           set: [
@@ -219,6 +293,7 @@ defmodule Egregoros.MiniApps.ActorActivation do
             activity_pub_actor_activated_at: activated_at,
             activity_pub_actor_key_id: key_id,
             activity_pub_actor_key_fingerprint: key_fingerprint,
+            activity_pub_actor_public_key_pem: public_key_pem,
             updated_at: activated_at
           ]
         )
@@ -231,7 +306,8 @@ defmodule Egregoros.MiniApps.ActorActivation do
          %Declaration{
            activity_pub_actor_fingerprint: ^fingerprint,
            activity_pub_actor_key_id: ^key_id,
-           activity_pub_actor_key_fingerprint: ^key_fingerprint
+           activity_pub_actor_key_fingerprint: ^key_fingerprint,
+           activity_pub_actor_public_key_pem: ^public_key_pem
          } = activated} ->
           {:ok, activated}
 

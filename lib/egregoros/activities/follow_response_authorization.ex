@@ -3,6 +3,7 @@ defmodule Egregoros.Activities.FollowResponseAuthorization do
 
   alias Egregoros.Object
   alias Egregoros.Objects
+  alias Egregoros.ActivityPub.TypeNormalizer
   alias Egregoros.Relationship
   alias Egregoros.Relationships
 
@@ -41,10 +42,19 @@ defmodule Egregoros.Activities.FollowResponseAuthorization do
 
   defp authorize_new_response(_activity), do: {:error, :uncorrelated_follow_response}
 
-  defp follow_reference(%{"type" => "Follow", "id" => id} = follow) when is_binary(id),
-    do: {:ok, id, follow}
+  defp follow_reference(%{"id" => id} = embedded) when is_binary(id) do
+    case Objects.get_by_ap_id(id) do
+      %Object{type: "Follow"} ->
+        if TypeNormalizer.primary_type(embedded) == "Follow",
+          do: {:ok, id, embedded},
+          else: {:error, :uncorrelated_follow_response}
 
-  defp follow_reference(%{"type" => type}) when is_binary(type), do: :not_follow
+      _ ->
+        if TypeNormalizer.primary_type(embedded) == "Follow",
+          do: {:ok, id, embedded},
+          else: :not_follow
+    end
+  end
 
   defp follow_reference(id) when is_binary(id) do
     case Objects.get_by_ap_id(id) do

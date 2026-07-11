@@ -921,9 +921,12 @@ The ActivityPub notification extension persists a narrower dedicated audit:
 permission grant/deny/revoke and delivery accepted/suppressed, with only local
 user ID, exact app origin, exact app actor, bounded reason code, and timestamp.
 It deliberately has no columns for content, activity/note IDs, recipient actor
-URLs, OAuth credentials, or key material. Signed inbox requests from a declared
-actor additionally must match the activated key ID and RSA-key fingerprint
-before ordinary signature verification can authorize delivery.
+URLs, OAuth credentials, or key material. Activation validates and pins the
+actor's exact RSA public-key PEM, key ID, and fingerprint; accepted modulus
+sizes are 2048 through 8192 bits. Signature verification for a declared actor
+uses only that pinned key and MUST NOT trigger an actor/key network fetch. A
+different, missing, malformed, or not-yet-pinned key fails closed before
+ordinary signature verification can authorize delivery.
 
 For delivery replay suppression, the server stores only a secret-keyed HMAC of
 the local user ID, exact app actor, and ActivityPub activity ID. The raw

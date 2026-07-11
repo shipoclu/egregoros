@@ -4,7 +4,24 @@ defmodule Egregoros.Signature.HTTPTest do
   alias Egregoros.Signature.HTTP
   alias Egregoros.HTTPDate
   alias Egregoros.Keys
+  alias Egregoros.MiniApps.ActorActivation
+  alias Egregoros.MiniApps.Declarations
+  alias Egregoros.MiniApps.Manifest
+  alias Egregoros.User
   alias Egregoros.Users
+
+  setup do
+    stub(Egregoros.Config.Mock, :get, fn
+      :public_host_aliases, [] -> ["www.example.com", "local.example", "forwarded.example"]
+      :trusted_proxies, [] -> ["10.0.0.0/8"]
+      :mini_apps_enabled, false -> true
+      :mini_apps_domain_allowlist, [] -> []
+      :mini_apps_domain_denylist, [] -> []
+      key, default -> Egregoros.Config.Stub.get(key, default)
+    end)
+
+    :ok
+  end
 
   defp create_remote_user(attrs) when is_map(attrs) do
     unique = Ecto.UUID.generate() |> String.replace("-", "")
@@ -213,7 +230,7 @@ defmodule Egregoros.Signature.HTTPTest do
       assert signer_ap_id == user.ap_id
     end
 
-    test "verifies requests using x-forwarded host/proto/port" do
+    test "verifies forwarded authority only from a trusted proxy" do
       {public_key, private_key} = Keys.generate_rsa_keypair()
 
       {:ok, user} =
@@ -234,14 +251,161 @@ defmodule Egregoros.Signature.HTTPTest do
         |> Plug.Conn.put_req_header("digest", signed.digest)
         |> Plug.Conn.put_req_header("content-length", signed.content_length)
         |> Plug.Conn.put_req_header("signature", signed.signature)
-        |> Plug.Conn.put_req_header("x-forwarded-host", "forwarded.example, other.example")
+        |> Plug.Conn.put_req_header("x-forwarded-host", "forwarded.example")
         |> Plug.Conn.put_req_header("x-forwarded-port", "8443")
         |> Plug.Conn.put_req_header("x-forwarded-proto", "https")
 
-      conn = %{conn | host: "internal.local", scheme: :http, port: 4000}
+      conn = %{
+        conn
+        | host: "internal.local",
+          scheme: :http,
+          port: 4000,
+          remote_ip: {10, 0, 0, 2}
+      }
 
       assert {:ok, signer_ap_id} = HTTP.verify_request(conn)
       assert signer_ap_id == user.ap_id
+    end
+
+    test "ignores spoofed forwarded authority from an untrusted peer" do
+      {public_key, private_key} = Keys.generate_rsa_keypair()
+
+      {:ok, user} =
+        create_remote_user(%{
+          public_key: public_key,
+          private_key: private_key
+        })
+
+      body = ""
+
+      {:ok, signed} =
+        HTTP.sign_request(
+          user,
+          "post",
+          "https://forwarded.example:8443/users/frank/inbox",
+          body
+        )
+
+      conn =
+        Plug.Test.conn(:post, "/users/frank/inbox", body)
+        |> Plug.Conn.assign(:raw_body, body)
+        |> Plug.Conn.put_req_header("date", signed.date)
+        |> Plug.Conn.put_req_header("digest", signed.digest)
+        |> Plug.Conn.put_req_header("content-length", signed.content_length)
+        |> Plug.Conn.put_req_header("signature", signed.signature)
+        |> Plug.Conn.put_req_header("x-forwarded-host", "forwarded.example")
+        |> Plug.Conn.put_req_header("x-forwarded-port", "8443")
+        |> Plug.Conn.put_req_header("x-forwarded-proto", "https")
+
+      conn = %{
+        conn
+        | host: "local.example",
+          scheme: :https,
+          port: 443,
+          remote_ip: {203, 0, 113, 9}
+      }
+
+      assert {:error, :invalid_signature} = HTTP.verify_request(conn)
+    end
+
+    test "rejects a signed Host outside the configured public authorities" do
+      {public_key, private_key} = Keys.generate_rsa_keypair()
+
+      {:ok, user} =
+        create_remote_user(%{
+          public_key: public_key,
+          private_key: private_key
+        })
+
+      body = ""
+      {:ok, signed} = HTTP.sign_request(user, "post", "https://evil.example/inbox", body)
+
+      conn =
+        Plug.Test.conn(:post, "/inbox", body)
+        |> Plug.Conn.assign(:raw_body, body)
+        |> Plug.Conn.put_req_header("date", signed.date)
+        |> Plug.Conn.put_req_header("digest", signed.digest)
+        |> Plug.Conn.put_req_header("content-length", signed.content_length)
+        |> Plug.Conn.put_req_header("signature", signed.signature)
+
+      conn = %{conn | host: "evil.example", scheme: :https, port: 443}
+
+      assert {:error, :invalid_host} = HTTP.verify_request(conn)
+    end
+
+    test "verifies a declared mini-app actor from its pinned key without a network fetch" do
+      origin = "https://app.example"
+      actor = origin <> "/ap/actor"
+      {public_key, private_key} = Keys.generate_rsa_keypair()
+
+      assert {:ok, manifest} =
+               Manifest.decode(
+                 Jason.encode!(%{
+                   "version" => "1",
+                   "name" => "Pinned signer",
+                   "homeUrl" => origin <> "/",
+                   "activityPub" => %{
+                     "actorUrl" => actor,
+                     "publicNotes" => true,
+                     "transactionalMentions" => false
+                   },
+                   "capabilities" => []
+                 }),
+                 origin <> "/.well-known/fediverse-miniapp.json"
+               )
+
+      assert {:ok, _declaration, :created} = Declarations.ensure(manifest)
+
+      expect(Egregoros.MiniApps.Fetcher.Mock, :get, fn ^actor, :actor ->
+        {:ok,
+         %{
+           status: 200,
+           headers: [{"content-type", "application/activity+json"}],
+           body:
+             Jason.encode!(%{
+               "id" => actor,
+               "type" => "Application",
+               "inbox" => origin <> "/ap/inbox",
+               "outbox" => origin <> "/ap/outbox",
+               "followers" => origin <> "/ap/followers",
+               "publicKey" => %{
+                 "id" => actor <> "#main-key",
+                 "owner" => actor,
+                 "publicKeyPem" => public_key
+               }
+             })
+         }}
+      end)
+
+      assert {:ok, _declaration} = ActorActivation.activate(origin)
+      refute Users.get_by_ap_id(actor)
+
+      expect(Egregoros.HTTP.Mock, :get, 0, fn _url, _headers ->
+        flunk("signature verification must not refetch a declared mini-app actor")
+      end)
+
+      signer = %User{ap_id: actor, private_key: private_key}
+      body = Jason.encode!(%{"id" => actor <> "/activities/1", "type" => "Create"})
+
+      assert {:ok, signed} =
+               HTTP.sign_request(
+                 signer,
+                 "post",
+                 "https://local.example/users/frank/inbox",
+                 body
+               )
+
+      conn =
+        Plug.Test.conn(:post, "/users/frank/inbox", body)
+        |> Plug.Conn.assign(:raw_body, body)
+        |> Plug.Conn.put_req_header("date", signed.date)
+        |> Plug.Conn.put_req_header("digest", signed.digest)
+        |> Plug.Conn.put_req_header("content-length", signed.content_length)
+        |> Plug.Conn.put_req_header("signature", signed.signature)
+
+      conn = %{conn | host: "local.example", scheme: :https, port: 443}
+
+      assert {:ok, ^actor} = HTTP.verify_request(conn)
     end
 
     test "verifies requests when the request contains a query string" do
@@ -320,6 +484,65 @@ defmodule Egregoros.Signature.HTTPTest do
           "signature",
           "Signature foo,keyId=\"#{user.ap_id}#main-key\",headers=\"(request-target) host date digest\",signature=\"AA==\""
         )
+
+      assert {:error, :invalid_signature} = HTTP.verify_request(conn)
+    end
+
+    test "rejects duplicate signature parameters instead of accepting the last value" do
+      {public_key, private_key} = Keys.generate_rsa_keypair()
+
+      {:ok, user} =
+        create_remote_user(%{
+          public_key: public_key,
+          private_key: private_key
+        })
+
+      body = ""
+      {:ok, signed} = HTTP.sign_request(user, "post", "https://local.example/inbox", body)
+
+      ambiguous =
+        "keyId=\"https://attacker.example/actor#main-key\"," <> signed.signature
+
+      conn =
+        Plug.Test.conn(:post, "/inbox", body)
+        |> Plug.Conn.assign(:raw_body, body)
+        |> Plug.Conn.put_req_header("date", signed.date)
+        |> Plug.Conn.put_req_header("digest", signed.digest)
+        |> Plug.Conn.put_req_header("content-length", signed.content_length)
+        |> Plug.Conn.put_req_header("signature", ambiguous)
+
+      conn = %{conn | host: "local.example", scheme: :https, port: 443}
+
+      assert {:error, :invalid_signature} = HTTP.verify_request(conn)
+    end
+
+    test "rejects duplicate security headers instead of collapsing them" do
+      {public_key, private_key} = Keys.generate_rsa_keypair()
+
+      {:ok, user} =
+        create_remote_user(%{
+          public_key: public_key,
+          private_key: private_key
+        })
+
+      body = ""
+      {:ok, signed} = HTTP.sign_request(user, "post", "https://local.example/inbox", body)
+
+      conn =
+        Plug.Test.conn(:post, "/inbox", body)
+        |> Plug.Conn.assign(:raw_body, body)
+        |> Plug.Conn.put_req_header("date", signed.date)
+        |> Plug.Conn.put_req_header("digest", signed.digest)
+        |> Plug.Conn.put_req_header("content-length", signed.content_length)
+        |> Plug.Conn.put_req_header("signature", signed.signature)
+
+      conn = %{
+        conn
+        | host: "local.example",
+          scheme: :https,
+          port: 443,
+          req_headers: [{"signature", signed.signature} | conn.req_headers]
+      }
 
       assert {:error, :invalid_signature} = HTTP.verify_request(conn)
     end
