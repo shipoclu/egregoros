@@ -45,6 +45,7 @@ config :egregoros, :password_iterations, 200_000
 config :egregoros, :mini_apps_enabled, false
 config :egregoros, :mini_apps_domain_allowlist, []
 config :egregoros, :mini_apps_domain_denylist, []
+config :egregoros, :public_host_aliases, []
 
 # Configure the endpoint
 config :egregoros, EgregorosWeb.Endpoint,

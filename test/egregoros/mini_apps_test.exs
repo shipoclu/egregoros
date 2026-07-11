@@ -80,6 +80,25 @@ defmodule Egregoros.MiniAppsTest do
     end)
   end
 
+  test "does not allow a configured public instance hostname as a mini-app domain" do
+    stub(Egregoros.Config.Mock, :get, fn
+      :mini_apps_enabled, false -> true
+      :mini_apps_domain_allowlist, [] -> []
+      :mini_apps_domain_denylist, [] -> []
+      :public_host_aliases, [] -> ["App.Example."]
+      key, default -> Egregoros.Config.Stub.get(key, default)
+    end)
+
+    expect(Egregoros.MiniApps.Fetcher.Mock, :get, 0, fn _url, _kind ->
+      flunk("the instance cookie hostname must be rejected before any network request")
+    end)
+
+    Egregoros.Config.with_impl(Egregoros.Config.Mock, fn ->
+      refute MiniApps.domain_allowed?("app.example")
+      assert {:error, :domain_denied} = MiniApps.fetch_manifest("https://app.example:444")
+    end)
+  end
+
   test "fetches and validates a manifest only after feature and policy checks" do
     json =
       Jason.encode!(%{

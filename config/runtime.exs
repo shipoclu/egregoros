@@ -61,6 +61,16 @@ if mini_apps_domain_denylist != [] do
   config :egregoros, :mini_apps_domain_denylist, mini_apps_domain_denylist
 end
 
+public_host_aliases =
+  System.get_env("EGREGOROS_PUBLIC_HOST_ALIASES", "")
+  |> String.split(",", trim: true)
+  |> Enum.map(&String.trim/1)
+  |> Enum.reject(&(&1 == ""))
+
+if public_host_aliases != [] do
+  config :egregoros, :public_host_aliases, public_host_aliases
+end
+
 trusted_proxies =
   System.get_env("EGREGOROS_TRUSTED_PROXIES", "")
   |> String.split(",", trim: true)

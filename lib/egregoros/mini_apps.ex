@@ -16,6 +16,7 @@ defmodule Egregoros.MiniApps do
   alias Egregoros.MiniApps.Origin
   alias Egregoros.MiniApps.PageMetadata
   alias Egregoros.MiniApps.ResolvedCard
+  alias Egregoros.PublicHostPolicy
 
   @manifest_path "/.well-known/fediverse-miniapp.json"
 
@@ -25,6 +26,7 @@ defmodule Egregoros.MiniApps do
 
   def domain_allowed?(domain) when is_binary(domain) do
     enabled?() and
+      not PublicHostPolicy.cookie_host?(domain) and
       DomainPolicy.allowed?(domain,
         allow: Config.get(:mini_apps_domain_allowlist, []),
         deny: Config.get(:mini_apps_domain_denylist, [])

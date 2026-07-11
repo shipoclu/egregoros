@@ -45,7 +45,20 @@ defmodule EgregorosWeb.MiniAppBrokerControllerTest do
     assert response(get(conn, "/mini-apps/broker/missing?launch_id=#{@launch_id}"), 404)
   end
 
-  defp card_fixture do
+  test "rejects an app on the browser-visible session-cookie hostname at every port", %{
+    conn: conn
+  } do
+    card = card_fixture("https://app.example:444")
+
+    conn =
+      conn
+      |> Map.put(:host, "App.Example.")
+      |> Map.put(:port, 443)
+
+    assert response(get(conn, "/mini-apps/broker/#{card.id}?launch_id=#{@launch_id}"), 404)
+  end
+
+  defp card_fixture(origin \\ "https://app.example") do
     {:ok, object} =
       Objects.create_object(%{
         ap_id: "https://social.example/notes/#{System.unique_integer([:positive])}",
@@ -57,19 +70,19 @@ defmodule EgregorosWeb.MiniAppBrokerControllerTest do
     manifest = %Manifest{
       version: "1",
       name: "Reader",
-      origin: "https://app.example",
-      home_url: "https://app.example/",
+      origin: origin,
+      home_url: origin <> "/",
       capabilities: [],
       cache_ttl_seconds: 600
     }
 
     resolved = %ResolvedCard{
-      source_url: "https://app.example/read/chapter-2",
-      app_origin: "https://app.example",
+      source_url: origin <> "/read/chapter-2",
+      app_origin: origin,
       app_name: "Reader",
       title: "Reader",
       button_title: "Open",
-      launch_url: "https://app.example/read/chapter-2",
+      launch_url: origin <> "/read/chapter-2",
       image_url: nil,
       manifest: manifest
     }

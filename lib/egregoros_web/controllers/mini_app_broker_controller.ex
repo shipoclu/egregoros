@@ -3,10 +3,12 @@ defmodule EgregorosWeb.MiniAppBrokerController do
 
   alias Egregoros.MiniApps.Cards
   alias Egregoros.MiniApps.Card
+  alias Egregoros.PublicHostPolicy
 
   def show(conn, %{"card_id" => card_id, "launch_id" => launch_id}) do
     with true <- valid_launch_id?(launch_id),
-         %Card{} = card <- Cards.get_active_by_id(card_id) do
+         %Card{} = card <- Cards.get_active_by_id(card_id),
+         false <- cookie_host_app?(card, conn.host) do
       nonce = :crypto.strong_rand_bytes(18) |> Base.url_encode64(padding: false)
 
       conn
@@ -28,6 +30,16 @@ defmodule EgregorosWeb.MiniAppBrokerController do
     do: String.match?(value, ~r/^[A-Za-z0-9_-]{43}$/)
 
   defp valid_launch_id?(_value), do: false
+
+  defp cookie_host_app?(%Card{app_origin: origin}, request_host) do
+    case URI.parse(origin) do
+      %URI{host: host} when is_binary(host) ->
+        PublicHostPolicy.cookie_host?(host, request_host)
+
+      _ ->
+        true
+    end
+  end
 
   defp policy(app_origin, nonce) do
     [
