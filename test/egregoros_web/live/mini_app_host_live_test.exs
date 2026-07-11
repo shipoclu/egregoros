@@ -597,6 +597,87 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
     assert has_element?(view, "#mini-app-wallet-incompatible")
   end
 
+  test "privileged wallet requests are reviewed exactly and rechecked before execution", %{
+    conn: conn,
+    user: user
+  } do
+    account = "0x1111111111111111111111111111111111111111"
+    params = ["0x68656c6c6f", account]
+
+    {:ok, note} =
+      Pipeline.ingest(
+        Note.build(user, ~s(<a href="https://app.example/shared/wallet">wallet</a>)),
+        local: true
+      )
+
+    assert {:ok, _card} = Cards.put(note, resolved_card(wallet?: true))
+
+    assert {:ok, _connection} =
+             WalletConnections.connect(user.id, "https://app.example", [account])
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/?timeline=public")
+    view |> element("[data-role='open-mini-app']") |> render_click()
+    launch_id = :sys.get_state(view.pid).socket.assigns.mini_app_host.launch_id
+    render_hook(view, "mini_app_ready", %{"launch_id" => launch_id})
+
+    render_hook(view, "mini_app_wallet_request", %{
+      "launch_id" => launch_id,
+      "request_id" => "sign-1",
+      "method" => "personal_sign",
+      "params" => params
+    })
+
+    assert_push_event(view, "mini_app_wallet_preflight", %{
+      launch_id: ^launch_id,
+      request_id: "sign-1"
+    })
+
+    render_hook(view, "mini_app_wallet_preflight_result", %{
+      "launch_id" => launch_id,
+      "request_id" => "sign-1",
+      "status" => "ok",
+      "chain_id" => "0x2105",
+      "accounts" => [account]
+    })
+
+    assert has_element?(view, "#mini-app-wallet-approval[data-method='personal_sign']")
+    assert has_element?(view, "#mini-app-wallet-review-message", "0x68656c6c6f")
+
+    view |> element("#mini-app-wallet-approve") |> render_click()
+
+    assert_push_event(view, "mini_app_wallet_execute", %{
+      launch_id: ^launch_id,
+      request_id: "sign-1",
+      method: "personal_sign",
+      params: ^params,
+      expected_chain_id: "0x2105",
+      expected_accounts: [^account]
+    })
+
+    signature = "0x" <> String.duplicate("ab", 65)
+
+    render_hook(view, "mini_app_wallet_execution_result", %{
+      "launch_id" => launch_id,
+      "request_id" => "sign-1",
+      "status" => "ok",
+      "result" => signature
+    })
+
+    assert_push_event(view, "mini_app_wallet_response", %{
+      launch_id: ^launch_id,
+      request_id: "sign-1",
+      result: ^signature
+    })
+
+    render_hook(view, "mini_app_wallet_preflight_result", %{
+      "launch_id" => launch_id,
+      "request_id" => "malformed"
+    })
+
+    assert has_element?(view, "#mini-app-host[data-state='open']")
+  end
+
   defp resolved_card(options \\ []) do
     oauth? = Keyword.get(options, :oauth?, false)
     wallet? = Keyword.get(options, :wallet?, false)

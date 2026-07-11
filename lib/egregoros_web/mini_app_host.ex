@@ -13,6 +13,7 @@ defmodule EgregorosWeb.MiniAppHost do
   alias Egregoros.MiniApps.LaunchContext
   alias Egregoros.MiniApps.OAuthRegistrations
   alias Egregoros.MiniApps.WalletConnections
+  alias Egregoros.MiniApps.WalletRequest
   alias Egregoros.Publish
   alias Egregoros.User
   alias Egregoros.Users
@@ -364,7 +365,11 @@ defmodule EgregorosWeb.MiniAppHost do
         </section>
 
         <section
-          :if={(@state.status == :open and @state.wallet_request) && @state.wallet_request.confirm?}
+          :if={
+            (@state.status == :open and @state.wallet_request) &&
+              @state.wallet_request.confirm? &&
+              @state.wallet_request.method == "eth_requestAccounts"
+          }
           id="mini-app-wallet-connection"
           class="absolute inset-0 z-30 flex items-center justify-center bg-[color:var(--text-primary)]/60 p-4"
           role="dialog"
@@ -395,6 +400,68 @@ defmodule EgregorosWeb.MiniAppHost do
                 class="cursor-pointer border-2 border-[color:var(--border-default)] bg-[color:var(--text-primary)] px-4 py-2 text-sm font-bold text-[color:var(--bg-base)]"
               >
                 Choose accounts
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section
+          :if={
+            (@state.status == :open and @state.wallet_request) &&
+              @state.wallet_request.confirm? &&
+              @state.wallet_request.method in [
+                "personal_sign",
+                "eth_signTypedData_v4",
+                "eth_sendTransaction"
+              ]
+          }
+          id="mini-app-wallet-approval"
+          data-method={@state.wallet_request.method}
+          class="absolute inset-0 z-30 flex items-center justify-center bg-[color:var(--text-primary)]/60 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="mini-app-wallet-approval-title"
+        >
+          <div class="max-h-full w-full max-w-md overflow-y-auto border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] p-5 shadow-[6px_6px_0_var(--border-default)]">
+            <h2 id="mini-app-wallet-approval-title" class="font-bold text-[color:var(--text-primary)]">
+              Review wallet request
+            </h2>
+            <p class="mt-2 text-sm leading-relaxed text-[color:var(--text-secondary)]">
+              <span class="font-mono font-bold">{display_origin(@state.card.app_origin)}</span>
+              is requesting this exact action. Egregoros does not simulate its effects.
+            </p>
+            <div class="mt-4 space-y-3 border border-[color:var(--border-muted)] bg-[color:var(--bg-subtle)] p-3 font-mono text-xs text-[color:var(--text-primary)]">
+              <%= case @state.wallet_request.summary do %>
+                <% %{kind: :personal_sign, message: message} -> %>
+                  <p id="mini-app-wallet-review-message" class="break-all">{message}</p>
+                <% %{kind: :typed_data} = summary -> %>
+                  <p>Domain: {summary.domain || "(not declared)"}</p>
+                  <p>Type: {summary.primary_type || "(not declared)"}</p>
+                  <p>Chain: {summary.chain_id || "(not declared)"}</p>
+                <% %{kind: :transaction} = summary -> %>
+                  <p class="break-all">From: {summary.from}</p>
+                  <p class="break-all">To: {summary.to || "(contract creation)"}</p>
+                  <p>Value: {summary.value || "0x0"}</p>
+                  <p>Gas: {summary.gas || "wallet estimate"}</p>
+                  <p class="break-all">Data: {summary.data || "0x"}</p>
+              <% end %>
+            </div>
+            <div class="mt-5 flex justify-end gap-2">
+              <button
+                id="mini-app-wallet-deny"
+                type="button"
+                phx-click="mini_app_wallet_deny"
+                class="cursor-pointer border-2 border-[color:var(--border-default)] px-4 py-2 text-sm font-bold"
+              >
+                Reject
+              </button>
+              <button
+                id="mini-app-wallet-approve"
+                type="button"
+                phx-click="mini_app_wallet_confirm"
+                class="cursor-pointer border-2 border-[color:var(--border-default)] bg-[color:var(--text-primary)] px-4 py-2 text-sm font-bold text-[color:var(--bg-base)]"
+              >
+                Confirm in wallet
               </button>
             </div>
           </div>
@@ -753,6 +820,93 @@ defmodule EgregorosWeb.MiniAppHost do
     end
   end
 
+  defp handle_host_event(
+         "mini_app_wallet_request",
+         %{
+           "launch_id" => launch_id,
+           "request_id" => request_id,
+           "method" => method,
+           "params" => params
+         },
+         socket
+       )
+       when method in ["personal_sign", "eth_signTypedData_v4", "eth_sendTransaction"] do
+    state = socket.assigns.mini_app_host
+    user_id = socket.assigns.mini_app_user_id
+
+    with true <- wallet_request_allowed?(state, launch_id, request_id, user_id),
+         approved when approved != [] <-
+           WalletConnections.accounts(user_id, state.card.app_origin),
+         {:ok, request} <- WalletRequest.validate(method, params, approved) do
+      pending = Map.merge(request, %{request_id: request_id, confirm?: false})
+
+      socket =
+        socket
+        |> Phoenix.Component.assign(:mini_app_host, %{state | wallet_request: pending})
+        |> Phoenix.LiveView.push_event("mini_app_wallet_preflight", %{
+          launch_id: state.launch_id,
+          request_id: request_id
+        })
+
+      {:halt, socket}
+    else
+      _other ->
+        {:halt, push_wallet_rejection(socket, request_id, 4100, "Wallet access unavailable")}
+    end
+  end
+
+  defp handle_host_event(
+         "mini_app_wallet_preflight_result",
+         %{
+           "launch_id" => launch_id,
+           "request_id" => request_id,
+           "status" => "ok",
+           "chain_id" => chain_id,
+           "accounts" => accounts
+         },
+         socket
+       ) do
+    state = socket.assigns.mini_app_host
+    current = normalize_wallet_accounts(accounts)
+
+    case state.wallet_request do
+      %{request_id: ^request_id, account: account, confirm?: false} = request
+      when state.launch_id == launch_id ->
+        if valid_chain_id?(chain_id) and wallet_chain_allowed?(state, chain_id) and
+             String.downcase(account) in current do
+          pending =
+            Map.merge(request, %{
+              confirm?: true,
+              expected_chain_id: chain_id,
+              expected_accounts: current
+            })
+
+          {:halt,
+           Phoenix.Component.assign(socket, :mini_app_host, %{state | wallet_request: pending})}
+        else
+          {:halt, push_wallet_error(socket, request_id, 4901, "Wallet account or chain changed")}
+        end
+
+      _other ->
+        {:halt, socket}
+    end
+  end
+
+  defp handle_host_event(
+         "mini_app_wallet_preflight_result",
+         %{"launch_id" => launch_id, "request_id" => request_id, "status" => "error"},
+         socket
+       ) do
+    state = socket.assigns.mini_app_host
+
+    if (state.launch_id == launch_id and state.wallet_request) &&
+         state.wallet_request.request_id == request_id do
+      {:halt, push_wallet_error(socket, request_id, 4900, "Wallet preflight failed")}
+    else
+      {:halt, socket}
+    end
+  end
+
   defp handle_host_event("mini_app_wallet_confirm", _params, socket) do
     state = socket.assigns.mini_app_host
 
@@ -768,6 +922,41 @@ defmodule EgregorosWeb.MiniAppHost do
 
         {:halt, socket}
 
+      %{
+        request_id: request_id,
+        method: method,
+        params: params,
+        fingerprint: fingerprint,
+        account: account,
+        confirm?: true,
+        expected_chain_id: chain_id,
+        expected_accounts: accounts
+      } = request ->
+        user_id = socket.assigns.mini_app_user_id
+        approved = WalletConnections.accounts(user_id, state.card.app_origin)
+
+        with true <- active_card?(state.card),
+             true <- Declarations.wallet_enabled?(state.card.app_origin),
+             true <- String.downcase(account) in approved,
+             {:ok, validated} <- WalletRequest.validate(method, params, approved),
+             true <- validated.fingerprint == fingerprint do
+          socket =
+            socket
+            |> Phoenix.Component.assign(:mini_app_host, %{
+              state
+              | wallet_request: %{request | confirm?: false}
+            })
+            |> push_wallet_execute(request_id, method, params,
+              expected_chain_id: chain_id,
+              expected_accounts: accounts
+            )
+
+          {:halt, socket}
+        else
+          _other ->
+            {:halt, push_wallet_error(socket, request_id, 4100, "Wallet access unavailable")}
+        end
+
       _ ->
         {:halt, socket}
     end
@@ -775,8 +964,11 @@ defmodule EgregorosWeb.MiniAppHost do
 
   defp handle_host_event("mini_app_wallet_deny", _params, socket) do
     case socket.assigns.mini_app_host.wallet_request do
-      %{request_id: request_id} ->
+      %{request_id: request_id, method: "eth_requestAccounts"} ->
         {:halt, push_wallet_error(socket, request_id, 4001, "User rejected wallet connection")}
+
+      %{request_id: request_id} ->
+        {:halt, push_wallet_error(socket, request_id, 4001, "User rejected wallet request")}
 
       _ ->
         {:halt, socket}
@@ -840,6 +1032,14 @@ defmodule EgregorosWeb.MiniAppHost do
       {:halt, socket}
     end
   end
+
+  defp handle_host_event(event, _params, socket)
+       when event in [
+              "mini_app_wallet_request",
+              "mini_app_wallet_preflight_result",
+              "mini_app_wallet_execution_result"
+            ],
+       do: {:halt, socket}
 
   defp handle_host_event(_event, _params, socket), do: {:cont, socket}
 
@@ -1057,18 +1257,27 @@ defmodule EgregorosWeb.MiniAppHost do
 
     socket
     |> Phoenix.Component.assign(:mini_app_host, %{state | wallet_request: request})
-    |> push_wallet_execute(request_id, method)
+    |> push_wallet_execute(request_id, method, [])
   end
 
-  defp push_wallet_execute(socket, request_id, method) do
+  defp push_wallet_execute(socket, request_id, method),
+    do: push_wallet_execute(socket, request_id, method, [])
+
+  defp push_wallet_execute(socket, request_id, method, params, extra \\ []) do
     state = socket.assigns.mini_app_host
 
-    Phoenix.LiveView.push_event(socket, "mini_app_wallet_execute", %{
+    payload = %{
       launch_id: state.launch_id,
       request_id: request_id,
       method: method,
-      params: []
-    })
+      params: params
+    }
+
+    Phoenix.LiveView.push_event(
+      socket,
+      "mini_app_wallet_execute",
+      Map.merge(payload, Map.new(extra))
+    )
   end
 
   defp finish_wallet_execution(socket, %{"status" => "error"} = params) do
@@ -1117,6 +1326,30 @@ defmodule EgregorosWeb.MiniAppHost do
           state.wallet_request.request_id,
           Enum.filter(approved, &(&1 in current))
         )
+
+      method when method in ["personal_sign", "eth_signTypedData_v4"] ->
+        if valid_signature?(result) do
+          push_wallet_result(socket, state.wallet_request.request_id, result)
+        else
+          push_wallet_error(
+            socket,
+            state.wallet_request.request_id,
+            -32603,
+            "Invalid wallet response"
+          )
+        end
+
+      "eth_sendTransaction" ->
+        if valid_transaction_hash?(result) do
+          push_wallet_result(socket, state.wallet_request.request_id, result)
+        else
+          push_wallet_error(
+            socket,
+            state.wallet_request.request_id,
+            -32603,
+            "Invalid wallet response"
+          )
+        end
     end
   end
 
@@ -1168,6 +1401,28 @@ defmodule EgregorosWeb.MiniAppHost do
     do: String.match?(value, ~r/^0x(?:0|[1-9a-fA-F][0-9a-fA-F]*)$/)
 
   defp valid_chain_id?(_value), do: false
+
+  defp wallet_chain_allowed?(state, chain_id) do
+    required = wallet_value(state, :wallet_evm_required_chains, [])
+    required == [] or evm_chain_reference(chain_id) in required
+  end
+
+  defp evm_chain_reference("0x" <> encoded) do
+    case Integer.parse(encoded, 16) do
+      {chain_id, ""} -> "eip155:#{chain_id}"
+      _other -> nil
+    end
+  end
+
+  defp valid_signature?(value) when is_binary(value),
+    do: String.match?(value, ~r/^0x[0-9a-fA-F]{130}$/)
+
+  defp valid_signature?(_value), do: false
+
+  defp valid_transaction_hash?(value) when is_binary(value),
+    do: String.match?(value, ~r/^0x[0-9a-fA-F]{64}$/)
+
+  defp valid_transaction_hash?(_value), do: false
 
   defp normalize_wallet_accounts(accounts) when is_list(accounts) do
     accounts

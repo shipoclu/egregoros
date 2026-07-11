@@ -356,6 +356,82 @@ test("wallet discovery and connection requests use a strict, replay-safe schema"
     {requestId: "wallet-chain", method: "eth_chainId", params: []},
     {requestId: "wallet-accounts", method: "eth_accounts", params: []},
     {requestId: "wallet-connect", method: "eth_requestAccounts", params: []},
+    {
+      requestId: "wallet-sign",
+      method: "personal_sign",
+      params: ["0x12", "0x1111111111111111111111111111111111111111"],
+    },
+  ])
+  broker.destroy()
+})
+
+test("privileged wallet methods require activation and exact bounded payloads", async () => {
+  const fixture = iframeFixture()
+  const requests = []
+  const account = "0x1111111111111111111111111111111111111111"
+  const broker = createMiniAppBroker({
+    iframe: fixture.iframe,
+    appOrigin: "https://wallet.example",
+    launchId: "launch-sign",
+    capabilities: ["wallet.evm"],
+    onWalletRequest: request => requests.push(request),
+  })
+
+  fixture.load()
+  const appPort = fixture.posts[0].transfer[0]
+  const personal = {
+    type: "walletRequest",
+    version: "1",
+    launchId: "launch-sign",
+    requestId: "sign-1",
+    method: "personal_sign",
+    params: ["0x68656c6c6f", account],
+    userActivation: true,
+  }
+
+  appPort.postMessage({...personal, userActivation: false})
+  appPort.postMessage({...personal, method: "eth_sign"})
+  appPort.postMessage({...personal, params: ["hello", "not-an-address"]})
+  appPort.postMessage(personal)
+  appPort.postMessage(personal)
+  appPort.postMessage({
+    ...personal,
+    requestId: "typed-1",
+    method: "eth_signTypedData_v4",
+    params: [account, '{"types":{},"primaryType":"Mail","domain":{},"message":{}}'],
+  })
+  appPort.postMessage({
+    ...personal,
+    requestId: "tx-1",
+    method: "eth_sendTransaction",
+    params: [
+      {
+        from: account,
+        to: "0x2222222222222222222222222222222222222222",
+        value: "0x1",
+      },
+    ],
+  })
+  await tick()
+
+  assert.deepEqual(requests, [
+    {requestId: "sign-1", method: "personal_sign", params: personal.params},
+    {
+      requestId: "typed-1",
+      method: "eth_signTypedData_v4",
+      params: [account, '{"types":{},"primaryType":"Mail","domain":{},"message":{}}'],
+    },
+    {
+      requestId: "tx-1",
+      method: "eth_sendTransaction",
+      params: [
+        {
+          from: account,
+          to: "0x2222222222222222222222222222222222222222",
+          value: "0x1",
+        },
+      ],
+    },
   ])
   broker.destroy()
 })

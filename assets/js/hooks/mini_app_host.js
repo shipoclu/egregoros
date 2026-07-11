@@ -1,6 +1,7 @@
 import {createMiniAppBroker} from "../lib/mini_app_broker.mjs"
 import {createMiniAppAuthRelay} from "../lib/mini_app_auth_relay.mjs"
 import {selectEvmWalletAdapter} from "../wallet/evm_wallet_adapter.mjs"
+import {walletContextMatches} from "../wallet/wallet_execution_guard.mjs"
 
 const MiniAppHost = {
   mounted() {
@@ -141,6 +142,16 @@ const MiniAppHost = {
       if (payload?.launch_id !== this.el.dataset.launchId) return
 
       try {
+        if (payload.expected_chain_id || payload.expected_accounts) {
+          const matches = await walletContextMatches(this.walletAdapter, {
+            chainId: payload.expected_chain_id,
+            accounts: payload.expected_accounts,
+          })
+          if (!matches) {
+            throw Object.assign(new Error("Wallet account or chain changed"), {code: 4901})
+          }
+        }
+
         const result = await this.walletAdapter.request({
           method: payload.method,
           params: payload.params,
@@ -157,6 +168,29 @@ const MiniAppHost = {
           request_id: payload.request_id,
           status: "error",
           code: Number.isInteger(error?.code) ? error.code : 4001,
+        })
+      }
+    })
+    this.handleEvent("mini_app_wallet_preflight", async payload => {
+      if (payload?.launch_id !== this.el.dataset.launchId) return
+
+      try {
+        const [chainId, accounts] = await Promise.all([
+          this.walletAdapter.request({method: "eth_chainId", params: []}),
+          this.walletAdapter.request({method: "eth_accounts", params: []}),
+        ])
+        this.pushEvent("mini_app_wallet_preflight_result", {
+          launch_id: payload.launch_id,
+          request_id: payload.request_id,
+          status: "ok",
+          chain_id: chainId,
+          accounts,
+        })
+      } catch (_error) {
+        this.pushEvent("mini_app_wallet_preflight_result", {
+          launch_id: payload.launch_id,
+          request_id: payload.request_id,
+          status: "error",
         })
       }
     })

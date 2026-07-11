@@ -71,7 +71,7 @@ const validTransaction = transaction => {
   return transaction.to !== undefined || transaction.data !== undefined
 }
 
-const validPayload = ({method, params}) => {
+export const validEvmWalletPayload = ({method, params}) => {
   if (["eth_accounts", "eth_chainId", "eth_requestAccounts"].includes(method)) return noParams(params)
   if (method === "personal_sign") {
     return Array.isArray(params) && params.length === 2 && validMessage(params[0]) && validAddress(params[1])
@@ -95,7 +95,7 @@ export const createInjectedEvmWalletAdapter = ({ethereum} = {}) => ({
     if (!payload || !allowedMethods.has(payload.method)) {
       throw walletError(4200, "Unsupported wallet method")
     }
-    if (!validPayload(payload)) {
+    if (!validEvmWalletPayload(payload)) {
       throw walletError(-32602, "Invalid wallet parameters")
     }
     return ethereum.request({method: payload.method, params: payload.params || []})

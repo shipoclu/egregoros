@@ -1,3 +1,5 @@
+import {validEvmWalletPayload} from "../wallet/injected_evm_wallet_adapter.mjs"
+
 const protocolVersion = "1"
 
 const validReadyMessage = (message, launchId) =>
@@ -146,10 +148,10 @@ const validWalletRequest = (message, launchId) =>
   message.version === protocolVersion &&
   message.launchId === launchId &&
   validRequestId(message.requestId) &&
-  ["eth_accounts", "eth_chainId", "eth_requestAccounts"].includes(message.method) &&
-  Array.isArray(message.params) &&
-  message.params.length === 0 &&
-  (message.method !== "eth_requestAccounts" || message.userActivation === true) &&
+  validEvmWalletPayload({method: message.method, params: message.params}) &&
+  (!["eth_requestAccounts", "personal_sign", "eth_signTypedData_v4", "eth_sendTransaction"].includes(
+    message.method
+  ) || message.userActivation === true) &&
   typeof message.userActivation === "boolean"
 
 export const createMiniAppBroker = ({
@@ -251,7 +253,7 @@ export const createMiniAppBroker = ({
         onWalletRequest?.({
           requestId: message.requestId,
           method: message.method,
-          params: [],
+          params: structuredClone(message.params),
         })
       }
     }
