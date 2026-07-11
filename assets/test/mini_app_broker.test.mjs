@@ -446,3 +446,72 @@ test("privileged wallet methods require activation and exact bounded payloads", 
   ])
   broker.destroy()
 })
+
+test("notification permission requests are capability-gated, strict, and replay-safe", async () => {
+  const fixture = iframeFixture()
+  const requests = []
+  const broker = createMiniAppBroker({
+    iframe: fixture.iframe,
+    appOrigin: "https://app.example",
+    hostOrigin: "https://social.example",
+    launchId: "launch-notifications",
+    capabilities: ["notifications.activitypub"],
+    onNotificationPermissionRequest: request => requests.push(request),
+  })
+
+  fixture.load()
+  const appPort = fixture.posts[0].transfer[0]
+  const get = {
+    type: "getNotificationPermission",
+    version: "1",
+    launchId: "launch-notifications",
+    requestId: "notification-get",
+  }
+  const request = {
+    type: "requestNotificationPermission",
+    version: "1",
+    launchId: "launch-notifications",
+    requestId: "notification-request",
+    userActivation: true,
+  }
+
+  appPort.postMessage({...get, launchId: "wrong"})
+  appPort.postMessage({...get, extra: true})
+  appPort.postMessage({...request, userActivation: false})
+  appPort.postMessage(request)
+  appPort.postMessage(request)
+  appPort.postMessage(get)
+  appPort.postMessage(get)
+  await tick()
+
+  assert.deepEqual(requests, [
+    {requestId: "notification-request", action: "request"},
+    {requestId: "notification-get", action: "get"},
+  ])
+  broker.destroy()
+})
+
+test("notification messages are rejected when the host omitted the capability", async () => {
+  const fixture = iframeFixture()
+  const requests = []
+  const broker = createMiniAppBroker({
+    iframe: fixture.iframe,
+    appOrigin: "https://app.example",
+    hostOrigin: "https://social.example",
+    launchId: "launch-no-notifications",
+    capabilities: [],
+    onNotificationPermissionRequest: request => requests.push(request),
+  })
+
+  fixture.load()
+  const appPort = fixture.posts[0].transfer[0]
+  appPort.postMessage({
+    type: "getNotificationPermission",
+    version: "1",
+    launchId: "launch-no-notifications",
+    requestId: "notification-get",
+  })
+  await tick()
+  assert.deepEqual(requests, [])
+  broker.destroy()
+})

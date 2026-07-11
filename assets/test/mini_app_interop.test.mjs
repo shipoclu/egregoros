@@ -81,7 +81,7 @@ test("reference SDK and host broker interoperate over one private channel", asyn
     appOrigin,
     hostOrigin,
     launchId,
-    capabilities: ["wallet.evm"],
+    capabilities: ["notifications.activitypub", "wallet.evm"],
     onReady: () => events.push("ready"),
     onContextRequest: requestId =>
       broker.send({
@@ -99,6 +99,15 @@ test("reference SDK and host broker interoperate over one private channel", asyn
         launchId,
         requestId: request.requestId,
         status: "approved",
+      }),
+    onNotificationPermissionRequest: request =>
+      broker.send({
+        type: "notificationPermissionResult",
+        version: "1",
+        launchId,
+        requestId: request.requestId,
+        state: request.action === "request" ? "granted" : "prompt",
+        actorUrl: "https://app.example/ap/actor",
       }),
     onWalletRequest: request =>
       broker.send({
@@ -133,6 +142,14 @@ test("reference SDK and host broker interoperate over one private channel", asyn
   assert.deepEqual(await sdk.getContext(), {launchUrl: "https://app.example/chapter/2"})
   assert.deepEqual(await sdk.openExternal("https://docs.example/chapter/2"), {
     status: "approved",
+  })
+  assert.deepEqual(await sdk.notifications.getPermission(), {
+    state: "prompt",
+    actorUrl: "https://app.example/ap/actor",
+  })
+  assert.deepEqual(await sdk.notifications.requestPermission(), {
+    state: "granted",
+    actorUrl: "https://app.example/ap/actor",
   })
   assert.equal(
     await sdk.wallet.getProvider().request({method: "eth_chainId", params: []}),

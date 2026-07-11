@@ -67,8 +67,9 @@ Egregoros tabs immediately.
 For developers considering app-owned public ActivityPub notes and future
 consent-gated transactional mentions, see
 [`MINIAPP_ACTIVITYPUB_MESSAGES.md`](MINIAPP_ACTIVITYPUB_MESSAGES.md). The
-manifest declaration and consent data model are implemented; the SDK permission
-flow and inbound transactional enforcement remain future work.
+manifest declaration, consent data model, and typed SDK/broker transport are
+implemented; host consent UI and inbound transactional enforcement remain
+future work.
 
 ## Architecture (quick tour)
 

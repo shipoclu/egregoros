@@ -2,9 +2,9 @@
 
 > Status: public ActivityPub publishing can be implemented independently today.
 > Egregoros parses and immutably persists the mini-app actor declaration and
-> notification-consent decisions. The SDK permission methods, actor-document
-> activation, backend permission endpoint, and inbound consent enforcement are
-> not yet implemented.
+> notification-consent decisions. The SDK and broker implement the typed
+> permission transport. Host UI/routing, actor-document activation, the backend
+> permission endpoint, and inbound consent enforcement are not yet implemented.
 
 This guide defines the smallest useful ActivityPub service a mini-app developer
 can operate for two distinct purposes:
@@ -327,8 +327,8 @@ model are implemented. A complete Egregoros flow still needs:
 
 1. SSRF-safe actor-document validation before activating the declaration;
 2. host-owned consent and revocation UI over the existing consent storage;
-3. broker and SDK `getPermission`/`requestPermission` messages and TypeScript
-   declarations;
+3. host-hook and LiveView routing/UI for the implemented typed SDK and broker
+   permission messages;
 4. the OAuth-authenticated backend permission endpoint;
 5. inbound transactional-mention recognition and consent enforcement;
 6. immediate cross-tab revocation behavior and audit events; and

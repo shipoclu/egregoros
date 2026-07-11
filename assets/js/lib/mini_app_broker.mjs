@@ -22,6 +22,31 @@ const validContextRequest = (message, launchId) =>
   message.launchId === launchId &&
   validRequestId(message.requestId)
 
+const validNotificationPermissionGetRequest = (message, launchId) =>
+  !!message &&
+  typeof message === "object" &&
+  !Array.isArray(message) &&
+  Object.keys(message).length === 4 &&
+  Object.keys(message).every(key => ["type", "version", "launchId", "requestId"].includes(key)) &&
+  message.type === "getNotificationPermission" &&
+  message.version === protocolVersion &&
+  message.launchId === launchId &&
+  validRequestId(message.requestId)
+
+const validNotificationPermissionPromptRequest = (message, launchId) =>
+  !!message &&
+  typeof message === "object" &&
+  !Array.isArray(message) &&
+  Object.keys(message).length === 5 &&
+  Object.keys(message).every(key =>
+    ["type", "version", "launchId", "requestId", "userActivation"].includes(key)
+  ) &&
+  message.type === "requestNotificationPermission" &&
+  message.version === protocolVersion &&
+  message.launchId === launchId &&
+  validRequestId(message.requestId) &&
+  message.userActivation === true
+
 const validRequestId = requestId =>
   typeof requestId === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(requestId)
 
@@ -177,6 +202,7 @@ export const createMiniAppBroker = ({
   onLoading,
   onReady,
   onContextRequest,
+  onNotificationPermissionRequest,
   onAuthRequest,
   onComposeRequest,
   onCloseRequest,
@@ -227,6 +253,24 @@ export const createMiniAppBroker = ({
       ) {
         onContextRequest?.(message.requestId)
         return
+      }
+
+      if (capabilities.includes("notifications.activitypub")) {
+        if (
+          validNotificationPermissionGetRequest(message, launchId) &&
+          acceptOnce(`notification:${message.requestId}`)
+        ) {
+          onNotificationPermissionRequest?.({requestId: message.requestId, action: "get"})
+          return
+        }
+
+        if (
+          validNotificationPermissionPromptRequest(message, launchId) &&
+          acceptOnce(`notification:${message.requestId}`)
+        ) {
+          onNotificationPermissionRequest?.({requestId: message.requestId, action: "request"})
+          return
+        }
       }
 
       if (validAuthRequest(message, launchId) && acceptOnce(`auth:${message.requestId}`)) {

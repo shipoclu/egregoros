@@ -26,6 +26,16 @@ const validOrigin = value => {
   }
 }
 
+const validHttpsUrl = value => {
+  if (typeof value !== "string" || value.length > 2048) return false
+  try {
+    const url = new URL(value)
+    return url.protocol === "https:" && !!url.hostname && !url.username && !url.password && !url.hash
+  } catch (_error) {
+    return false
+  }
+}
+
 const frozenBootstrap = message =>
   Object.freeze({
     version: message.version,
@@ -204,6 +214,29 @@ export const createFediverseMiniAppSDK = ({
       return
     }
 
+    if (message.type === "notificationPermissionResult") {
+      if (
+        !exactFields(message, [
+          "type",
+          "version",
+          "launchId",
+          "requestId",
+          "state",
+          "actorUrl",
+        ]) ||
+        !requestIdPattern.test(message.requestId || "") ||
+        !["prompt", "granted", "denied"].includes(message.state) ||
+        !validHttpsUrl(message.actorUrl)
+      ) {
+        return
+      }
+      settle(message, "requestId", "notificationPermissionResult", result => ({
+        state: result.state,
+        actorUrl: result.actorUrl,
+      }))
+      return
+    }
+
     if (message.type === "walletResult") {
       const baseFields = ["type", "version", "launchId", "requestId"]
       const valid =
@@ -285,6 +318,12 @@ export const createFediverseMiniAppSDK = ({
 
   const userActivation = () => navigatorObject?.userActivation?.isActive === true
 
+  const requireCapability = capability => {
+    if (!bootstrapData.capabilities.includes(capability)) {
+      throw miniAppError("CAPABILITY_UNAVAILABLE", `${capability} capability is unavailable`)
+    }
+  }
+
   const provider = Object.freeze({
     request: async payload => {
       await connected
@@ -364,6 +403,30 @@ export const createFediverseMiniAppSDK = ({
       return () => callbacks.delete(callback)
     },
     wallet: Object.freeze({getProvider: () => provider}),
+    notifications: Object.freeze({
+      getPermission: async () => {
+        await connected
+        requireCapability("notifications.activitypub")
+        return request(
+          {type: "getNotificationPermission"},
+          "notificationPermissionResult"
+        )
+      },
+      requestPermission: async () => {
+        await connected
+        requireCapability("notifications.activitypub")
+        if (!userActivation()) {
+          throw miniAppError(
+            "USER_ACTIVATION_REQUIRED",
+            "Notification permission requires a user gesture"
+          )
+        }
+        return request(
+          {type: "requestNotificationPermission", userActivation: true},
+          "notificationPermissionResult"
+        )
+      },
+    }),
     destroy: () => {
       if (destroyed) return
       destroyed = true

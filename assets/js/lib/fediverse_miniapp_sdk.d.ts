@@ -1,5 +1,5 @@
 export type MiniAppProtocolVersion = "1"
-export type MiniAppCapability = "wallet.evm" | (string & {})
+export type MiniAppCapability = "notifications.activitypub" | "wallet.evm" | (string & {})
 export type MiniAppVisibility = "public" | "unlisted" | "followers" | "direct"
 export type Hex = `0x${string}`
 export type EvmAddress = `0x${string}`
@@ -62,6 +62,13 @@ export interface MiniAppComposePublishedReceipt {
   readonly scope: MiniAppVisibility
 }
 
+export type MiniAppNotificationPermissionState = "prompt" | "granted" | "denied"
+
+export interface MiniAppNotificationPermission {
+  readonly state: MiniAppNotificationPermissionState
+  readonly actorUrl: string
+}
+
 export interface EvmTransactionRequest {
   readonly from: EvmAddress
   readonly to?: EvmAddress
@@ -117,6 +124,10 @@ export interface FediverseMiniAppSDK {
   readonly bootstrap: MiniAppBootstrap | null
   readonly wallet: {
     getProvider(): MiniAppEvmProvider
+  }
+  readonly notifications: {
+    getPermission(): Promise<MiniAppNotificationPermission>
+    requestPermission(): Promise<MiniAppNotificationPermission>
   }
   connect(): Promise<MiniAppBootstrap>
   ready(): Promise<void>

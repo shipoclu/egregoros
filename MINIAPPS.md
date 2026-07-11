@@ -358,10 +358,11 @@ when the signed direct mention arrives, so revocation suppresses user-visible
 delivery even when the sender has stale state.
 
 The current v1 manifest strictly parses and immutably persists the actor
-declaration, and Egregoros has actor-bound consent storage. The SDK permission
-surface, actor-document activation, backend check, host UI, and inbound
-enforcement remain unimplemented. Public ActivityPub publishing requires no
-mini-app host extension and can be implemented independently.
+declaration, Egregoros has actor-bound consent storage, and the SDK/broker have
+a typed, capability-gated permission transport. Actor-document activation, the
+backend check, host routing/UI, and inbound enforcement remain unimplemented.
+Public ActivityPub publishing requires no mini-app host extension and can be
+implemented independently.
 
 #### Dynamic registration
 
@@ -418,7 +419,10 @@ origin-checked `postMessage` handshake. Initial candidate methods:
   versions, locale/theme, the exact launch URL, and (when launched from a
   note) the author, note identifier, content, mentions, and link URL; and
 - `requestAuth(backendPreparedAuthorization)`, `close()`, and
-  `openExternal(url)` — host-mediated actions.
+  `openExternal(url)` — host-mediated actions; and
+- `notifications.getPermission()` and
+  `notifications.requestPermission()` — capability-gated ActivityPub
+  transactional-message permission state and host-owned prompting.
 
 The v1 reference module is built as
 `/assets/js/fediverse-miniapp-sdk-v1.js`. A mini app should vendor and serve a
@@ -458,6 +462,11 @@ button.addEventListener("click", async () => {
 
 const ethereum = sdk.wallet.getProvider()
 const accounts = await ethereum.request({method: "eth_requestAccounts", params: []})
+
+const permission = await sdk.notifications.getPermission()
+notificationButton.addEventListener("click", async () => {
+  await sdk.notifications.requestPermission()
+})
 ```
 
 `requestAuth` accepts the backend-prepared dynamic client ID, exact redirect
@@ -466,7 +475,9 @@ the SDK fixes the method to `S256`. `composeNote(draft)` resolves when the host
 accepts or rejects the draft and `on("composeNotePublished", callback)` emits
 the later publication receipt. `wallet.getProvider()` returns a narrow
 EIP-1193-compatible provider only when `wallet.evm` appears in bootstrap
-capabilities. Calls time out, are correlated by random IDs, and reject with a
+capabilities. Notification methods similarly require
+`notifications.activitypub`; prompting also requires current browser user
+activation. Calls time out, are correlated by random IDs, and reject with a
 stable `error.code`. Destroying the SDK closes the private port and rejects all
 pending calls.
 
@@ -475,6 +486,7 @@ pending calls.
 | Public base | `ready`, `bootstrap`, `getContext`, `close`, `openExternal` | Valid framed app; `getContext` needs context disclosure before note details are sent; `openExternal` needs user gesture. |
 | OAuth initiation | `requestAuth` | Optional `oauth` manifest object and a server-side dynamic registration. |
 | Wallet | `wallet.evm.getProvider` and its allowlisted EIP-1193 calls | Immutable wallet declaration, host wallet availability, and per-app wallet connection/confirmation. No OAuth required. |
+| Transactional notifications | `notifications.getPermission`, `notifications.requestPermission` | Immutable ActivityPub declaration and OAuth; prompting additionally requires a user gesture and host confirmation. |
 | OAuth-gated | `composeNote` | Immutable `compose_note` declaration plus completed OAuth with its fixed `read`-inclusive scope set. |
 
 #### Compose a note

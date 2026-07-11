@@ -257,3 +257,92 @@ test("requires a current user gesture before privileged host actions", async () 
   sdk.destroy()
   hostPort.close()
 })
+
+test("reads and requests ActivityPub notification permission through a typed capability", async () => {
+  const f = fixture()
+  const sdk = createFediverseMiniAppSDK({
+    windowObject: f.windowObject,
+    parentWindow: f.parentWindow,
+    cryptoObject: f.cryptoObject,
+    navigatorObject: {userActivation: {isActive: true}},
+    allowedHostOrigin: () => true,
+  })
+  const hostPort = f.bootstrap({message: {capabilities: ["notifications.activitypub"]}})
+  await sdk.connect()
+
+  const getMessage = nextMessage(hostPort)
+  const getPromise = sdk.notifications.getPermission()
+  const getRequest = await getMessage
+  assert.equal(getRequest.type, "getNotificationPermission")
+  hostPort.postMessage({
+    type: "notificationPermissionResult",
+    version: "1",
+    launchId,
+    requestId: getRequest.requestId,
+    state: "prompt",
+    actorUrl: "https://app.example/ap/actor",
+  })
+  assert.deepEqual(await getPromise, {
+    state: "prompt",
+    actorUrl: "https://app.example/ap/actor",
+  })
+
+  const requestMessage = nextMessage(hostPort)
+  const requestPromise = sdk.notifications.requestPermission()
+  const permissionRequest = await requestMessage
+  assert.equal(permissionRequest.type, "requestNotificationPermission")
+  assert.equal(permissionRequest.userActivation, true)
+  hostPort.postMessage({
+    type: "notificationPermissionResult",
+    version: "1",
+    launchId,
+    requestId: permissionRequest.requestId,
+    state: "granted",
+    actorUrl: "https://app.example/ap/actor",
+  })
+  assert.deepEqual(await requestPromise, {
+    state: "granted",
+    actorUrl: "https://app.example/ap/actor",
+  })
+
+  sdk.destroy()
+  hostPort.close()
+})
+
+test("notification permission is capability-gated and prompting requires activation", async () => {
+  const unavailable = fixture()
+  const unavailableSdk = createFediverseMiniAppSDK({
+    windowObject: unavailable.windowObject,
+    parentWindow: unavailable.parentWindow,
+    cryptoObject: unavailable.cryptoObject,
+    navigatorObject: {userActivation: {isActive: true}},
+    allowedHostOrigin: () => true,
+  })
+  const unavailablePort = unavailable.bootstrap({message: {capabilities: []}})
+  await unavailableSdk.connect()
+  await assert.rejects(
+    unavailableSdk.notifications.getPermission(),
+    error => error.code === "CAPABILITY_UNAVAILABLE"
+  )
+  unavailableSdk.destroy()
+  unavailablePort.close()
+
+  const inactive = fixture()
+  const inactiveSdk = createFediverseMiniAppSDK({
+    windowObject: inactive.windowObject,
+    parentWindow: inactive.parentWindow,
+    cryptoObject: inactive.cryptoObject,
+    navigatorObject: {userActivation: {isActive: false}},
+    allowedHostOrigin: () => true,
+  })
+  const inactivePort = inactive.bootstrap({
+    message: {capabilities: ["notifications.activitypub"]},
+  })
+  await inactiveSdk.connect()
+  await assert.rejects(
+    inactiveSdk.notifications.requestPermission(),
+    error => error.code === "USER_ACTIVATION_REQUIRED"
+  )
+  inactiveSdk.destroy()
+  inactivePort.close()
+})

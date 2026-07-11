@@ -3,6 +3,7 @@ import {
   type EvmAddress,
   type Hex,
   type MiniAppComposePublishedReceipt,
+  type MiniAppNotificationPermission,
 } from "../js/lib/fediverse_miniapp_sdk.d.ts"
 
 const sdk = createFediverseMiniAppSDK({allowedHostOrigin: origin => origin === "https://social.example"})
@@ -17,6 +18,10 @@ const signature: Hex = await provider.request({
   method: "personal_sign",
   params: ["hello", accounts[0]],
 })
+const notificationPermission: MiniAppNotificationPermission =
+  await sdk.notifications.getPermission()
+const requestedNotificationPermission: MiniAppNotificationPermission =
+  await sdk.notifications.requestPermission()
 
 sdk.on("composeNotePublished", (receipt: MiniAppComposePublishedReceipt) => {
   const publishedId: string = receipt.id
@@ -27,3 +32,5 @@ void issuer
 void noteId
 void chainId
 void signature
+void notificationPermission
+void requestedNotificationPermission
