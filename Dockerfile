@@ -38,10 +38,13 @@ FROM ${RUNNER_IMAGE} AS runner
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
+    imagemagick \
     libvips \
     libncurses6 \
     libstdc++6 \
     openssl \
+    procps \
+    python3-minimal \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -49,11 +52,13 @@ WORKDIR /app
 ENV LANG=C.UTF-8
 ENV PHX_SERVER=true
 ENV EGREGOROS_UPLOADS_DIR=/data/uploads
+ENV EGREGOROS_MINI_APP_IMAGE_TMP_DIR=/data/miniapp-images
 
 COPY --from=builder /app/_build/prod/rel/egregoros ./
 
 RUN useradd --create-home --shell /bin/bash egregoros && \
-    mkdir -p /data/uploads && \
+    mkdir -p /data/uploads /data/miniapp-images && \
+    chmod 0700 /data/miniapp-images && \
     chown -R egregoros:egregoros /app /data
 
 USER egregoros

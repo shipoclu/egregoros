@@ -1,6 +1,6 @@
 defmodule Egregoros.Workers.ResolveMiniAppCard do
   use Oban.Worker,
-    queue: :federation_incoming,
+    queue: :mini_apps,
     max_attempts: 3,
     unique: [period: 60, keys: [:object_id]]
 
@@ -89,6 +89,9 @@ defmodule Egregoros.Workers.ResolveMiniAppCard do
               {:error, reason} ->
                 {:error, reason}
             end
+
+          {:error, reason} when reason in [:disabled, :no_mini_app] ->
+            Cards.delete(object)
 
           {:error, reason} ->
             {:error, reason}

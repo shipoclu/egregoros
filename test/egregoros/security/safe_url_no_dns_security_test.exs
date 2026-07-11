@@ -18,6 +18,9 @@ defmodule Egregoros.Security.SafeURLNoDNSSecurityTest do
           "http://0x0a000001/evil.png",
           "http://0x7f.1/evil.png",
           "http://0x7f.0x0.0x0.0x1/evil.png",
+          "http://0177.0.0.1/evil.png",
+          "http://0177.0x0.0.1/evil.png",
+          "http://017700000001/evil.png",
           "http://999.999.999.999/evil.png"
         ],
         fn url ->
@@ -38,6 +41,9 @@ defmodule Egregoros.Security.SafeURLNoDNSSecurityTest do
           "http://0x0a000001/evil.png",
           "http://0x7f.1/evil.png",
           "http://0x7f.0x0.0x0.0x1/evil.png",
+          "http://0177.0.0.1/evil.png",
+          "http://0177.0x0.0.1/evil.png",
+          "http://017700000001/evil.png",
           "http://999.999.999.999/evil.png"
         ],
         fn url ->

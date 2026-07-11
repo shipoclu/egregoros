@@ -61,6 +61,38 @@ if mini_apps_domain_denylist != [] do
   config :egregoros, :mini_apps_domain_denylist, mini_apps_domain_denylist
 end
 
+mini_app_image_python =
+  System.get_env("EGREGOROS_MINI_APP_IMAGE_PYTHON", "")
+  |> String.trim()
+
+if mini_app_image_python != "" do
+  config :egregoros, :mini_app_image_python, mini_app_image_python
+end
+
+mini_app_image_decoder =
+  System.get_env("EGREGOROS_MINI_APP_IMAGE_DECODER", "")
+  |> String.trim()
+
+if mini_app_image_decoder != "" do
+  config :egregoros, :mini_app_image_decoder, mini_app_image_decoder
+end
+
+mini_app_image_kill =
+  System.get_env("EGREGOROS_MINI_APP_IMAGE_KILL", "")
+  |> String.trim()
+
+if mini_app_image_kill != "" do
+  config :egregoros, :mini_app_image_kill, mini_app_image_kill
+end
+
+mini_app_image_tmp_dir =
+  System.get_env("EGREGOROS_MINI_APP_IMAGE_TMP_DIR", "")
+  |> String.trim()
+
+if mini_app_image_tmp_dir != "" do
+  config :egregoros, :mini_app_image_tmp_dir, mini_app_image_tmp_dir
+end
+
 public_host_aliases =
   System.get_env("EGREGOROS_PUBLIC_HOST_ALIASES", "")
   |> String.split(",", trim: true)

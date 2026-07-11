@@ -20,7 +20,7 @@ defmodule Egregoros.Workers.ResolveMiniAppCardTest do
 
     assert_enqueued(
       worker: ResolveMiniAppCard,
-      queue: "federation_incoming",
+      queue: "mini_apps",
       args: %{"object_id" => public.id}
     )
 
@@ -100,7 +100,7 @@ defmodule Egregoros.Workers.ResolveMiniAppCardTest do
     end)
 
     Egregoros.Config.with_impl(Egregoros.Config.Mock, fn ->
-      assert {:error, :no_mini_app} =
+      assert :ok =
                ResolveMiniAppCard.perform(%Oban.Job{args: %{"object_id" => object.id}})
     end)
 
@@ -114,7 +114,7 @@ defmodule Egregoros.Workers.ResolveMiniAppCardTest do
              ResolveMiniAppCard.perform(%Oban.Job{args: %{"object_id" => Ecto.UUID.generate()}})
   end
 
-  test "returns a retryable error when candidates cannot be resolved" do
+  test "does not amplify ordinary discovery failures with Oban retries" do
     object = note_fixture(~s(<a href="https://app.example/read">reader</a>))
     enable_mini_apps()
 
@@ -124,7 +124,7 @@ defmodule Egregoros.Workers.ResolveMiniAppCardTest do
     end)
 
     Egregoros.Config.with_impl(Egregoros.Config.Mock, fn ->
-      assert {:error, :no_mini_app} =
+      assert :ok =
                ResolveMiniAppCard.perform(%Oban.Job{args: %{"object_id" => object.id}})
     end)
   end

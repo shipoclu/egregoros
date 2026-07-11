@@ -16,7 +16,8 @@ config :egregoros, Oban,
   notifier: Oban.Notifiers.PG,
   queues: [
     federation_incoming: 10,
-    federation_outgoing: 25
+    federation_outgoing: 25,
+    mini_apps: 4
   ],
   plugins: [
     {Oban.Plugins.Pruner, max_age: 60 * 60 * 24},
@@ -33,13 +34,16 @@ config :egregoros, Egregoros.AuthZ, Egregoros.AuthZ.OAuthScopes
 config :egregoros, Egregoros.Discovery, Egregoros.Discovery.DNS
 config :egregoros, Egregoros.HTTP, Egregoros.HTTP.Req
 config :egregoros, Egregoros.MiniApps.Fetcher, Egregoros.MiniApps.Fetcher.Req
+config :egregoros, Egregoros.MiniApps.ImageSanitizer, Egregoros.MiniApps.ImageProxy
 config :egregoros, Egregoros.DNS, Egregoros.DNS.Cached
 config :egregoros, Egregoros.AvatarStorage, Egregoros.AvatarStorage.Local
 config :egregoros, Egregoros.MediaStorage, Egregoros.MediaStorage.Local
 
 config :egregoros, Egregoros.DNS.Cached,
   resolver: Egregoros.DNS.Inet,
-  ttl_ms: 60_000
+  ttl_ms: 60_000,
+  max_entries: 4_096,
+  cleanup_interval_ms: 60_000
 
 config :egregoros, :password_iterations, 200_000
 config :egregoros, :mini_apps_enabled, false

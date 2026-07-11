@@ -31,16 +31,44 @@ defmodule Egregoros.SafeURLTest do
     assert resolved.hostname == "app.example"
     assert resolved.ip == {93, 184, 216, 34}
     assert resolved.connect_url == "https://93.184.216.34:8443/path?x=1"
+    assert resolved.authority == "app.example:8443"
+    assert resolved.canonical_url == "https://app.example:8443/path?x=1"
 
     for url <- [
           "http://app.example/path",
           "https://127.0.0.1/path",
           "https://93.184.216.34/path",
+          "https://127.0x0.1/path",
+          "https://127.0.0x0.1/path",
           "https://app.example/path#fragment",
-          "https://user@app.example/path"
+          "https://user@app.example/path",
+          "https://@app.example/path"
         ] do
       assert {:error, :unsafe_url} = SafeURL.resolve_https_domain_url(url)
     end
+  end
+
+  test "exported URL resolution rejects parser-differential byte sequences" do
+    for suffix <- [
+          "/raw\r\nheader:value",
+          "/raw\0value",
+          "/raw\tvalue",
+          "/has space",
+          "/back\\slash",
+          "/bare%",
+          "/short%0",
+          "/invalid%zz",
+          "/encoded%00nul",
+          "/encoded%0dreturn",
+          "/encoded%0Alinefeed",
+          "/encoded%7fdelete",
+          "/encoded%5cbackslash"
+        ] do
+      assert {:error, :unsafe_url} =
+               SafeURL.resolve_https_domain_url("https://app.example" <> suffix)
+    end
+
+    assert {:error, :unsafe_url} = SafeURL.resolve_https_domain_url("//app.example/path")
   end
 
   test "mini-app resolution rejects a domain when any dns answer is not global" do
@@ -77,6 +105,11 @@ defmodule Egregoros.SafeURLTest do
   test "rejects loopback ip literals" do
     assert {:error, :unsafe_url} == SafeURL.validate_http_url("http://127.0.0.1/users/alice")
     assert {:error, :unsafe_url} == SafeURL.validate_http_url("http://[::1]/users/alice")
+
+    for host <- ["0177.0.0.1", "127.0x0.1", "127.0.0x0.1", "017700000001"] do
+      assert {:error, :unsafe_url} ==
+               SafeURL.validate_http_url("http://#{host}/users/alice")
+    end
   end
 
   test "rejects IPv4-embedded IPv6 loopback/private literals" do
@@ -101,6 +134,9 @@ defmodule Egregoros.SafeURLTest do
     assert {:error, :unsafe_url} ==
              SafeURL.validate_http_url("https://user:password@remote.example/private")
 
+    assert {:error, :unsafe_url} ==
+             SafeURL.validate_http_url("https://@remote.example/private")
+
     for url <- [
           "http://192.0.2.1/object",
           "http://198.51.100.1/object",
@@ -112,6 +148,20 @@ defmodule Egregoros.SafeURLTest do
           "http://[::ffff:8.8.8.8]/object"
         ] do
       assert {:error, :unsafe_url} == SafeURL.validate_http_url(url)
+    end
+  end
+
+  test "rejects non-global IANA special-purpose DNS answers" do
+    for {hostname, ip} <- [
+          {"deprecated-6to4.example", {192, 88, 99, 1}},
+          {"documentation-v4.example", {192, 0, 2, 1}},
+          {"benchmark.example", {198, 18, 0, 1}},
+          {"documentation-v6.example", {0x2001, 0x0DB8, 0, 0, 0, 0, 0, 1}}
+        ] do
+      expect(Egregoros.DNS.Mock, :lookup_ips, fn ^hostname -> {:ok, [ip]} end)
+
+      assert {:error, :unsafe_url} ==
+               SafeURL.validate_http_url("https://#{hostname}/object")
     end
   end
 
@@ -224,6 +274,19 @@ defmodule Egregoros.SafeURLTest do
     assert :ok == SafeURL.validate_http_url_no_dns("http://8.8/users/alice")
     assert :ok == SafeURL.validate_http_url_no_dns("http://8.8.8/users/alice")
     assert :ok == SafeURL.validate_http_url_no_dns("http://0x8.0x8.0x8.0x8/users/alice")
+    assert :ok == SafeURL.validate_http_url_no_dns("http://010.010.010.010/users/alice")
+  end
+
+  test "validate_http_url_no_dns follows browser octal semantics for legacy IPv4" do
+    for host <- ["0177.0.0.1", "0177.0x0.0.1", "017700000001"] do
+      assert {:error, :unsafe_url} ==
+               SafeURL.validate_http_url_no_dns("http://#{host}/users/alice")
+    end
+
+    # WHATWG treats a numeric final label as an IPv4 candidate, then rejects
+    # invalid octal rather than falling back to a hostname.
+    assert {:error, :unsafe_url} ==
+             SafeURL.validate_http_url_no_dns("http://010.010.010.08/users/alice")
   end
 
   test "validate_http_url_no_dns rejects numeric hosts that fail parsing" do

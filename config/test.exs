@@ -66,6 +66,7 @@ config :egregoros, Egregoros.Auth, Egregoros.Auth.Mock
 config :egregoros, Egregoros.Discovery, Egregoros.Discovery.Mock
 config :egregoros, Egregoros.HTTP, Egregoros.HTTP.Mock
 config :egregoros, Egregoros.MiniApps.Fetcher, Egregoros.MiniApps.Fetcher.Mock
+config :egregoros, Egregoros.MiniApps.ImageSanitizer, Egregoros.MiniApps.ImageSanitizer.Mock
 config :egregoros, Egregoros.DNS, Egregoros.DNS.Mock
 config :egregoros, Egregoros.AuthZ, Egregoros.AuthZ.Mock
 config :egregoros, Egregoros.AvatarStorage, Egregoros.AvatarStorage.Mock

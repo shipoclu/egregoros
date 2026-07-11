@@ -91,7 +91,26 @@ defmodule Egregoros.MiniApps.DomainPolicy do
   defp ip_literal?(domain) do
     case :inet.parse_address(String.to_charlist(domain)) do
       {:ok, _ip} -> true
-      {:error, _reason} -> String.match?(domain, ~r/^\d+(?:\.\d+){1,3}$/)
+      {:error, _reason} -> whatwg_ipv4_candidate?(domain)
+    end
+  end
+
+  # The URL Standard does not decide that a host is a DNS name solely from
+  # dotted-decimal syntax. If its final label is an IPv4 number candidate, the
+  # entire host is sent through the legacy IPv4 parser. That parser accepts
+  # short, hexadecimal, octal, and mixed-radix forms such as `127.0x0.1` and
+  # canonicalizes them to an address. It rejects malformed mixtures such as
+  # `example.1` rather than falling back to DNS. Reject both outcomes here so a
+  # domain accepted by the server cannot mean an IP address (or an invalid URL)
+  # to the browser that launches the mini app.
+  defp whatwg_ipv4_candidate?(domain) when is_binary(domain) do
+    case domain |> String.split(".", trim: false) |> List.last() do
+      nil ->
+        false
+
+      label ->
+        String.match?(label, ~r/^\d+$/) or
+          String.match?(label, ~r/^0[xX][0-9a-fA-F]*$/)
     end
   end
 end

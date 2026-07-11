@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<policymap>
+  <policy domain="resource" name="thread" value="1"/>
+  <policy domain="resource" name="time" value="4"/>
+  <policy domain="resource" name="file" value="16"/>
+  <policy domain="resource" name="memory" value="128MiB"/>
+  <policy domain="resource" name="map" value="128MiB"/>
+  <policy domain="resource" name="area" value="10MP"/>
+  <policy domain="resource" name="disk" value="0"/>
+  <policy domain="resource" name="list-length" value="2"/>
+  <policy domain="resource" name="width" value="10KP"/>
+  <policy domain="resource" name="height" value="10KP"/>
+  <policy domain="cache" name="memory-map" value="anonymous"/>
+  <policy domain="delegate" rights="none" pattern="*"/>
+  <policy domain="filter" rights="none" pattern="*"/>
+  <policy domain="path" rights="none" pattern="-"/>
+  <policy domain="path" rights="none" pattern="[Ff][Dd]:*"/>
+  <policy domain="path" rights="none" pattern="@*"/>
+  <policy domain="path" rights="none" pattern="*../*"/>
+  <policy domain="module" rights="none" pattern="*"/>
+  <policy domain="module" rights="read | write" pattern="AVIF"/>
+  <policy domain="module" rights="read | write" pattern="HEIC"/>
+  <policy domain="module" rights="read | write" pattern="JPEG"/>
+  <policy domain="module" rights="read | write" pattern="PNG"/>
+  <policy domain="module" rights="read | write" pattern="WEBP"/>
+  <policy domain="coder" rights="none" pattern="*"/>
+  <policy domain="coder" rights="read" pattern="AVIF"/>
+  <policy domain="coder" rights="read" pattern="HEIC"/>
+  <policy domain="coder" rights="read" pattern="JPEG"/>
+  <policy domain="coder" rights="read" pattern="PNG"/>
+  <policy domain="coder" rights="read | write" pattern="WEBP"/>
+  <policy domain="system" name="max-memory-request" value="128MiB"/>
+  <policy domain="system" name="symlink" rights="none" pattern="follow"/>
+</policymap>

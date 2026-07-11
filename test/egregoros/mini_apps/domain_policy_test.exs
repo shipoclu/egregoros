@@ -45,4 +45,28 @@ defmodule Egregoros.MiniApps.DomainPolicyTest do
     assert {:error, :invalid_domain_pattern} = DomainPolicy.validate_patterns(["*example.com"])
     assert :ok = DomainPolicy.validate_patterns(["example.com", "*.example.com"])
   end
+
+  test "rejects every browser-style IPv4 candidate rather than treating it as a DNS name" do
+    # The WHATWG host parser accepts mixed decimal, hexadecimal, and octal
+    # components and canonicalizes these spellings to an IPv4 address. Other
+    # candidates ending in a number make the browser reject the URL instead of
+    # treating it as a DNS name. Neither class is a mini-app domain.
+    for domain <- [
+          "127.0x0.1",
+          "127.0.0x0.1",
+          "0177.0.0.1",
+          "127.1",
+          "0x7f.1",
+          "2130706433",
+          "0x7f000001",
+          "127.0xgg.1",
+          "example.1"
+        ] do
+      assert {:error, :invalid_domain} = DomainPolicy.normalize_domain(domain)
+      refute DomainPolicy.allowed?(domain, allow: [], deny: [])
+    end
+
+    assert {:ok, "127.app.example"} = DomainPolicy.normalize_domain("127.app.example")
+    assert {:ok, "0x7f.app.example"} = DomainPolicy.normalize_domain("0x7f.app.example")
+  end
 end

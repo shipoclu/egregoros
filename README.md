@@ -76,6 +76,12 @@ signing key. Subsequent signed inbox delivery must match that pinned key ID and
 fingerprint; permission and delivery decisions produce a bounded, content-free
 security audit.
 
+Remote card images are decoded only in a disposable, resource-limited OS
+worker and re-encoded as one static WebP. The supplied Docker image includes
+its Linux runtime dependencies; non-Docker operators must follow
+[`deploy/MINI_APP_IMAGE_WORKER.md`](deploy/MINI_APP_IMAGE_WORKER.md). Missing
+or incomplete isolation fails closed and no remote image bytes are served.
+
 ## Architecture (quick tour)
 
 - **Core ingestion:** `lib/egregoros/pipeline.ex` → activity module (`lib/egregoros/activities/*`) → `objects` + `relationships` + side effects (broadcast, notifications, delivery).

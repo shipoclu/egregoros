@@ -18,19 +18,24 @@ defmodule Egregoros.SafeURL do
   def validate_http_url(_), do: {:error, :unsafe_url}
 
   def resolve_https_domain_url(url) when is_binary(url) do
-    uri = URI.parse(url)
-
-    with "https" <- uri.scheme,
+    with {:ok, %URI{} = uri} <- parse_http_uri(url),
+         "https" <- uri.scheme,
          host when is_binary(host) and host != "" <- uri.host,
-         true <- uri.userinfo in [nil, ""],
+         true <- is_nil(uri.userinfo),
          true <- uri.fragment in [nil, ""],
          {:ok, host} <- DomainPolicy.normalize_domain(host),
          {:ok, ip} <- resolve_public_ip(host) do
+      normalized_uri = %URI{uri | host: host, fragment: nil}
+      port = normalized_uri.port || 443
+
       {:ok,
        %{
-         connect_url: connect_url(%URI{uri | host: host, fragment: nil}, ip),
+         authority: authority(host, port, 443),
+         canonical_url: URI.to_string(normalized_uri),
+         connect_url: connect_url(normalized_uri, ip),
          hostname: host,
-         ip: ip
+         ip: ip,
+         port: port
        }}
     else
       _ -> {:error, :unsafe_url}
@@ -54,11 +59,10 @@ defmodule Egregoros.SafeURL do
   def resolve_http_url_federation(_url), do: {:error, :unsafe_url}
 
   defp resolve_http_url(url) when is_binary(url) do
-    uri = URI.parse(url)
-
-    with scheme when scheme in @http_schemes <- uri.scheme,
+    with {:ok, %URI{} = uri} <- parse_http_uri(url),
+         scheme when scheme in @http_schemes <- uri.scheme,
          host when is_binary(host) and host != "" <- uri.host,
-         true <- uri.userinfo in [nil, ""],
+         true <- is_nil(uri.userinfo),
          {:ok, ip} <- resolve_public_ip(host) do
       {:ok,
        %{
@@ -74,10 +78,10 @@ defmodule Egregoros.SafeURL do
   defp resolve_http_url(_url), do: {:error, :unsafe_url}
 
   defp validate_http_url_shape(url) do
-    case URI.parse(url) do
-      %URI{scheme: scheme, host: host, userinfo: userinfo} = uri
+    case parse_http_uri(url) do
+      {:ok, %URI{scheme: scheme, host: host, userinfo: userinfo} = uri}
       when scheme in @http_schemes and is_binary(host) and host != "" and
-             userinfo in [nil, ""] ->
+             is_nil(userinfo) ->
         {:ok, uri}
 
       _ ->
@@ -96,11 +100,10 @@ defmodule Egregoros.SafeURL do
   def validate_http_url_federation(_), do: {:error, :unsafe_url}
 
   def validate_http_url_no_dns(url) when is_binary(url) do
-    uri = URI.parse(url)
-
-    with scheme when scheme in @http_schemes <- uri.scheme,
+    with {:ok, %URI{} = uri} <- parse_http_uri(url),
+         scheme when scheme in @http_schemes <- uri.scheme,
          host when is_binary(host) and host != "" <- uri.host,
-         true <- uri.userinfo in [nil, ""],
+         true <- is_nil(uri.userinfo),
          :ok <- validate_host_no_dns(host) do
       :ok
     else
@@ -175,6 +178,8 @@ defmodule Egregoros.SafeURL do
   defp globally_routable?({172, second, _, _}) when second in 16..31, do: false
   defp globally_routable?({192, 0, 0, _}), do: false
   defp globally_routable?({192, 0, 2, _}), do: false
+  # Deprecated 6to4 relay anycast. IANA marks the full prefix non-global.
+  defp globally_routable?({192, 88, 99, _}), do: false
   defp globally_routable?({192, 168, _, _}), do: false
   defp globally_routable?({198, second, _, _}) when second in 18..19, do: false
   defp globally_routable?({198, 51, 100, _}), do: false
@@ -209,6 +214,49 @@ defmodule Egregoros.SafeURL do
     uri |> Map.put(:host, host) |> Map.put(:userinfo, nil) |> URI.to_string()
   end
 
+  defp authority(host, port, default_port) when port == default_port, do: host
+  defp authority(host, port, _default_port), do: "#{host}:#{port}"
+
+  defp parse_http_uri(url) when is_binary(url) do
+    with true <- String.valid?(url),
+         false <- forbidden_raw_byte?(url),
+         true <- valid_percent_encoding?(url),
+         {:ok, %URI{} = uri} <- URI.new(url) do
+      {:ok, uri}
+    else
+      _ -> {:error, :unsafe_url}
+    end
+  end
+
+  defp parse_http_uri(_url), do: {:error, :unsafe_url}
+
+  defp forbidden_raw_byte?(url) do
+    url
+    |> :binary.bin_to_list()
+    |> Enum.any?(fn byte -> byte <= 0x20 or byte in [0x5C, 0x7F] end)
+  end
+
+  defp valid_percent_encoding?(<<>>), do: true
+
+  defp valid_percent_encoding?(<<?%, high, low, rest::binary>>) do
+    with {:ok, high} <- hex_value(high),
+         {:ok, low} <- hex_value(low),
+         byte = high * 16 + low,
+         false <- byte <= 0x1F or byte in [0x5C, 0x7F] do
+      valid_percent_encoding?(rest)
+    else
+      _ -> false
+    end
+  end
+
+  defp valid_percent_encoding?(<<?%, _rest::binary>>), do: false
+  defp valid_percent_encoding?(<<_byte, rest::binary>>), do: valid_percent_encoding?(rest)
+
+  defp hex_value(byte) when byte in ?0..?9, do: {:ok, byte - ?0}
+  defp hex_value(byte) when byte in ?a..?f, do: {:ok, byte - ?a + 10}
+  defp hex_value(byte) when byte in ?A..?F, do: {:ok, byte - ?A + 10}
+  defp hex_value(_byte), do: :error
+
   defp parse_ip_literal_no_dns(host) when is_binary(host) do
     host = String.trim(host)
 
@@ -239,6 +287,13 @@ defmodule Egregoros.SafeURL do
 
   defp parse_ipv4_integer("0x" <> hex), do: parse_ipv4_integer_hex(hex)
   defp parse_ipv4_integer("0X" <> hex), do: parse_ipv4_integer_hex(hex)
+
+  defp parse_ipv4_integer("0" <> rest = value) when rest != "" do
+    case parse_octal_int(value) do
+      int when is_integer(int) and int <= 0xFFFF_FFFF -> {:ok, ipv4_from_int(int)}
+      _ -> :error
+    end
+  end
 
   defp parse_ipv4_integer(value) when is_binary(value) do
     with true <- String.match?(value, ~r/^\d+$/),
@@ -302,6 +357,9 @@ defmodule Egregoros.SafeURL do
       String.starts_with?(part, ["0x", "0X"]) ->
         parse_prefixed_int(part, 16, 2)
 
+      byte_size(part) > 1 and String.starts_with?(part, "0") ->
+        parse_octal_int(part)
+
       String.match?(part, ~r/^\d+$/) ->
         {int, rest} = Integer.parse(part, 10)
         if rest == "" and int >= 0, do: int, else: :error
@@ -317,6 +375,17 @@ defmodule Egregoros.SafeURL do
     with digits when is_binary(digits) and digits != "" <- String.slice(part, prefix_len..-1//1),
          true <- String.match?(digits, ~r/^[0-9a-fA-F]+$/),
          {int, ""} <- Integer.parse(digits, base),
+         true <- int >= 0 do
+      int
+    else
+      _ -> :error
+    end
+  end
+
+  defp parse_octal_int(part) when is_binary(part) do
+    with digits when is_binary(digits) and digits != "" <- String.slice(part, 1..-1//1),
+         true <- String.match?(digits, ~r/^[0-7]+$/),
+         {int, ""} <- Integer.parse(digits, 8),
          true <- int >= 0 do
       int
     else
