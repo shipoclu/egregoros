@@ -518,7 +518,7 @@ defmodule EgregorosWeb.MiniAppHost do
           data-role="mini-app-frame-container"
         >
           <div
-            :if={!@state.ready?}
+            :if={!@state.ready? and !@state.load_error?}
             data-role="mini-app-loading"
             class="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 bg-[color:var(--bg-base)] p-8 text-center"
           >
@@ -530,6 +530,43 @@ defmodule EgregorosWeb.MiniAppHost do
               <p class="mt-1 font-mono text-xs text-[color:var(--text-muted)]">
                 Waiting for the app to become ready…
               </p>
+            </div>
+          </div>
+
+          <div
+            :if={@state.load_error?}
+            id="mini-app-frame-error"
+            class="absolute inset-0 z-20 flex flex-col items-center justify-center gap-5 bg-[color:var(--bg-base)] p-8 text-center"
+            role="alert"
+          >
+            <div class="flex size-16 items-center justify-center border-2 border-[color:var(--border-default)] bg-[color:var(--warning)] shadow-[4px_4px_0_var(--border-default)]">
+              <.icon name="hero-exclamation-triangle" class="size-8 text-[color:var(--text-primary)]" />
+            </div>
+            <div class="max-w-sm">
+              <p class="font-bold text-[color:var(--text-primary)]">
+                {@state.card.app_name} did not become ready
+              </p>
+              <p class="mt-2 text-sm text-[color:var(--text-secondary)]">
+                The app may block framing, be offline, or use an incompatible protocol. No host permission was granted.
+              </p>
+            </div>
+            <div class="flex flex-wrap justify-center gap-2">
+              <button
+                id="mini-app-frame-retry"
+                type="button"
+                phx-click="mini_app_frame_retry"
+                class="border-2 border-[color:var(--border-default)] bg-[color:var(--text-primary)] px-4 py-2 text-sm font-bold text-[color:var(--bg-base)]"
+              >
+                Retry
+              </button>
+              <button
+                id="mini-app-frame-open-external"
+                type="button"
+                phx-click="mini_app_frame_external"
+                class="border-2 border-[color:var(--border-default)] px-4 py-2 text-sm font-bold text-[color:var(--text-secondary)]"
+              >
+                Open externally
+              </button>
             </div>
           </div>
 
@@ -564,6 +601,7 @@ defmodule EgregorosWeb.MiniAppHost do
            card: card,
            launch_id: launch_id(),
            ready?: false,
+           load_error?: false,
            context_request: nil,
            auth_request: nil,
            oauth_authenticated?: false,
@@ -810,6 +848,61 @@ defmodule EgregorosWeb.MiniAppHost do
   end
 
   defp handle_host_event(
+         "mini_app_ready_timeout",
+         %{"launch_id" => launch_id},
+         socket
+       ) do
+    state = socket.assigns.mini_app_host
+
+    if state.status in [:open, :collapsed] and state.launch_id == launch_id and not state.ready? do
+      {:halt, Phoenix.Component.assign(socket, :mini_app_host, %{state | load_error?: true})}
+    else
+      {:halt, socket}
+    end
+  end
+
+  defp handle_host_event("mini_app_frame_retry", _params, socket) do
+    state = socket.assigns.mini_app_host
+
+    if state.status == :open and state.load_error? and active_card?(state.card) do
+      launch_id = launch_id()
+
+      socket =
+        socket
+        |> Phoenix.Component.assign(:mini_app_host, %{
+          state
+          | launch_id: launch_id,
+            ready?: false,
+            load_error?: false,
+            auth_request: nil,
+            oauth_authenticated?: false,
+            context_request: nil,
+            compose_request: nil,
+            external_request: nil,
+            wallet_request: nil
+        })
+        |> Phoenix.LiveView.push_event("mini_app_frame_reload", %{launch_id: launch_id})
+
+      {:halt, socket}
+    else
+      {:halt, socket}
+    end
+  end
+
+  defp handle_host_event("mini_app_frame_external", _params, socket) do
+    state = socket.assigns.mini_app_host
+
+    if state.status == :open and state.load_error? and active_card?(state.card) do
+      request = %{request_id: launch_id(), url: state.card.launch_url, host_only?: true}
+
+      {:halt,
+       Phoenix.Component.assign(socket, :mini_app_host, %{state | external_request: request})}
+    else
+      {:halt, socket}
+    end
+  end
+
+  defp handle_host_event(
          "mini_app_close_request",
          %{"launch_id" => launch_id, "request_id" => request_id},
          socket
@@ -1040,11 +1133,13 @@ defmodule EgregorosWeb.MiniAppHost do
        when event in ["mini_app_loading", "mini_app_ready"] do
     state = socket.assigns.mini_app_host
 
-    if state.status == :open and state.launch_id == launch_id and active_card?(state.card) do
+    if state.status in [:open, :collapsed] and state.launch_id == launch_id and
+         active_card?(state.card) do
       {:halt,
        Phoenix.Component.assign(socket, :mini_app_host, %{
          state
          | ready?: event == "mini_app_ready",
+           load_error?: false,
            auth_request: if(event == "mini_app_loading", do: nil, else: state.auth_request),
            oauth_authenticated?:
              if(event == "mini_app_loading", do: false, else: state.oauth_authenticated?),
@@ -1062,7 +1157,8 @@ defmodule EgregorosWeb.MiniAppHost do
        when event in [
               "mini_app_wallet_request",
               "mini_app_wallet_preflight_result",
-              "mini_app_wallet_execution_result"
+              "mini_app_wallet_execution_result",
+              "mini_app_ready_timeout"
             ],
        do: {:halt, socket}
 
@@ -1099,6 +1195,7 @@ defmodule EgregorosWeb.MiniAppHost do
       card: nil,
       launch_id: nil,
       ready?: false,
+      load_error?: false,
       context_request: nil,
       auth_request: nil,
       oauth_authenticated?: false,
@@ -1225,6 +1322,9 @@ defmodule EgregorosWeb.MiniAppHost do
     state = socket.assigns.mini_app_host
 
     case state.external_request do
+      %{request_id: _request_id, host_only?: true} ->
+        Phoenix.Component.assign(socket, :mini_app_host, %{state | external_request: nil})
+
       %{request_id: request_id} ->
         socket
         |> Phoenix.Component.assign(:mini_app_host, %{state | external_request: nil})
@@ -1517,15 +1617,15 @@ defmodule EgregorosWeb.MiniAppHost do
   defp host_classes(%{status: :closed}), do: "hidden"
 
   defp host_classes(%{status: :collapsed}) do
-    "fixed inset-x-4 bottom-4 z-[60] flex border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] shadow-[6px_6px_0_var(--border-default)] md:left-auto md:w-80"
+    "fixed inset-x-4 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-[60] flex border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] shadow-[6px_6px_0_var(--border-default)] md:bottom-4 md:left-auto md:w-80"
   end
 
   defp host_classes(%{status: :open, expanded?: true}) do
-    "fixed inset-0 z-[60] flex flex-col border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] shadow-[8px_8px_0_var(--border-default)] md:inset-6"
+    "fixed inset-0 z-[60] flex flex-col border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] shadow-[8px_8px_0_var(--border-default)] md:inset-6 md:p-0"
   end
 
   defp host_classes(%{status: :open}) do
-    "fixed inset-0 z-[60] flex flex-col border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] shadow-[8px_8px_0_var(--border-default)] md:inset-auto md:bottom-6 md:right-6 md:h-[min(695px,calc(100vh-3rem))] md:w-[min(424px,calc(100vw-3rem))]"
+    "fixed inset-0 z-[60] flex flex-col border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] shadow-[8px_8px_0_var(--border-default)] md:inset-auto md:bottom-6 md:right-6 md:h-[min(695px,calc(100vh-3rem))] md:w-[min(424px,calc(100vw-3rem))] md:p-0"
   end
 
   defp card_value(%{card: %Card{} = card}, field), do: Map.get(card, field)

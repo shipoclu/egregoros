@@ -128,6 +128,49 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
     assert card.id
   end
 
+  test "ready timeout offers an exact-origin retry and confirmed external fallback", %{
+    conn: conn,
+    user: user
+  } do
+    {:ok, note} =
+      Pipeline.ingest(
+        Note.build(user, ~s(<a href="https://app.example/shared/chapter-2">reader</a>)),
+        local: true
+      )
+
+    assert {:ok, _card} = Cards.put(note, resolved_card())
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/?timeline=public")
+    view |> element("[data-role='open-mini-app']") |> render_click()
+    launch_id = :sys.get_state(view.pid).socket.assigns.mini_app_host.launch_id
+
+    view |> element("#mini-app-host-collapse") |> render_click()
+    render_hook(view, "mini_app_ready_timeout", %{"launch_id" => launch_id})
+    view |> element("#mini-app-host-restore") |> render_click()
+    assert has_element?(view, "#mini-app-frame-error")
+    assert has_element?(view, "#mini-app-frame-open-external")
+
+    view |> element("#mini-app-frame-open-external") |> render_click()
+    assert has_element?(view, "#mini-app-external-confirmation")
+
+    assert has_element?(
+             view,
+             "#mini-app-external-confirmation",
+             "https://app.example/book/chapter-2"
+           )
+
+    view |> element("#mini-app-external-deny") |> render_click()
+
+    view |> element("#mini-app-frame-retry") |> render_click()
+    refute has_element?(view, "#mini-app-frame-error")
+    assert has_element?(view, "[data-role='mini-app-loading']")
+
+    new_launch_id = :sys.get_state(view.pid).socket.assigns.mini_app_host.launch_id
+    refute new_launch_id == launch_id
+
+    assert_push_event(view, "mini_app_frame_reload", %{launch_id: ^new_launch_id})
+  end
+
   test "validates auth requests against the card origin and presents a host-controlled prompt", %{
     conn: conn,
     user: user

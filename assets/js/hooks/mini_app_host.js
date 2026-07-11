@@ -1,5 +1,6 @@
 import {createMiniAppBroker} from "../lib/mini_app_broker.mjs"
 import {createMiniAppAuthRelay} from "../lib/mini_app_auth_relay.mjs"
+import {createMiniAppReadiness} from "../lib/mini_app_readiness.mjs"
 import {selectEvmWalletAdapter} from "../wallet/evm_wallet_adapter.mjs"
 import {walletContextMatches} from "../wallet/wallet_execution_guard.mjs"
 
@@ -12,6 +13,10 @@ const MiniAppHost = {
     this.walletCheckPending = false
     this.walletCompatible = null
     this.walletConfigKey = null
+    this.readiness = createMiniAppReadiness({
+      onTimeout: launchId =>
+        this.pushEvent("mini_app_ready_timeout", {launch_id: launchId}),
+    })
     this.authRelay = createMiniAppAuthRelay({
       windowObject: window,
       sendResult: result =>
@@ -206,6 +211,11 @@ const MiniAppHost = {
         ...(payload.error ? {error: payload.error} : {result: payload.result}),
       })
     })
+    this.handleEvent("mini_app_frame_reload", payload => {
+      if (payload?.launch_id !== this.el.dataset.launchId) return
+      const frame = this.el.querySelector("#mini-app-frame")
+      if (frame) frame.src = frame.src
+    })
     this.initializeWallet()
   },
 
@@ -219,12 +229,14 @@ const MiniAppHost = {
 
   destroyed() {
     this.destroyBroker()
+    this.readiness.destroy()
     this.authRelay.destroy()
     this.el.removeEventListener("click", this.onHostClick)
   },
 
   destroyBroker() {
     this.broker?.destroy()
+    this.readiness?.destroy()
     this.broker = null
     this.frame = null
     this.brokerKey = null
@@ -305,9 +317,13 @@ const MiniAppHost = {
       capabilities,
       onLoading: () => {
         this.authRelay.cancel()
+        this.readiness.loading(launchId)
         this.pushEvent("mini_app_loading", {launch_id: launchId})
       },
-      onReady: () => this.pushEvent("mini_app_ready", {launch_id: launchId}),
+      onReady: () => {
+        this.readiness.ready(launchId)
+        this.pushEvent("mini_app_ready", {launch_id: launchId})
+      },
       onContextRequest: requestId =>
         this.pushEvent("mini_app_context_request", {
           launch_id: launchId,
