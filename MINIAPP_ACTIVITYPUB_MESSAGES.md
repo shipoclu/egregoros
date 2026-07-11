@@ -212,6 +212,163 @@ types or side effects. When a `Note` is dereferenced independently, its
 standalone representation includes the same ActivityStreams and inline `fma`
 context.
 
+#### Explicit mini-app launch-link hint
+
+An ordinary public `Note` may identify one exact visible link as a candidate
+mini-app launch URL by adding `fma:miniAppLink`. This is a discovery hint, not
+an authorship claim:
+
+```json
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    {
+      "fma": "https://fediverse.example/ns/miniapps#"
+    }
+  ],
+  "id": "https://social.example/users/alice/statuses/01JLINK",
+  "type": "Note",
+  "attributedTo": "https://social.example/users/alice",
+  "to": ["https://www.w3.org/ns/activitystreams#Public"],
+  "content": "<p>Vote in <a href=\"https://polls.example/questions/42?round=final\">this poll</a>.</p>",
+  "fma:miniAppLink": {
+    "type": "Link",
+    "href": "https://polls.example/questions/42?round=final",
+    "rel": "https://fediverse.example/ns/miniapps#miniApp",
+    "mediaType": "text/html",
+    "name": "Open poll"
+  }
+}
+```
+
+The mini-app vocabulary and its eventual dereferenceable JSON-LD context
+define `miniAppLink` with the expanded IRI
+`https://fediverse.example/ns/miniapps#miniAppLink`. The wire representation
+continues to carry the exact inline `fma` prefix mapping shown above, so
+receivers never need to fetch a remote context while processing a delivery.
+The namespace remains provisional until a permanent, controlled IRI and its
+context document are published.
+
+The dereferenceable namespace document serves an HTML vocabulary description
+for browsers and, under `application/ld+json`, a stable context containing at
+least these definitions (with the placeholder replaced by the permanent
+namespace at publication):
+
+```json
+{
+  "@context": {
+    "fma": {
+      "@id": "https://fediverse.example/ns/miniapps#",
+      "@prefix": true
+    },
+    "miniApp": "fma:miniApp",
+    "notificationPurpose": "fma:notificationPurpose",
+    "miniAppLink": "fma:miniAppLink"
+  }
+}
+```
+
+The context establishes identifier expansion only. It cannot encode the
+authorization, cardinality, closed-enum, exact-URL, or validation rules in this
+profile; the human-readable vocabulary document and this specification remain
+normative for those meanings. Publishing the context does not change the wire
+rule: deliveries use the inline prefix and receivers do not dereference it in
+the activity-processing path.
+
+The two link-shaped mini-app properties have intentionally different meanings:
+
+- `fma:miniApp` says the object itself claims to have been produced by the
+  identified mini app. It is accepted only with the manifest, actor, signature,
+  key pin, and policy checks above.
+- `fma:miniAppLink` says only that the containing `Note` presents the identified
+  URL as a candidate mini-app launch link. Any actor may share such a link; the
+  actor does not become the app and need not control or sign for it.
+
+For version 1, `fma:miniAppLink` is one object, never an array, with this closed
+shape:
+
+- `type` is exactly the ActivityStreams `Link` type;
+- `href` is the exact HTTPS launch URL, including its path, query string, and
+  non-default port when present;
+- `rel` is exactly the full vocabulary IRI
+  `https://fediverse.example/ns/miniapps#miniApp`, expressing the link's
+  purpose within this `Note`;
+- `mediaType` is exactly `text/html`; and
+- optional `name` is a bounded, untrusted accessibility/display hint. It does
+  not replace title or presentation metadata fetched from the app.
+
+Unknown properties, arrays where scalars are required, duplicate JSON keys,
+overlong values, or conflicting values make the hint invalid. The hint belongs
+on the `Note`, not its enclosing `Create`, because `rel` describes the link's
+relationship to its immediate containing object. The enclosing activity's
+context may cover an embedded `Note`; a separately dereferenced `Note` includes
+the ActivityStreams and inline `fma` contexts itself.
+
+The full IRI is deliberate: the standard ActivityStreams context defines
+`rel` as a literal value rather than an `@id`-coerced value, so a compact string
+such as `fma:miniApp` would not expand during JSON-LD processing. The eventual
+published mini-app JSON-LD context and vocabulary documentation therefore list
+all three terms, while this wire profile uses prefixed property names and the
+full IRI when a vocabulary term appears as a `rel` value:
+
+| Term | Expanded IRI | Range and meaning |
+| --- | --- | --- |
+| `fma:miniApp` | `…#miniApp` | One canonical manifest identity object; app-production provenance. |
+| `fma:notificationPurpose` | `…#notificationPurpose` | Optional scalar `transactional` or `promotional` classification. |
+| `fma:miniAppLink` | `…#miniAppLink` | One ActivityStreams `Link`; exact candidate launch-link discovery hint. |
+
+Here `…` abbreviates the provisional namespace base only in this explanatory
+table; it is never legal wire syntax.
+
+The hint is never proof that the target is a mini app, is controlled by the
+sender, is safe, or should be framed. Before making any target-origin request,
+a receiver validates all of the following:
+
+- mini-app discovery is enabled and the `Note` is completely public;
+- the exact inline namespace mapping and bounded `Link` shape are valid;
+- `href` has an allowed HTTPS URL shape: no userinfo, fragment, IP literal,
+  localhost name, or unsafe port;
+- the exact `href` also occurs as a candidate derived from the sanitized note
+  content, either as a parsed anchor destination or an otherwise eligible plain
+  HTTPS URL; and
+- current instance domain policy permits the target host.
+
+For that comparison, exact means the content-derived URL after HTML entity
+decoding but before URL normalization. A receiver must not replace it with the
+app `homeUrl`, strip or reorder its query, assume `/`, substitute another
+same-origin path, or follow a redirect to make it match. A direct link to
+`/.well-known/fediverse-miniapp.json` does not qualify because `href` identifies
+the HTML launch page. The receiver derives the exact URL origin and constructs
+the fixed well-known manifest URL itself; the sender cannot nominate a
+different manifest location.
+
+A valid explicit hint receives priority within the ordinary rich-card discovery
+algorithm; it does not create a second fetch allowance:
+
+1. consider the valid `fma:miniAppLink.href` first;
+2. consider the remaining eligible content URLs in document order;
+3. deduplicate exact URLs;
+4. apply the same existing per-note candidate limit to the combined sequence;
+5. stop at the first independently validated mini app and render at most one
+   mini-app card; and
+6. count malformed or abusive hints against the same source and target rate
+   controls rather than granting another discovery budget.
+
+An invalid hint does not invalidate or hide the `Note`. The receiver ignores
+the hint, may continue ordinary content scanning within the one shared budget,
+and otherwise renders an ordinary link. Fetch scheduling also applies bounded
+timeouts, circuit breakers, per-source/per-author/per-target-origin/global
+limits, and negative caching for permanent failures. Duplicate metadata,
+duplicate deliveries, and repeated candidate URLs must not multiply fetches.
+An `Update` triggers rediscovery only when the exact candidate URL changed or
+the cached result independently requires revalidation.
+
+A supporting authoring server should emit this hint only after it has parsed
+the exact visible link, completed its own mini-app validation, and shown the
+resulting card to the author. If validation is incomplete or fails, it emits an
+ordinary link without the hint. Downstream servers always repeat their own
+validation; they do not transitively trust the authoring server's assertion.
+
 #### Optional notification purpose
 
 An app-produced object may additionally carry exactly one purpose label:

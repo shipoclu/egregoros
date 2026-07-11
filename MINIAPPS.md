@@ -373,12 +373,14 @@ are validated and pinned. Public ActivityPub publishing requires no mini-app
 host extension and can be implemented independently.
 
 The next protocol revision adds a self-contained inline `fma` namespace and
-two independent properties on app-authored `Create(Note)` payloads:
+three distinct vocabulary properties:
 
 - `fma:miniApp` links both the activity and object to the exact canonical
   well-known manifest URL; and
 - optional `fma:notificationPurpose` is the closed scalar enum
-  `transactional` or `promotional`.
+  `transactional` or `promotional`; and
+- optional `fma:miniAppLink` is an ActivityStreams `Link` on an ordinary public
+  `Note` that identifies one exact, visible candidate launch URL.
 
 The provenance marker is required for an object to claim mini-app production,
 but is trusted only when its manifest, declared actor, activated signing-key
@@ -391,6 +393,17 @@ content is labeled promotional. Classification is sender-declared moderation
 evidence rather than something Egregoros infers from prose. The complete wire
 profile is normative in
 [`MINIAPP_ACTIVITYPUB_MESSAGES.md`](MINIAPP_ACTIVITYPUB_MESSAGES.md#31-mini-app-provenance-and-message-purpose-wire-profile).
+
+`fma:miniAppLink` is discovery metadata, not mini-app provenance or trust. Its
+`href` must exactly match a URL parsed from sanitized note content, and its
+closed `Link` shape carries `type: Link`, the full mini-app vocabulary IRI as
+`rel`, `mediaType: text/html`, and an optional bounded display name. The full
+IRI is required because ActivityStreams does not JSON-LD-coerce `rel` values to
+identifiers. The receiver still applies
+URL safety and domain policy, derives the origin's fixed well-known manifest
+location, and independently validates the app. Explicit and implicit URLs share
+one candidate/fetch budget and can produce at most one mini-app card. Invalid
+hints degrade to ordinary links and never invalidate the containing note.
 
 #### Dynamic registration
 
