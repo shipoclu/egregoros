@@ -925,6 +925,15 @@ URLs, OAuth credentials, or key material. Signed inbox requests from a declared
 actor additionally must match the activated key ID and RSA-key fingerprint
 before ordinary signature verification can authorize delivery.
 
+For delivery replay suppression, the server stores only a secret-keyed HMAC of
+the local user ID, exact app actor, and ActivityPub activity ID. The raw
+activity ID is never retained in the mini-app audit. The fingerprint is unique
+per user, so a replay is ignored before persistence or side effects. Consent,
+OAuth revocation, authorization, persistence, and the accepted/suppressed audit
+decision are serialized on the same per-user/app lock. Audit history is pruned
+transactionally to at most 500 rows per user; an operator may configure a lower
+limit but may not raise this security ceiling.
+
 The purpose-label revision adds declared and effective purpose to that audit;
 it does not add message content or identifiers.
 

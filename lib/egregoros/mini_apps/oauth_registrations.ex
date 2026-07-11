@@ -6,6 +6,7 @@ defmodule Egregoros.MiniApps.OAuthRegistrations do
   alias Egregoros.MiniApps
   alias Egregoros.MiniApps.Declarations
   alias Egregoros.MiniApps.Manifest
+  alias Egregoros.MiniApps.NotificationConsents
   alias Egregoros.MiniApps.OAuthRegistration
   alias Egregoros.MiniApps.Permissions
   alias Egregoros.OAuth
@@ -133,22 +134,28 @@ defmodule Egregoros.MiniApps.OAuthRegistrations do
       %OAuthRegistration{oauth_application_id: application_id} ->
         now = DateTime.utc_now()
 
-        Repo.transaction(fn ->
-          from(token in Token,
-            where:
-              token.application_id == ^application_id and token.user_id == ^user_id and
-                is_nil(token.revoked_at)
-          )
-          |> Repo.update_all(set: [revoked_at: now])
+        case Repo.transaction(fn ->
+               NotificationConsents.lock_delivery(user_id, origin)
 
-          from(code in AuthorizationCode,
-            where: code.application_id == ^application_id and code.user_id == ^user_id
-          )
-          |> Repo.delete_all()
-        end)
+               from(token in Token,
+                 where:
+                   token.application_id == ^application_id and token.user_id == ^user_id and
+                     is_nil(token.revoked_at)
+               )
+               |> Repo.update_all(set: [revoked_at: now])
 
-        Permissions.notify_revoked(user_id, origin, :oauth)
-        :ok
+               from(code in AuthorizationCode,
+                 where: code.application_id == ^application_id and code.user_id == ^user_id
+               )
+               |> Repo.delete_all()
+             end) do
+          {:ok, _result} ->
+            Permissions.notify_revoked(user_id, origin, :oauth)
+            :ok
+
+          {:error, _reason} ->
+            {:error, :revocation_failed}
+        end
 
       nil ->
         :ok

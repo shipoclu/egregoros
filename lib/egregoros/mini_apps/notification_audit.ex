@@ -19,6 +19,7 @@ defmodule Egregoros.MiniApps.NotificationAudit do
     field :app_actor_url, :string
     field :event, Ecto.Enum, values: @events
     field :reason, :string
+    field :delivery_fingerprint, :binary
     field :occurred_at, :utc_datetime_usec
 
     timestamps(type: :utc_datetime_usec, updated_at: false)
@@ -26,10 +27,20 @@ defmodule Egregoros.MiniApps.NotificationAudit do
 
   def changeset(audit, attrs) do
     audit
-    |> cast(attrs, [:app_origin, :app_actor_url, :event, :reason, :occurred_at])
+    |> cast(attrs, [
+      :app_origin,
+      :app_actor_url,
+      :event,
+      :reason,
+      :delivery_fingerprint,
+      :occurred_at
+    ])
     |> validate_required([:user_id, :app_origin, :app_actor_url, :event, :occurred_at])
     |> validate_length(:app_origin, max: 255)
     |> validate_length(:app_actor_url, max: 2_048)
     |> validate_length(:reason, max: 64)
+    |> unique_constraint([:user_id, :delivery_fingerprint],
+      name: :mini_app_notification_audits_delivery_replay_index
+    )
   end
 end

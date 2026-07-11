@@ -165,4 +165,41 @@ defmodule Egregoros.Activities.UpdateNoteIngestTest do
     assert {:error, :stale_update} = Pipeline.ingest(stale_update, local: false)
     assert Objects.get_by_ap_id(note_id).data["content"] == "newest"
   end
+
+  test "an oversized remote Update cannot bypass the inbound Note content limit" do
+    actor = "https://remote.example/users/oversized-update"
+    note_id = "https://remote.example/objects/bounded-note"
+
+    assert {:ok, %Object{}} =
+             Pipeline.ingest(
+               %{
+                 "id" => note_id,
+                 "type" => "Note",
+                 "attributedTo" => actor,
+                 "published" => "2026-01-01T00:00:00Z",
+                 "to" => [@public],
+                 "content" => "bounded"
+               },
+               local: false
+             )
+
+    update = %{
+      "id" => "https://remote.example/activities/update/oversized",
+      "type" => "Update",
+      "actor" => actor,
+      "to" => [@public],
+      "object" => %{
+        "id" => note_id,
+        "type" => "Note",
+        "attributedTo" => actor,
+        "updated" => "2026-01-02T00:00:00Z",
+        "to" => [@public],
+        "content" => String.duplicate("x", 20_001)
+      }
+    }
+
+    assert {:error, :too_long} = Pipeline.ingest(update, local: false)
+    assert Objects.get_by_ap_id(note_id).data["content"] == "bounded"
+    refute Objects.get_by_ap_id(update["id"])
+  end
 end

@@ -70,40 +70,46 @@ defmodule Egregoros.MiniApps.Declarations do
   def notification_actor(_origin), do: {:error, :notifications_not_declared}
 
   def notification_origin_for_actor(actor_url) when is_binary(actor_url) do
+    case activity_pub_declaration_for_actor(actor_url) do
+      {:ok, %Declaration{app_origin: origin, activity_pub_transactional_mentions: true}} ->
+        {:ok, origin}
+
+      {:ok, %Declaration{}} ->
+        {:error, :notifications_not_declared}
+
+      result ->
+        result
+    end
+  end
+
+  def notification_origin_for_actor(_actor_url), do: :not_declared
+
+  def activity_pub_declaration_for_actor(actor_url) when is_binary(actor_url) do
     declarations =
       Declaration
       |> where(
         [declaration],
-        declaration.activity_pub_actor_url == ^actor_url and
-          declaration.activity_pub_transactional_mentions == true
+        declaration.activity_pub_actor_url == ^actor_url
       )
       |> Repo.all()
 
     case declarations do
-      [
-        %Declaration{
-          app_origin: origin,
-          activity_pub_actor_fingerprint: fingerprint,
-          activity_pub_actor_key_id: key_id,
-          activity_pub_actor_key_fingerprint: key_fingerprint,
-          activity_pub_actor_activated_at: %DateTime{}
-        }
-      ]
-      when is_binary(fingerprint) and is_binary(key_id) and is_binary(key_fingerprint) ->
-        if origin_allowed?(origin), do: {:ok, origin}, else: {:error, :domain_denied}
+      [%Declaration{app_origin: origin} = declaration] ->
+        cond do
+          not origin_allowed?(origin) -> {:error, :domain_denied}
+          actor_activated?(declaration) -> {:ok, declaration}
+          true -> {:error, :actor_not_activated}
+        end
 
       [] ->
         :not_declared
-
-      [%Declaration{}] ->
-        {:error, :actor_not_activated}
 
       _ ->
         {:error, :ambiguous_actor}
     end
   end
 
-  def notification_origin_for_actor(_actor_url), do: :not_declared
+  def activity_pub_declaration_for_actor(_actor_url), do: :not_declared
 
   defp ensure_locked(manifest) do
     lock_origin(manifest.origin)
@@ -186,4 +192,15 @@ defmodule Egregoros.MiniApps.Declarations do
   end
 
   defp origin_allowed?(origin), do: require_origin_allowed(origin) == :ok
+
+  defp actor_activated?(%Declaration{
+         activity_pub_actor_fingerprint: fingerprint,
+         activity_pub_actor_key_id: key_id,
+         activity_pub_actor_key_fingerprint: key_fingerprint,
+         activity_pub_actor_activated_at: %DateTime{}
+       })
+       when is_binary(fingerprint) and is_binary(key_id) and is_binary(key_fingerprint),
+       do: true
+
+  defp actor_activated?(%Declaration{}), do: false
 end

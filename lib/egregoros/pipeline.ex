@@ -22,11 +22,13 @@ defmodule Egregoros.Pipeline do
          :ok <- validate_namespace(normalized_activity, opts),
          :ok <- validate_structure(normalized_activity, opts),
          :ok <- validate_authority(normalized_activity, opts),
-         {:ok, module} <- ActivityRegistry.fetch(normalized_activity),
-         :allow <- TransactionalMessages.classify_inbound(normalized_activity, opts) do
-      ingest_with(module, normalized_activity, opts)
+         {:ok, module} <- ActivityRegistry.fetch(normalized_activity) do
+      classification = TransactionalMessages.classify_inbound(normalized_activity, opts)
+
+      TransactionalMessages.run_inbound(classification, fn authorization_opts ->
+        ingest_with(module, normalized_activity, Keyword.merge(opts, authorization_opts))
+      end)
     else
-      :ignore -> {:ok, :ignored}
       {:error, _reason} = error -> error
     end
   end

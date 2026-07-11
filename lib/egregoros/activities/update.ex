@@ -136,7 +136,7 @@ defmodule Egregoros.Activities.Update do
          {:ok, normalized_object, type_metadata} <- TypeNormalizer.normalize_incoming(object),
          existing_note <- Objects.get_by_ap_id(note_id),
          :ok <- authorize_existing_note(existing_note, actor_ap_id),
-         {:ok, validated_note} <- Note.cast_and_validate(normalized_object),
+         {:ok, validated_note} <- Note.cast_and_validate(normalized_object, opts),
          note_actor when is_binary(note_actor) <- Map.get(validated_note, "actor"),
          true <- note_actor == actor_ap_id do
       note_opts = TypeNormalizer.put_type_metadata(opts, type_metadata)
@@ -254,7 +254,9 @@ defmodule Egregoros.Activities.Update do
 
     case Objects.get_by_ap_id(note_id) do
       %Object{type: "Note", actor: ^actor_ap_id} = existing_note ->
-        validate_note_update_freshness(existing_note, object)
+        with {:ok, _validated_note} <- Note.cast_and_validate(object, local: false) do
+          validate_note_update_freshness(existing_note, object)
+        end
 
       %Object{} ->
         {:error, :unauthorized_update}

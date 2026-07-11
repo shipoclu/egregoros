@@ -34,32 +34,13 @@ defmodule Egregoros.MiniApps.NotificationConsents do
     with %User{} = user <- Repo.get(User, user_id),
          {:ok, app_origin} <- Origin.parse_origin(app_origin),
          {:ok, actor_url} <- Declarations.notification_actor(app_origin) do
-      now = DateTime.utc_now()
-
-      result =
-        %NotificationConsent{user_id: user_id}
-        |> NotificationConsent.changeset(%{
-          app_origin: app_origin,
-          app_actor_url: actor_url,
-          decision: decision,
-          decided_at: now
-        })
-        |> Repo.insert(
-          conflict_target: [:user_id, :app_origin],
-          on_conflict: {:replace, [:app_actor_url, :decision, :decided_at, :updated_at]},
-          returning: true
-        )
-
-      case result do
-        {:ok, %NotificationConsent{}} ->
-          event = if decision == :granted, do: :permission_granted, else: :permission_denied
-          _ = NotificationAudits.record(user, app_origin, actor_url, event)
-
-        _ ->
-          :ok
+      case Repo.transaction(fn ->
+             lock_delivery(user_id, app_origin)
+             decide_locked(user, app_origin, actor_url, decision)
+           end) do
+        {:ok, result} -> result
+        {:error, reason} -> {:error, reason}
       end
-
-      result
     else
       nil -> {:error, :invalid_user}
       _ -> {:error, :notifications_not_declared}
@@ -85,6 +66,64 @@ defmodule Egregoros.MiniApps.NotificationConsents do
   def list_for_user(_user_id), do: []
 
   def revoke(user_id, app_origin) when is_binary(user_id) and is_binary(app_origin) do
+    revoked? =
+      case Repo.transaction(fn -> revoke_locked(user_id, app_origin) end) do
+        {:ok, revoked?} -> revoked?
+        {:error, _reason} -> false
+      end
+
+    if revoked?, do: Permissions.notify_revoked(user_id, app_origin, :notifications)
+
+    :ok
+  rescue
+    ArgumentError -> :ok
+    Ecto.Query.CastError -> :ok
+  end
+
+  def revoke(_user_id, _app_origin), do: :ok
+
+  def lock_delivery(user_id, app_origin)
+      when is_binary(user_id) and is_binary(app_origin) do
+    Ecto.Adapters.SQL.query!(
+      Repo,
+      "SELECT pg_advisory_xact_lock(hashtext($1))",
+      ["mini-app-notification:" <> user_id <> ":" <> app_origin]
+    )
+
+    :ok
+  end
+
+  defp decide_locked(user, app_origin, actor_url, decision) do
+    now = DateTime.utc_now()
+
+    result =
+      %NotificationConsent{user_id: user.id}
+      |> NotificationConsent.changeset(%{
+        app_origin: app_origin,
+        app_actor_url: actor_url,
+        decision: decision,
+        decided_at: now
+      })
+      |> Repo.insert(
+        conflict_target: [:user_id, :app_origin],
+        on_conflict: {:replace, [:app_actor_url, :decision, :decided_at, :updated_at]},
+        returning: true
+      )
+
+    case result do
+      {:ok, %NotificationConsent{}} ->
+        event = if decision == :granted, do: :permission_granted, else: :permission_denied
+        _ = NotificationAudits.record(user, app_origin, actor_url, event)
+
+      _ ->
+        :ok
+    end
+
+    result
+  end
+
+  defp revoke_locked(user_id, app_origin) do
+    lock_delivery(user_id, app_origin)
     consent = Repo.get_by(NotificationConsent, user_id: user_id, app_origin: app_origin)
 
     {count, _rows} =
@@ -94,19 +133,12 @@ defmodule Egregoros.MiniApps.NotificationConsents do
       |> Repo.delete_all()
 
     if count > 0 do
-      Permissions.notify_revoked(user_id, app_origin, :notifications)
-
       with %NotificationConsent{app_actor_url: actor_url} <- consent,
            %User{} = user <- Repo.get(User, user_id) do
         _ = NotificationAudits.record(user, app_origin, actor_url, :permission_revoked)
       end
     end
 
-    :ok
-  rescue
-    ArgumentError -> :ok
-    Ecto.Query.CastError -> :ok
+    count > 0
   end
-
-  def revoke(_user_id, _app_origin), do: :ok
 end

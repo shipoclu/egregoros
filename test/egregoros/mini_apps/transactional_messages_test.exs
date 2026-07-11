@@ -2,6 +2,7 @@ defmodule Egregoros.MiniApps.TransactionalMessagesTest do
   use Egregoros.DataCase, async: false
 
   alias Egregoros.DirectMessages
+  alias Egregoros.MiniApps.Declarations
   alias Egregoros.MiniApps.Manifest
   alias Egregoros.MiniApps.NotificationConsents
   alias Egregoros.MiniApps.NotificationAudits
@@ -44,6 +45,42 @@ defmodule Egregoros.MiniApps.TransactionalMessagesTest do
     assert hd(NotificationAudits.list_for_user(user)).event == :delivery_accepted
   end
 
+  test "canonicalizes structured actor identifiers before applying consent", %{user: user} do
+    activity =
+      user.ap_id
+      |> transactional_create("structured-actor")
+      |> Map.put("actor", %{"id" => @actor})
+      |> put_in(["object", "attributedTo"], %{"id" => @actor})
+
+    assert_ignored(activity, user)
+  end
+
+  test "enforces the declared capability matrix for every mini-app actor", %{user: user} do
+    public_origin = "https://public-only.example"
+    public_actor = public_origin <> "/ap/actor"
+    declare_actor!(public_origin, public_notes: true, transactional_mentions: false)
+
+    user.ap_id
+    |> transactional_create("public-only-direct", public_actor)
+    |> assert_ignored(user)
+
+    transactional_origin = "https://transactional-only.example"
+    transactional_actor = transactional_origin <> "/ap/actor"
+    declare_actor!(transactional_origin, public_notes: false, transactional_mentions: true)
+
+    public =
+      user.ap_id
+      |> transactional_create("transactional-only-public", transactional_actor)
+      |> Map.put("to", ["https://www.w3.org/ns/activitystreams#Public"])
+      |> Map.put("cc", [transactional_actor <> "/followers"])
+      |> put_in(["object", "to"], ["https://www.w3.org/ns/activitystreams#Public"])
+      |> put_in(["object", "cc"], [transactional_actor <> "/followers"])
+      |> put_in(["object", "tag"], [])
+
+    assert {:ok, :ignored} = Pipeline.ingest(public, local: false)
+    refute Objects.get_by_ap_id(public["object"]["id"])
+  end
+
   test "silently suppresses delivery without consent and after either grant is revoked", %{
     user: user
   } do
@@ -76,6 +113,88 @@ defmodule Egregoros.MiniApps.TransactionalMessagesTest do
     assert :ok = IngestActivity.perform(job)
     refute Objects.get_by_ap_id(activity["id"])
     refute Objects.get_by_ap_id(activity["object"]["id"])
+  end
+
+  test "records at most one suppression for replayed activity IDs", %{user: user} do
+    activity = transactional_create(user.ap_id, "replayed-suppression")
+
+    assert_ignored(activity, user)
+    assert_ignored(activity, user)
+
+    suppressed =
+      user
+      |> NotificationAudits.list_for_user()
+      |> Enum.filter(&(&1.event == :delivery_suppressed))
+
+    assert length(suppressed) == 1
+  end
+
+  test "records acceptance only after the Note validates and persists", %{user: user} do
+    assert {:ok, _consent} = NotificationConsents.decide(user.id, @origin, :granted)
+
+    invalid =
+      user.ap_id
+      |> transactional_create("invalid-after-envelope")
+      |> put_in(["object", "content"], String.duplicate("x", 20_001))
+
+    assert {:ok, :ignored} =
+             Pipeline.ingest(invalid, local: false, inbox_user_ap_id: user.ap_id)
+
+    refute Enum.any?(
+             NotificationAudits.list_for_user(user),
+             &(&1.event == :delivery_accepted)
+           )
+  end
+
+  test "reauthorizes private transactional Updates and prevents visibility widening", %{
+    user: user
+  } do
+    assert {:ok, _consent} = NotificationConsents.decide(user.id, @origin, :granted)
+    create = transactional_create(user.ap_id, "mutable-transaction")
+
+    assert {:ok, _create} =
+             Pipeline.ingest(create, local: false, inbox_user_ap_id: user.ap_id)
+
+    note_id = create["object"]["id"]
+
+    allowed_update =
+      transactional_update(create["object"], user.ap_id, "allowed private edit")
+
+    assert {:ok, _update} =
+             Pipeline.ingest(allowed_update,
+               local: false,
+               inbox_user_ap_id: user.ap_id
+             )
+
+    assert Objects.get_by_ap_id(note_id).data["content"] == "allowed private edit"
+
+    public_update =
+      allowed_update
+      |> Map.put("id", @origin <> "/ap/update/public-widening")
+      |> Map.put("to", ["https://www.w3.org/ns/activitystreams#Public"])
+      |> put_in(["object", "content"], "public edit")
+      |> put_in(["object", "to"], ["https://www.w3.org/ns/activitystreams#Public"])
+      |> put_in(["object", "tag"], [])
+      |> put_in(["object", "updated"], "2026-07-11T12:00:01Z")
+
+    assert {:ok, :ignored} = Pipeline.ingest(public_update, local: false)
+    assert Objects.get_by_ap_id(note_id).data["content"] == "allowed private edit"
+
+    assert :ok = NotificationConsents.revoke(user.id, @origin)
+
+    revoked_update =
+      allowed_update
+      |> Map.put("id", @origin <> "/ap/update/revoked")
+      |> put_in(["object", "content"], "revoked edit")
+      |> put_in(["object", "updated"], "2026-07-11T12:00:02Z")
+
+    assert {:ok, :ignored} =
+             Pipeline.ingest(revoked_update,
+               local: false,
+               inbox_user_ap_id: user.ap_id
+             )
+
+    assert Objects.get_by_ap_id(note_id).data["content"] == "allowed private edit"
   end
 
   test "silently suppresses malformed transactional notes and shared-inbox delivery", %{
@@ -238,6 +357,22 @@ defmodule Egregoros.MiniApps.TransactionalMessagesTest do
     }
   end
 
+  defp transactional_update(note, recipient_ap_id, content) do
+    updated_note =
+      note
+      |> Map.put("content", content)
+      |> Map.put("updated", "2026-07-11T12:00:00Z")
+
+    %{
+      "id" => @origin <> "/ap/update/" <> Ecto.UUID.generate(),
+      "type" => "Update",
+      "actor" => @actor,
+      "to" => [recipient_ap_id],
+      "cc" => [],
+      "object" => updated_note
+    }
+  end
+
   defp authorize!(application, user) do
     verifier = String.duplicate("v", 43)
     challenge = :crypto.hash(:sha256, verifier) |> Base.url_encode64(padding: false)
@@ -263,19 +398,37 @@ defmodule Egregoros.MiniApps.TransactionalMessagesTest do
              })
   end
 
-  defp manifest_fixture do
+  defp declare_actor!(origin, options) do
+    manifest =
+      manifest_fixture(
+        origin,
+        Keyword.fetch!(options, :public_notes),
+        Keyword.fetch!(options, :transactional_mentions)
+      )
+
+    assert {:ok, _declaration, :created} = Declarations.ensure(manifest)
+    activate_mini_app_actor!(origin)
+  end
+
+  defp manifest_fixture(
+         origin \\ @origin,
+         public_notes \\ true,
+         transactional_mentions \\ true
+       ) do
+    actor = origin <> "/ap/actor"
+
     attrs = %{
       "version" => "1",
       "name" => "Transactional app",
-      "homeUrl" => @origin <> "/",
+      "homeUrl" => origin <> "/",
       "oauth" => %{
-        "redirectUris" => [@origin <> "/oauth/callback"],
+        "redirectUris" => [origin <> "/oauth/callback"],
         "scopes" => ["read"]
       },
       "activityPub" => %{
-        "actorUrl" => @actor,
-        "publicNotes" => true,
-        "transactionalMentions" => true
+        "actorUrl" => actor,
+        "publicNotes" => public_notes,
+        "transactionalMentions" => transactional_mentions
       },
       "capabilities" => []
     }
@@ -283,7 +436,7 @@ defmodule Egregoros.MiniApps.TransactionalMessagesTest do
     assert {:ok, manifest} =
              Manifest.decode(
                Jason.encode!(attrs),
-               @origin <> "/.well-known/fediverse-miniapp.json"
+               origin <> "/.well-known/fediverse-miniapp.json"
              )
 
     manifest

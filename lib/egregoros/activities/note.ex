@@ -11,6 +11,7 @@ defmodule Egregoros.Activities.Note do
   alias Egregoros.Federation.ThreadDiscovery
   alias Egregoros.InboxTargeting
   alias Egregoros.Media
+  alias Egregoros.MiniApps.TransactionalMessages
   alias Egregoros.Notifications
   alias Egregoros.Objects
   alias Egregoros.Timeline
@@ -118,6 +119,7 @@ defmodule Egregoros.Activities.Note do
       local: Keyword.get(opts, :local, true)
     }
     |> Helpers.attach_type_metadata(opts)
+    |> TransactionalMessages.attach_object_metadata(opts)
   end
 
   def ingest(note, opts) do

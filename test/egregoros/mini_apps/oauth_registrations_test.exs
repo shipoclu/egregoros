@@ -1,8 +1,9 @@
 defmodule Egregoros.MiniApps.OAuthRegistrationsTest do
-  use Egregoros.DataCase, async: true
+  use Egregoros.DataCase, async: false
 
   alias Egregoros.MiniApps.Manifest
   alias Egregoros.MiniApps.Declarations
+  alias Egregoros.MiniApps.NotificationConsents
   alias Egregoros.MiniApps.OAuthRegistrations
   alias Egregoros.MiniApps.Permissions
   alias Egregoros.OAuth
@@ -166,6 +167,73 @@ defmodule Egregoros.MiniApps.OAuthRegistrationsTest do
     assert :ok = OAuthRegistrations.revoke_user_grant(nil, nil)
   end
 
+  test "OAuth revocation waits for an in-flight notification delivery boundary" do
+    assert {:ok, _registration} = OAuthRegistrations.register(manifest_fixture())
+    assert {:ok, user} = Users.create_local_user("mini-app-oauth-revoke-lock-user")
+
+    supervisor = start_supervised!(Task.Supervisor)
+    parent = self()
+    origin = "https://app.example"
+
+    holder =
+      Task.Supervisor.async_nolink(supervisor, fn ->
+        :ok = Ecto.Adapters.SQL.Sandbox.checkout(Repo)
+
+        try do
+          Repo.transaction(fn ->
+            NotificationConsents.lock_delivery(user.id, origin)
+            send(parent, {:delivery_lock_held, self()})
+
+            receive do
+              :release_delivery -> :released
+            end
+          end)
+        after
+          Ecto.Adapters.SQL.Sandbox.checkin(Repo)
+        end
+      end)
+
+    assert_receive {:delivery_lock_held, holder_pid}
+    Permissions.subscribe(user.id)
+
+    revoker =
+      Task.Supervisor.async_nolink(supervisor, fn ->
+        receive do
+          :revoke ->
+            [[backend_pid]] = Repo.query!("SELECT pg_backend_pid()").rows
+            send(parent, {:revoker_backend, backend_pid})
+            result = OAuthRegistrations.revoke_user_grant(origin, user.id)
+            send(parent, {:revocation_finished, result})
+            result
+        end
+      end)
+
+    Ecto.Adapters.SQL.Sandbox.allow(Repo, self(), revoker.pid)
+    send(revoker.pid, :revoke)
+    assert_receive {:revoker_backend, backend_pid}
+
+    observer =
+      Task.Supervisor.async_nolink(supervisor, fn ->
+        :ok = Ecto.Adapters.SQL.Sandbox.checkout(Repo)
+
+        try do
+          wait_for_blocked_advisory_lock(backend_pid, System.monotonic_time(:millisecond) + 2_000)
+        after
+          Ecto.Adapters.SQL.Sandbox.checkin(Repo)
+        end
+      end)
+
+    assert :ok = Task.await(observer, 3_000)
+    refute_receive {:revocation_finished, _result}
+    refute_receive {:mini_app_permission_revoked, ^origin, :oauth}
+
+    send(holder_pid, :release_delivery)
+    assert_receive {:revocation_finished, :ok}
+    assert_receive {:mini_app_permission_revoked, ^origin, :oauth}
+    assert {:ok, :released} = Task.await(holder, 3_000)
+    assert :ok = Task.await(revoker, 3_000)
+  end
+
   defp manifest_fixture(overrides \\ []) do
     scopes = Keyword.get(overrides, :scopes, ["read", "write"])
     capabilities = Keyword.get(overrides, :capabilities, ["compose_note"])
@@ -198,5 +266,30 @@ defmodule Egregoros.MiniApps.OAuthRegistrationsTest do
       :mini_apps_domain_denylist, [] -> []
       key, default -> Egregoros.Config.Stub.get(key, default)
     end)
+  end
+
+  defp wait_for_blocked_advisory_lock(backend_pid, deadline) do
+    [[waiting?]] =
+      Repo.query!(
+        """
+        SELECT EXISTS (
+          SELECT 1
+          FROM pg_locks
+          WHERE pid = $1 AND locktype = 'advisory' AND granted = false
+        )
+        """,
+        [backend_pid]
+      ).rows
+
+    cond do
+      waiting? ->
+        :ok
+
+      System.monotonic_time(:millisecond) < deadline ->
+        wait_for_blocked_advisory_lock(backend_pid, deadline)
+
+      true ->
+        {:error, :lock_not_observed}
+    end
   end
 end

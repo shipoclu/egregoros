@@ -65,6 +65,25 @@ defmodule Egregoros.MiniApps.NotificationConsentsTest do
     assert hd(NotificationAudits.list_for_user(user)).event == :permission_revoked
   end
 
+  test "bounds retained audit history per user", %{user: user} do
+    stub(Egregoros.Config.Mock, :get, fn
+      :mini_app_notification_audit_limit, 500 -> 3
+      key, default -> Egregoros.Config.Stub.get(key, default)
+    end)
+
+    for _index <- 1..5 do
+      assert :ok =
+               NotificationAudits.record(
+                 user,
+                 "https://app.example",
+                 "https://app.example/ap/actor",
+                 :permission_denied
+               )
+    end
+
+    assert length(NotificationAudits.list_for_user(user)) == 3
+  end
+
   test "fails closed for malformed inputs", %{user: user} do
     assert {:error, :invalid_decision} =
              NotificationConsents.decide(user.id, "https://app.example", :maybe)
