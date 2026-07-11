@@ -60,7 +60,8 @@ The initial manifest would declare:
 - OAuth client metadata (or an indirection to standard OAuth client
   registration);
 - requested capabilities/scopes; and
-- optional webhook/notification endpoint, deferred beyond the first release.
+- a future immutable ActivityPub actor declaration for public publishing and
+  consent-gated transactional mentions, deferred beyond the first release.
 
 The manifest is intentionally domain-scoped: one app identity owns the domain,
 while individual paths identify launch destinations/shareable views within that
@@ -338,6 +339,27 @@ of v1. Deny rules always win. If an allowlist is non-empty, only matching
 domains may operate as mini apps. Rule changes take effect immediately: a newly
 blocked app's iframe closes, future host calls and token use are denied, and its
 links revert to ordinary links.
+
+#### Proposed ActivityPub messaging and notification consent
+
+Public app messages and consent-gated transactional mentions are specified as
+a post-v1 extension in
+[`MINIAPP_ACTIVITYPUB_MESSAGES.md`](MINIAPP_ACTIVITYPUB_MESSAGES.md). The app
+operates one normal ActivityPub `Application` or `Service` actor. Public notes
+are delivered to its followers; transactional notes are non-public, address
+exactly one consenting actor, and contain one matching `Mention`.
+
+Notification permission is deliberately separate from launch context. A future
+SDK `notifications.getPermission()`/`requestPermission()` surface reports and
+requests user-specific permission only after OAuth and a host-owned gesture
+confirmation. An OAuth-authenticated backend endpoint provides the
+authoritative recipient/app-actor binding. Egregoros rechecks current consent
+when the signed direct mention arrives, so revocation suppresses user-visible
+delivery even when the sender has stale state.
+
+This extension is not implemented by the current strict v1 manifest, SDK, or
+host. Public ActivityPub publishing requires no mini-app extension and can be
+implemented independently; Egregoros-enforced transactional consent cannot.
 
 #### Dynamic registration
 
@@ -864,7 +886,9 @@ The choices are:
 
 ## Deferred from v1 unless explicitly selected
 
-- app directory/search, user-installed/pinned apps, and notifications/webhooks;
+- app directory/search and user-installed/pinned apps;
+- the ActivityPub messaging/notification-consent extension and any webhook or
+  browser-push notification mechanism;
 - payments, non-EVM wallets, EIP-5792 batching, and device permissions;
 - host-side profile-navigation actions beyond `openExternal`;
 - cross-instance app reputation/discovery federation; and
@@ -928,6 +952,9 @@ The choices are:
 | Scope request | Exact immutable manifest set | No per-session scope variation or escalation. |
 | Host capabilities | Immutable manifest declaration | Consent visibly covers non-base actions such as `compose_note`. |
 | Context disclosure | Once per app, independent of OAuth | Required before public note context is sent; may be combined with OAuth consent. |
+| App public messages | Ordinary app-owned ActivityPub actor | Followers receive standard public `Create(Note)` activities. |
+| Transactional messages | Proposed post-v1 direct-mention profile | One non-public recipient and matching mention; sender and receiver both enforce consent. |
+| Notification permission | Separate from launch context and OAuth | Dedicated host UI/API avoids leaking user authority through public launch context. |
 | `write` scope | Separate second confirmation | Makes high-impact API authority unmistakable. |
 | User revocation | Settings disconnect revokes grants/tokens/context approval | A later launch must gain fresh approval. |
 | Instance domain policy | Operator allow/deny patterns | Gate applies to every mini-app lifecycle stage. |
@@ -982,8 +1009,9 @@ key or host OAuth token.
 
 All currently identified v1 product and protocol decisions have been resolved.
 Future work should treat wallet delegation, transaction batching, other wallet
-types, notifications, device permissions, an app directory, and non-public
-note launches as new design efforts rather than implicit extensions.
+types, the documented ActivityPub messaging/notification-consent profile,
+device permissions, an app directory, and non-public note launches as new
+design efforts rather than implicit extensions.
 
 The first-party SDK source and declarations live at
 `assets/js/lib/fediverse_miniapp_sdk.{mjs,d.ts}`. Builds publish matching
