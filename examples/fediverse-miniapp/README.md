@@ -4,6 +4,10 @@ This is a deliberately small, static v1 mini app. It demonstrates that useful
 apps can render and use public host actions before OAuth, while optional wallet
 access remains host mediated.
 
+For a complete production walkthrough, including nginx, TLS, security headers,
+caching, validation, and an optional OAuth-backend proxy, see
+[DEPLOYMENT.md](./DEPLOYMENT.md).
+
 Before deploying:
 
 1. Replace every `https://miniapp.example` URL in `public/.well-known/fediverse-miniapp.json`.
