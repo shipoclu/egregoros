@@ -144,6 +144,20 @@ const MiniAppHost = {
         status: payload.status,
       })
     })
+    this.handleEvent("mini_app_notification_permission_response", payload => {
+      if (payload?.launch_id !== this.el.dataset.launchId) return
+
+      this.broker?.send({
+        type: "notificationPermissionResult",
+        version: "1",
+        launchId: payload.launch_id,
+        requestId: payload.request_id,
+        status: payload.status,
+        ...(payload.status === "ok"
+          ? {state: payload.state, actorUrl: payload.actor_url}
+          : {}),
+      })
+    })
     this.handleEvent("mini_app_wallet_execute", async payload => {
       if (payload?.launch_id !== this.el.dataset.launchId) return
 
@@ -293,10 +307,13 @@ const MiniAppHost = {
     const launchId = this.el.dataset.launchId || ""
     const brokerKey = `${appOrigin}\n${launchId}`
     const walletEnabled = this.el.dataset.walletEnabled === "true"
-    const capabilities =
-      walletEnabled && this.walletAdapter.available() && this.walletCompatible !== false
-        ? ["wallet.evm"]
-        : []
+    const capabilities = []
+    if (this.el.dataset.notificationsEnabled === "true") {
+      capabilities.push("notifications.activitypub")
+    }
+    if (walletEnabled && this.walletAdapter.available() && this.walletCompatible !== false) {
+      capabilities.push("wallet.evm")
+    }
 
     if (!frame || !appOrigin || !launchId) {
       this.destroyBroker()
@@ -328,6 +345,12 @@ const MiniAppHost = {
         this.pushEvent("mini_app_context_request", {
           launch_id: launchId,
           request_id: requestId,
+        }),
+      onNotificationPermissionRequest: request =>
+        this.pushEvent("mini_app_notification_permission_request", {
+          launch_id: launchId,
+          request_id: request.requestId,
+          action: request.action,
         }),
       onAuthRequest: request =>
         this.pushEvent("mini_app_auth_request", {

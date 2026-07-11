@@ -3,6 +3,7 @@ defmodule EgregorosWeb.PrivacyLive do
 
   alias Egregoros.Notifications
   alias Egregoros.MiniApps.ContextConsents
+  alias Egregoros.MiniApps.NotificationConsents
   alias Egregoros.MiniApps.OAuthRegistrations
   alias Egregoros.MiniApps.WalletConnections
   alias Egregoros.Relationship
@@ -36,6 +37,12 @@ defmodule EgregorosWeb.PrivacyLive do
         _ -> []
       end
 
+    notification_consents =
+      case current_user do
+        %User{id: user_id} -> NotificationConsents.list_for_user(user_id)
+        _ -> []
+      end
+
     oauth_grants =
       case current_user do
         %User{id: user_id} -> OAuthRegistrations.list_user_grants(user_id)
@@ -52,6 +59,9 @@ defmodule EgregorosWeb.PrivacyLive do
        targets_by_ap_id: target_cards(mutes ++ blocks)
      )
      |> stream(:context_consents, context_consents, dom_id: &"context-consent-#{&1.id}")
+     |> stream(:notification_consents, notification_consents,
+       dom_id: &"notification-consent-#{&1.id}"
+     )
      |> stream(:oauth_grants, oauth_grants, dom_id: &"oauth-grant-#{&1.id}")
      |> stream(:wallet_connections, wallet_connections, dom_id: &"wallet-connection-#{&1.id}")}
   end
@@ -90,6 +100,25 @@ defmodule EgregorosWeb.PrivacyLive do
          stream(socket, :context_consents, ContextConsents.list_for_user(user_id),
            reset: true,
            dom_id: &"context-consent-#{&1.id}"
+         )}
+
+      _ ->
+        {:noreply, socket}
+    end
+  end
+
+  def handle_event("privacy-revoke-notifications", %{"origin" => origin}, socket) do
+    case socket.assigns.current_user do
+      %User{id: user_id} ->
+        :ok = NotificationConsents.revoke(user_id, origin)
+
+        {:noreply,
+         stream(
+           socket,
+           :notification_consents,
+           NotificationConsents.list_for_user(user_id),
+           reset: true,
+           dom_id: &"notification-consent-#{&1.id}"
          )}
 
       _ ->
@@ -325,6 +354,55 @@ defmodule EgregorosWeb.PrivacyLive do
                 </div>
               </.card>
             </div>
+
+            <.card class="p-6">
+              <div class="flex items-center justify-between gap-4">
+                <div>
+                  <h3 class="text-xl font-bold text-[color:var(--text-primary)]">
+                    Transactional mini-app messages
+                  </h3>
+                  <p class="mt-1 text-sm text-[color:var(--text-secondary)]">
+                    Manage which app actors may send private ActivityPub notes that mention you.
+                  </p>
+                </div>
+                <.icon name="hero-bell" class="size-6 text-[color:var(--accent)]" />
+              </div>
+
+              <div id="notification-consents" phx-update="stream" class="mt-4 space-y-3">
+                <p
+                  id="notification-consents-empty"
+                  class="hidden only:block text-sm text-[color:var(--text-secondary)]"
+                >
+                  No mini apps have a transactional-message decision.
+                </p>
+                <div
+                  :for={{id, consent} <- @streams.notification_consents}
+                  id={id}
+                  class="flex flex-col gap-3 border border-[color:var(--border-default)] bg-[color:var(--bg-base)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div class="min-w-0">
+                    <p class="truncate font-mono text-sm font-bold text-[color:var(--text-primary)]">
+                      {consent.app_origin}
+                    </p>
+                    <p class="mt-1 break-all font-mono text-xs text-[color:var(--text-muted)]">
+                      {consent.app_actor_url}
+                    </p>
+                    <p class="mt-1 text-xs font-bold uppercase tracking-wide text-[color:var(--text-secondary)]">
+                      Decision: {consent.decision}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    data-role="privacy-revoke-notifications"
+                    phx-click="privacy-revoke-notifications"
+                    phx-value-origin={consent.app_origin}
+                    class="shrink-0 border-2 border-[color:var(--border-default)] px-3 py-2 text-xs font-bold uppercase tracking-wide text-[color:var(--text-secondary)] transition hover:border-[color:var(--danger)] hover:text-[color:var(--danger)]"
+                  >
+                    Reset
+                  </button>
+                </div>
+              </div>
+            </.card>
 
             <.card class="p-6">
               <div class="flex items-center justify-between gap-4">

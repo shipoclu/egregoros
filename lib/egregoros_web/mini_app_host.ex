@@ -12,6 +12,7 @@ defmodule EgregorosWeb.MiniAppHost do
   alias Egregoros.MiniApps.ExternalURL
   alias Egregoros.MiniApps.LaunchContext
   alias Egregoros.MiniApps.OAuthRegistrations
+  alias Egregoros.MiniApps.NotificationConsents
   alias Egregoros.MiniApps.Permissions
   alias Egregoros.MiniApps.WalletConnections
   alias Egregoros.MiniApps.WalletRequest
@@ -45,7 +46,7 @@ defmodule EgregorosWeb.MiniAppHost do
          {:mini_app_permission_revoked, app_origin, kind},
          socket
        )
-       when kind in [:context, :oauth, :wallet] do
+       when kind in [:context, :notifications, :oauth, :wallet] do
     case socket.assigns.mini_app_host do
       %{card: %Card{app_origin: ^app_origin}} ->
         {:halt, Phoenix.Component.assign(socket, :mini_app_host, closed_state())}
@@ -73,6 +74,10 @@ defmodule EgregorosWeb.MiniAppHost do
       data-wallet-required-chains={
         Jason.encode!(wallet_value(@state, :wallet_evm_required_chains, []))
       }
+      data-notifications-enabled={
+        to_string(wallet_value(@state, :activity_pub_transactional_mentions, false))
+      }
+      data-notifications-actor-url={wallet_value(@state, :activity_pub_actor_url, nil)}
       phx-hook="MiniAppHost"
       class={host_classes(@state)}
       aria-hidden={if @state.status == :closed, do: "true", else: "false"}
@@ -188,6 +193,60 @@ defmodule EgregorosWeb.MiniAppHost do
                 class="cursor-pointer border-2 border-[color:var(--border-default)] bg-[color:var(--text-primary)] px-4 py-2 text-sm font-bold text-[color:var(--bg-base)] transition hover:shadow-[3px_3px_0_var(--accent)] focus-visible:outline-none focus-brutal"
               >
                 Share context
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section
+          :if={@state.status == :open and @state.notification_request}
+          id="mini-app-notification-consent"
+          class="absolute inset-0 z-30 flex items-center justify-center bg-[color:var(--text-primary)]/60 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="mini-app-notification-consent-title"
+        >
+          <div class="w-full max-w-sm border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] p-5 shadow-[6px_6px_0_var(--border-default)]">
+            <div class="flex items-start gap-3">
+              <div class="flex size-10 shrink-0 items-center justify-center border-2 border-[color:var(--border-default)] bg-[color:var(--accent-subtle)]">
+                <.icon name="hero-bell" class="size-5 text-[color:var(--accent)]" />
+              </div>
+              <div class="min-w-0">
+                <h2
+                  id="mini-app-notification-consent-title"
+                  class="font-bold text-[color:var(--text-primary)]"
+                >
+                  Allow transactional messages?
+                </h2>
+                <p class="mt-2 text-sm leading-relaxed text-[color:var(--text-secondary)]">
+                  <span class="font-mono font-bold">{display_origin(@state.card.app_origin)}</span>
+                  may send private ActivityPub notes that mention you from this exact actor:
+                </p>
+                <p class="mt-2 break-all font-mono text-xs text-[color:var(--text-primary)]">
+                  {@state.notification_request.actor_url}
+                </p>
+                <p class="mt-2 text-xs text-[color:var(--text-muted)]">
+                  This does not authorize public mentions, bypass blocks, or guarantee delivery. You can revoke it in Privacy settings.
+                </p>
+              </div>
+            </div>
+
+            <div class="mt-5 flex justify-end gap-2">
+              <button
+                id="mini-app-notification-deny"
+                type="button"
+                phx-click="mini_app_notification_deny"
+                class="cursor-pointer border-2 border-[color:var(--border-default)] px-4 py-2 text-sm font-bold text-[color:var(--text-secondary)] transition hover:bg-[color:var(--bg-subtle)] focus-visible:outline-none focus-brutal"
+              >
+                Don’t allow
+              </button>
+              <button
+                id="mini-app-notification-approve"
+                type="button"
+                phx-click="mini_app_notification_approve"
+                class="cursor-pointer border-2 border-[color:var(--border-default)] bg-[color:var(--text-primary)] px-4 py-2 text-sm font-bold text-[color:var(--bg-base)] transition hover:shadow-[3px_3px_0_var(--accent)] focus-visible:outline-none focus-brutal"
+              >
+                Allow messages
               </button>
             </div>
           </div>
@@ -601,6 +660,7 @@ defmodule EgregorosWeb.MiniAppHost do
            ready?: false,
            load_error?: false,
            context_request: nil,
+           notification_request: nil,
            auth_request: nil,
            oauth_authenticated?: false,
            compose_request: nil,
@@ -664,6 +724,64 @@ defmodule EgregorosWeb.MiniAppHost do
 
   defp handle_host_event("mini_app_context_deny", _params, socket) do
     {:halt, deny_pending_context(socket, "denied")}
+  end
+
+  defp handle_host_event(
+         "mini_app_notification_permission_request",
+         %{
+           "launch_id" => launch_id,
+           "request_id" => request_id,
+           "action" => action
+         },
+         socket
+       )
+       when action in ["get", "request"] do
+    state = socket.assigns.mini_app_host
+    user_id = socket.assigns.mini_app_user_id
+
+    if notification_request_allowed?(state, launch_id, request_id) do
+      with true <- is_binary(user_id),
+           true <- OAuthRegistrations.active_user_grant?(state.card.app_origin, user_id),
+           {:ok, actor_url} <- Declarations.notification_actor(state.card.app_origin) do
+        permission_state = NotificationConsents.state(user_id, state.card.app_origin)
+
+        cond do
+          action == "get" or permission_state == :granted ->
+            {:halt,
+             push_notification_permission_response(
+               socket,
+               request_id,
+               permission_state,
+               actor_url
+             )}
+
+          true ->
+            request = %{request_id: request_id, actor_url: actor_url}
+
+            {:halt,
+             Phoenix.Component.assign(socket, :mini_app_host, %{
+               state
+               | notification_request: request
+             })}
+        end
+      else
+        false ->
+          {:halt, push_notification_permission_error(socket, request_id, "auth_required")}
+
+        _ ->
+          {:halt, push_notification_permission_error(socket, request_id, "unavailable")}
+      end
+    else
+      {:halt, socket}
+    end
+  end
+
+  defp handle_host_event("mini_app_notification_approve", _params, socket) do
+    decide_notification_permission(socket, :granted)
+  end
+
+  defp handle_host_event("mini_app_notification_deny", _params, socket) do
+    decide_notification_permission(socket, :denied)
   end
 
   defp handle_host_event(
@@ -1139,6 +1257,8 @@ defmodule EgregorosWeb.MiniAppHost do
          | ready?: event == "mini_app_ready",
            load_error?: false,
            auth_request: if(event == "mini_app_loading", do: nil, else: state.auth_request),
+           notification_request:
+             if(event == "mini_app_loading", do: nil, else: state.notification_request),
            oauth_authenticated?:
              if(event == "mini_app_loading", do: false, else: state.oauth_authenticated?),
            compose_request: if(event == "mini_app_loading", do: nil, else: state.compose_request),
@@ -1153,6 +1273,7 @@ defmodule EgregorosWeb.MiniAppHost do
 
   defp handle_host_event(event, _params, socket)
        when event in [
+              "mini_app_notification_permission_request",
               "mini_app_wallet_request",
               "mini_app_wallet_preflight_result",
               "mini_app_wallet_execution_result",
@@ -1196,6 +1317,7 @@ defmodule EgregorosWeb.MiniAppHost do
       load_error?: false,
       context_request: nil,
       auth_request: nil,
+      notification_request: nil,
       oauth_authenticated?: false,
       compose_request: nil,
       external_request: nil,
@@ -1208,7 +1330,7 @@ defmodule EgregorosWeb.MiniAppHost do
   defp context_request_allowed?(state, launch_id, request_id) do
     state.status == :open and state.ready? and state.launch_id == launch_id and
       is_nil(state.compose_request) and is_nil(state.external_request) and
-      is_nil(state.wallet_request) and
+      is_nil(state.wallet_request) and is_nil(state.notification_request) and
       valid_request_id?(request_id) and active_card?(state.card)
   end
 
@@ -1216,7 +1338,14 @@ defmodule EgregorosWeb.MiniAppHost do
     state.status == :open and state.ready? and state.launch_id == launch_id and
       is_nil(state.auth_request) and is_nil(state.context_request) and
       is_nil(state.compose_request) and is_nil(state.external_request) and
-      is_nil(state.wallet_request) and valid_request_id?(request_id) and active_card?(state.card)
+      is_nil(state.wallet_request) and is_nil(state.notification_request) and
+      valid_request_id?(request_id) and active_card?(state.card)
+  end
+
+  defp notification_request_allowed?(state, launch_id, request_id) do
+    host_action_allowed?(state, launch_id, request_id) and
+      is_nil(state.notification_request) and
+      match?({:ok, _actor_url}, Declarations.notification_actor(state.card.app_origin))
   end
 
   defp wallet_request_allowed?(state, launch_id, request_id, user_id) do
@@ -1228,7 +1357,7 @@ defmodule EgregorosWeb.MiniAppHost do
     state.status == :open and state.ready? and state.launch_id == launch_id and
       is_nil(state.auth_request) and is_nil(state.context_request) and
       is_nil(state.compose_request) and is_nil(state.external_request) and
-      is_nil(state.wallet_request) and
+      is_nil(state.wallet_request) and is_nil(state.notification_request) and
       valid_request_id?(call_id) and active_card?(state.card)
   end
 
@@ -1236,7 +1365,7 @@ defmodule EgregorosWeb.MiniAppHost do
     state.status == :open and state.ready? and state.launch_id == launch_id and
       is_nil(state.auth_request) and is_nil(state.context_request) and
       is_nil(state.compose_request) and is_nil(state.external_request) and
-      is_nil(state.wallet_request) and
+      is_nil(state.wallet_request) and is_nil(state.notification_request) and
       valid_request_id?(request_id) and active_card?(state.card)
   end
 
@@ -1245,6 +1374,54 @@ defmodule EgregorosWeb.MiniAppHost do
   end
 
   defp valid_request_id?(_request_id), do: false
+
+  defp decide_notification_permission(socket, decision) when decision in [:granted, :denied] do
+    state = socket.assigns.mini_app_host
+    user_id = socket.assigns.mini_app_user_id
+
+    with %{request_id: request_id, actor_url: actor_url} <- state.notification_request,
+         true <- is_binary(user_id),
+         true <- OAuthRegistrations.active_user_grant?(state.card.app_origin, user_id),
+         {:ok, ^actor_url} <- Declarations.notification_actor(state.card.app_origin),
+         {:ok, _consent} <-
+           NotificationConsents.decide(user_id, state.card.app_origin, decision) do
+      {:halt, push_notification_permission_response(socket, request_id, decision, actor_url)}
+    else
+      false ->
+        request_id = state.notification_request && state.notification_request.request_id
+        {:halt, push_notification_permission_error(socket, request_id, "auth_required")}
+
+      _ ->
+        request_id = state.notification_request && state.notification_request.request_id
+        {:halt, push_notification_permission_error(socket, request_id, "unavailable")}
+    end
+  end
+
+  defp push_notification_permission_response(socket, request_id, state_name, actor_url) do
+    state = socket.assigns.mini_app_host
+
+    socket
+    |> Phoenix.Component.assign(:mini_app_host, %{state | notification_request: nil})
+    |> Phoenix.LiveView.push_event("mini_app_notification_permission_response", %{
+      launch_id: state.launch_id,
+      request_id: request_id,
+      status: "ok",
+      state: Atom.to_string(state_name),
+      actor_url: actor_url
+    })
+  end
+
+  defp push_notification_permission_error(socket, request_id, status) do
+    state = socket.assigns.mini_app_host
+
+    socket
+    |> Phoenix.Component.assign(:mini_app_host, %{state | notification_request: nil})
+    |> Phoenix.LiveView.push_event("mini_app_notification_permission_response", %{
+      launch_id: state.launch_id,
+      request_id: request_id,
+      status: status
+    })
+  end
 
   defp handle_context_request(socket, request_id) do
     state = socket.assigns.mini_app_host

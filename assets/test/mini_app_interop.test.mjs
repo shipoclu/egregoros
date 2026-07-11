@@ -106,6 +106,7 @@ test("reference SDK and host broker interoperate over one private channel", asyn
         version: "1",
         launchId,
         requestId: request.requestId,
+        status: "ok",
         state: request.action === "request" ? "granted" : "prompt",
         actorUrl: "https://app.example/ap/actor",
       }),

@@ -7,6 +7,7 @@ defmodule EgregorosWeb.PrivacyLiveTest do
   alias Egregoros.MiniApps.ContextConsents
   alias Egregoros.MiniApps.Declarations
   alias Egregoros.MiniApps.Manifest
+  alias Egregoros.MiniApps.NotificationConsents
   alias Egregoros.MiniApps.OAuthRegistrations
   alias Egregoros.MiniApps.WalletConnections
   alias Egregoros.OAuth
@@ -134,6 +135,31 @@ defmodule EgregorosWeb.PrivacyLiveTest do
     refute has_element?(view, "#oauth-grant-#{registration.id}")
   end
 
+  test "lists and revokes transactional mini-app message consent independently", %{
+    conn: conn,
+    alice: alice
+  } do
+    assert {:ok, _declaration, :created} = Declarations.ensure(notification_manifest())
+
+    assert {:ok, consent} =
+             NotificationConsents.decide(alice.id, "https://alerts.example", :granted)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: alice.id})
+    {:ok, view, _html} = live(conn, "/settings/privacy")
+
+    assert has_element?(view, "#notification-consent-#{consent.id}")
+    assert has_element?(view, "#notification-consent-#{consent.id}", consent.app_actor_url)
+
+    view
+    |> element(
+      "button[data-role='privacy-revoke-notifications'][phx-value-origin='https://alerts.example']"
+    )
+    |> render_click()
+
+    assert NotificationConsents.state(alice.id, "https://alerts.example") == :prompt
+    refute has_element?(view, "#notification-consent-#{consent.id}")
+  end
+
   test "lists blocks and mutes for the current user", %{
     conn: conn,
     alice: alice,
@@ -218,6 +244,32 @@ defmodule EgregorosWeb.PrivacyLiveTest do
              Manifest.decode(
                Jason.encode!(attrs),
                "https://writer.example/.well-known/fediverse-miniapp.json"
+             )
+
+    manifest
+  end
+
+  defp notification_manifest do
+    attrs = %{
+      "version" => "1",
+      "name" => "Alerts App",
+      "homeUrl" => "https://alerts.example/",
+      "oauth" => %{
+        "redirectUris" => ["https://alerts.example/oauth/callback"],
+        "scopes" => ["read"]
+      },
+      "activityPub" => %{
+        "actorUrl" => "https://alerts.example/ap/actor",
+        "publicNotes" => true,
+        "transactionalMentions" => true
+      },
+      "capabilities" => []
+    }
+
+    assert {:ok, manifest} =
+             Manifest.decode(
+               Jason.encode!(attrs),
+               "https://alerts.example/.well-known/fediverse-miniapp.json"
              )
 
     manifest

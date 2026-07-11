@@ -85,6 +85,46 @@ test("pins the exact bootstrap origin and exposes immutable bootstrap data", asy
   hostPort.close()
 })
 
+test("notification permission reports authentication and availability failures", async () => {
+  const f = fixture()
+  const sdk = createFediverseMiniAppSDK({
+    windowObject: f.windowObject,
+    parentWindow: f.parentWindow,
+    cryptoObject: f.cryptoObject,
+    navigatorObject: {userActivation: {isActive: true}},
+    allowedHostOrigin: () => true,
+  })
+  const hostPort = f.bootstrap({message: {capabilities: ["notifications.activitypub"]}})
+  await sdk.connect()
+
+  const authMessage = nextMessage(hostPort)
+  const authPromise = sdk.notifications.getPermission()
+  const authRequest = await authMessage
+  hostPort.postMessage({
+    type: "notificationPermissionResult",
+    version: "1",
+    launchId,
+    requestId: authRequest.requestId,
+    status: "auth_required",
+  })
+  await assert.rejects(authPromise, error => error.code === "AUTH_REQUIRED")
+
+  const unavailableMessage = nextMessage(hostPort)
+  const unavailablePromise = sdk.notifications.getPermission()
+  const unavailableRequest = await unavailableMessage
+  hostPort.postMessage({
+    type: "notificationPermissionResult",
+    version: "1",
+    launchId,
+    requestId: unavailableRequest.requestId,
+    status: "unavailable",
+  })
+  await assert.rejects(unavailablePromise, error => error.code === "CAPABILITY_UNAVAILABLE")
+
+  sdk.destroy()
+  hostPort.close()
+})
+
 test("correlates context and external action promises over the private port", async () => {
   const f = fixture()
   const sdk = createFediverseMiniAppSDK({
@@ -279,6 +319,7 @@ test("reads and requests ActivityPub notification permission through a typed cap
     version: "1",
     launchId,
     requestId: getRequest.requestId,
+    status: "ok",
     state: "prompt",
     actorUrl: "https://app.example/ap/actor",
   })
@@ -297,6 +338,7 @@ test("reads and requests ActivityPub notification permission through a typed cap
     version: "1",
     launchId,
     requestId: permissionRequest.requestId,
+    status: "ok",
     state: "granted",
     actorUrl: "https://app.example/ap/actor",
   })

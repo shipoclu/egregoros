@@ -215,25 +215,25 @@ export const createFediverseMiniAppSDK = ({
     }
 
     if (message.type === "notificationPermissionResult") {
-      if (
-        !exactFields(message, [
-          "type",
-          "version",
-          "launchId",
-          "requestId",
-          "state",
-          "actorUrl",
-        ]) ||
-        !requestIdPattern.test(message.requestId || "") ||
-        !["prompt", "granted", "denied"].includes(message.state) ||
-        !validHttpsUrl(message.actorUrl)
-      ) {
-        return
-      }
-      settle(message, "requestId", "notificationPermissionResult", result => ({
-        state: result.state,
-        actorUrl: result.actorUrl,
-      }))
+      const baseFields = ["type", "version", "launchId", "requestId", "status"]
+      const validSuccess =
+        message.status === "ok" &&
+        exactFields(message, [...baseFields, "state", "actorUrl"]) &&
+        ["prompt", "granted", "denied"].includes(message.state) &&
+        validHttpsUrl(message.actorUrl)
+      const validFailure =
+        ["auth_required", "unavailable"].includes(message.status) &&
+        exactFields(message, baseFields)
+      if (!requestIdPattern.test(message.requestId || "") || (!validSuccess && !validFailure)) return
+      settle(message, "requestId", "notificationPermissionResult", result => {
+        if (result.status === "auth_required") {
+          throw miniAppError("AUTH_REQUIRED", "Authentication is required")
+        }
+        if (result.status === "unavailable") {
+          throw miniAppError("CAPABILITY_UNAVAILABLE", "Notification permission is unavailable")
+        }
+        return {state: result.state, actorUrl: result.actorUrl}
+      })
       return
     }
 

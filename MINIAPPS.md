@@ -359,10 +359,12 @@ delivery even when the sender has stale state.
 
 The current v1 manifest strictly parses and immutably persists the actor
 declaration, Egregoros has actor-bound consent storage, and the SDK/broker have
-a typed, capability-gated permission transport. Actor-document activation, the
-backend check, host routing/UI, and inbound enforcement remain unimplemented.
-Public ActivityPub publishing requires no mini-app host extension and can be
-implemented independently.
+a typed, capability-gated permission transport. The host advertises the
+capability, requires active OAuth, answers non-prompting state reads, owns the
+grant/deny dialog, and provides independent Privacy-settings revocation.
+Actor-document activation, the backend check, and inbound enforcement remain
+unimplemented. Public ActivityPub publishing requires no mini-app host
+extension and can be implemented independently.
 
 #### Dynamic registration
 

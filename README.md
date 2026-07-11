@@ -68,8 +68,8 @@ For developers considering app-owned public ActivityPub notes and future
 consent-gated transactional mentions, see
 [`MINIAPP_ACTIVITYPUB_MESSAGES.md`](MINIAPP_ACTIVITYPUB_MESSAGES.md). The
 manifest declaration, consent data model, and typed SDK/broker transport are
-implemented; host consent UI and inbound transactional enforcement remain
-future work.
+implemented together with host-owned consent and revocation UI; the backend
+permission endpoint and inbound transactional enforcement remain future work.
 
 ## Architecture (quick tour)
 

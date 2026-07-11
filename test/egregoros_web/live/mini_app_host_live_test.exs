@@ -7,6 +7,7 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
   alias Egregoros.MiniApps.Cards
   alias Egregoros.MiniApps.Manifest
   alias Egregoros.MiniApps.OAuthRegistrations
+  alias Egregoros.MiniApps.NotificationConsents
   alias Egregoros.MiniApps.Permissions
   alias Egregoros.MiniApps.WalletConnections
   alias Egregoros.MiniApps.ResolvedCard
@@ -352,6 +353,104 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
 
     assert %{data: %{"source" => %{"content" => "Edited and explicitly submitted"}}} =
              Objects.get_by_ap_id(published_id)
+  end
+
+  test "notification permission requires OAuth and uses a host-owned decision dialog", %{
+    conn: conn,
+    user: user
+  } do
+    {:ok, note} =
+      Pipeline.ingest(
+        Note.build(user, ~s(<a href="https://app.example/shared/alerts">alerts</a>)),
+        local: true
+      )
+
+    resolved = resolved_card(oauth?: true, notifications?: true)
+    assert {:ok, registration} = OAuthRegistrations.register(resolved.manifest)
+    assert {:ok, _card} = Cards.put(note, resolved)
+
+    application =
+      Egregoros.Repo.get!(Egregoros.OAuth.Application, registration.oauth_application_id)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/?timeline=public")
+    view |> element("[data-role='open-mini-app']") |> render_click()
+
+    assert has_element?(
+             view,
+             "#mini-app-host[data-notifications-enabled='true'][data-notifications-actor-url='https://app.example/ap/actor']"
+           )
+
+    launch_id = :sys.get_state(view.pid).socket.assigns.mini_app_host.launch_id
+    render_hook(view, "mini_app_ready", %{"launch_id" => launch_id})
+
+    render_hook(view, "mini_app_notification_permission_request", %{
+      "launch_id" => launch_id,
+      "request_id" => "notification-before-auth",
+      "action" => "get"
+    })
+
+    assert_push_event(view, "mini_app_notification_permission_response", %{
+      launch_id: ^launch_id,
+      request_id: "notification-before-auth",
+      status: "auth_required"
+    })
+
+    complete_oauth_grant(application, user)
+
+    render_hook(view, "mini_app_notification_permission_request", %{
+      "launch_id" => launch_id,
+      "request_id" => "notification-get",
+      "action" => "get"
+    })
+
+    assert_push_event(view, "mini_app_notification_permission_response", %{
+      launch_id: ^launch_id,
+      request_id: "notification-get",
+      status: "ok",
+      state: "prompt",
+      actor_url: "https://app.example/ap/actor"
+    })
+
+    render_hook(view, "mini_app_notification_permission_request", %{
+      "launch_id" => launch_id,
+      "request_id" => "notification-prompt-deny",
+      "action" => "request"
+    })
+
+    assert has_element?(view, "#mini-app-notification-consent")
+    assert has_element?(view, "#mini-app-notification-consent", "https://app.example/ap/actor")
+    view |> element("#mini-app-notification-deny") |> render_click()
+    assert NotificationConsents.state(user.id, "https://app.example") == :denied
+
+    assert_push_event(view, "mini_app_notification_permission_response", %{
+      launch_id: ^launch_id,
+      request_id: "notification-prompt-deny",
+      status: "ok",
+      state: "denied",
+      actor_url: "https://app.example/ap/actor"
+    })
+
+    render_hook(view, "mini_app_notification_permission_request", %{
+      "launch_id" => launch_id,
+      "request_id" => "notification-prompt-grant",
+      "action" => "request"
+    })
+
+    view |> element("#mini-app-notification-approve") |> render_click()
+    assert NotificationConsents.granted?(user.id, "https://app.example")
+
+    assert_push_event(view, "mini_app_notification_permission_response", %{
+      launch_id: ^launch_id,
+      request_id: "notification-prompt-grant",
+      status: "ok",
+      state: "granted",
+      actor_url: "https://app.example/ap/actor"
+    })
+
+    assert :ok = NotificationConsents.revoke(user.id, "https://app.example")
+    _ = :sys.get_state(view.pid)
+    assert has_element?(view, "#mini-app-host[data-state='closed']")
   end
 
   test "external navigation requires host confirmation and close is launch-bound", %{
@@ -748,6 +847,7 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
 
   defp resolved_card(options \\ []) do
     oauth? = Keyword.get(options, :oauth?, false)
+    notifications? = Keyword.get(options, :notifications?, false)
     wallet? = Keyword.get(options, :wallet?, false)
     wallet_required? = Keyword.get(options, :wallet_required?, false)
 
@@ -772,6 +872,15 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
               required: wallet_required?,
               required_chains: ["eip155:8453"]
             }
+          },
+          else: nil
+        ),
+      activity_pub:
+        if(notifications?,
+          do: %{
+            actor_url: "https://app.example/ap/actor",
+            public_notes: true,
+            transactional_mentions: true
           },
           else: nil
         ),
