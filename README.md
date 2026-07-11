@@ -72,7 +72,9 @@ implemented together with host-owned consent and revocation UI; the backend
 permission endpoint and inbound transactional enforcement are also
 implemented. Declared ActivityPub actors remain disabled until a bounded,
 SSRF-safe background fetch validates and pins their identity, endpoints, and
-signing key.
+signing key. Subsequent signed inbox delivery must match that pinned key ID and
+fingerprint; permission and delivery decisions produce a bounded, content-free
+security audit.
 
 ## Architecture (quick tour)
 

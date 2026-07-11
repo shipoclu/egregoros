@@ -5,6 +5,7 @@ defmodule Egregoros.MiniApps.NotificationConsents do
 
   alias Egregoros.MiniApps.Declarations
   alias Egregoros.MiniApps.NotificationConsent
+  alias Egregoros.MiniApps.NotificationAudits
   alias Egregoros.MiniApps.Origin
   alias Egregoros.MiniApps.Permissions
   alias Egregoros.Repo
@@ -30,23 +31,35 @@ defmodule Egregoros.MiniApps.NotificationConsents do
 
   def decide(user_id, app_origin, decision)
       when is_binary(user_id) and is_binary(app_origin) and decision in [:granted, :denied] do
-    with %User{} <- Repo.get(User, user_id),
+    with %User{} = user <- Repo.get(User, user_id),
          {:ok, app_origin} <- Origin.parse_origin(app_origin),
          {:ok, actor_url} <- Declarations.notification_actor(app_origin) do
       now = DateTime.utc_now()
 
-      %NotificationConsent{user_id: user_id}
-      |> NotificationConsent.changeset(%{
-        app_origin: app_origin,
-        app_actor_url: actor_url,
-        decision: decision,
-        decided_at: now
-      })
-      |> Repo.insert(
-        conflict_target: [:user_id, :app_origin],
-        on_conflict: {:replace, [:app_actor_url, :decision, :decided_at, :updated_at]},
-        returning: true
-      )
+      result =
+        %NotificationConsent{user_id: user_id}
+        |> NotificationConsent.changeset(%{
+          app_origin: app_origin,
+          app_actor_url: actor_url,
+          decision: decision,
+          decided_at: now
+        })
+        |> Repo.insert(
+          conflict_target: [:user_id, :app_origin],
+          on_conflict: {:replace, [:app_actor_url, :decision, :decided_at, :updated_at]},
+          returning: true
+        )
+
+      case result do
+        {:ok, %NotificationConsent{}} ->
+          event = if decision == :granted, do: :permission_granted, else: :permission_denied
+          _ = NotificationAudits.record(user, app_origin, actor_url, event)
+
+        _ ->
+          :ok
+      end
+
+      result
     else
       nil -> {:error, :invalid_user}
       _ -> {:error, :notifications_not_declared}
@@ -72,13 +85,22 @@ defmodule Egregoros.MiniApps.NotificationConsents do
   def list_for_user(_user_id), do: []
 
   def revoke(user_id, app_origin) when is_binary(user_id) and is_binary(app_origin) do
+    consent = Repo.get_by(NotificationConsent, user_id: user_id, app_origin: app_origin)
+
     {count, _rows} =
       from(consent in NotificationConsent,
         where: consent.user_id == ^user_id and consent.app_origin == ^app_origin
       )
       |> Repo.delete_all()
 
-    if count > 0, do: Permissions.notify_revoked(user_id, app_origin, :notifications)
+    if count > 0 do
+      Permissions.notify_revoked(user_id, app_origin, :notifications)
+
+      with %NotificationConsent{app_actor_url: actor_url} <- consent,
+           %User{} = user <- Repo.get(User, user_id) do
+        _ = NotificationAudits.record(user, app_origin, actor_url, :permission_revoked)
+      end
+    end
 
     :ok
   rescue

@@ -4,6 +4,7 @@ defmodule Egregoros.MiniApps.TransactionalMessagesTest do
   alias Egregoros.DirectMessages
   alias Egregoros.MiniApps.Manifest
   alias Egregoros.MiniApps.NotificationConsents
+  alias Egregoros.MiniApps.NotificationAudits
   alias Egregoros.MiniApps.OAuthRegistrations
   alias Egregoros.Notifications
   alias Egregoros.OAuth
@@ -40,6 +41,7 @@ defmodule Egregoros.MiniApps.TransactionalMessagesTest do
     assert_receive {:notification_created, %{ap_id: note_id}}
     assert note_id == activity["object"]["id"]
     assert Enum.map(DirectMessages.list_for_user(user), & &1.ap_id) == [note_id]
+    assert hd(NotificationAudits.list_for_user(user)).event == :delivery_accepted
   end
 
   test "silently suppresses delivery without consent and after either grant is revoked", %{
@@ -47,6 +49,7 @@ defmodule Egregoros.MiniApps.TransactionalMessagesTest do
   } do
     absent = transactional_create(user.ap_id, "absent-consent")
     assert_ignored(absent, user)
+    assert hd(NotificationAudits.list_for_user(user)).event == :delivery_suppressed
 
     assert {:ok, _consent} = NotificationConsents.decide(user.id, @origin, :granted)
     assert :ok = OAuthRegistrations.revoke_user_grant(@origin, user.id)

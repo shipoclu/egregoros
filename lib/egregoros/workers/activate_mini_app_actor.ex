@@ -29,7 +29,7 @@ defmodule Egregoros.Workers.ActivateMiniAppActor do
   def maybe_enqueue(%Declaration{
         app_origin: origin,
         activity_pub_actor_url: actor_url,
-        activity_pub_actor_fingerprint: nil
+        activity_pub_actor_key_fingerprint: nil
       })
       when is_binary(origin) and is_binary(actor_url) do
     origin

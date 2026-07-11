@@ -1,7 +1,16 @@
 defmodule EgregorosWeb.InboxControllerTest do
   use EgregorosWeb.ConnCase, async: false
 
+  alias Egregoros.Keys
+  alias Egregoros.MiniApps.Declarations
+  alias Egregoros.MiniApps.Manifest
+  alias Egregoros.MiniApps.NotificationAudits
+  alias Egregoros.MiniApps.NotificationConsents
+  alias Egregoros.MiniApps.OAuthRegistrations
   alias Egregoros.Objects
+  alias Egregoros.OAuth
+  alias Egregoros.OAuth.Application, as: OAuthApplication
+  alias Egregoros.Repo
   alias Egregoros.Relationships
   alias Egregoros.Users
   alias Egregoros.Workers.IngestActivity
@@ -64,6 +73,205 @@ defmodule EgregorosWeb.InboxControllerTest do
              })
 
     assert Objects.get_by_ap_id(note["id"])
+  end
+
+  test "POST /users/:nickname/inbox binds a declared mini-app actor to its activated key", %{
+    conn: conn
+  } do
+    enable_mini_apps()
+    {:ok, frank} = Users.create_local_user("mini-app-pinned-key-recipient")
+    actor = "https://app.example/ap/actor"
+    {public_key, private_key} = Keys.generate_rsa_keypair()
+
+    {:ok, _actor_user} =
+      Users.create_user(%{
+        nickname: "app",
+        ap_id: actor,
+        inbox: "https://app.example/ap/inbox",
+        outbox: "https://app.example/ap/outbox",
+        public_key: public_key,
+        private_key: private_key,
+        local: false
+      })
+
+    assert {:ok, manifest} =
+             Manifest.decode(
+               Jason.encode!(%{
+                 "version" => "1",
+                 "name" => "Pinned app",
+                 "homeUrl" => "https://app.example/",
+                 "activityPub" => %{
+                   "actorUrl" => actor,
+                   "publicNotes" => true,
+                   "transactionalMentions" => false
+                 },
+                 "capabilities" => []
+               }),
+               "https://app.example/.well-known/fediverse-miniapp.json"
+             )
+
+    assert {:ok, declaration, :created} = Declarations.ensure(manifest)
+
+    declaration
+    |> Ecto.Changeset.change(%{
+      activity_pub_actor_fingerprint: :crypto.hash(:sha256, "actor-document"),
+      activity_pub_actor_activated_at: DateTime.utc_now(),
+      activity_pub_actor_key_id: actor <> "#main-key",
+      activity_pub_actor_key_fingerprint: rsa_key_fingerprint(public_key)
+    })
+    |> Repo.update!()
+
+    valid = public_create(actor, "pinned-valid")
+    path = "/users/#{frank.nickname}/inbox"
+
+    conn =
+      conn
+      |> sign_request(
+        "post",
+        path,
+        private_key,
+        actor <> "#main-key",
+        ["(request-target)", "host", "date", "digest"],
+        Jason.encode!(valid)
+      )
+      |> post_signed(path, valid)
+
+    assert response(conn, 202)
+
+    {rotated_public_key, rotated_private_key} = Keys.generate_rsa_keypair()
+
+    assert {:ok, _rotated_actor} =
+             Users.upsert_user(%{
+               ap_id: actor,
+               public_key: rotated_public_key,
+               private_key: rotated_private_key
+             })
+
+    rotated = public_create(actor, "pinned-rotated")
+
+    conn =
+      build_conn()
+      |> sign_request(
+        "post",
+        path,
+        rotated_private_key,
+        actor <> "#main-key",
+        ["(request-target)", "host", "date", "digest"],
+        Jason.encode!(rotated)
+      )
+      |> post_signed(path, rotated)
+
+    assert response(conn, 401)
+    refute_enqueued(worker: IngestActivity, args: %{"activity" => rotated})
+  end
+
+  test "signed transactional delivery is consented, auditable, and silently revoked", %{
+    conn: conn
+  } do
+    enable_mini_apps()
+    {:ok, recipient} = Users.create_local_user("mini-app-signed-transaction-recipient")
+    actor = "https://alerts.example/ap/actor"
+    origin = "https://alerts.example"
+    {public_key, private_key} = Keys.generate_rsa_keypair()
+
+    {:ok, _actor_user} =
+      Users.create_user(%{
+        nickname: "alerts",
+        ap_id: actor,
+        inbox: origin <> "/ap/inbox",
+        outbox: origin <> "/ap/outbox",
+        public_key: public_key,
+        private_key: private_key,
+        local: false
+      })
+
+    assert {:ok, manifest} =
+             Manifest.decode(
+               Jason.encode!(%{
+                 "version" => "1",
+                 "name" => "Signed alerts",
+                 "homeUrl" => origin <> "/",
+                 "oauth" => %{
+                   "redirectUris" => [origin <> "/oauth/callback"],
+                   "scopes" => ["read"]
+                 },
+                 "activityPub" => %{
+                   "actorUrl" => actor,
+                   "publicNotes" => false,
+                   "transactionalMentions" => true
+                 },
+                 "capabilities" => []
+               }),
+               origin <> "/.well-known/fediverse-miniapp.json"
+             )
+
+    assert {:ok, registration} = OAuthRegistrations.register(manifest)
+    declaration = Declarations.get_by_origin(origin)
+
+    declaration
+    |> Ecto.Changeset.change(%{
+      activity_pub_actor_fingerprint: :crypto.hash(:sha256, "signed-alerts-actor"),
+      activity_pub_actor_activated_at: DateTime.utc_now(),
+      activity_pub_actor_key_id: actor <> "#main-key",
+      activity_pub_actor_key_fingerprint: rsa_key_fingerprint(public_key)
+    })
+    |> Repo.update!()
+
+    application = Repo.get!(OAuthApplication, registration.oauth_application_id)
+    authorize_mini_app!(application, recipient, origin)
+    assert {:ok, _consent} = NotificationConsents.decide(recipient.id, origin, :granted)
+
+    path = "/users/#{recipient.nickname}/inbox"
+    allowed = transactional_create(actor, recipient.ap_id, "signed-allowed")
+
+    conn =
+      conn
+      |> sign_request(
+        "post",
+        path,
+        private_key,
+        actor <> "#main-key",
+        ["(request-target)", "host", "date", "digest"],
+        Jason.encode!(allowed)
+      )
+      |> post_signed(path, allowed)
+
+    assert response(conn, 202)
+
+    assert :ok =
+             perform_job(IngestActivity, %{
+               "activity" => allowed,
+               "inbox_user_ap_id" => recipient.ap_id
+             })
+
+    assert Objects.get_by_ap_id(allowed["object"]["id"])
+    assert hd(NotificationAudits.list_for_user(recipient)).event == :delivery_accepted
+
+    assert :ok = NotificationConsents.revoke(recipient.id, origin)
+    revoked = transactional_create(actor, recipient.ap_id, "signed-revoked")
+
+    conn =
+      build_conn()
+      |> sign_request(
+        "post",
+        path,
+        private_key,
+        actor <> "#main-key",
+        ["(request-target)", "host", "date", "digest"],
+        Jason.encode!(revoked)
+      )
+      |> post_signed(path, revoked)
+
+    assert response(conn, 202)
+
+    assert :ok =
+             perform_job(IngestActivity, %{
+               "activity" => revoked,
+               "inbox_user_ap_id" => recipient.ap_id
+             })
+
+    refute Objects.get_by_ap_id(revoked["object"]["id"])
+    assert hd(NotificationAudits.list_for_user(recipient)).event == :delivery_suppressed
   end
 
   test "POST /users/:nickname/inbox returns 429 when rate limited", %{conn: conn} do
@@ -1304,5 +1512,83 @@ defmodule EgregorosWeb.InboxControllerTest do
       second
     ])
     |> IO.iodata_to_binary()
+  end
+
+  defp public_create(actor, suffix) do
+    public = "https://www.w3.org/ns/activitystreams#Public"
+
+    %{
+      "id" => "https://app.example/ap/create/#{suffix}",
+      "type" => "Create",
+      "actor" => actor,
+      "to" => [public],
+      "object" => %{
+        "id" => "https://app.example/ap/notes/#{suffix}",
+        "type" => "Note",
+        "attributedTo" => actor,
+        "to" => [public],
+        "content" => "Public announcement"
+      }
+    }
+  end
+
+  defp transactional_create(actor, recipient, suffix) do
+    %{
+      "id" => "https://alerts.example/ap/create/#{suffix}",
+      "type" => "Create",
+      "actor" => actor,
+      "to" => [recipient],
+      "cc" => [],
+      "object" => %{
+        "id" => "https://alerts.example/ap/notes/#{suffix}",
+        "type" => "Note",
+        "attributedTo" => actor,
+        "to" => [recipient],
+        "cc" => [],
+        "content" => "Transactional alert",
+        "tag" => [%{"type" => "Mention", "href" => recipient}]
+      }
+    }
+  end
+
+  defp authorize_mini_app!(application, user, origin) do
+    verifier = String.duplicate("v", 43)
+    challenge = :crypto.hash(:sha256, verifier) |> Base.url_encode64(padding: false)
+
+    assert {:ok, code} =
+             OAuth.create_authorization_code(
+               application,
+               user,
+               origin <> "/oauth/callback",
+               "read",
+               code_challenge: challenge,
+               code_challenge_method: "S256"
+             )
+
+    assert {:ok, _token} =
+             OAuth.exchange_code_for_token(%{
+               "grant_type" => "authorization_code",
+               "code" => code.code,
+               "client_id" => application.client_id,
+               "client_secret" => application.client_secret,
+               "redirect_uri" => origin <> "/oauth/callback",
+               "code_verifier" => verifier
+             })
+  end
+
+  defp rsa_key_fingerprint(pem) do
+    [entry] = :public_key.pem_decode(pem)
+    key = :public_key.pem_entry_decode(entry)
+    der = :public_key.der_encode(:RSAPublicKey, key)
+    :crypto.hash(:sha256, der)
+  end
+
+  defp enable_mini_apps do
+    stub(Egregoros.Config.Mock, :get, fn
+      :mini_apps_enabled, false -> true
+      :mini_apps_domain_allowlist, [] -> []
+      :mini_apps_domain_denylist, [] -> []
+      key, default -> Egregoros.Config.Stub.get(key, default)
+    end)
   end
 end

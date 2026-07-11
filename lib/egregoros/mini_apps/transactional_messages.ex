@@ -3,6 +3,7 @@ defmodule Egregoros.MiniApps.TransactionalMessages do
 
   alias Egregoros.MiniApps.Declarations
   alias Egregoros.MiniApps.NotificationConsents
+  alias Egregoros.MiniApps.NotificationAudits
   alias Egregoros.MiniApps.OAuthRegistrations
   alias Egregoros.ActivityPub.TypeNormalizer
   alias Egregoros.User
@@ -100,14 +101,32 @@ defmodule Egregoros.MiniApps.TransactionalMessages do
     recipients = recipient_ids(create) ++ recipient_ids(note)
     mentions = mention_ids(note)
 
-    if object_actor(note) == actor and Enum.uniq(recipients) == [user.ap_id] and
-         mentions == [user.ap_id] and not Enum.member?(recipients, @as_public) and
-         NotificationConsents.granted?(user.id, origin) and
-         OAuthRegistrations.active_user_grant?(origin, user.id) do
-      :allow
-    else
-      :ignore
+    valid_envelope? =
+      object_actor(note) == actor and Enum.uniq(recipients) == [user.ap_id] and
+        mentions == [user.ap_id] and not Enum.member?(recipients, @as_public)
+
+    cond do
+      not valid_envelope? ->
+        audit_delivery(user, origin, actor, :delivery_suppressed, :invalid_envelope)
+        :ignore
+
+      not NotificationConsents.granted?(user.id, origin) ->
+        audit_delivery(user, origin, actor, :delivery_suppressed, :consent_missing)
+        :ignore
+
+      not OAuthRegistrations.active_user_grant?(origin, user.id) ->
+        audit_delivery(user, origin, actor, :delivery_suppressed, :oauth_missing)
+        :ignore
+
+      true ->
+        audit_delivery(user, origin, actor, :delivery_accepted, nil)
+        :allow
     end
+  end
+
+  defp audit_delivery(user, origin, actor, event, reason) do
+    _ = NotificationAudits.record(user, origin, actor, event, reason)
+    :ok
   end
 
   defp targets_local_user?(create, note) do

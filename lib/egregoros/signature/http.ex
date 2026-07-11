@@ -3,6 +3,7 @@ defmodule Egregoros.Signature.HTTP do
 
   alias Egregoros.Config
   alias Egregoros.HTTPDate
+  alias Egregoros.MiniApps.ActorActivation
   alias Egregoros.User
   alias Egregoros.Users
 
@@ -15,6 +16,7 @@ defmodule Egregoros.Signature.HTTP do
     with {:ok, key_id, signature, headers_param} <- parse_signature(headers),
          signer_ap_id when is_binary(signer_ap_id) <- signer_ap_id_from_key_id(key_id),
          {:ok, key} <- public_key_for_key_id(key_id),
+         :ok <- ActorActivation.authorize_signing_key(signer_ap_id, key_id, key),
          {:ok, method} <- method_atom(conn.method),
          :ok <- validate_date(headers, headers_param),
          :ok <- validate_required_signature_headers(headers_param, method),

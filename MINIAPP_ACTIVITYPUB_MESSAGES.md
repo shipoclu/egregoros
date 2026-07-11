@@ -270,10 +270,12 @@ Transactional constraints are strict:
 The receiving Egregoros instance verifies the normal ActivityPub signature and
 authorization rules, resolves the sender to a current mini-app declaration,
 and checks both the local recipient's current notification consent and active
-OAuth grant. Without both grants it does not persist the activity or note and
-therefore cannot create a notification or direct-message timeline item. The
-inbound worker still returns a non-oracular success so revocation does not
-become a remote account-state probe.
+OAuth grant. For a declared actor, the HTTP signature key ID and RSA public-key
+fingerprint must exactly match the activated pin; a later actor refetch or key
+rotation cannot silently replace it. Without all checks it does not persist the
+activity or note and therefore cannot create a notification or direct-message
+timeline item. The inbound worker still returns a non-oracular success so
+revocation does not become a remote account-state probe.
 
 This receiver check is the decisive safety boundary: a stale or malicious app
 cannot restore revoked user-visible notifications merely by continuing to send
@@ -324,20 +326,20 @@ necessary but never sufficient to bypass moderation or abuse controls.
 - [ ] Private activity/note IDs do not disclose content publicly.
 - [ ] Sender-side unsubscribe and immediate enqueue suppression.
 - [x] Receiver-side current-consent and OAuth enforcement with immediate revocation.
-- [ ] Adversarial tests for forged recipients, stale grants, replay, SSRF,
+- [x] Adversarial tests for forged recipients, stale grants, replay, SSRF,
       signature failure, public-audience smuggling, rate abuse, and post-revoke
       delivery.
 
 ## 9. What remains to implement in Egregoros
 
-The manifest declaration, immutable persistence, consent decision data model,
-and receiver-side suppression are implemented. A complete Egregoros flow still
-needs:
+The manifest declaration, actor activation and key pin, consent model, backend
+permission check, receiver-side suppression, and notification-specific audit
+events are implemented. Audits contain only user ID, app origin, app actor,
+event, bounded reason code, and time—never note content, activity/note IDs,
+recipient actor URLs, OAuth data, or signing material.
 
-1. notification-specific audit events; and
-2. federation, security, and browser interoperability tests for the completed
-   end-to-end flow.
-
-The remaining hardening work must verify signed delivery end to end against the
-pinned actor identity and exercise the complete flow across real federation and
-browser boundaries.
+Automated coverage exercises the complete signed personal-inbox path through
+OAuth, consent, persistence, revocation, silent suppression, and audit output,
+plus the SDK/broker browser boundary. Continued interoperability testing across
+additional Fediverse implementations is release validation rather than a
+missing protocol component.

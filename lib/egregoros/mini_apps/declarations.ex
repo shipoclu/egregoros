@@ -45,9 +45,12 @@ defmodule Egregoros.MiniApps.Declarations do
         activity_pub_actor_url: actor_url,
         activity_pub_transactional_mentions: true,
         activity_pub_actor_fingerprint: fingerprint,
+        activity_pub_actor_key_id: key_id,
+        activity_pub_actor_key_fingerprint: key_fingerprint,
         activity_pub_actor_activated_at: %DateTime{}
       }
-      when is_binary(actor_url) and is_binary(fingerprint) ->
+      when is_binary(actor_url) and is_binary(fingerprint) and is_binary(key_id) and
+             is_binary(key_fingerprint) ->
         if origin_allowed?(origin),
           do: {:ok, actor_url},
           else: {:error, :notifications_not_declared}
@@ -81,10 +84,12 @@ defmodule Egregoros.MiniApps.Declarations do
         %Declaration{
           app_origin: origin,
           activity_pub_actor_fingerprint: fingerprint,
+          activity_pub_actor_key_id: key_id,
+          activity_pub_actor_key_fingerprint: key_fingerprint,
           activity_pub_actor_activated_at: %DateTime{}
         }
       ]
-      when is_binary(fingerprint) ->
+      when is_binary(fingerprint) and is_binary(key_id) and is_binary(key_fingerprint) ->
         if origin_allowed?(origin), do: {:ok, origin}, else: {:error, :domain_denied}
 
       [] ->

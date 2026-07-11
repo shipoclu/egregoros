@@ -4,6 +4,7 @@ defmodule Egregoros.MiniApps.NotificationConsentsTest do
   alias Egregoros.MiniApps.Declarations
   alias Egregoros.MiniApps.Manifest
   alias Egregoros.MiniApps.NotificationConsents
+  alias Egregoros.MiniApps.NotificationAudits
   alias Egregoros.MiniApps.Permissions
   alias Egregoros.Users
 
@@ -33,6 +34,11 @@ defmodule Egregoros.MiniApps.NotificationConsentsTest do
     assert granted.decision == :granted
     assert NotificationConsents.granted?(user.id, "https://app.example")
     assert NotificationConsents.list_for_user(user.id) == [granted]
+
+    assert Enum.map(NotificationAudits.list_for_user(user), & &1.event) == [
+             :permission_granted,
+             :permission_denied
+           ]
   end
 
   test "requires a current transactional declaration and domain policy", %{user: user} do
@@ -56,6 +62,7 @@ defmodule Egregoros.MiniApps.NotificationConsentsTest do
     assert_receive {:mini_app_permission_revoked, "https://app.example", :notifications}
     assert NotificationConsents.state(user.id, "https://app.example") == :prompt
     assert NotificationConsents.list_for_user(user.id) == []
+    assert hd(NotificationAudits.list_for_user(user)).event == :permission_revoked
   end
 
   test "fails closed for malformed inputs", %{user: user} do

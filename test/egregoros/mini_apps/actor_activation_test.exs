@@ -38,7 +38,25 @@ defmodule Egregoros.MiniApps.ActorActivationTest do
     activated = Declarations.get_by_origin(@origin)
     assert activated.activity_pub_actor_activated_at
     assert byte_size(activated.activity_pub_actor_fingerprint) == 32
+    assert activated.activity_pub_actor_key_id == @actor <> "#main-key"
+    assert byte_size(activated.activity_pub_actor_key_fingerprint) == 32
     assert {:ok, @actor} = Declarations.notification_actor(@origin)
+
+    [entry] = :public_key.pem_decode(public_key)
+    key = :public_key.pem_entry_decode(entry)
+
+    assert :ok =
+             ActorActivation.authorize_signing_key(@actor, @actor <> "#main-key", key)
+
+    {other_public_key, _other_private_key} = Keys.generate_rsa_keypair()
+    [other_entry] = :public_key.pem_decode(other_public_key)
+    other_key = :public_key.pem_entry_decode(other_entry)
+
+    assert {:error, :mini_app_actor_key_mismatch} =
+             ActorActivation.authorize_signing_key(@actor, @actor <> "#main-key", other_key)
+
+    assert {:error, :mini_app_actor_key_mismatch} =
+             ActorActivation.authorize_signing_key(@actor, @actor <> "#rotated-key", key)
   end
 
   test "does not refetch or silently repin an activated actor", %{public_key: public_key} do
@@ -55,6 +73,27 @@ defmodule Egregoros.MiniApps.ActorActivationTest do
     assert second.activity_pub_actor_activated_at == first.activity_pub_actor_activated_at
   end
 
+  test "backfills a legacy activation only when the pinned actor fingerprint is unchanged", %{
+    public_key: public_key
+  } do
+    assert {:ok, _declaration, :created} = Declarations.ensure(manifest_fixture())
+    expect_actor_fetch(valid_actor(public_key))
+    assert {:ok, activated} = ActorActivation.activate(@origin)
+
+    activated
+    |> Ecto.Changeset.change(%{
+      activity_pub_actor_key_id: nil,
+      activity_pub_actor_key_fingerprint: nil
+    })
+    |> Repo.update!()
+
+    expect_actor_fetch(valid_actor(public_key))
+    assert {:ok, backfilled} = ActorActivation.activate(@origin)
+    assert backfilled.activity_pub_actor_key_id == @actor <> "#main-key"
+    assert byte_size(backfilled.activity_pub_actor_key_fingerprint) == 32
+    assert backfilled.activity_pub_actor_fingerprint == activated.activity_pub_actor_fingerprint
+  end
+
   test "rejects identity, type, endpoint, key ownership, and key material violations", %{
     public_key: public_key
   } do
@@ -66,6 +105,7 @@ defmodule Egregoros.MiniApps.ActorActivationTest do
       :cross_origin_outbox,
       :cross_origin_followers,
       :cross_origin_key,
+      :unbound_key,
       :invalid_key
     ]
 
@@ -169,6 +209,9 @@ defmodule Egregoros.MiniApps.ActorActivationTest do
 
   defp invalidate(document, :cross_origin_key, _origin, _actor),
     do: put_in(document, ["publicKey", "id"], "https://other.example/key#main")
+
+  defp invalidate(document, :unbound_key, origin, _actor),
+    do: put_in(document, ["publicKey", "id"], origin <> "/keys/1")
 
   defp invalidate(document, :invalid_key, _origin, _actor),
     do: put_in(document, ["publicKey", "publicKeyPem"], "not a PEM key")

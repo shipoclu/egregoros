@@ -17,8 +17,12 @@ defmodule Egregoros.MiniApps.ActorActivation do
 
   def activate(origin) when is_binary(origin) do
     case Repo.get_by(Declaration, app_origin: origin) do
-      %Declaration{activity_pub_actor_fingerprint: fingerprint} = declaration
-      when is_binary(fingerprint) ->
+      %Declaration{
+        activity_pub_actor_fingerprint: fingerprint,
+        activity_pub_actor_key_id: key_id,
+        activity_pub_actor_key_fingerprint: key_fingerprint
+      } = declaration
+      when is_binary(fingerprint) and is_binary(key_id) and is_binary(key_fingerprint) ->
         {:ok, declaration}
 
       %Declaration{activity_pub_actor_url: actor_url} = declaration when is_binary(actor_url) ->
@@ -34,12 +38,48 @@ defmodule Egregoros.MiniApps.ActorActivation do
 
   def activate(_origin), do: {:error, :declaration_not_found}
 
+  def authorize_signing_key(actor_url, key_id, key)
+      when is_binary(actor_url) and is_binary(key_id) do
+    declarations =
+      from(declaration in Declaration,
+        where: declaration.activity_pub_actor_url == ^actor_url
+      )
+      |> Repo.all()
+
+    case declarations do
+      [] ->
+        :ok
+
+      [
+        %Declaration{
+          app_origin: origin,
+          activity_pub_actor_fingerprint: fingerprint,
+          activity_pub_actor_key_id: ^key_id,
+          activity_pub_actor_key_fingerprint: key_fingerprint
+        }
+      ]
+      when is_binary(fingerprint) and is_binary(key_fingerprint) ->
+        with :ok <- require_current_policy(origin),
+             ^key_fingerprint <- public_key_fingerprint(key) do
+          :ok
+        else
+          _ -> {:error, :mini_app_actor_key_mismatch}
+        end
+
+      _ ->
+        {:error, :mini_app_actor_key_mismatch}
+    end
+  end
+
+  def authorize_signing_key(_actor_url, _key_id, _key),
+    do: {:error, :mini_app_actor_key_mismatch}
+
   defp activate_declaration(declaration, actor_url) do
     with :ok <- require_current_policy(declaration.app_origin),
          {:ok, %{body: body}} <- Fetcher.get(actor_url, :actor),
          {:ok, actor} <- StrictJSON.decode(body),
-         {:ok, fingerprint} <- validate_actor(actor, declaration),
-         {:ok, activated} <- pin_activation(declaration, fingerprint) do
+         {:ok, security} <- validate_actor(actor, declaration),
+         {:ok, activated} <- pin_activation(declaration, security) do
       {:ok, activated}
     else
       {:error, reason} when reason in [:timeout, :closed, :econnrefused, :nxdomain] ->
@@ -63,10 +103,18 @@ defmodule Egregoros.MiniApps.ActorActivation do
          :ok <- validate_endpoints(actor, origin),
          %{} <- public_key,
          true <- Map.get(public_key, "owner") == actor_url,
-         :ok <- validate_key_id(Map.get(public_key, "id"), origin),
+         :ok <- validate_key_id(Map.get(public_key, "id"), origin, actor_url),
          pem when is_binary(pem) <- Map.get(public_key, "publicKeyPem"),
          :ok <- validate_rsa_public_key(pem) do
-      {:ok, fingerprint(actor, public_key)}
+      [entry] = :public_key.pem_decode(pem)
+      key = :public_key.pem_entry_decode(entry)
+
+      {:ok,
+       %{
+         fingerprint: fingerprint(actor, public_key),
+         key_id: Map.fetch!(public_key, "id"),
+         key_fingerprint: public_key_fingerprint(key)
+       }}
     else
       _ -> {:error, :invalid_actor_document}
     end
@@ -87,20 +135,28 @@ defmodule Egregoros.MiniApps.ActorActivation do
     end
   end
 
-  defp validate_key_id(key_id, origin) when is_binary(key_id) do
+  defp validate_key_id(key_id, origin, actor_url)
+       when is_binary(key_id) and is_binary(actor_url) do
     uri = URI.parse(key_id)
 
     with true <- uri.query in [nil, ""],
          true <- uri.userinfo in [nil, ""],
          base = URI.to_string(%{uri | fragment: nil}),
-         :ok <- Origin.validate_url(base, origin) do
+         :ok <- Origin.validate_url(base, origin),
+         true <- actor_bound_key_id?(key_id, base, uri.fragment, actor_url) do
       :ok
     else
       _ -> {:error, :invalid_actor_document}
     end
   end
 
-  defp validate_key_id(_key_id, _origin), do: {:error, :invalid_actor_document}
+  defp validate_key_id(_key_id, _origin, _actor_url),
+    do: {:error, :invalid_actor_document}
+
+  defp actor_bound_key_id?(key_id, base, fragment, actor_url) do
+    (base == actor_url and is_binary(fragment) and fragment != "") or
+      key_id == actor_url <> "/main-key"
+  end
 
   defp validate_rsa_public_key(pem)
        when is_binary(pem) and byte_size(pem) > 0 and byte_size(pem) <= @max_pem_bytes do
@@ -144,33 +200,58 @@ defmodule Egregoros.MiniApps.ActorActivation do
     |> then(&:crypto.hash(:sha256, &1))
   end
 
-  defp pin_activation(declaration, fingerprint) do
+  defp pin_activation(declaration, %{
+         fingerprint: fingerprint,
+         key_id: key_id,
+         key_fingerprint: key_fingerprint
+       }) do
     activated_at = DateTime.utc_now()
 
-    {count, _rows} =
-      from(candidate in Declaration,
-        where: candidate.id == ^declaration.id,
-        where: is_nil(candidate.activity_pub_actor_fingerprint)
-      )
-      |> Repo.update_all(
-        set: [
-          activity_pub_actor_fingerprint: fingerprint,
-          activity_pub_actor_activated_at: activated_at,
-          updated_at: activated_at
-        ]
-      )
+    if declaration.activity_pub_actor_fingerprint in [nil, fingerprint] do
+      {count, _rows} =
+        from(candidate in Declaration,
+          where: candidate.id == ^declaration.id,
+          where: is_nil(candidate.activity_pub_actor_key_fingerprint)
+        )
+        |> Repo.update_all(
+          set: [
+            activity_pub_actor_fingerprint: fingerprint,
+            activity_pub_actor_activated_at: activated_at,
+            activity_pub_actor_key_id: key_id,
+            activity_pub_actor_key_fingerprint: key_fingerprint,
+            updated_at: activated_at
+          ]
+        )
 
-    case {count, Repo.get(Declaration, declaration.id)} do
-      {1, %Declaration{} = activated} ->
-        {:ok, activated}
+      case {count, Repo.get(Declaration, declaration.id)} do
+        {1, %Declaration{} = activated} ->
+          {:ok, activated}
 
-      {0, %Declaration{activity_pub_actor_fingerprint: ^fingerprint} = activated} ->
-        {:ok, activated}
+        {0,
+         %Declaration{
+           activity_pub_actor_fingerprint: ^fingerprint,
+           activity_pub_actor_key_id: ^key_id,
+           activity_pub_actor_key_fingerprint: ^key_fingerprint
+         } = activated} ->
+          {:ok, activated}
 
-      _ ->
-        {:error, :activation_conflict}
+        _ ->
+          {:error, :activation_conflict}
+      end
+    else
+      {:error, :activation_conflict}
     end
   end
+
+  defp public_key_fingerprint({:RSAPublicKey, _modulus, _exponent} = key) do
+    key
+    |> then(&:public_key.der_encode(:RSAPublicKey, &1))
+    |> then(&:crypto.hash(:sha256, &1))
+  rescue
+    _ -> nil
+  end
+
+  defp public_key_fingerprint(_key), do: nil
 
   defp require_current_policy(origin) do
     case URI.parse(origin) do

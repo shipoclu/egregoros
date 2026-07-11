@@ -847,6 +847,14 @@ needed, URL query secrets, OAuth credentials, handoff codes/verifiers, wallet
 payload secrets, cookies, and private keys. Repeated origin/schema/rate
 violations should terminate the channel and feed operator abuse controls.
 
+The ActivityPub notification extension persists a narrower dedicated audit:
+permission grant/deny/revoke and delivery accepted/suppressed, with only local
+user ID, exact app origin, exact app actor, bounded reason code, and timestamp.
+It deliberately has no columns for content, activity/note IDs, recipient actor
+URLs, OAuth credentials, or key material. Signed inbox requests from a declared
+actor additionally must match the activated key ID and RSA-key fingerprint
+before ordinary signature verification can authorize delivery.
+
 ### Required adversarial tests
 
 Before release, automated tests MUST cover at least:
