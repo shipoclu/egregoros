@@ -290,7 +290,8 @@ defmodule EgregorosWeb.OAuthControllerTest do
     assert document |> LazyHTML.query("#oauth-mini-app-capabilities") |> LazyHTML.text() =~
              "prefilled note draft"
 
-    assert LazyHTML.query(document, "#oauth-write-confirmation") |> LazyHTML.to_tree() != []
+    assert LazyHTML.query(document, "#oauth-write-confirmation[required]") |> LazyHTML.to_tree() !=
+             []
 
     cancel_url =
       document

@@ -71,8 +71,12 @@
             id="oauth-write-confirmation"
             type="checkbox"
             field={@form[:write_confirmed]}
+            required
             label="I understand this app can use the API to create, edit, and delete content as my account."
           />
+          <p class="mt-2 text-xs font-bold text-[color:var(--danger)]">
+            You must check this box before Authorize can continue.
+          </p>
           <p class="mt-2 text-xs leading-relaxed text-[color:var(--danger)]">
             This API permission is separate from the host composer: mini-app compose actions still open a prefilled draft and never submit it automatically.
           </p>
