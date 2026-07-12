@@ -29,9 +29,10 @@ defmodule EgregorosWeb.MiniAppBrokerControllerTest do
         "/mini-apps/broker/#{card.id}?launch_id=#{@launch_id}&resolution_token=#{card.resolution_token}"
       )
 
-    assert html_response(conn, 200) =~ ~s(src="https://app.example/read/chapter-2")
-    assert conn.resp_body =~ ~s(sandbox="allow-scripts allow-forms allow-same-origin")
+    assert html_response(conn, 200) =~ ~s(id="mini-app-frame-root")
+    assert conn.resp_body =~ ~s(data-launch-url="https://app.example/read/chapter-2")
     assert conn.resp_body =~ ~s(data-app-origin="https://app.example")
+    refute conn.resp_body =~ "<iframe"
     refute conn.resp_body =~ "csrf"
     refute conn.resp_body =~ "mini-app-host-user"
 

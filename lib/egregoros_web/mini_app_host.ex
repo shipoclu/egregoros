@@ -699,10 +699,8 @@ defmodule EgregorosWeb.MiniAppHost do
             data-frame-src={
               ~p"/mini-apps/broker/#{@state.card.id}?launch_id=#{@state.launch_id}&resolution_token=#{@state.card.resolution_token}"
             }
-            class={[
-              "h-full w-full border-0 transition-opacity duration-200",
-              if(@state.ready?, do: "opacity-100", else: "opacity-0")
-            ]}
+            phx-update="ignore"
+            class="h-full w-full border-0"
           >
             <iframe
               id="mini-app-frame"
@@ -711,7 +709,6 @@ defmodule EgregorosWeb.MiniAppHost do
                 ~p"/mini-apps/broker/#{@state.card.id}?launch_id=#{@state.launch_id}&resolution_token=#{@state.card.resolution_token}"
               }
               referrerpolicy="no-referrer"
-              phx-update="ignore"
               class="h-full w-full border-0"
             >
             </iframe>

@@ -68,6 +68,27 @@ test("broker transfers one capability port only to the exact same-origin frame r
   assert.equal(fixture.hasLoadListener(), false)
 })
 
+test("broker bootstraps a same-origin relay that loaded before the hook bound", () => {
+  const fixture = iframeFixture()
+  fixture.iframe.contentDocument = {
+    readyState: "complete",
+    URL: "https://social.example/mini-apps/broker/card",
+  }
+
+  const broker = createMiniAppBroker({
+    iframe: fixture.iframe,
+    appOrigin: "https://app.example",
+    hostOrigin: "https://social.example",
+    launchId: "launch-already-loaded",
+  })
+
+  assert.equal(fixture.posts.length, 1)
+  assert.equal(fixture.posts[0].targetOrigin, "https://social.example")
+
+  fixture.posts[0].transfer[0].close()
+  broker.destroy()
+})
+
 test("ready is accepted once through the transferred port for the active launch", async () => {
   const fixture = iframeFixture()
   let readyCount = 0

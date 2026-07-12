@@ -529,6 +529,14 @@ export const createMiniAppBroker = ({
 
   iframe.addEventListener("load", start)
 
+  try {
+    const frameDocument = iframe.contentDocument
+    if (frameDocument?.readyState === "complete" && frameDocument.URL !== "about:blank") start()
+  } catch (_error) {
+    // The broker is same-origin by construction. If the browser cannot expose
+    // its document yet, the load listener remains the only bootstrap path.
+  }
+
   return {
     send: message => {
       if (!hostPort || !ready || violated || !consumeBytes(message)) return false

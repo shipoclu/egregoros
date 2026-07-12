@@ -75,10 +75,10 @@ defmodule EgregorosWeb.MiniAppBrokerController do
         <meta name="referrer" content="no-referrer">
         <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
         <title>Mini app broker</title>
-        <style nonce="#{nonce}">html,body,iframe{box-sizing:border-box;width:100%;height:100%;margin:0;border:0;overflow:hidden}body{background:white}</style>
+        <style nonce="#{nonce}">html,body,#mini-app-frame-root,iframe{box-sizing:border-box;width:100%;height:100%;margin:0;border:0;overflow:hidden}body{background:white}</style>
       </head>
       <body>
-        <iframe id="mini-app-frame" title="#{title}" src="#{launch_url}" data-app-origin="#{app_origin}" sandbox="allow-scripts allow-forms allow-same-origin" referrerpolicy="no-referrer" allow="camera 'none'; microphone 'none'; geolocation 'none'; clipboard-read 'none'; clipboard-write 'none'"></iframe>
+        <div id="mini-app-frame-root" data-frame-title="#{title}" data-launch-url="#{launch_url}" data-app-origin="#{app_origin}"></div>
         <script src="/assets/js/mini-app-frame-relay.js" defer></script>
       </body>
     </html>
