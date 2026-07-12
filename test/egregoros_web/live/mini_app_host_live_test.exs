@@ -67,10 +67,10 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
 
     assert has_element?(
              view,
-             ~s(#mini-app-host iframe[src^="/mini-apps/broker/#{card.id}?launch_id="])
+             ~s(#mini-app-host[data-frame-src^="/mini-apps/broker/#{card.id}?launch_id="] #mini-app-frame-shell[phx-update="ignore"])
            )
 
-    assert has_element?(view, "#mini-app-frame-shell[phx-update='ignore']")
+    refute has_element?(view, "#mini-app-host iframe")
 
     refute render(view) =~ ~s(src="https://app.example/book/chapter-2")
 
@@ -85,6 +85,7 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
 
     render_hook(view, "mini_app_ready", %{"launch_id" => launch_id})
     refute has_element?(view, "#mini-app-host [data-role='mini-app-loading']")
+    refute has_element?(view, "#mini-app-host iframe")
 
     render_hook(view, "mini_app_context_request", %{
       "launch_id" => launch_id,
@@ -131,9 +132,11 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
 
     view |> element("#mini-app-host-collapse") |> render_click()
     assert has_element?(view, "#mini-app-host[data-state='collapsed']")
+    assert has_element?(view, "#mini-app-frame-shell[phx-update='ignore']")
 
     view |> element("#mini-app-host-restore") |> render_click()
     assert has_element?(view, "#mini-app-host[data-state='open']")
+    assert :sys.get_state(view.pid).socket.assigns.mini_app_host.ready?
 
     view |> element("#mini-app-host-expand") |> render_click()
     assert has_element?(view, "#mini-app-host[data-expanded='true']")
@@ -189,7 +192,45 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
     new_launch_id = :sys.get_state(view.pid).socket.assigns.mini_app_host.launch_id
     refute new_launch_id == launch_id
 
-    assert_push_event(view, "mini_app_frame_reload", %{launch_id: ^new_launch_id})
+    assert has_element?(
+             view,
+             ~s(#mini-app-host[data-frame-src*="launch_id=#{new_launch_id}"])
+           )
+  end
+
+  test "a valid request restores a collapsed live launch instead of replacing its frame", %{
+    conn: conn,
+    user: user
+  } do
+    {:ok, note} =
+      Pipeline.ingest(
+        Note.build(user, ~s(<a href="https://app.example/shared/chapter-2">reader</a>)),
+        local: true
+      )
+
+    assert {:ok, _card} = Cards.put(note, resolved_card())
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/?timeline=public")
+    view |> element("[data-role='open-mini-app']") |> render_click()
+    launch_id = :sys.get_state(view.pid).socket.assigns.mini_app_host.launch_id
+    render_hook(view, "mini_app_ready", %{"launch_id" => launch_id})
+
+    view |> element("#mini-app-host-collapse") |> render_click()
+    assert has_element?(view, "#mini-app-host[data-state='collapsed']")
+
+    assert has_element?(
+             view,
+             "#mini-app-frame-container[data-state='collapsed'] #mini-app-frame-shell"
+           )
+
+    render_hook(view, "mini_app_context_request", %{
+      "launch_id" => launch_id,
+      "request_id" => "context-collapsed"
+    })
+
+    assert has_element?(view, "#mini-app-host[data-state='open']")
+    assert has_element?(view, "#mini-app-context-consent")
+    assert :sys.get_state(view.pid).socket.assigns.mini_app_host.launch_id == launch_id
   end
 
   test "does not grant context after the opened card resolution is replaced", %{

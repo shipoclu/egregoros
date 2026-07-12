@@ -68,27 +68,6 @@ test("broker transfers one capability port only to the exact same-origin frame r
   assert.equal(fixture.hasLoadListener(), false)
 })
 
-test("broker bootstraps a same-origin relay that loaded before the hook bound", () => {
-  const fixture = iframeFixture()
-  fixture.iframe.contentDocument = {
-    readyState: "complete",
-    URL: "https://social.example/mini-apps/broker/card",
-  }
-
-  const broker = createMiniAppBroker({
-    iframe: fixture.iframe,
-    appOrigin: "https://app.example",
-    hostOrigin: "https://social.example",
-    launchId: "launch-already-loaded",
-  })
-
-  assert.equal(fixture.posts.length, 1)
-  assert.equal(fixture.posts[0].targetOrigin, "https://social.example")
-
-  fixture.posts[0].transfer[0].close()
-  broker.destroy()
-})
-
 test("ready is accepted once through the transferred port for the active launch", async () => {
   const fixture = iframeFixture()
   let readyCount = 0
@@ -270,6 +249,9 @@ test("releases outstanding capacity only for the exactly correlated host respons
 
   fixture.load()
   const appPort = fixture.posts[0].transfer[0]
+  const responses = []
+  appPort.onmessage = event => responses.push(event.data)
+  appPort.start?.()
   appPort.postMessage({type: "ready", version: "1", launchId: "launch-outstanding"})
   appPort.postMessage({
     type: "getContext",
@@ -278,14 +260,18 @@ test("releases outstanding capacity only for the exactly correlated host respons
     requestId: "ctx-1",
   })
   await tick()
-  broker.send({
+  assert.equal(
+    broker.send({
     type: "contextResult",
     version: "1",
     launchId: "launch-outstanding",
     requestId: "wrong",
     status: "unavailable",
     context: null,
-  })
+    }),
+    false,
+  )
+  assert.deepEqual(responses, [])
   appPort.postMessage({
     type: "getContext",
     version: "1",
@@ -296,6 +282,47 @@ test("releases outstanding capacity only for the exactly correlated host respons
 
   assert.deepEqual(requests, ["ctx-1"])
   assert.deepEqual(violations, ["outstanding"])
+  broker.destroy()
+})
+
+test("correlated host results are delivered at most once to an exact outstanding request", async () => {
+  const fixture = iframeFixture()
+  const responses = []
+  const broker = createMiniAppBroker({
+    iframe: fixture.iframe,
+    appOrigin: "https://app.example",
+    hostOrigin: "https://social.example",
+    launchId: "launch-result-once",
+    onContextRequest: () => {},
+  })
+
+  fixture.load()
+  const appPort = fixture.posts[0].transfer[0]
+  appPort.onmessage = event => responses.push(event.data)
+  appPort.start?.()
+  await markReady(appPort, "launch-result-once")
+  appPort.postMessage({
+    type: "getContext",
+    version: "1",
+    launchId: "launch-result-once",
+    requestId: "ctx-once",
+  })
+  await tick()
+
+  const result = {
+    type: "contextResult",
+    version: "1",
+    launchId: "launch-result-once",
+    requestId: "ctx-once",
+    status: "unavailable",
+    context: null,
+  }
+  assert.equal(broker.send({...result, launchId: "stale-launch"}), false)
+  assert.equal(broker.send(result), true)
+  assert.equal(broker.send(result), false)
+  await tick()
+  assert.deepEqual(responses, [result])
+
   broker.destroy()
 })
 

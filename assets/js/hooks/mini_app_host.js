@@ -4,6 +4,7 @@ import {
   openMiniAppAuthWindow,
 } from "../lib/mini_app_auth_relay.mjs"
 import {createMiniAppReadiness} from "../lib/mini_app_readiness.mjs"
+import {bindMiniAppBrokerFrame} from "../lib/mini_app_host_frame.mjs"
 import {selectEvmWalletAdapter} from "../wallet/evm_wallet_adapter.mjs"
 import {evmWalletErrorCode} from "../wallet/evm_wallet_schema.mjs"
 import {
@@ -11,18 +12,20 @@ import {
   executeWalletRequest,
   normalizeWalletExecution,
 } from "../wallet/wallet_execution_guard.mjs"
-import {navigateMiniAppFrame} from "../lib/mini_app_frame_navigation.mjs"
 
 const MiniAppHost = {
   mounted() {
     this.broker = null
     this.frame = null
     this.brokerKey = null
+    this.brokerFailedKey = null
     this.walletAdapter = selectEvmWalletAdapter({ethereum: window.ethereum})
     this.walletExecutionTracker = createWalletExecutionTracker()
     this.walletCheckPending = false
     this.walletCompatible = null
     this.walletConfigKey = null
+    this.walletGeneration = 0
+    this.destroyedFlag = false
     this.readiness = createMiniAppReadiness({
       onTimeout: launchId =>
         this.pushEvent("mini_app_ready_timeout", {launch_id: launchId}),
@@ -248,17 +251,6 @@ const MiniAppHost = {
         ...(payload.error ? {error: payload.error} : {result: payload.result}),
       })
     })
-    this.handleEvent("mini_app_frame_reload", payload => {
-      if (payload?.launch_id !== this.el.dataset.launchId) return
-      const frame = this.el.querySelector("#mini-app-frame")
-      const frameSrc = this.el.querySelector("#mini-app-frame-shell")?.dataset.frameSrc
-      navigateMiniAppFrame({
-        frame,
-        frameSrc,
-        hostOrigin: window.location.origin,
-        launchId: payload.launch_id,
-      })
-    })
     this.initializeWallet()
   },
 
@@ -271,6 +263,9 @@ const MiniAppHost = {
   },
 
   destroyed() {
+    this.destroyedFlag = true
+    this.walletGeneration += 1
+    this.walletCheckPending = false
     this.destroyBroker()
     this.readiness.destroy()
     this.authRelay.destroy()
@@ -283,9 +278,16 @@ const MiniAppHost = {
     this.broker = null
     this.frame = null
     this.brokerKey = null
+    this.brokerFailedKey = null
   },
 
   initializeWallet() {
+    this.walletGeneration += 1
+    const generation = this.walletGeneration
+    this.walletCheckPending = false
+    this.destroyBroker()
+    this.authRelay.cancel()
+    this.el.querySelector("#mini-app-frame-shell")?.replaceChildren()
     this.walletConfigKey = this.walletConfigurationKey()
     this.walletExecutionTracker = createWalletExecutionTracker()
     const configKey = this.walletConfigKey
@@ -300,7 +302,13 @@ const MiniAppHost = {
     const launchId = this.el.dataset.launchId
     const requiredChains = JSON.parse(this.el.dataset.walletRequiredChains || "[]")
     const finish = compatible => {
-      if (this.walletConfigKey !== configKey) return
+      if (
+        this.destroyedFlag ||
+        this.walletGeneration !== generation ||
+        this.walletConfigKey !== configKey
+      ) {
+        return
+      }
       this.walletCompatible = compatible
       this.walletCheckPending = false
       this.pushEvent("mini_app_wallet_availability", {launch_id: launchId, compatible})
@@ -332,10 +340,12 @@ const MiniAppHost = {
 
   bindFrame() {
     if (this.walletCheckPending) return
-    const frame = this.el.querySelector("#mini-app-frame")
+    const shell = this.el.querySelector("#mini-app-frame-shell")
+    const frame = shell?.querySelector("#mini-app-frame")
     const appOrigin = this.el.dataset.appOrigin || ""
     const launchId = this.el.dataset.launchId || ""
-    const brokerKey = `${appOrigin}\n${launchId}`
+    const frameSrc = this.el.dataset.frameSrc || ""
+    const frameTitle = this.el.dataset.frameTitle || ""
     const walletEnabled = this.el.dataset.walletEnabled === "true"
     const capabilities = []
     if (this.el.dataset.notificationsEnabled === "true") {
@@ -344,86 +354,108 @@ const MiniAppHost = {
     if (walletEnabled && this.walletAdapter.available() && this.walletCompatible !== false) {
       capabilities.push("wallet.evm")
     }
+    const brokerKey = [appOrigin, launchId, frameSrc, frameTitle, ...capabilities].join("\n")
 
-    if (!frame || !appOrigin || !launchId) {
+    if (!shell || !appOrigin || !launchId) {
       this.destroyBroker()
       this.authRelay.cancel()
       return
     }
 
-    if (this.frame === frame && this.brokerKey === brokerKey) return
+    if (frame && this.frame === frame && this.brokerKey === brokerKey) return
+    if (!frame && this.brokerFailedKey === brokerKey) return
 
     this.destroyBroker()
-    this.frame = frame
-    this.brokerKey = brokerKey
-    this.broker = createMiniAppBroker({
-      iframe: frame,
-      appOrigin,
+    // Bound broker network hangs and fail-closed mount errors from the moment
+    // navigation begins, not only after the iframe eventually fires `load`.
+    this.readiness.loading(launchId)
+    const binding = bindMiniAppBrokerFrame({
+      shell,
+      documentObject: document,
+      createBroker: createMiniAppBroker,
+      frameSrc,
+      frameTitle,
       hostOrigin: window.location.origin,
       launchId,
-      capabilities,
-      onLoading: () => {
-        this.authRelay.cancel()
-        this.readiness.loading(launchId)
-        this.pushEvent("mini_app_loading", {launch_id: launchId})
+      brokerOptions: {
+        appOrigin,
+        hostOrigin: window.location.origin,
+        launchId,
+        capabilities,
+        onLoading: () => {
+          this.authRelay.cancel()
+          this.readiness.loading(launchId)
+          this.pushEvent("mini_app_loading", {launch_id: launchId})
+        },
+        onReady: () => {
+          this.readiness.ready(launchId)
+          this.pushEvent("mini_app_ready", {launch_id: launchId})
+        },
+        onContextRequest: requestId =>
+          this.pushEvent("mini_app_context_request", {
+            launch_id: launchId,
+            request_id: requestId,
+          }),
+        onNotificationPermissionRequest: request =>
+          this.pushEvent("mini_app_notification_permission_request", {
+            launch_id: launchId,
+            request_id: request.requestId,
+            action: request.action,
+          }),
+        onAuthRequest: request =>
+          this.pushEvent("mini_app_auth_request", {
+            launch_id: launchId,
+            request_id: request.requestId,
+            client_id: request.clientId,
+            redirect_uri: request.redirectUri,
+            scopes: request.scopes,
+            state: request.state,
+            code_challenge: request.codeChallenge,
+            code_challenge_method: request.codeChallengeMethod,
+            handoff_challenge: request.handoffChallenge,
+          }),
+        onComposeRequest: request =>
+          this.pushEvent("mini_app_compose_request", {
+            launch_id: launchId,
+            call_id: request.callId,
+            draft: request.draft,
+          }),
+        onCloseRequest: requestId =>
+          this.pushEvent("mini_app_close_request", {
+            launch_id: launchId,
+            request_id: requestId,
+          }),
+        onExternalRequest: request =>
+          this.pushEvent("mini_app_external_request", {
+            launch_id: launchId,
+            request_id: request.requestId,
+            url: request.url,
+          }),
+        onWalletRequest: request =>
+          this.pushEvent("mini_app_wallet_request", {
+            launch_id: launchId,
+            request_id: request.requestId,
+            method: request.method,
+            params: request.params,
+          }),
+        onProtocolViolation: reason =>
+          this.pushEvent("mini_app_protocol_violation", {
+            launch_id: launchId,
+            reason,
+          }),
       },
-      onReady: () => {
-        this.readiness.ready(launchId)
-        this.pushEvent("mini_app_ready", {launch_id: launchId})
-      },
-      onContextRequest: requestId =>
-        this.pushEvent("mini_app_context_request", {
-          launch_id: launchId,
-          request_id: requestId,
-        }),
-      onNotificationPermissionRequest: request =>
-        this.pushEvent("mini_app_notification_permission_request", {
-          launch_id: launchId,
-          request_id: request.requestId,
-          action: request.action,
-        }),
-      onAuthRequest: request =>
-        this.pushEvent("mini_app_auth_request", {
-          launch_id: launchId,
-          request_id: request.requestId,
-          client_id: request.clientId,
-          redirect_uri: request.redirectUri,
-          scopes: request.scopes,
-          state: request.state,
-          code_challenge: request.codeChallenge,
-          code_challenge_method: request.codeChallengeMethod,
-          handoff_challenge: request.handoffChallenge,
-        }),
-      onComposeRequest: request =>
-        this.pushEvent("mini_app_compose_request", {
-          launch_id: launchId,
-          call_id: request.callId,
-          draft: request.draft,
-        }),
-      onCloseRequest: requestId =>
-        this.pushEvent("mini_app_close_request", {
-          launch_id: launchId,
-          request_id: requestId,
-        }),
-      onExternalRequest: request =>
-        this.pushEvent("mini_app_external_request", {
-          launch_id: launchId,
-          request_id: request.requestId,
-          url: request.url,
-        }),
-      onWalletRequest: request =>
-        this.pushEvent("mini_app_wallet_request", {
-          launch_id: launchId,
-          request_id: request.requestId,
-          method: request.method,
-          params: request.params,
-        }),
-      onProtocolViolation: reason =>
-        this.pushEvent("mini_app_protocol_violation", {
-          launch_id: launchId,
-          reason,
-        }),
     })
+    if (!binding) {
+      this.frame = null
+      this.brokerKey = null
+      this.brokerFailedKey = brokerKey
+      this.broker = null
+      return
+    }
+    this.frame = binding.frame
+    this.brokerKey = brokerKey
+    this.brokerFailedKey = null
+    this.broker = binding.broker
   },
 }
 

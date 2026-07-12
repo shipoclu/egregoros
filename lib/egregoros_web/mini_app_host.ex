@@ -82,10 +82,18 @@ defmodule EgregorosWeb.MiniAppHost do
       true ->
         case consume_broker_budget(state.broker_budget, event, params) do
           {:ok, budget} ->
+            pending? = event in @broker_outstanding_events and host_request_pending?(state)
+
+            state =
+              if not pending? and state.status == :collapsed and
+                   event in @broker_outstanding_events,
+                 do: %{state | status: :open},
+                 else: state
+
             socket =
               Phoenix.Component.assign(socket, :mini_app_host, %{state | broker_budget: budget})
 
-            if event in @broker_outstanding_events and host_request_pending?(state),
+            if pending?,
               do: {:halt, socket},
               else: {:cont, socket}
 
@@ -127,6 +135,8 @@ defmodule EgregorosWeb.MiniAppHost do
       data-expanded={to_string(@state.expanded?)}
       data-app-origin={card_value(@state, :app_origin)}
       data-launch-id={@state.launch_id}
+      data-frame-title={if(@state.card, do: @state.card.app_name <> " mini app")}
+      data-frame-src={broker_path(@state)}
       data-wallet-enabled={to_string(wallet_value(@state, :wallet_evm_enabled, false))}
       data-wallet-required={to_string(wallet_value(@state, :wallet_evm_required, false))}
       data-wallet-required-chains={
@@ -637,8 +647,13 @@ defmodule EgregorosWeb.MiniAppHost do
         </section>
 
         <div
-          :if={@state.status == :open}
-          class="relative min-h-0 flex-1 bg-white"
+          :if={@state.status in [:open, :collapsed]}
+          id="mini-app-frame-container"
+          data-state={@state.status}
+          class={[
+            "relative min-h-0 flex-1 bg-white",
+            @state.status == :collapsed && "hidden"
+          ]}
           data-role="mini-app-frame-container"
         >
           <div
@@ -696,22 +711,9 @@ defmodule EgregorosWeb.MiniAppHost do
 
           <div
             id="mini-app-frame-shell"
-            data-frame-src={
-              ~p"/mini-apps/broker/#{@state.card.id}?launch_id=#{@state.launch_id}&resolution_token=#{@state.card.resolution_token}"
-            }
             phx-update="ignore"
             class="h-full w-full border-0"
           >
-            <iframe
-              id="mini-app-frame"
-              title={@state.card.app_name <> " mini app"}
-              src={
-                ~p"/mini-apps/broker/#{@state.card.id}?launch_id=#{@state.launch_id}&resolution_token=#{@state.card.resolution_token}"
-              }
-              referrerpolicy="no-referrer"
-              class="h-full w-full border-0"
-            >
-            </iframe>
           </div>
         </div>
       <% end %>
@@ -760,7 +762,7 @@ defmodule EgregorosWeb.MiniAppHost do
   end
 
   defp handle_host_event("mini_app_restore", _params, socket) do
-    {:halt, socket |> update_status(:open) |> update_ready(false)}
+    {:halt, update_status(socket, :open)}
   end
 
   defp handle_host_event("mini_app_expand", _params, socket) do
@@ -1065,24 +1067,22 @@ defmodule EgregorosWeb.MiniAppHost do
     if state.status == :open and state.load_error? and active_card?(state.card) do
       launch_id = launch_id()
 
-      socket =
-        socket
-        |> Phoenix.Component.assign(:mini_app_host, %{
-          state
-          | launch_id: launch_id,
-            ready?: false,
-            load_error?: false,
-            auth_request: nil,
-            oauth_authenticated?: false,
-            context_request: nil,
-            compose_request: nil,
-            external_request: nil,
-            wallet_request: nil,
-            broker_budget: new_broker_budget()
-        })
-        |> Phoenix.LiveView.push_event("mini_app_frame_reload", %{launch_id: launch_id})
-
-      {:halt, socket}
+      {:halt,
+       Phoenix.Component.assign(socket, :mini_app_host, %{
+         state
+         | launch_id: launch_id,
+           ready?: false,
+           load_error?: false,
+           auth_request: nil,
+           oauth_authenticated?: false,
+           context_request: nil,
+           notification_request: nil,
+           compose_request: nil,
+           external_request: nil,
+           wallet_request: nil,
+           wallet_incompatible?: false,
+           broker_budget: new_broker_budget()
+       })}
     else
       {:halt, socket}
     end
@@ -1484,11 +1484,6 @@ defmodule EgregorosWeb.MiniAppHost do
     else
       socket
     end
-  end
-
-  defp update_ready(socket, ready?) do
-    state = socket.assigns.mini_app_host
-    Phoenix.Component.assign(socket, :mini_app_host, %{state | ready?: ready?})
   end
 
   defp active_card?(%Card{} = card), do: Cards.active?(card)
@@ -2102,6 +2097,13 @@ defmodule EgregorosWeb.MiniAppHost do
 
   defp card_value(%{card: %Card{} = card}, field), do: Map.get(card, field)
   defp card_value(_state, _field), do: nil
+
+  defp broker_path(%{card: %Card{} = card, launch_id: launch_id})
+       when is_binary(launch_id) do
+    ~p"/mini-apps/broker/#{card.id}?launch_id=#{launch_id}&resolution_token=#{card.resolution_token}"
+  end
+
+  defp broker_path(_state), do: nil
 
   defp wallet_value(%{wallet_declaration: declaration}, field, default)
        when not is_nil(declaration) do

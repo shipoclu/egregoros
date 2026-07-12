@@ -52,7 +52,7 @@ test("binds the relay before starting the remote app navigation", () => {
   })
 
   assert.equal(mounted, iframe)
-  assert.deepEqual(operations, ["bind", "attach", "navigate"])
+  assert.deepEqual(operations, ["bind", "navigate", "attach"])
   assert.equal(attributes.get("src"), "https://app.example/read/chapter-2")
   assert.equal(attributes.get("sandbox"), "allow-scripts allow-forms allow-same-origin")
   assert.equal(attributes.get("referrerpolicy"), "no-referrer")

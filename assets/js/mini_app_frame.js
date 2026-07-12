@@ -23,8 +23,8 @@ export const mountMiniAppFrame = ({documentObject, windowObject, createRelay = c
     appOrigin,
   })
 
-  root.replaceChildren(iframe)
   iframe.src = launchUrl
+  root.replaceChildren(iframe)
   return iframe
 }
 
