@@ -284,6 +284,10 @@ defmodule EgregorosWeb.OAuthControllerTest do
     assert get_resp_header(consent_conn, "referrer-policy") == ["no-referrer"]
     assert get_resp_header(consent_conn, "cross-origin-opener-policy") == ["same-origin"]
 
+    assert [csp] = get_resp_header(consent_conn, "content-security-policy")
+    assert csp =~ "form-action 'self' https://app.example"
+    refute csp =~ "https://app.example/oauth/callback"
+
     assert document |> LazyHTML.query("#oauth-mini-app-origin") |> LazyHTML.text() =~
              "app.example"
 

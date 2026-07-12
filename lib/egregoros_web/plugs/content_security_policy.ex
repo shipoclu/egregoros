@@ -3,6 +3,8 @@ defmodule EgregorosWeb.Plugs.ContentSecurityPolicy do
 
   import Plug.Conn
 
+  alias Egregoros.MiniApps.Origin
+
   @policy [
             "default-src 'self'",
             "base-uri 'self'",
@@ -54,5 +56,36 @@ defmodule EgregorosWeb.Plugs.ContentSecurityPolicy do
     conn
     |> put_resp_header(header, policy)
     |> put_resp_header("permissions-policy", @permissions_policy)
+  end
+
+  def allow_form_action_redirect(conn, redirect_uri) do
+    with {:ok, origin} <- Origin.from_url(redirect_uri) do
+      Enum.reduce(
+        ["content-security-policy", "content-security-policy-report-only"],
+        conn,
+        fn header, conn -> allow_form_action_origin(conn, header, origin) end
+      )
+    else
+      _error -> conn
+    end
+  end
+
+  defp allow_form_action_origin(conn, header, origin) do
+    case get_resp_header(conn, header) do
+      [policy] ->
+        put_resp_header(
+          conn,
+          header,
+          String.replace(
+            policy,
+            "form-action 'self'",
+            "form-action 'self' #{origin}",
+            global: false
+          )
+        )
+
+      _other ->
+        conn
+    end
   end
 end

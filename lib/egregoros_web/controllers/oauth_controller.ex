@@ -10,6 +10,7 @@ defmodule EgregorosWeb.OAuthController do
   alias Egregoros.OAuth
   alias Egregoros.MiniApps.OAuthRegistrations, as: MiniAppOAuthRegistrations
   alias Egregoros.User
+  alias EgregorosWeb.Plugs.ContentSecurityPolicy
 
   defp secure_response(conn, _opts) do
     conn
@@ -123,7 +124,9 @@ defmodule EgregorosWeb.OAuthController do
           as: :oauth
         )
 
-      render(conn, :authorize,
+      conn
+      |> ContentSecurityPolicy.allow_form_action_redirect(redirect_uri)
+      |> render(:authorize,
         form: form,
         app: app,
         scope: scope,

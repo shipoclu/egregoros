@@ -41,6 +41,33 @@ defmodule EgregorosWeb.Plugs.ContentSecurityPolicyTest do
            ]
   end
 
+  test "allows an exact validated OAuth callback origin without allowing its path" do
+    conn =
+      policy_conn()
+      |> ContentSecurityPolicy.allow_form_action_redirect(
+        "https://app.example:8443/oauth/callback?attempt=1"
+      )
+
+    [policy] = get_resp_header(conn, "content-security-policy")
+
+    assert policy =~ "form-action 'self' https://app.example:8443"
+    refute policy =~ "oauth/callback"
+    refute policy =~ "attempt=1"
+  end
+
+  test "refuses non-HTTP and credentialed OAuth callback sources" do
+    original = policy_conn()
+    [original_policy] = get_resp_header(original, "content-security-policy")
+
+    Enum.each(
+      ["javascript:alert(1)", "https://user:password@app.example/callback", "//app.example/cb"],
+      fn redirect_uri ->
+        conn = ContentSecurityPolicy.allow_form_action_redirect(original, redirect_uri)
+        assert get_resp_header(conn, "content-security-policy") == [original_policy]
+      end
+    )
+  end
+
   defp policy_header do
     conn = policy_conn()
     [policy] = get_resp_header(conn, "content-security-policy")
