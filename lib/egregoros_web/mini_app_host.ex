@@ -694,19 +694,28 @@ defmodule EgregorosWeb.MiniAppHost do
             </div>
           </div>
 
-          <iframe
-            id="mini-app-frame"
-            title={@state.card.app_name <> " mini app"}
-            src={
+          <div
+            id="mini-app-frame-shell"
+            data-frame-src={
               ~p"/mini-apps/broker/#{@state.card.id}?launch_id=#{@state.launch_id}&resolution_token=#{@state.card.resolution_token}"
             }
-            referrerpolicy="no-referrer"
             class={[
               "h-full w-full border-0 transition-opacity duration-200",
               if(@state.ready?, do: "opacity-100", else: "opacity-0")
             ]}
           >
-          </iframe>
+            <iframe
+              id="mini-app-frame"
+              title={@state.card.app_name <> " mini app"}
+              src={
+                ~p"/mini-apps/broker/#{@state.card.id}?launch_id=#{@state.launch_id}&resolution_token=#{@state.card.resolution_token}"
+              }
+              referrerpolicy="no-referrer"
+              phx-update="ignore"
+              class="h-full w-full border-0"
+            >
+            </iframe>
+          </div>
         </div>
       <% end %>
     </aside>

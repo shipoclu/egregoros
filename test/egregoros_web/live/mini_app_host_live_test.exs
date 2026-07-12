@@ -70,6 +70,9 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
              ~s(#mini-app-host iframe[src^="/mini-apps/broker/#{card.id}?launch_id="])
            )
 
+    assert has_element?(view, "#mini-app-frame-shell")
+    assert has_element?(view, "#mini-app-frame[phx-update='ignore']")
+
     refute render(view) =~ ~s(src="https://app.example/book/chapter-2")
 
     assert has_element?(view, "#mini-app-host[data-app-origin='https://app.example']")

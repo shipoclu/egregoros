@@ -250,7 +250,8 @@ const MiniAppHost = {
     this.handleEvent("mini_app_frame_reload", payload => {
       if (payload?.launch_id !== this.el.dataset.launchId) return
       const frame = this.el.querySelector("#mini-app-frame")
-      if (frame) frame.src = frame.src
+      const frameSrc = this.el.querySelector("#mini-app-frame-shell")?.dataset.frameSrc
+      if (frame && frameSrc) frame.src = frameSrc
     })
     this.initializeWallet()
   },
