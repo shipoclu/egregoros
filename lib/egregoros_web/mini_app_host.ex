@@ -645,78 +645,71 @@ defmodule EgregorosWeb.MiniAppHost do
             </p>
           </div>
         </section>
+      <% end %>
 
+      <div
+        id="mini-app-frame-container"
+        data-role="mini-app-frame-container"
+        data-active={to_string(@state.status in [:open, :collapsed] and not is_nil(@state.card))}
+        data-state={@state.status}
+        data-ready={to_string(@state.ready?)}
+        data-load-error={to_string(@state.load_error?)}
+        phx-update="ignore"
+        class="relative min-h-0 flex-1 bg-white"
+      >
         <div
-          :if={@state.status in [:open, :collapsed]}
-          id="mini-app-frame-container"
-          data-state={@state.status}
-          class={[
-            "relative min-h-0 flex-1 bg-white",
-            @state.status == :collapsed && "hidden"
-          ]}
-          data-role="mini-app-frame-container"
+          data-role="mini-app-loading"
+          class="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 bg-[color:var(--bg-base)] p-8 text-center"
         >
-          <div
-            :if={!@state.ready? and !@state.load_error?}
-            data-role="mini-app-loading"
-            class="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 bg-[color:var(--bg-base)] p-8 text-center"
-          >
-            <div class="flex size-16 items-center justify-center border-2 border-[color:var(--border-default)] bg-[color:var(--text-primary)] shadow-[4px_4px_0_var(--accent)]">
-              <.icon name="hero-window" class="size-8 text-[color:var(--bg-base)]" />
-            </div>
-            <div>
-              <p class="font-bold text-[color:var(--text-primary)]">Loading {@state.card.app_name}</p>
-              <p class="mt-1 font-mono text-xs text-[color:var(--text-muted)]">
-                Waiting for the app to become ready…
-              </p>
-            </div>
+          <div class="flex size-16 items-center justify-center border-2 border-[color:var(--border-default)] bg-[color:var(--text-primary)] shadow-[4px_4px_0_var(--accent)]">
+            <.icon name="hero-window" class="size-8 text-[color:var(--bg-base)]" />
           </div>
-
-          <div
-            :if={@state.load_error?}
-            id="mini-app-frame-error"
-            class="absolute inset-0 z-20 flex flex-col items-center justify-center gap-5 bg-[color:var(--bg-base)] p-8 text-center"
-            role="alert"
-          >
-            <div class="flex size-16 items-center justify-center border-2 border-[color:var(--border-default)] bg-[color:var(--warning)] shadow-[4px_4px_0_var(--border-default)]">
-              <.icon name="hero-exclamation-triangle" class="size-8 text-[color:var(--text-primary)]" />
-            </div>
-            <div class="max-w-sm">
-              <p class="font-bold text-[color:var(--text-primary)]">
-                {@state.card.app_name} did not become ready
-              </p>
-              <p class="mt-2 text-sm text-[color:var(--text-secondary)]">
-                The app may block framing, be offline, or use an incompatible protocol. No host permission was granted.
-              </p>
-            </div>
-            <div class="flex flex-wrap justify-center gap-2">
-              <button
-                id="mini-app-frame-retry"
-                type="button"
-                phx-click="mini_app_frame_retry"
-                class="border-2 border-[color:var(--border-default)] bg-[color:var(--text-primary)] px-4 py-2 text-sm font-bold text-[color:var(--bg-base)]"
-              >
-                Retry
-              </button>
-              <button
-                id="mini-app-frame-open-external"
-                type="button"
-                phx-click="mini_app_frame_external"
-                class="border-2 border-[color:var(--border-default)] px-4 py-2 text-sm font-bold text-[color:var(--text-secondary)]"
-              >
-                Open externally
-              </button>
-            </div>
-          </div>
-
-          <div
-            id="mini-app-frame-shell"
-            phx-update="ignore"
-            class="h-full w-full border-0"
-          >
+          <div>
+            <p class="font-bold text-[color:var(--text-primary)]">Loading mini app</p>
+            <p class="mt-1 font-mono text-xs text-[color:var(--text-muted)]">
+              Waiting for the app to become ready…
+            </p>
           </div>
         </div>
-      <% end %>
+
+        <div
+          id="mini-app-frame-error"
+          class="absolute inset-0 z-20 hidden flex-col items-center justify-center gap-5 bg-[color:var(--bg-base)] p-8 text-center"
+          role="alert"
+        >
+          <div class="flex size-16 items-center justify-center border-2 border-[color:var(--border-default)] bg-[color:var(--warning)] shadow-[4px_4px_0_var(--border-default)]">
+            <.icon name="hero-exclamation-triangle" class="size-8 text-[color:var(--text-primary)]" />
+          </div>
+          <div class="max-w-sm">
+            <p class="font-bold text-[color:var(--text-primary)]">
+              Mini app did not become ready
+            </p>
+            <p class="mt-2 text-sm text-[color:var(--text-secondary)]">
+              The app may block framing, be offline, or use an incompatible protocol. No host permission was granted.
+            </p>
+          </div>
+          <div class="flex flex-wrap justify-center gap-2">
+            <button
+              id="mini-app-frame-retry"
+              type="button"
+              phx-click="mini_app_frame_retry"
+              class="border-2 border-[color:var(--border-default)] bg-[color:var(--text-primary)] px-4 py-2 text-sm font-bold text-[color:var(--bg-base)]"
+            >
+              Retry
+            </button>
+            <button
+              id="mini-app-frame-open-external"
+              type="button"
+              phx-click="mini_app_frame_external"
+              class="border-2 border-[color:var(--border-default)] px-4 py-2 text-sm font-bold text-[color:var(--text-secondary)]"
+            >
+              Open externally
+            </button>
+          </div>
+        </div>
+
+        <div id="mini-app-frame-shell" class="h-full w-full border-0"></div>
+      </div>
     </aside>
     """
   end

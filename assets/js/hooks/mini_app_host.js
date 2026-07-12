@@ -359,6 +359,7 @@ const MiniAppHost = {
     if (!shell || !appOrigin || !launchId) {
       this.destroyBroker()
       this.authRelay.cancel()
+      shell?.replaceChildren()
       return
     }
 

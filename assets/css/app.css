@@ -857,3 +857,28 @@ article[data-role="status-card"]:target {
     inset 0 0 80px 30px rgba(0, 0, 0, 0.25),
     inset 0 0 30px 10px rgba(0, 0, 0, 0.15);
 }
+
+/* The mini-app frame is a persistent LiveView-owned boundary whose children
+   are client-owned. LiveView merges only these exact data attributes into the
+   ignored node, so visibility changes never reconcile or reload the iframe. */
+#mini-app-frame-container[data-active="false"],
+#mini-app-frame-container[data-state="collapsed"] {
+  display: none;
+}
+
+#mini-app-frame-container [data-role="mini-app-loading"] {
+  display: flex;
+}
+
+#mini-app-frame-container[data-ready="true"] [data-role="mini-app-loading"],
+#mini-app-frame-container[data-load-error="true"] [data-role="mini-app-loading"] {
+  display: none;
+}
+
+#mini-app-frame-container #mini-app-frame-error {
+  display: none;
+}
+
+#mini-app-frame-container[data-load-error="true"] #mini-app-frame-error {
+  display: flex;
+}

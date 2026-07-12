@@ -61,13 +61,18 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
     assert has_element?(view, "[data-role='mini-app-card']")
     refute has_element?(view, "#mini-app-host[data-state='open']")
 
+    assert has_element?(
+             view,
+             "#mini-app-frame-container[phx-update='ignore'][data-active='false'] #mini-app-frame-shell"
+           )
+
     view |> element("[data-role='open-mini-app']") |> render_click()
 
     assert has_element?(view, "#mini-app-host[data-state='open']")
 
     assert has_element?(
              view,
-             ~s(#mini-app-host[data-frame-src^="/mini-apps/broker/#{card.id}?launch_id="] #mini-app-frame-shell[phx-update="ignore"])
+             ~s(#mini-app-host[data-frame-src^="/mini-apps/broker/#{card.id}?launch_id="] #mini-app-frame-container[phx-update="ignore"][data-active="true"][data-ready="false"] #mini-app-frame-shell)
            )
 
     refute has_element?(view, "#mini-app-host iframe")
@@ -76,15 +81,15 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
 
     assert has_element?(view, "#mini-app-host[data-app-origin='https://app.example']")
     assert has_element?(view, "#mini-app-host[phx-hook='MiniAppHost']")
-    assert has_element?(view, "#mini-app-host [data-role='mini-app-loading']")
+    assert has_element?(view, "#mini-app-frame-container[data-ready='false']")
 
     launch_id = :sys.get_state(view.pid).socket.assigns.mini_app_host.launch_id
 
     render_hook(view, "mini_app_ready", %{"launch_id" => "wrong"})
-    assert has_element?(view, "#mini-app-host [data-role='mini-app-loading']")
+    assert has_element?(view, "#mini-app-frame-container[data-ready='false']")
 
     render_hook(view, "mini_app_ready", %{"launch_id" => launch_id})
-    refute has_element?(view, "#mini-app-host [data-role='mini-app-loading']")
+    assert has_element?(view, "#mini-app-frame-container[data-ready='true']")
     refute has_element?(view, "#mini-app-host iframe")
 
     render_hook(view, "mini_app_context_request", %{
@@ -132,7 +137,11 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
 
     view |> element("#mini-app-host-collapse") |> render_click()
     assert has_element?(view, "#mini-app-host[data-state='collapsed']")
-    assert has_element?(view, "#mini-app-frame-shell[phx-update='ignore']")
+
+    assert has_element?(
+             view,
+             "#mini-app-frame-container[phx-update='ignore'][data-state='collapsed'] #mini-app-frame-shell"
+           )
 
     view |> element("#mini-app-host-restore") |> render_click()
     assert has_element?(view, "#mini-app-host[data-state='open']")
@@ -171,7 +180,7 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
     view |> element("#mini-app-host-collapse") |> render_click()
     render_hook(view, "mini_app_ready_timeout", %{"launch_id" => launch_id})
     view |> element("#mini-app-host-restore") |> render_click()
-    assert has_element?(view, "#mini-app-frame-error")
+    assert has_element?(view, "#mini-app-frame-container[data-load-error='true']")
     assert has_element?(view, "#mini-app-frame-open-external")
 
     view |> element("#mini-app-frame-open-external") |> render_click()
@@ -186,8 +195,11 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
     view |> element("#mini-app-external-deny") |> render_click()
 
     view |> element("#mini-app-frame-retry") |> render_click()
-    refute has_element?(view, "#mini-app-frame-error")
-    assert has_element?(view, "[data-role='mini-app-loading']")
+
+    assert has_element?(
+             view,
+             "#mini-app-frame-container[data-load-error='false'][data-ready='false']"
+           )
 
     new_launch_id = :sys.get_state(view.pid).socket.assigns.mini_app_host.launch_id
     refute new_launch_id == launch_id
@@ -220,7 +232,7 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
 
     assert has_element?(
              view,
-             "#mini-app-frame-container[data-state='collapsed'] #mini-app-frame-shell"
+             "#mini-app-frame-container[phx-update='ignore'][data-state='collapsed'] #mini-app-frame-shell"
            )
 
     render_hook(view, "mini_app_context_request", %{

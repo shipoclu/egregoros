@@ -136,3 +136,22 @@ test("an invalid broker binding fails once instead of retrying on every patch", 
     assert.equal(hook.loading(), 1)
   })
 })
+
+test("removing launch identity clears the persistent frame island fail closed", async () => {
+  const fixture = frameDocument()
+  const frameSrc =
+    `/mini-apps/broker/card-1?launch_id=${launchId}&resolution_token=${resolutionToken}`
+  const hook = hookContext({documentObject: fixture.documentObject, frameSrc})
+
+  await withDocument(fixture.documentObject, () => {
+    MiniAppHost.bindFrame.call(hook.value)
+    assert.equal(hook.shell.querySelector("#mini-app-frame"), hook.value.frame)
+
+    hook.value.el.dataset.appOrigin = ""
+    MiniAppHost.bindFrame.call(hook.value)
+
+    assert.equal(hook.value.frame, null)
+    assert.equal(hook.value.broker, null)
+    assert.equal(hook.shell.querySelector("#mini-app-frame"), null)
+  })
+})
