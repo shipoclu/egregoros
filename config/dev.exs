@@ -57,20 +57,28 @@ config :egregoros, EgregorosWeb.Endpoint,
 # configured to run both http and https servers on
 # different ports.
 
-# Reload browser tabs when matching files change.
-config :egregoros, EgregorosWeb.Endpoint,
-  live_reload: [
-    web_console_logger: true,
-    patterns: [
-      # Static assets, except user uploads
-      ~r"priv/static/(?!uploads/).*\.(js|css|png|jpeg|jpg|gif|svg)$",
-      # Gettext translations
-      ~r"priv/gettext/.*\.po$",
-      # Router, Controllers, LiveViews and LiveComponents
-      ~r"lib/egregoros_web/router\.ex$",
-      ~r"lib/egregoros_web/(controllers|live|components)/.*\.(ex|heex)$"
+# Reload browser tabs when matching files change. Remote development instances
+# that exercise the mini-app iframe boundary can disable only the injected
+# live-reload frame while retaining code reloading and asset watchers.
+live_reload =
+  if System.get_env("PHX_LIVE_RELOAD", "true") == "true" do
+    [
+      web_console_logger: true,
+      patterns: [
+        # Static assets, except user uploads
+        ~r"priv/static/(?!uploads/).*\.(js|css|png|jpeg|jpg|gif|svg)$",
+        # Gettext translations
+        ~r"priv/gettext/.*\.po$",
+        # Router, Controllers, LiveViews and LiveComponents
+        ~r"lib/egregoros_web/router\.ex$",
+        ~r"lib/egregoros_web/(controllers|live|components)/.*\.(ex|heex)$"
+      ]
     ]
-  ]
+  else
+    []
+  end
+
+config :egregoros, EgregorosWeb.Endpoint, live_reload: live_reload
 
 # Enable dev routes for dashboard and mailbox
 config :egregoros, dev_routes: true

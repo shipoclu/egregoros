@@ -40,4 +40,12 @@ defmodule Egregoros.DeploymentSecurityHeadersTest do
     refute config =~ "proxy_hide_header Content-Security-Policy"
     refute config =~ "add_header X-Frame-Options"
   end
+
+  test "development live reload can be disabled without disabling code reloading" do
+    config = File.read!("config/dev.exs")
+
+    assert config =~ ~s|System.get_env("PHX_LIVE_RELOAD", "true")|
+    assert config =~ "live_reload: live_reload"
+    assert config =~ "code_reloader: true"
+  end
 end
