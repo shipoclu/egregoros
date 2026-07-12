@@ -132,6 +132,13 @@ consent, and threat-model design.
 If the app blocks framing with `X-Frame-Options` or CSP `frame-ancestors`, the
 host displays a clear framed-app error with an **Open externally** action. It
 does not silently replace the Egregoros surface with a browser navigation.
+A generally published app may use `frame-ancestors https:` so compatible
+Fediverse instances can embed it without advance registration. That directive
+controls framing only; it grants no host capability. Exact browser-origin
+matching, bootstrap issuer equality, message-port pinning, backend public-DNS
+validation, OAuth, and per-capability consent remain the authorization
+boundaries. A private or instance-specific app may use a narrower
+`frame-ancestors` policy.
 
 Only one mini app may be active at a time. Launching another app explicitly
 closes/replaces the active panel or sheet; v1 has no background/minimized app
@@ -507,8 +514,15 @@ The v1 reference module is built as
 pinned copy from its own origin rather than hot-linking an arbitrary user's
 instance. Construction requires an `allowedHostOrigin(origin)` callback; there
 is deliberately no accept-any-host default. The app can allow a known instance
-exactly or validate an instance through its own discovery/trust policy before
-returning `true`. The connected SDK exposes a frozen `bootstrap` containing
+exactly, but a generally published Fediverse mini app SHOULD instead accept any
+syntactically exact public HTTPS domain under a fail-closed public-DNS policy.
+This is not a static instance allowlist: the bootstrap still requires
+`event.origin === hostOrigin === issuer`, and the SDK pins that one exact origin
+for the channel lifetime. The app backend MUST independently reject private,
+local, reserved, mixed public/private, redirected, or malformed issuer
+destinations and connect to a DNS-pinned public address while preserving the
+original hostname for Host, SNI, and TLS certificate verification. The
+connected SDK exposes a frozen `bootstrap` containing
 `hostOrigin`, OAuth `issuer`, `authorizationServerMetadata`, the exact
 `authorizationResultRelay`, protocol version, launch ID, and the currently
 available capability names.
@@ -528,7 +542,7 @@ The reference API is promise-based:
 import {createFediverseMiniAppSDK} from "./fediverse-miniapp-sdk-v1.js"
 
 const sdk = createFediverseMiniAppSDK({
-  allowedHostOrigin: origin => trustedInstances.has(origin),
+  allowedHostOrigin: origin => publicHttpsFediverseOrigin(origin),
 })
 
 const bootstrap = await sdk.connect()
