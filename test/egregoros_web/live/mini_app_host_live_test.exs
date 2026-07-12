@@ -72,7 +72,7 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
 
     assert has_element?(
              view,
-             ~s(#mini-app-host[data-frame-src^="/mini-apps/broker/#{card.id}?launch_id="] #mini-app-frame-container[phx-update="ignore"][data-active="true"][data-ready="false"] #mini-app-frame-shell)
+             ~s(#mini-app-host[data-frame-src^="/mini-apps/broker/#{card.id}?launch_id="] > #mini-app-frame-container:first-child[phx-update="ignore"][data-active="true"][data-ready="false"] #mini-app-frame-shell)
            )
 
     refute has_element?(view, "#mini-app-host iframe")
@@ -99,6 +99,11 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
 
     assert has_element?(view, "#mini-app-context-consent")
     assert has_element?(view, "#mini-app-context-consent", "app.example")
+
+    assert has_element?(
+             view,
+             "#mini-app-host > #mini-app-frame-container:first-child[phx-update='ignore']"
+           )
 
     view |> element("#mini-app-context-approve") |> render_click()
     refute has_element?(view, "#mini-app-context-consent")
