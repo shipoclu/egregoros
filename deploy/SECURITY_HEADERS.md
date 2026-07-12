@@ -85,10 +85,11 @@ customize it:
 
 ## Example nginx reverse proxy
 
-There is no supplied nginx configuration for the main Egregoros origin. A
-minimal custom TLS proxy can use the following boundary. This example lets the
-application supply CSP and all browser-policy headers; nginx supplies no
-competing CSP or `X-Frame-Options`.
+[`deploy/nginx/egregoros.conf`](nginx/egregoros.conf) is a complete sample for
+separate application and upload origins. Replace its example hostnames,
+certificate paths, and upstream port. The sample lets the application supply
+CSP and all browser-policy headers; nginx supplies no competing CSP or
+`X-Frame-Options`.
 
 ```nginx
 map $http_upgrade $connection_upgrade {
