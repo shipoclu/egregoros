@@ -11,6 +11,7 @@ import {
   executeWalletRequest,
   normalizeWalletExecution,
 } from "../wallet/wallet_execution_guard.mjs"
+import {navigateMiniAppFrame} from "../lib/mini_app_frame_navigation.mjs"
 
 const MiniAppHost = {
   mounted() {
@@ -251,7 +252,12 @@ const MiniAppHost = {
       if (payload?.launch_id !== this.el.dataset.launchId) return
       const frame = this.el.querySelector("#mini-app-frame")
       const frameSrc = this.el.querySelector("#mini-app-frame-shell")?.dataset.frameSrc
-      if (frame && frameSrc) frame.src = frameSrc
+      navigateMiniAppFrame({
+        frame,
+        frameSrc,
+        hostOrigin: window.location.origin,
+        launchId: payload.launch_id,
+      })
     })
     this.initializeWallet()
   },
