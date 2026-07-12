@@ -94,7 +94,7 @@ defmodule EgregorosWeb.MiniAppHost do
               Phoenix.Component.assign(socket, :mini_app_host, %{state | broker_budget: budget})
 
             if pending?,
-              do: {:halt, socket},
+              do: {:halt, reject_concurrent_request(socket, event, params)},
               else: {:cont, socket}
 
           {:error, _reason} ->
@@ -1586,6 +1586,102 @@ defmodule EgregorosWeb.MiniAppHost do
       &(not is_nil(&1))
     )
   end
+
+  defp reject_concurrent_request(socket, "mini_app_context_request", %{
+         "request_id" => request_id
+       }) do
+    if valid_request_id?(request_id) do
+      state = socket.assigns.mini_app_host
+
+      Phoenix.LiveView.push_event(socket, "mini_app_context_response", %{
+        launch_id: state.launch_id,
+        request_id: request_id,
+        status: "unavailable",
+        context: nil
+      })
+    else
+      socket
+    end
+  end
+
+  defp reject_concurrent_request(socket, "mini_app_notification_permission_request", %{
+         "request_id" => request_id
+       }) do
+    if valid_request_id?(request_id) do
+      state = socket.assigns.mini_app_host
+
+      Phoenix.LiveView.push_event(socket, "mini_app_notification_permission_response", %{
+        launch_id: state.launch_id,
+        request_id: request_id,
+        status: "unavailable"
+      })
+    else
+      socket
+    end
+  end
+
+  defp reject_concurrent_request(socket, "mini_app_auth_request", %{
+         "request_id" => request_id
+       }) do
+    if valid_request_id?(request_id) do
+      state = socket.assigns.mini_app_host
+
+      Phoenix.LiveView.push_event(socket, "mini_app_auth_response", %{
+        launch_id: state.launch_id,
+        request_id: request_id,
+        status: "error"
+      })
+    else
+      socket
+    end
+  end
+
+  defp reject_concurrent_request(socket, "mini_app_compose_request", %{"call_id" => call_id}) do
+    if valid_request_id?(call_id) do
+      state = socket.assigns.mini_app_host
+
+      Phoenix.LiveView.push_event(socket, "mini_app_compose_response", %{
+        launch_id: state.launch_id,
+        call_id: call_id,
+        status: "unavailable"
+      })
+    else
+      socket
+    end
+  end
+
+  defp reject_concurrent_request(socket, "mini_app_external_request", %{
+         "request_id" => request_id
+       }) do
+    if valid_request_id?(request_id) do
+      state = socket.assigns.mini_app_host
+
+      Phoenix.LiveView.push_event(socket, "mini_app_external_response", %{
+        launch_id: state.launch_id,
+        request_id: request_id,
+        status: "denied"
+      })
+    else
+      socket
+    end
+  end
+
+  defp reject_concurrent_request(socket, "mini_app_wallet_request", %{
+         "request_id" => request_id
+       }) do
+    if valid_request_id?(request_id) do
+      push_wallet_rejection(
+        socket,
+        request_id,
+        -32_002,
+        "Another mini app request is already pending"
+      )
+    else
+      socket
+    end
+  end
+
+  defp reject_concurrent_request(socket, _event, _params), do: socket
 
   defp context_request_allowed?(state, launch_id, request_id) do
     state.status == :open and state.ready? and state.launch_id == launch_id and

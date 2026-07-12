@@ -58,6 +58,58 @@ defmodule EgregorosWeb.MiniAppHostBudgetLiveTest do
     })
   end
 
+  test "every concurrent host request is rejected without disturbing the active prompt or frame",
+       %{
+         conn: conn,
+         user: user
+       } do
+    {view, launch_id} = open_ready_app(conn, user)
+
+    render_hook(view, "mini_app_context_request", %{
+      "launch_id" => launch_id,
+      "request_id" => "ctx-original"
+    })
+
+    concurrent_requests = [
+      {"mini_app_context_request", %{"request_id" => "ctx-busy"},
+       {"mini_app_context_response",
+        %{request_id: "ctx-busy", status: "unavailable", context: nil}}},
+      {"mini_app_notification_permission_request",
+       %{"request_id" => "notification-busy", "action" => "get"},
+       {"mini_app_notification_permission_response",
+        %{request_id: "notification-busy", status: "unavailable"}}},
+      {"mini_app_auth_request", %{"request_id" => "auth-busy"},
+       {"mini_app_auth_response", %{request_id: "auth-busy", status: "error"}}},
+      {"mini_app_compose_request", %{"call_id" => "compose-busy", "draft" => %{}},
+       {"mini_app_compose_response", %{call_id: "compose-busy", status: "unavailable"}}},
+      {"mini_app_external_request",
+       %{"request_id" => "external-busy", "url" => "https://elsewhere.example/path"},
+       {"mini_app_external_response", %{request_id: "external-busy", status: "denied"}}},
+      {"mini_app_wallet_request",
+       %{"request_id" => "wallet-busy", "method" => "eth_chainId", "params" => []},
+       {"mini_app_wallet_response",
+        %{
+          request_id: "wallet-busy",
+          error: %{code: -32_002, message: "Another mini app request is already pending"}
+        }}}
+    ]
+
+    Enum.each(concurrent_requests, fn {event, params, {response_event, response}} ->
+      render_hook(view, event, Map.put(params, "launch_id", launch_id))
+      response = Map.put(response, :launch_id, launch_id)
+
+      assert_push_event(view, ^response_event, ^response)
+
+      assert %{request_id: "ctx-original"} =
+               :sys.get_state(view.pid).socket.assigns.mini_app_host.context_request
+
+      assert has_element?(
+               view,
+               "#mini-app-host > #mini-app-frame-container:first-child[phx-update='ignore']"
+             )
+    end)
+  end
+
   test "server closes a launch that exceeds its event rate budget", %{conn: conn, user: user} do
     {view, launch_id} = open_ready_app(conn, user)
     assert {:ok, _consent} = ContextConsents.grant(user.id, "https://app.example")
