@@ -4,7 +4,7 @@ import {
   type Hex,
   type MiniAppComposePublishedReceipt,
   type MiniAppNotificationPermission,
-} from "../js/lib/fediverse_miniapp_sdk.d.ts"
+} from "@fediverse-miniapps/sdk"
 
 const sdk = createFediverseMiniAppSDK({allowedHostOrigin: origin => origin === "https://social.example"})
 const bootstrap = await sdk.connect()

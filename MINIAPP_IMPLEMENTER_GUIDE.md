@@ -44,14 +44,18 @@ public/
 ├── .well-known/
 │   └── fediverse-miniapp.json
 ├── app.js
-├── fediverse-miniapp-sdk-v1.d.ts
-├── fediverse-miniapp-sdk-v1.js
-└── index.html
+├── index.html
+└── vendor/
+    └── fediverse-miniapp-sdk/
+        ├── index.d.ts
+        ├── index.js
+        └── wallet/
+            └── evm_wallet_schema.js
 ```
 
-Publish the matching `fediverse-miniapp-sdk-v1.d.ts` beside the JavaScript file,
-even if the app itself uses plain JavaScript. The runtime and its public types
-are one versioned SDK release.
+Keep the matching `index.d.ts` beside the JavaScript package, even if the app
+itself uses plain JavaScript. The runtime, wallet schema, and public types are
+one versioned SDK release.
 
 ### Step 1: choose one HTTPS origin
 
@@ -102,22 +106,21 @@ The complete shape and JSON Schema are in the
 [wire-format section of `MINIAPPS.md`](MINIAPPS.md#v1-wire-format) and
 [`docs/schemas/fediverse-miniapp-manifest-v1.schema.json`](docs/schemas/fediverse-miniapp-manifest-v1.schema.json).
 
-### Step 3: vendor the SDK
+### Step 3: install and pin the SDK
 
-Copy the version 1 SDK into the app instead of importing it from a particular
-Egregoros instance. From an Egregoros source checkout:
+Install an exact tag or full commit of the standalone package over Git SSH
+instead of importing code from a particular Egregoros instance:
 
 ```sh
-MIX_ENV=prod mix assets.build
-cp priv/static/assets/js/fediverse-miniapp-sdk-v1.js \
-  /path/to/miniapp/public/fediverse-miniapp-sdk-v1.js
-cp priv/static/assets/js/fediverse-miniapp-sdk-v1.d.ts \
-  /path/to/miniapp/public/fediverse-miniapp-sdk-v1.d.ts
+npm install \
+  'git+ssh://git@github.com/shipoclu/fediverse-miniapp-sdk.git#COMMIT_OR_TAG'
 ```
 
-Copy the `.js` and `.d.ts` files from the same build. Pin the resulting files
-with the rest of the app so an instance upgrade cannot unexpectedly change the
-app's runtime.
+Commit the resulting lockfile. A bundled app imports
+`@fediverse-miniapps/sdk` directly. A no-build static app copies the complete
+installed package—`index.js`, `index.d.ts`, and `wallet/`—beneath its own
+public vendor directory without rewriting the files. Do not copy `index.js`
+alone: it intentionally imports its adjacent wallet schema.
 
 ### Step 4: connect and become ready
 
@@ -150,7 +153,7 @@ Create `app.js`. For the first deployment, trust the exact Egregoros origin
 where the app will be tested:
 
 ```js
-import {createFediverseMiniAppSDK} from "./fediverse-miniapp-sdk-v1.js"
+import {createFediverseMiniAppSDK} from "/vendor/fediverse-miniapp-sdk/index.js"
 
 const trustedHosts = new Set(["https://social.example"])
 const status = document.querySelector("#status")
@@ -219,7 +222,7 @@ into the app:
 
 ```js
 import {createRoot} from "react-dom/client"
-import {createFediverseMiniAppSDK} from "./fediverse-miniapp-sdk-v1.js"
+import {createFediverseMiniAppSDK} from "/vendor/fediverse-miniapp-sdk/index.js"
 import App from "./App.jsx"
 
 const sdk = createFediverseMiniAppSDK({
@@ -265,7 +268,7 @@ curl --fail --silent --show-error \
   https://miniapp.example/.well-known/fediverse-miniapp.json | jq .
 curl --fail --silent --show-error --head https://miniapp.example/
 curl --fail --silent --show-error --head \
-  https://miniapp.example/fediverse-miniapp-sdk-v1.js
+  https://miniapp.example/vendor/fediverse-miniapp-sdk/index.js
 ```
 
 Check the status, `Content-Type`, CSP, hostname, and every URL in the returned

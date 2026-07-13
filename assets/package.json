@@ -2,5 +2,8 @@
   "private": true,
   "scripts": {
     "test": "node --test"
+  },
+  "dependencies": {
+    "@fediverse-miniapps/sdk": "github:shipoclu/fediverse-miniapp-sdk#46ca9c113631daa519933c01f211cf7b13f6dbe6"
   }
 }

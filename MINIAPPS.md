@@ -1429,8 +1429,11 @@ types, the documented ActivityPub messaging/notification-consent profile,
 device permissions, an app directory, and non-public note launches as new
 design efforts rather than implicit extensions.
 
-The first-party SDK source and declarations live at
-`assets/js/lib/fediverse_miniapp_sdk.{mjs,d.ts}`. Builds publish matching
+The first-party SDK source and declarations live in the standalone
+[`fediverse-miniapp-sdk`](https://github.com/shipoclu/fediverse-miniapp-sdk)
+repository as raw ES modules with no runtime dependencies or build step.
+Egregoros pins an exact Git commit through `assets/package-lock.json`; its thin
+asset entrypoint bundles that package and publishes matching
 `fediverse-miniapp-sdk-v1.{js,d.ts}` artifacts. A deployable public/read-only
 example with optional wallet support lives at `examples/fediverse-miniapp/`;
 its manifest is parsed by the Elixir suite and its SDK transport is exercised

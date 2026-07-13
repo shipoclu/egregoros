@@ -112,7 +112,11 @@ defmodule Egregoros.MixProject do
       "ecto.setup": ["ecto.create", "ecto.migrate", "run priv/repo/seeds.exs"],
       "ecto.reset": ["ecto.drop", "ecto.setup"],
       test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
-      "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
+      "assets.setup": [
+        "cmd --cd assets npm ci",
+        "tailwind.install --if-missing",
+        "esbuild.install --if-missing"
+      ],
       "assets.test": [
         "cmd --cd assets node --test",
         "cmd deno check assets/typecheck/fediverse_miniapp_sdk_types.ts"
@@ -124,7 +128,7 @@ defmodule Egregoros.MixProject do
         "esbuild mini_app_sdk",
         "esbuild mini_app_frame",
         "esbuild mini_app_auth_completion",
-        "cmd cp assets/js/lib/fediverse_miniapp_sdk.d.ts priv/static/assets/js/fediverse-miniapp-sdk-v1.d.ts"
+        "cmd cp assets/node_modules/@fediverse-miniapps/sdk/index.d.ts priv/static/assets/js/fediverse-miniapp-sdk-v1.d.ts"
       ],
       "assets.deploy": [
         "tailwind egregoros --minify",
@@ -132,7 +136,7 @@ defmodule Egregoros.MixProject do
         "esbuild mini_app_sdk --minify",
         "esbuild mini_app_frame --minify",
         "esbuild mini_app_auth_completion --minify",
-        "cmd cp assets/js/lib/fediverse_miniapp_sdk.d.ts priv/static/assets/js/fediverse-miniapp-sdk-v1.d.ts",
+        "cmd cp assets/node_modules/@fediverse-miniapps/sdk/index.d.ts priv/static/assets/js/fediverse-miniapp-sdk-v1.d.ts",
         "phx.digest"
       ],
       precommit: [
