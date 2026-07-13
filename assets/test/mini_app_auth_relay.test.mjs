@@ -40,6 +40,7 @@ test("relays only a strict completion over a launch-secret same-origin channel",
   const broadcasts = broadcastFixture()
   const results = []
   const completed = []
+  let popupClosed = 0
   const relay = createMiniAppAuthRelay({
     broadcastChannelFactory: broadcasts.factory,
     sendResult: result => results.push(result),
@@ -50,6 +51,7 @@ test("relays only a strict completion over a launch-secret same-origin channel",
     launchId,
     requestId: "auth-1",
     state: oauthState,
+    popup: {close: () => popupClosed++},
   })
 
   const valid = {
@@ -88,6 +90,7 @@ test("relays only a strict completion over a launch-secret same-origin channel",
       status: "success",
     },
   ])
+  assert.equal(popupClosed, 1)
 
   publisher.postMessage(valid)
   assert.equal(results.length, 1)
@@ -107,6 +110,7 @@ test("accepts bounded failure callbacks without a handoff code", () => {
     launchId,
     requestId: "auth-2",
     state: oauthState,
+    popup: {close: () => {}},
   })
 
   const publisher = broadcasts.factory(
@@ -181,12 +185,13 @@ test("completion page rejects duplicate, oversized, and token-smuggling fragment
   }
 })
 
-test("authorization windows are opened without an opener or referrer", () => {
+test("authorization windows retain a host-close handle while clearing the popup opener", () => {
   const calls = []
+  const popup = {opener: "must-not-be-retained"}
   const windowObject = {
     open: (...args) => {
       calls.push(args)
-      return {opener: "must-not-be-retained"}
+      return popup
     },
   }
 
@@ -196,10 +201,11 @@ test("authorization windows are opened without an opener or referrer", () => {
       url: "/oauth/authorize?client_id=client",
       requestId: "auth-1",
     }),
-    true
+    popup
   )
+  assert.equal(popup.opener, null)
   assert.equal(calls.length, 1)
   assert.equal(calls[0][1], "fediverse-miniapp-auth-auth-1")
-  assert.match(calls[0][2], /(?:^|,)noopener(?:,|$)/)
-  assert.match(calls[0][2], /(?:^|,)noreferrer(?:,|$)/)
+  assert.doesNotMatch(calls[0][2], /(?:^|,)noopener(?:,|$)/)
+  assert.doesNotMatch(calls[0][2], /(?:^|,)noreferrer(?:,|$)/)
 })
