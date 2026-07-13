@@ -11,7 +11,7 @@ defmodule EgregorosWeb.MiniAppAuthCompletionControllerTest do
     refute conn.resp_body =~ "handoff_code"
     assert get_resp_header(conn, "cache-control") == ["private, no-store, max-age=0"]
     assert get_resp_header(conn, "referrer-policy") == ["no-referrer"]
-    assert get_resp_header(conn, "cross-origin-opener-policy") == []
+    assert get_resp_header(conn, "cross-origin-opener-policy") == ["same-origin"]
     assert get_resp_header(conn, "cross-origin-resource-policy") == ["same-origin"]
 
     [policy] = get_resp_header(conn, "content-security-policy")

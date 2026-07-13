@@ -78,17 +78,14 @@ export const openMiniAppAuthWindow = ({windowObject = window, url, requestId}) =
   }
 
   try {
-    const popup = windowObject.open(
+    windowObject.open(
       url,
       `fediverse-miniapp-auth-${requestId}`,
-      "popup=yes,width=520,height=720,resizable=yes,scrollbars=yes"
+      "noopener,noreferrer,popup=yes,width=520,height=720,resizable=yes,scrollbars=yes"
     )
-    if (!popup) return null
-
-    popup.opener = null
-    return popup
+    return true
   } catch (_error) {
-    return null
+    return false
   }
 }
 
@@ -101,22 +98,18 @@ export const createMiniAppAuthRelay = ({
   let channel = null
 
   const clear = () => {
-    const popup = pending?.popup
-
     if (channel) {
       channel.onmessage = null
       channel.close?.()
       channel = null
     }
     pending = null
-    popup?.close?.()
   }
 
   const begin = next => {
     clear()
     if (
       !next ||
-      !next.popup ||
       !launchIdPattern.test(next.launchId || "") ||
       !requestIdPattern.test(next.requestId || "") ||
       !statePattern.test(next.state || "")
@@ -134,12 +127,7 @@ export const createMiniAppAuthRelay = ({
       return false
     }
 
-    pending = {
-      popup: next.popup,
-      launchId: next.launchId,
-      requestId: next.requestId,
-      state: next.state,
-    }
+    pending = {launchId: next.launchId, requestId: next.requestId, state: next.state}
     channel.onmessage = event => {
       if (!pending || !validCompletion(event?.data, pending.launchId, pending.state)) return
 

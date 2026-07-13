@@ -74,12 +74,13 @@ const MiniAppHost = {
       const button = event.target.closest?.("[data-role='mini-app-auth-open']")
       if (!button || !this.el.contains(button)) return
 
-      const popup = openMiniAppAuthWindow({
-        windowObject: window,
-        url: button.dataset.authUrl,
-        requestId: button.dataset.requestId,
-      })
-      if (!popup) {
+      if (
+        !this.authRelay.begin({
+          launchId: this.el.dataset.launchId,
+          requestId: button.dataset.requestId,
+          state: button.dataset.authState,
+        })
+      ) {
         completePopupFailure({
           type: "authResult",
           version: "1",
@@ -91,14 +92,13 @@ const MiniAppHost = {
       }
 
       if (
-        !this.authRelay.begin({
-          popup,
-          launchId: this.el.dataset.launchId,
+        !openMiniAppAuthWindow({
+          windowObject: window,
+          url: button.dataset.authUrl,
           requestId: button.dataset.requestId,
-          state: button.dataset.authState,
         })
       ) {
-        popup.close?.()
+        this.authRelay.cancel()
         completePopupFailure({
           type: "authResult",
           version: "1",

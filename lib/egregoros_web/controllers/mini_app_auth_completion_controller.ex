@@ -8,6 +8,7 @@ defmodule EgregorosWeb.MiniAppAuthCompletionController do
     |> put_resp_header("pragma", "no-cache")
     |> put_resp_header("referrer-policy", "no-referrer")
     |> put_resp_header("x-content-type-options", "nosniff")
+    |> put_resp_header("cross-origin-opener-policy", "same-origin")
     |> put_resp_header("cross-origin-resource-policy", "same-origin")
     |> put_resp_content_type("text/html")
     |> send_resp(200, document())

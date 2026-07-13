@@ -40,7 +40,6 @@ test("relays only a strict completion over a launch-secret same-origin channel",
   const broadcasts = broadcastFixture()
   const results = []
   const completed = []
-  let popupClosed = 0
   const relay = createMiniAppAuthRelay({
     broadcastChannelFactory: broadcasts.factory,
     sendResult: result => results.push(result),
@@ -51,7 +50,6 @@ test("relays only a strict completion over a launch-secret same-origin channel",
     launchId,
     requestId: "auth-1",
     state: oauthState,
-    popup: {close: () => popupClosed++},
   })
 
   const valid = {
@@ -90,7 +88,6 @@ test("relays only a strict completion over a launch-secret same-origin channel",
       status: "success",
     },
   ])
-  assert.equal(popupClosed, 1)
 
   publisher.postMessage(valid)
   assert.equal(results.length, 1)
@@ -110,7 +107,6 @@ test("accepts bounded failure callbacks without a handoff code", () => {
     launchId,
     requestId: "auth-2",
     state: oauthState,
-    popup: {close: () => {}},
   })
 
   const publisher = broadcasts.factory(
@@ -185,13 +181,12 @@ test("completion page rejects duplicate, oversized, and token-smuggling fragment
   }
 })
 
-test("authorization windows retain a host-close handle while clearing the popup opener", () => {
+test("authorization windows are opened without an opener or referrer", () => {
   const calls = []
-  const popup = {opener: "must-not-be-retained"}
   const windowObject = {
     open: (...args) => {
       calls.push(args)
-      return popup
+      return {opener: "must-not-be-retained"}
     },
   }
 
@@ -201,11 +196,10 @@ test("authorization windows retain a host-close handle while clearing the popup 
       url: "/oauth/authorize?client_id=client",
       requestId: "auth-1",
     }),
-    popup
+    true
   )
-  assert.equal(popup.opener, null)
   assert.equal(calls.length, 1)
   assert.equal(calls[0][1], "fediverse-miniapp-auth-auth-1")
-  assert.doesNotMatch(calls[0][2], /(?:^|,)noopener(?:,|$)/)
-  assert.doesNotMatch(calls[0][2], /(?:^|,)noreferrer(?:,|$)/)
+  assert.match(calls[0][2], /(?:^|,)noopener(?:,|$)/)
+  assert.match(calls[0][2], /(?:^|,)noreferrer(?:,|$)/)
 })

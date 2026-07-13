@@ -142,7 +142,6 @@ defmodule EgregorosWeb.OAuthController do
         )
 
       conn
-      |> allow_mini_app_popup(mini_app_registration)
       |> ContentSecurityPolicy.allow_form_action_redirect(redirect_uri)
       |> render(:authorize,
         form: form,
@@ -183,12 +182,6 @@ defmodule EgregorosWeb.OAuthController do
     |> append_query_params(%{"error" => "access_denied", "state" => to_string(state)})
   end
 
-  defp allow_mini_app_popup(conn, nil), do: conn
-
-  defp allow_mini_app_popup(conn, _mini_app_registration) do
-    delete_resp_header(conn, "cross-origin-opener-policy")
-  end
-
   defp do_approve(conn, user, params) do
     with %{} = app <- OAuth.get_application_by_client_id(Map.get(params, "client_id")),
          redirect_uri when is_binary(redirect_uri) and redirect_uri != "" <-
@@ -208,8 +201,6 @@ defmodule EgregorosWeb.OAuthController do
              code_challenge_method: Map.get(params, "code_challenge_method"),
              grant_ttl_seconds: authorization_lifetime_seconds
            ) do
-      mini_app_registration = MiniAppOAuthRegistrations.get_by_application_id(app.id)
-      conn = allow_mini_app_popup(conn, mini_app_registration)
       state = params |> Map.get("state", "") |> to_string()
 
       if oob_redirect_uri?(redirect_uri) do
