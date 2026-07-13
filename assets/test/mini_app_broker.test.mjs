@@ -4,6 +4,12 @@ import test from "node:test"
 import {createMiniAppBroker} from "../js/lib/mini_app_broker.mjs"
 
 const tick = () => new Promise(resolve => setImmediate(resolve))
+const launchInfo = Object.freeze({
+  version: "1",
+  launchUrl: "https://app.example/read?chapter=2",
+  linkedUrl: "https://app.example/shared?chapter=2",
+  sourceNoteId: "http://localhost:4000/notes/123",
+})
 const markReady = async (appPort, launchId) => {
   appPort.postMessage({type: "ready", version: "1", launchId})
   await tick()
@@ -90,17 +96,60 @@ test("ready is accepted once through the transferred port for the active launch"
   broker.destroy()
 })
 
+test("returns bounded public launch info locally without asking LiveView permission", async () => {
+  const fixture = iframeFixture()
+  const contextRequests = []
+  const broker = createMiniAppBroker({
+    iframe: fixture.iframe,
+    appOrigin: "https://app.example",
+    hostOrigin: "https://social.example",
+    launchId: "launch-public-info",
+    launchInfo,
+    onContextRequest: requestId => contextRequests.push(requestId),
+  })
+
+  fixture.load()
+  const appPort = fixture.posts[0].transfer[0]
+  await markReady(appPort, "launch-public-info")
+  const response = new Promise(resolve =>
+    appPort.addEventListener("message", event => resolve(event.data), {once: true})
+  )
+  appPort.postMessage({
+    type: "getLaunchInfo",
+    version: "1",
+    launchId: "launch-public-info",
+    requestId: "public-1",
+  })
+
+  assert.deepEqual(await response, {
+    type: "launchInfoResult",
+    version: "1",
+    launchId: "launch-public-info",
+    requestId: "public-1",
+    launchInfo,
+  })
+  assert.deepEqual(contextRequests, [])
+  broker.destroy()
+})
+
 test("rejects every app request sent before the launch is ready", async () => {
   const fixture = iframeFixture()
   const requests = []
   const violations = []
+  let resolveViolation
+  const violation = new Promise(resolve => {
+    resolveViolation = resolve
+  })
   const broker = createMiniAppBroker({
     iframe: fixture.iframe,
     appOrigin: "https://app.example",
     hostOrigin: "https://social.example",
     launchId: "launch-not-ready",
     onContextRequest: requestId => requests.push(requestId),
-    onProtocolViolation: reason => violations.push(reason),
+    onProtocolViolation: reason => {
+      violations.push(reason)
+      resolveViolation()
+    },
   })
 
   fixture.load()
@@ -111,7 +160,7 @@ test("rejects every app request sent before the launch is ready", async () => {
     launchId: "launch-not-ready",
     requestId: "ctx-before-ready",
   })
-  await tick()
+  await violation
 
   assert.deepEqual(requests, [])
   assert.deepEqual(violations, ["ready_required"])
@@ -183,6 +232,10 @@ test("closes a launch that exceeds message, request, outstanding, byte, or rate 
   for (const scenario of scenarios) {
     const fixture = iframeFixture()
     const violations = []
+    let resolveViolation
+    const violation = new Promise(resolve => {
+      resolveViolation = resolve
+    })
     const launchId = `launch-${scenario.name}`
     const broker = createMiniAppBroker({
       iframe: fixture.iframe,
@@ -190,13 +243,16 @@ test("closes a launch that exceeds message, request, outstanding, byte, or rate 
       hostOrigin: "https://social.example",
       launchId,
       limits: scenario.limits,
-      onProtocolViolation: reason => violations.push(reason),
+      onProtocolViolation: reason => {
+        violations.push(reason)
+        resolveViolation()
+      },
     })
 
     fixture.load()
     const appPort = fixture.posts[0].transfer[0]
     for (const message of scenario.messages(launchId)) appPort.postMessage(message)
-    await tick()
+    await violation
 
     assert.deepEqual(violations, [scenario.name], scenario.name)
     broker.destroy()
@@ -206,13 +262,20 @@ test("closes a launch that exceeds message, request, outstanding, byte, or rate 
 test("an iframe reload cannot reset or revive the active launch budget", async () => {
   const fixture = iframeFixture()
   const violations = []
+  let resolveViolation
+  const violation = new Promise(resolve => {
+    resolveViolation = resolve
+  })
   const broker = createMiniAppBroker({
     iframe: fixture.iframe,
     appOrigin: "https://app.example",
     hostOrigin: "https://social.example",
     launchId: "launch-reload-budget",
     limits: {maxMessages: 2, maxRequests: 8, maxOutstanding: 8, rateCapacity: 8},
-    onProtocolViolation: reason => violations.push(reason),
+    onProtocolViolation: reason => {
+      violations.push(reason)
+      resolveViolation()
+    },
   })
 
   fixture.load()
@@ -224,7 +287,7 @@ test("an iframe reload cannot reset or revive the active launch budget", async (
   fixture.load()
   const secondPort = fixture.posts[1].transfer[0]
   secondPort.postMessage({type: "ready", version: "1", launchId: "launch-reload-budget"})
-  await tick()
+  await violation
 
   fixture.load()
   broker.destroy()

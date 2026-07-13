@@ -9,6 +9,26 @@ defmodule Egregoros.MiniApps.LaunchContext do
   @max_content_chars 5_000
   @max_mentions 32
 
+  def public_for_card(%Card{} = card) do
+    with %Object{type: "Note"} = object <- Repo.get(Object, card.object_id),
+         true <- Objects.publicly_listed?(object),
+         true <- public_source_id?(object.ap_id),
+         true <- public_https_url?(card.launch_url, allow_fragment: true),
+         true <- public_https_url?(card.source_url, allow_fragment: true) do
+      {:ok,
+       %{
+         "version" => "1",
+         "launchUrl" => card.launch_url,
+         "linkedUrl" => card.source_url,
+         "sourceNoteId" => object.ap_id
+       }}
+    else
+      _ -> {:error, :ineligible_note}
+    end
+  end
+
+  def public_for_card(_card), do: {:error, :ineligible_note}
+
   def for_card(%Card{} = card) do
     with %Object{type: "Note"} = object <- Repo.get(Object, card.object_id),
          true <- Objects.publicly_listed?(object) do
@@ -57,4 +77,32 @@ defmodule Egregoros.MiniApps.LaunchContext do
   end
 
   defp public_mentions(_object), do: []
+
+  defp public_https_url?(value, opts) when is_binary(value) and byte_size(value) <= 2_048 do
+    allow_fragment? = Keyword.get(opts, :allow_fragment, false)
+
+    case URI.parse(value) do
+      %URI{scheme: "https", host: host, userinfo: nil, fragment: fragment}
+      when is_binary(host) and host != "" ->
+        allow_fragment? or is_nil(fragment)
+
+      _ ->
+        false
+    end
+  end
+
+  defp public_https_url?(_value, _opts), do: false
+
+  defp public_source_id?(value) when is_binary(value) and byte_size(value) <= 2_048 do
+    case URI.parse(value) do
+      %URI{scheme: scheme, host: host, userinfo: nil, fragment: nil}
+      when scheme in ["http", "https"] and is_binary(host) and host != "" ->
+        true
+
+      _ ->
+        false
+    end
+  end
+
+  defp public_source_id?(_value), do: false
 end

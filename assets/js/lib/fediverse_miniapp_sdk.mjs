@@ -41,6 +41,56 @@ const validHttpsUrl = value => {
   }
 }
 
+const validLaunchUrl = (value, {allowFragment = false} = {}) => {
+  if (typeof value !== "string" || value.length > 2048) return false
+  try {
+    const url = new URL(value)
+    return (
+      url.protocol === "https:" &&
+      !!url.hostname &&
+      !url.username &&
+      !url.password &&
+      (allowFragment || !url.hash)
+    )
+  } catch (_error) {
+    return false
+  }
+}
+
+const validSourceNoteId = value => {
+  if (typeof value !== "string" || value.length > 2048) return false
+  try {
+    const url = new URL(value)
+    return (
+      ["http:", "https:"].includes(url.protocol) &&
+      !!url.hostname &&
+      !url.username &&
+      !url.password &&
+      !url.hash
+    )
+  } catch (_error) {
+    return false
+  }
+}
+
+const validLaunchInfo = value =>
+  !!value &&
+  typeof value === "object" &&
+  !Array.isArray(value) &&
+  exactFields(value, ["version", "launchUrl", "linkedUrl", "sourceNoteId"]) &&
+  value.version === protocolVersion &&
+  validLaunchUrl(value.launchUrl, {allowFragment: true}) &&
+  validLaunchUrl(value.linkedUrl, {allowFragment: true}) &&
+  validSourceNoteId(value.sourceNoteId)
+
+const frozenLaunchInfo = value =>
+  Object.freeze({
+    version: value.version,
+    launchUrl: value.launchUrl,
+    linkedUrl: value.linkedUrl,
+    sourceNoteId: value.sourceNoteId,
+  })
+
 const frozenBootstrap = message =>
   Object.freeze({
     version: message.version,
@@ -118,6 +168,26 @@ export const createFediverseMiniAppSDK = ({
       message.version !== protocolVersion ||
       message.launchId !== bootstrapData.launchId
     ) {
+      return
+    }
+
+    if (message.type === "launchInfoResult") {
+      if (
+        !exactFields(message, [
+          "type",
+          "version",
+          "launchId",
+          "requestId",
+          "launchInfo",
+        ]) ||
+        !requestIdPattern.test(message.requestId || "") ||
+        !validLaunchInfo(message.launchInfo)
+      ) {
+        return
+      }
+      settle(message, "requestId", "launchInfoResult", result =>
+        frozenLaunchInfo(result.launchInfo)
+      )
       return
     }
 
@@ -395,6 +465,7 @@ export const createFediverseMiniAppSDK = ({
     },
     connect: () => connected,
     ready: () => send({type: "ready"}),
+    getLaunchInfo: () => request({type: "getLaunchInfo"}, "launchInfoResult"),
     getContext: () => request({type: "getContext"}, "contextResult"),
     requestAuth: auth => {
       const completionMode = auth?.completionMode || "backend_handoff"

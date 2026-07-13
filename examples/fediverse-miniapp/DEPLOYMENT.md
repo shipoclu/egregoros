@@ -4,8 +4,9 @@ This guide deploys the static reference app behind nginx at the exact origin
 `https://miniapp.example`. Substitute your real hostname and the exact
 Egregoros origins you trust everywhere they appear.
 
-The reference app works without OAuth. It can request public launch context,
-open a confirmed external URL, and use an optional host-mediated EVM wallet.
+The reference app works without OAuth. It can read the narrow public launch
+information disclosed by the card, separately request enriched public-note
+context, open a confirmed external URL, and use an optional host-mediated EVM wallet.
 The final section explains the additional boundary needed when adding an OAuth
 backend.
 
@@ -219,8 +220,11 @@ Confirm all of the following:
 
 Finally, place an exact mini-app URL in a fully public note on an allowed
 Egregoros instance. Verify that it becomes a rich card, opens only after the
-explicit **Open** action, reaches `ready()`, and shows the host-owned context
-and wallet confirmations when requested.
+explicit **Open** action, displays the public-attribution disclosure, reaches
+`ready()`, returns `getLaunchInfo()` without another prompt, and shows the
+host-owned enriched-context and wallet confirmations when requested. Confirm
+that public launch information has only the exact launch URL, exact linked URL,
+and original Note ActivityPub ID, with no viewer identity or boost attribution.
 
 ## 7. Operator policy on Egregoros
 
@@ -327,7 +331,7 @@ cookies are involved, and every OAuth state transition independently.
 
 ## 9. Browser action lifecycle
 
-SDK calls such as `getContext`, notification permission, OAuth, compose,
+SDK calls such as `getLaunchInfo`, `getContext`, notification permission, OAuth, compose,
 external navigation, and wallet requests are asynchronous message exchanges.
 They must not assign `window.location`, submit the miniapp page, or reload the
 iframe. If an action control is inside a form, use `type="button"` or prevent
@@ -357,8 +361,9 @@ opener reference, or poll the authorization window.
 - [ ] `X-Frame-Options` does not block the trusted broker.
 - [ ] Device permissions, top navigation, popups, and downloads are not added.
 - [ ] Egregoros operator allow/deny policy permits the app domain.
-- [ ] Manifest, page, SDK, context, external action, and optional wallet flows
-      are tested from a fully public note.
+- [ ] Manifest, page, SDK, public launch information, enriched context,
+      external action, and optional wallet flows are tested from a fully public
+      note.
 - [ ] Any OAuth secrets and bearer tokens remain backend-only.
 - [ ] Ordinary account linking requests `identify`, not broad `read`, and uses
       `/api/v1/mini-apps/identity` rather than `verify_credentials`.

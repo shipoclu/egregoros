@@ -59,6 +59,9 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
 
     assert has_element?(view, "[data-role='status-card']")
     assert has_element?(view, "[data-role='mini-app-card']")
+    assert has_element?(view, "[data-role='mini-app-launch-disclosure']", "public post")
+    assert has_element?(view, "[data-role='mini-app-launch-disclosure']", "app.example")
+    assert has_element?(view, "[data-role='mini-app-launch-disclosure']", "identity")
     refute has_element?(view, "#mini-app-host[data-state='open']")
 
     assert has_element?(
@@ -80,10 +83,19 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
     refute render(view) =~ ~s(src="https://app.example/book/chapter-2")
 
     assert has_element?(view, "#mini-app-host[data-app-origin='https://app.example']")
+    assert has_element?(view, "#mini-app-host[data-launch-info]")
     assert has_element?(view, "#mini-app-host[phx-hook='MiniAppHost']")
     assert has_element?(view, "#mini-app-frame-container[data-ready='false']")
 
     launch_id = :sys.get_state(view.pid).socket.assigns.mini_app_host.launch_id
+    launch_info = :sys.get_state(view.pid).socket.assigns.mini_app_host.launch_info
+
+    assert launch_info == %{
+             "version" => "1",
+             "launchUrl" => "https://app.example/book/chapter-2",
+             "linkedUrl" => "https://app.example/shared/chapter-2",
+             "sourceNoteId" => note.ap_id
+           }
 
     render_hook(view, "mini_app_ready", %{"launch_id" => "wrong"})
     assert has_element?(view, "#mini-app-frame-container[data-ready='false']")

@@ -87,6 +87,46 @@ test("pins the exact bootstrap origin and exposes immutable bootstrap data", asy
   hostPort.close()
 })
 
+test("gets immutable public launch info without using permissioned context", async () => {
+  const f = fixture()
+  const sdk = createFediverseMiniAppSDK({
+    windowObject: f.windowObject,
+    parentWindow: f.parentWindow,
+    cryptoObject: f.cryptoObject,
+    allowedHostOrigin: () => true,
+  })
+  const hostPort = f.bootstrap()
+  await sdk.connect()
+
+  const requestMessage = nextMessage(hostPort)
+  const launchInfoPromise = sdk.getLaunchInfo()
+  const request = await requestMessage
+  assert.equal(request.type, "getLaunchInfo")
+  hostPort.postMessage({
+    type: "launchInfoResult",
+    version: "1",
+    launchId,
+    requestId: request.requestId,
+    launchInfo: {
+      version: "1",
+      launchUrl: "https://app.example/read?chapter=2",
+      linkedUrl: "https://app.example/shared?chapter=2",
+      sourceNoteId: "http://localhost:4000/notes/123",
+    },
+  })
+
+  const launchInfo = await launchInfoPromise
+  assert.deepEqual(launchInfo, {
+    version: "1",
+    launchUrl: "https://app.example/read?chapter=2",
+    linkedUrl: "https://app.example/shared?chapter=2",
+    sourceNoteId: "http://localhost:4000/notes/123",
+  })
+  assert.equal(Object.isFrozen(launchInfo), true)
+  sdk.destroy()
+  hostPort.close()
+})
+
 test("notification permission reports authentication and availability failures", async () => {
   const f = fixture()
   const sdk = createFediverseMiniAppSDK({

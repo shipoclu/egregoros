@@ -4,6 +4,15 @@ This is a deliberately small, static v1 mini app. It demonstrates that useful
 apps can render and use public host actions before OAuth, while optional wallet
 access remains host mediated.
 
+The **Read public share info** action calls `getLaunchInfo()`. After the user
+opens the clearly labelled rich card, it returns the exact app launch URL, the
+exact link found in the public Note, and that original Note's ActivityPub ID.
+It does not prompt, authenticate, or identify the viewer. **Request additional
+note context** calls the separate `getContext()` method; the host obtains its
+once-per-app permission before sharing public note text, author, and mentions.
+If the card was encountered through a boost, v1 still identifies only the
+original Note and does not attribute an Announce.
+
 For a complete production walkthrough, including nginx, TLS, security headers,
 caching, validation, and an optional OAuth-backend proxy, see
 [DEPLOYMENT.md](./DEPLOYMENT.md).

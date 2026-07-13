@@ -44,6 +44,15 @@ defmodule EgregorosWeb.Components.TimelineItems.MiniAppCard do
             {@card.title}
           </h3>
 
+          <p
+            data-role="mini-app-launch-disclosure"
+            class="mt-3 max-w-xl text-xs leading-relaxed text-[color:var(--text-muted)]"
+          >
+            Opening shares this public post’s Fediverse ID and exact app link with <span class="font-mono font-bold text-[color:var(--text-secondary)]">
+              {display_origin(@card.app_origin)}
+            </span>. It does not share your identity.
+          </p>
+
           <button
             id={@id <> "-open"}
             type="button"

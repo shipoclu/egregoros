@@ -111,6 +111,62 @@ const validContextRequest = (message, launchId) =>
   message.launchId === launchId &&
   validRequestId(message.requestId)
 
+const validLaunchInfoRequest = (message, launchId) =>
+  !!message &&
+  typeof message === "object" &&
+  !Array.isArray(message) &&
+  Object.keys(message).length === 4 &&
+  Object.keys(message).every(key => ["type", "version", "launchId", "requestId"].includes(key)) &&
+  message.type === "getLaunchInfo" &&
+  message.version === protocolVersion &&
+  message.launchId === launchId &&
+  validRequestId(message.requestId)
+
+const validLaunchUrl = (value, {allowFragment = false} = {}) => {
+  if (typeof value !== "string" || value.length > 2048) return false
+  try {
+    const url = new URL(value)
+    return (
+      url.protocol === "https:" &&
+      !!url.hostname &&
+      !url.username &&
+      !url.password &&
+      (allowFragment || !url.hash)
+    )
+  } catch (_error) {
+    return false
+  }
+}
+
+const validSourceNoteId = value => {
+  if (typeof value !== "string" || value.length > 2048) return false
+  try {
+    const url = new URL(value)
+    return (
+      ["http:", "https:"].includes(url.protocol) &&
+      !!url.hostname &&
+      !url.username &&
+      !url.password &&
+      !url.hash
+    )
+  } catch (_error) {
+    return false
+  }
+}
+
+export const validMiniAppLaunchInfo = value =>
+  !!value &&
+  typeof value === "object" &&
+  !Array.isArray(value) &&
+  Object.keys(value).length === 4 &&
+  Object.keys(value).every(key =>
+    ["version", "launchUrl", "linkedUrl", "sourceNoteId"].includes(key)
+  ) &&
+  value.version === protocolVersion &&
+  validLaunchUrl(value.launchUrl, {allowFragment: true}) &&
+  validLaunchUrl(value.linkedUrl, {allowFragment: true}) &&
+  validSourceNoteId(value.sourceNoteId)
+
 const validNotificationPermissionGetRequest = (message, launchId) =>
   !!message &&
   typeof message === "object" &&
@@ -317,6 +373,7 @@ export const createMiniAppBroker = ({
   hostOrigin,
   launchId,
   capabilities = [],
+  launchInfo,
   onLoading,
   onReady,
   onContextRequest,
@@ -448,6 +505,24 @@ export const createMiniAppBroker = ({
       }
 
       if (validReadyMessage(message, launchId)) return
+
+      if (
+        validLaunchInfoRequest(message, launchId) &&
+        acceptOnce(`launch-info:${message.requestId}`, {trackOutstanding: false})
+      ) {
+        if (!validMiniAppLaunchInfo(launchInfo)) {
+          violate("launch_info")
+          return
+        }
+        hostPort.postMessage({
+          type: "launchInfoResult",
+          version: protocolVersion,
+          launchId,
+          requestId: message.requestId,
+          launchInfo,
+        })
+        return
+      }
 
       if (
         validContextRequest(message, launchId) &&

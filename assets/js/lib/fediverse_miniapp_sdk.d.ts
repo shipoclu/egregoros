@@ -29,6 +29,13 @@ export interface MiniAppLaunchContext {
   readonly note: MiniAppLaunchNote
 }
 
+export interface MiniAppLaunchInfo {
+  readonly version: MiniAppProtocolVersion
+  readonly launchUrl: string
+  readonly linkedUrl: string
+  readonly sourceNoteId: string
+}
+
 export interface MiniAppAuthorizationRequestBase {
   readonly clientId: string
   readonly redirectUri: string
@@ -168,6 +175,7 @@ export interface FediverseMiniAppSDK {
   }
   connect(): Promise<MiniAppBootstrap>
   ready(): Promise<void>
+  getLaunchInfo(): Promise<MiniAppLaunchInfo>
   getContext(): Promise<MiniAppLaunchContext>
   requestAuth(request: MiniAppBackendAuthorizationRequest): Promise<MiniAppBackendAuthorizationResult>
   requestAuth(request: MiniAppBrowserAuthorizationRequest): Promise<MiniAppBrowserAuthorizationResult>

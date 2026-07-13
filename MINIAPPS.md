@@ -142,7 +142,11 @@ third-party CDN asset origins are not accepted in v1.
 When a user puts a URL whose domain publishes a valid mini-app manifest in a
 **fully public** note, Egregoros resolves it asynchronously and renders a rich
 mini-app card in the note. The card uses the app's verified preview image/name
-and has an explicit **Open** control. Selecting it launches the declared URL.
+and has an explicit **Open** control. The card states that opening it shares the
+public Note's canonical ActivityPub ID and the exact linked mini-app URL with
+the displayed app origin, but does not share the viewer's identity. Selecting
+it launches the declared URL and makes that narrow public launch information
+available to the app without another prompt or OAuth.
 Links in followers-only, direct, private, or otherwise non-public notes remain
 ordinary links in v1 and do not provide mini-app launch context. URLs outside
 the app's verified origin must open externally or require an explicit new
@@ -220,6 +224,13 @@ direct child), render overlays after it, and use CSS ordering for visual layout.
 Requesting context or any other SDK operation is a message exchange, never a
 frame navigation or launch restart.
 
+Opening a card for a Note that was displayed because another actor announced
+or boosted it still attributes the original Note. Announce discovery and
+attribution are not part of v1: the host neither claims which viewer announced
+the Note nor supplies an Announce ID. An app may independently fetch the public
+`sourceNoteId` and apply whatever reward or abuse policy fits its own threat
+model.
+
 Cards never launch an app merely from an image/title click: the user must select
 the explicit **Open** button. There is no v1 app directory, saved-app surface,
 or other launcher. Direct, explicit app URLs remain valid entry points, while
@@ -270,8 +281,9 @@ URL.
 Authentication is optional and app-initiated. A newly launched iframe may call
 `ready`, receive the non-user `bootstrap` object, use `openExternal` after a
 user gesture, discover host capabilities, and use any separately authorized
-non-OAuth capability such as the EVM wallet. It may also request disclosed
-public-note launch context before OAuth. It must request OAuth before
+non-OAuth capability such as the EVM wallet. It can read the narrow public
+launch information and may request separately disclosed enriched public-note
+context before OAuth. It must request OAuth before
 `composeNote` or any future capability explicitly marked auth-gated. This lets
 read-only public mini apps work without a consent prompt, while ensuring that
 actions affecting the user's Egregoros account remain authenticated.
@@ -519,14 +531,16 @@ complete a separate, plain-language second confirmation explaining that the app
 can perform write actions through the Egregoros API. Neither confirmation lets
 the app silently publish through the host compose action.
 
-The once-per-app disclosure that public-note launch context is sent to the
-app's domain is independent of OAuth. It appears before the app first receives
-that context, including for apps that never declare OAuth; when both disclosures
-are needed in the same launch, the host may present them together.
+The once-per-app disclosure for enriched public-note context is independent of
+OAuth. It appears before the app first receives note text, author, mentions, or
+other enriched context, including for apps that never declare OAuth. The narrow
+public launch information described on the rich card is available on open
+without this prompt. When OAuth and enriched-context disclosures are needed in
+the same launch, the host may present them together.
 
 Egregoros settings provide a per-app revoke/disconnect control. Revocation
 invalidates the app's access and refresh tokens plus its reusable grant, clears
-the once-per-app launch-context approval, and closes any active iframe for that
+the once-per-app enriched-context approval, and closes any active iframe for that
 app. A future launch starts the approval process again.
 
 Instance operators can configure mini-app domain allow/deny patterns. Policy is
@@ -715,9 +729,12 @@ Publish a small versioned JavaScript SDK. Its transport uses a nonce-bound,
 origin-checked `postMessage` handshake. Initial candidate methods:
 
 - `ready()` — app declares that its first render is usable;
-- `getContext()` — non-authoritative launch context, app/client protocol
-  versions, locale/theme, the exact launch URL, and (when launched from a
-  note) the author, note identifier, content, mentions, and link URL; and
+- `getLaunchInfo()` — immediately available, non-authoritative public
+  attribution containing only protocol version, exact launch URL, exact linked
+  URL, and the original public Note's canonical ActivityPub ID;
+- `getContext()` — separately permissioned enriched public-note context,
+  containing the exact launch/link URLs and (when launched from a note) its
+  identifier, text, author, and public mentions; and
 - `requestAuth(authorization)`, `close()`, and
   `openExternal(url)` — host-mediated actions; and
 - `notifications.getPermission()` and
@@ -762,6 +779,9 @@ const sdk = createFediverseMiniAppSDK({
 
 const bootstrap = await sdk.connect()
 await sdk.ready()
+const launchInfo = await sdk.getLaunchInfo()
+
+// This separately asks the host for the user's once-per-app approval.
 const context = await sdk.getContext()
 
 button.addEventListener("click", async () => {
@@ -794,7 +814,7 @@ pending calls.
 
 | Access class | V1 methods | Prerequisite |
 | --- | --- | --- |
-| Public base | `ready`, `bootstrap`, `getContext`, `close`, `openExternal` | Valid framed app; `getContext` needs context disclosure before note details are sent; `openExternal` needs user gesture. |
+| Public base | `ready`, `bootstrap`, `getLaunchInfo`, `getContext`, `close`, `openExternal` | Valid framed app; `getLaunchInfo` needs no OAuth or prompt, `getContext` needs enriched-context disclosure, and `openExternal` needs user gesture. |
 | OAuth initiation | `requestAuth` | Optional `oauth` manifest object and a public dynamic registration obtained by the backend or browser. |
 | Wallet | `wallet.evm.getProvider` and its allowlisted EIP-1193 calls | Immutable wallet declaration, host wallet availability, and per-app wallet connection/confirmation. No OAuth required. |
 | Transactional notifications | `notifications.getPermission`, `notifications.requestPermission` | Immutable ActivityPub declaration and OAuth; prompting additionally requires a user gesture and host confirmation. |
@@ -844,17 +864,19 @@ submission produce no event in v1.
 
 The app must validate the host origin and handshake nonce; Egregoros must
 validate the iframe origin against the installed manifest before accepting every
-message. Context contains no access token or current-user identity. It is
-available without OAuth after the separately consented launch-context
-permission; note data is not implied by an OAuth API scope.
+message. Neither public launch information nor enriched context contains an
+access token or current-user identity. Public launch information is available
+without OAuth or a second prompt after the disclosed **Open** action. Enriched
+context is available without OAuth only after the separate once-per-app
+permission; neither kind of note data is implied by an OAuth API scope.
 
 The handshake always exposes a `bootstrap` object with the exact Egregoros host
 origin, SDK protocol version, and authorization-server issuer/metadata URL,
 letting an OAuth-enabled app backend reuse or create its dynamic registration
 and form a PKCE request. Bootstrap contains no
-current-user identity. Apps may obtain locale/theme and public launch context
-through `getContext()` after the separate context disclosure, whether or not
-they authenticate with OAuth.
+current-user identity. Apps obtain the narrow public attribution through
+`getLaunchInfo()` and may obtain enriched note context through `getContext()`
+after the separate disclosure, whether or not they authenticate with OAuth.
 
 Launch context is useful but is untrusted input—it can be malformed, stale, or
 controlled by the note author. More importantly, opening an app shares it with
@@ -1060,7 +1082,7 @@ use the standard `-32002` request-already-pending error. The response must
 preserve the original prompt, launch ID, message channel, iframe identity, and
 per-launch budgets.
 
-`ready`, `getContext`, wallet, compose, and OAuth messages all pass through the
+`ready`, `getLaunchInfo`, `getContext`, wallet, compose, and OAuth messages all pass through the
 same broker. The host MUST re-check the current manifest identity,
 capabilities, user state, disclosure state, OAuth state, and domain policy at
 the moment of each privileged operation; handshake success is not a durable
@@ -1068,13 +1090,24 @@ authorization grant.
 
 ### Data-release boundary
 
-Before the once-per-app launch-context disclosure, `getContext` returns no note
-details. After disclosure it returns only the documented fields from a fully
-public note, normalized into a bounded DTO. It MUST NOT serialize database
-structs, internal metadata, recipient lists beyond public fields, moderation
-state, viewer identity, IP address, session IDs, or inferred relationships.
-OAuth is the only path to Egregoros user identity/API data. Wallet account
-addresses are exposed only by the separately approved wallet provider.
+After the app has sent valid `ready`, `getLaunchInfo` is answered entirely
+inside the origin-pinned broker channel and never opens a host prompt. The
+immutable, exactly shaped, bounded DTO contains only `version`, `launchUrl`,
+`linkedUrl`, and `sourceNoteId`. The launch and linked URLs MUST be bounded
+HTTPS URLs. `sourceNoteId` MUST be a bounded absolute HTTP(S) canonical ID of
+the fully public original Note and MUST NOT contain credentials or a fragment.
+The response contains no viewer, author, content,
+mention, OAuth, wallet, session, or Announce data. It is not placed in the app
+URL or query string.
+
+Before the once-per-app enriched-context disclosure, `getContext` returns no
+enriched note details. After disclosure it returns only the documented fields
+from a fully public note, normalized into a bounded DTO. It MUST NOT serialize
+database structs, internal metadata, recipient lists beyond public fields,
+moderation state, viewer identity, IP address, session IDs, or inferred
+relationships. OAuth is the only path to Egregoros user identity/API data.
+Wallet account addresses are exposed only by the separately approved wallet
+provider.
 
 Closing an iframe clears ephemeral channel state. Revoking context permission,
 OAuth, wallet permission, or operator policy takes effect immediately and
@@ -1242,24 +1275,26 @@ side effects, not merely that an error was rendered.
 - [OWASP SSRF Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html)
 - [EIP-1193 Ethereum Provider API](https://eips.ethereum.org/EIPS/eip-1193)
 
-## Launch-context disclosure
+## Public launch information and enriched-context disclosure
 
 OAuth consent answers: “May this app access Egregoros APIs with these scopes?”
-Launch-context disclosure answers a different question: “May Egregoros send
-this public note's launch details directly to this external app?” An app can
-use launch context without ever asking for OAuth, so the OAuth screen alone is
-not a reliable disclosure point.
+The mini-app card separately tells the user: “Opening shares this public post's
+Fediverse ID and exact app link with this app domain; it does not share your
+identity.” That explicit launch action releases the narrow `getLaunchInfo()`
+DTO without a second dialog. An app can use this data without ever asking for
+OAuth.
 
-For a link opened from a public note, the context may include the exact linked
-URL, the note's canonical URL/ID and public text, its author and public
-mentions, plus the client theme/locale. It is untrusted application input, but
-it is still data Egregoros is intentionally sending to the app's domain.
+The separate enriched-context disclosure asks whether the app may additionally
+receive the public Note's text, author, and public mentions through
+`getContext()`. Both DTOs are untrusted application input. The public ID and
+link let an app independently fetch a Note and decide whether it qualifies for
+a share reward, but the protocol makes no anti-abuse or reward-validity claim.
 
-The choices are:
+The enriched-context consent choices are:
 
 | Timing | User experience | Privacy trade-off |
 | --- | --- | --- |
-| Once per app | The first contextual launch says that this domain will receive public-note launch details; later launches proceed without repeating it. | Clear, low friction; recommended baseline. |
+| Once per app | The first `getContext()` request says that this domain will receive public-note text, author, and mentions; later requests proceed without repeating it. | Clear, low friction; selected baseline. |
 | Once per note | The user sees the same disclosure each time a different note launches the app. | Maximum reminder, but repetitive for normal use. |
 | Only in OAuth consent | No separate message; data sharing is mentioned only if/when the app asks for OAuth. | Inadequate for apps that never request OAuth; not recommended. |
 
@@ -1286,7 +1321,8 @@ The choices are:
 | Platforms | Desktop and mobile/PWA | Desktop floating panel; mobile full-screen sheet. |
 | App installation | Not in v1 | No saved/pinned-app launcher or app notifications. |
 | Registration | Anonymous dynamic registration | One public registration per mini-app manifest and Egregoros issuer, cached by the app backend or browser. |
-| Launch context | Available through SDK after once-per-app disclosure | It is untrusted; the user approves sending public-note details to the app domain. |
+| Public launch information | `getLaunchInfo()` after explicit card open, without a second prompt | Exact launch URL, linked URL, and original public Note ID only; no viewer identity or Announce attribution. |
+| Enriched context | `getContext()` after once-per-app disclosure | Untrusted public-note text, author, and mentions are shared with the app domain. |
 | Context source visibility | Fully public notes only | Non-public notes retain ordinary links in v1. |
 | OAuth callback origin | Exact manifest origin | Prevents callback widening to sibling/subdomains. |
 | Card model | Required domain manifest + optional page metadata | Exact-page cards when available; generic app card otherwise. |
@@ -1307,7 +1343,7 @@ The choices are:
 | Federated cards | Supported for public incoming notes | Resolution failure leaves the source link intact. |
 | Card assets | Proxied, not persistently cached | Protects viewer IP privacy without retaining remote assets. |
 | Metadata refresh | One-hour default; shorter explicit TTL honored | User can manually refresh app details. |
-| Pre-auth SDK data | Bootstrap issuer/origin only | Enables dynamic registration without exposing user or note context. |
+| Pre-auth SDK data | Bootstrap plus public `getLaunchInfo()` attribution | Enables dynamic registration and organic-share discovery without exposing viewer identity; enriched context remains permissioned. |
 | Authentication trigger | App calls `requestAuth` | No automatic prompt merely from card display or launch. |
 | Authentication requirement | On demand | OAuth is required for compose/auth-gated capabilities, not for public/read-only apps. |
 | OAuth callback completion | Opener-free popup redirects to a host-owned fragment relay and launch-secret `BroadcastChannel` | Backend mode relays a verifier-bound app handoff; browser mode relays only the exact PKCE-bound authorization code. Bearer tokens never traverse the relay. |

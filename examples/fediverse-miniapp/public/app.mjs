@@ -28,6 +28,14 @@ document.querySelector("#context").addEventListener("click", async () => {
   }
 })
 
+document.querySelector("#launch-info").addEventListener("click", async () => {
+  try {
+    show({launchInfo: await sdk.getLaunchInfo()})
+  } catch (error) {
+    showError(error)
+  }
+})
+
 document.querySelector("#chain").addEventListener("click", async () => {
   try {
     const provider = sdk.wallet.getProvider()

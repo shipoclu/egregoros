@@ -136,6 +136,7 @@ defmodule EgregorosWeb.MiniAppHost do
       data-expanded={to_string(@state.expanded?)}
       data-app-origin={card_value(@state, :app_origin)}
       data-launch-id={@state.launch_id}
+      data-launch-info={launch_info_json(@state)}
       data-frame-title={if(@state.card, do: @state.card.app_name <> " mini app")}
       data-frame-src={broker_path(@state)}
       data-wallet-enabled={to_string(wallet_value(@state, :wallet_evm_enabled, false))}
@@ -238,11 +239,11 @@ defmodule EgregorosWeb.MiniAppHost do
                   id="mini-app-context-consent-title"
                   class="font-bold text-[color:var(--text-primary)]"
                 >
-                  Share public note context?
+                  Share additional public note context?
                 </h2>
                 <p class="mt-2 text-sm leading-relaxed text-[color:var(--text-secondary)]">
                   <span class="font-mono font-bold">{display_origin(@state.card.app_origin)}</span>
-                  will receive this public note’s URL, text, author, mentions, and the exact app link.
+                  already received this public note’s Fediverse ID and exact app link when you opened it. If you approve, it will additionally receive the note’s text, author, and mentions.
                 </p>
                 <p class="mt-2 text-xs text-[color:var(--text-muted)]">
                   This approval applies to future launches of this app. It does not share your Egregoros identity.
@@ -732,32 +733,32 @@ defmodule EgregorosWeb.MiniAppHost do
          %{"card_id" => card_id, "resolution_token" => resolution_token},
          socket
        ) do
-    case Cards.get_active_by_id(card_id, resolution_token) do
-      %Card{} = card ->
-        wallet_declaration = Declarations.get_by_origin(card.app_origin)
+    with %Card{} = card <- Cards.get_active_by_id(card_id, resolution_token),
+         {:ok, launch_info} <- LaunchContext.public_for_card(card) do
+      wallet_declaration = Declarations.get_by_origin(card.app_origin)
 
-        {:halt,
-         Phoenix.Component.assign(socket, :mini_app_host, %{
-           status: :open,
-           expanded?: false,
-           card: card,
-           launch_id: launch_id(),
-           ready?: false,
-           load_error?: false,
-           context_request: nil,
-           notification_request: nil,
-           auth_request: nil,
-           oauth_authenticated?: false,
-           compose_request: nil,
-           external_request: nil,
-           wallet_declaration: wallet_declaration,
-           wallet_request: nil,
-           wallet_incompatible?: false,
-           broker_budget: new_broker_budget()
-         })}
-
-      _ ->
-        {:halt, socket}
+      {:halt,
+       Phoenix.Component.assign(socket, :mini_app_host, %{
+         status: :open,
+         expanded?: false,
+         card: card,
+         launch_info: launch_info,
+         launch_id: launch_id(),
+         ready?: false,
+         load_error?: false,
+         context_request: nil,
+         notification_request: nil,
+         auth_request: nil,
+         oauth_authenticated?: false,
+         compose_request: nil,
+         external_request: nil,
+         wallet_declaration: wallet_declaration,
+         wallet_request: nil,
+         wallet_incompatible?: false,
+         broker_budget: new_broker_budget()
+       })}
+    else
+      _ -> {:halt, socket}
     end
   end
 
@@ -1523,6 +1524,7 @@ defmodule EgregorosWeb.MiniAppHost do
       status: :closed,
       expanded?: false,
       card: nil,
+      launch_info: nil,
       launch_id: nil,
       ready?: false,
       load_error?: false,
@@ -1548,6 +1550,9 @@ defmodule EgregorosWeb.MiniAppHost do
       rate_updated_at: System.monotonic_time(:millisecond)
     }
   end
+
+  defp launch_info_json(%{launch_info: %{} = launch_info}), do: Jason.encode!(launch_info)
+  defp launch_info_json(_state), do: nil
 
   defp consume_broker_budget(budget, event, params) when is_map(budget) do
     with {:ok, encoded} <- Jason.encode(params),

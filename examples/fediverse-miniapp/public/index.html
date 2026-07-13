@@ -25,9 +25,14 @@
     <main>
       <section>
         <h1>Fediverse Mini App Reference</h1>
-        <p>This page works before authentication. Host context and wallet access happen only when requested.</p>
+        <p>
+          This page works before authentication. Public share attribution is available
+          without another prompt; note text, author, and mentions require separate consent.
+          Wallet access happens only when requested.
+        </p>
         <div class="actions">
-          <button id="context" type="button">Request launch context</button>
+          <button id="launch-info" type="button">Read public share info</button>
+          <button id="context" type="button" class="secondary">Request additional note context</button>
           <button id="chain" type="button" class="secondary">Read wallet chain</button>
           <button id="connect" type="button" class="secondary">Connect wallet</button>
           <button id="external" type="button" class="secondary">Open ActivityPub spec</button>

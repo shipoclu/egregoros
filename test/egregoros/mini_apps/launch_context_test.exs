@@ -43,12 +43,31 @@ defmodule Egregoros.MiniApps.LaunchContextTest do
     refute inspect(context) =~ "current_user"
   end
 
+  test "returns automatic public launch info without enriched note fields" do
+    card = card_fixture()
+
+    assert {:ok, launch_info} = LaunchContext.public_for_card(card)
+
+    assert launch_info == %{
+             "version" => "1",
+             "launchUrl" => "https://app.example/read?chapter=2",
+             "linkedUrl" => "https://app.example/shared?chapter=2",
+             "sourceNoteId" => "https://social.example/notes/context"
+           }
+
+    refute Map.has_key?(launch_info, "note")
+    refute inspect(launch_info) =~ "Hello"
+    refute inspect(launch_info) =~ "alice"
+    refute inspect(launch_info) =~ "bob"
+  end
+
   test "fails closed if the source note is no longer fully public" do
     card = card_fixture()
     object = Objects.get_by_ap_id("https://social.example/notes/context")
     assert {:ok, _object} = Objects.update_object(object, %{data: Map.put(object.data, "to", [])})
 
     assert {:error, :ineligible_note} = LaunchContext.for_card(card)
+    assert {:error, :ineligible_note} = LaunchContext.public_for_card(card)
   end
 
   test "uses empty bounded fields when optional public content is malformed" do

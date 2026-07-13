@@ -1,4 +1,7 @@
-import {createMiniAppBroker} from "../lib/mini_app_broker.mjs"
+import {
+  createMiniAppBroker,
+  validMiniAppLaunchInfo,
+} from "../lib/mini_app_broker.mjs"
 import {
   createMiniAppAuthRelay,
   openMiniAppAuthWindow,
@@ -12,6 +15,15 @@ import {
   executeWalletRequest,
   normalizeWalletExecution,
 } from "../wallet/wallet_execution_guard.mjs"
+
+const parseLaunchInfo = value => {
+  try {
+    const launchInfo = JSON.parse(value || "null")
+    return validMiniAppLaunchInfo(launchInfo) ? launchInfo : null
+  } catch (_error) {
+    return null
+  }
+}
 
 const MiniAppHost = {
   mounted() {
@@ -354,6 +366,8 @@ const MiniAppHost = {
     const launchId = this.el.dataset.launchId || ""
     const frameSrc = this.el.dataset.frameSrc || ""
     const frameTitle = this.el.dataset.frameTitle || ""
+    const serializedLaunchInfo = this.el.dataset.launchInfo || ""
+    const launchInfo = parseLaunchInfo(serializedLaunchInfo)
     const walletEnabled = this.el.dataset.walletEnabled === "true"
     const capabilities = []
     if (this.el.dataset.notificationsEnabled === "true") {
@@ -362,9 +376,16 @@ const MiniAppHost = {
     if (walletEnabled && this.walletAdapter.available() && this.walletCompatible !== false) {
       capabilities.push("wallet.evm")
     }
-    const brokerKey = [appOrigin, launchId, frameSrc, frameTitle, ...capabilities].join("\n")
+    const brokerKey = [
+      appOrigin,
+      launchId,
+      frameSrc,
+      frameTitle,
+      serializedLaunchInfo,
+      ...capabilities,
+    ].join("\n")
 
-    if (!shell || !appOrigin || !launchId) {
+    if (!shell || !appOrigin || !launchId || !launchInfo) {
       this.destroyBroker()
       this.authRelay.cancel()
       shell?.replaceChildren()
@@ -391,6 +412,7 @@ const MiniAppHost = {
         hostOrigin: window.location.origin,
         launchId,
         capabilities,
+        launchInfo,
         onLoading: () => {
           this.authRelay.cancel()
           this.readiness.loading(launchId)

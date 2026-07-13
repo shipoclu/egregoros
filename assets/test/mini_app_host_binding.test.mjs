@@ -50,6 +50,12 @@ const hookContext = ({documentObject, frameSrc}) => {
     launchId,
     frameSrc,
     frameTitle: "Reader mini app",
+    launchInfo: JSON.stringify({
+      version: "1",
+      launchUrl: "https://app.example/read",
+      linkedUrl: "https://app.example/shared",
+      sourceNoteId: "https://social.example/notes/123",
+    }),
     walletEnabled: "false",
     notificationsEnabled: "false",
   }

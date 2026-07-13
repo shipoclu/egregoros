@@ -9,6 +9,8 @@ import {
 const sdk = createFediverseMiniAppSDK({allowedHostOrigin: origin => origin === "https://social.example"})
 const bootstrap = await sdk.connect()
 const issuer: string = bootstrap.issuer
+const launchInfo = await sdk.getLaunchInfo()
+const sharedFrom: string = launchInfo.sourceNoteId
 const context = await sdk.getContext()
 const noteId: string = context.note.id
 const provider = sdk.wallet.getProvider()
@@ -50,6 +52,7 @@ sdk.on("composeNotePublished", (receipt: MiniAppComposePublishedReceipt) => {
 })
 
 void issuer
+void sharedFrom
 void noteId
 void chainId
 void signature
