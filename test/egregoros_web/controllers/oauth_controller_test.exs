@@ -189,6 +189,7 @@ defmodule EgregorosWeb.OAuthControllerTest do
     assert html =~ "Husky"
     assert html =~ ~s(data-role="app-shell")
     assert html =~ ~s(data-role="nav-settings")
+    assert get_resp_header(conn, "cross-origin-opener-policy") == ["same-origin"]
   end
 
   test "POST /oauth/authorize approves and redirects with code", %{conn: conn} do
@@ -221,6 +222,7 @@ defmodule EgregorosWeb.OAuthControllerTest do
     location = redirected_to(conn)
     assert String.starts_with?(location, "https://client.example/cb")
     assert location =~ "code="
+    assert get_resp_header(conn, "cross-origin-opener-policy") == ["same-origin"]
   end
 
   test "mini-app consent identifies the origin and requires separate write confirmation", %{
@@ -289,7 +291,7 @@ defmodule EgregorosWeb.OAuthControllerTest do
     assert get_resp_header(consent_conn, "cache-control") == ["no-store"]
     assert get_resp_header(consent_conn, "pragma") == ["no-cache"]
     assert get_resp_header(consent_conn, "referrer-policy") == ["no-referrer"]
-    assert get_resp_header(consent_conn, "cross-origin-opener-policy") == ["same-origin"]
+    assert get_resp_header(consent_conn, "cross-origin-opener-policy") == []
 
     assert [csp] = get_resp_header(consent_conn, "content-security-policy")
     assert csp =~ "form-action 'self' https://app.example"
@@ -380,6 +382,7 @@ defmodule EgregorosWeb.OAuthControllerTest do
 
     approved_url = redirected_to(approved_conn)
     assert approved_url =~ "https://app.example/oauth/callback"
+    assert get_resp_header(approved_conn, "cross-origin-opener-policy") == []
 
     code =
       approved_url
