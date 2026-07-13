@@ -22,12 +22,14 @@ defmodule Egregoros.Objects do
     # stays in data and auxiliary types live in internal state.
     attrs = TypeNormalizer.apply_type_metadata(attrs)
 
-    %Object{}
-    |> Object.changeset(attrs)
+    changeset = Object.changeset(%Object{}, attrs)
+
     # A constraint conflict aborts an enclosing PostgreSQL transaction unless
     # the insert is isolated in a savepoint. Federation replay intentionally
-    # handles that conflict by loading the existing object below.
-    |> Repo.insert(mode: :savepoint)
+    # handles that conflict by loading the existing object below. A savepoint
+    # cannot be opened outside a transaction, though, which is how local posts
+    # are created from LiveViews.
+    insert_object(changeset)
     |> case do
       {:ok, %Object{} = object} ->
         _ = maybe_bump_actor_last_activity(object)
@@ -35,6 +37,14 @@ defmodule Egregoros.Objects do
 
       other ->
         other
+    end
+  end
+
+  defp insert_object(changeset) do
+    if Repo.in_transaction?() do
+      Repo.insert(changeset, mode: :savepoint)
+    else
+      Repo.insert(changeset)
     end
   end
 

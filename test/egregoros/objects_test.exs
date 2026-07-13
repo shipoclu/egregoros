@@ -4,6 +4,7 @@ defmodule Egregoros.ObjectsTest do
   alias Egregoros.Object
   alias Egregoros.Objects
   alias Egregoros.Pipeline
+  alias Egregoros.Repo
   alias Egregoros.Relationships
   alias Egregoros.Users
 
@@ -31,6 +32,16 @@ defmodule Egregoros.ObjectsTest do
     assert {:ok, %Object{} = object} = Objects.create_object(@note_attrs)
     assert object.ap_id == @note_attrs.ap_id
     assert object.data["content"] == "Hello from Redux"
+  end
+
+  test "create_object works outside an enclosing transaction" do
+    attrs = Map.put(@note_attrs, :ap_id, "https://example.com/objects/non-transactional")
+
+    Ecto.Adapters.SQL.Sandbox.unboxed_run(Repo, fn ->
+      assert {:ok, %Object{} = object} = Objects.create_object(attrs)
+      assert object.ap_id == attrs.ap_id
+      assert {:ok, _object} = Repo.delete(object)
+    end)
   end
 
   test "get_by_ap_id returns stored object" do
