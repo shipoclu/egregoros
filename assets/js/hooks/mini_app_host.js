@@ -38,12 +38,19 @@ const MiniAppHost = {
             launch_id: result.launchId,
             request_id: result.requestId,
             status: result.status,
+            ...(result.authorizationCode
+              ? {authorization_code: result.authorizationCode}
+              : {}),
           },
           reply => {
             if (!reply?.accepted) return
 
             if (result.status === "success" && !reply.authenticated) {
-              const {handoffCode: _handoffCode, ...failed} = result
+              const {
+                handoffCode: _handoffCode,
+                authorizationCode: _authorizationCode,
+                ...failed
+              } = result
               this.broker?.send({...failed, status: "error"})
             } else {
               this.broker?.send(result)
@@ -79,6 +86,7 @@ const MiniAppHost = {
           launchId: this.el.dataset.launchId,
           requestId: button.dataset.requestId,
           state: button.dataset.authState,
+          completionMode: button.dataset.authCompletionMode,
         })
       ) {
         completePopupFailure({
@@ -414,6 +422,7 @@ const MiniAppHost = {
             code_challenge: request.codeChallenge,
             code_challenge_method: request.codeChallengeMethod,
             handoff_challenge: request.handoffChallenge,
+            completion_mode: request.completionMode,
             authorization_lifetime_seconds: request.authorizationLifetimeSeconds,
           }),
         onComposeRequest: request =>

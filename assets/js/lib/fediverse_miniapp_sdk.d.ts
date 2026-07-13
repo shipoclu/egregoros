@@ -29,20 +29,42 @@ export interface MiniAppLaunchContext {
   readonly note: MiniAppLaunchNote
 }
 
-export interface MiniAppAuthorizationRequest {
+export interface MiniAppAuthorizationRequestBase {
   readonly clientId: string
   readonly redirectUri: string
   readonly scopes: readonly string[]
   readonly state: string
   readonly codeChallenge: string
-  readonly handoffChallenge: string
   readonly authorizationLifetimeSeconds?: number
 }
 
-export interface MiniAppAuthorizationResult {
+export interface MiniAppBackendAuthorizationRequest extends MiniAppAuthorizationRequestBase {
+  readonly completionMode?: "backend_handoff"
+  readonly handoffChallenge: string
+}
+
+export interface MiniAppBrowserAuthorizationRequest extends MiniAppAuthorizationRequestBase {
+  readonly completionMode: "browser_code"
+  readonly handoffChallenge?: never
+}
+
+export type MiniAppAuthorizationRequest =
+  | MiniAppBackendAuthorizationRequest
+  | MiniAppBrowserAuthorizationRequest
+
+export interface MiniAppBackendAuthorizationResult {
   readonly status: "success"
   readonly handoffCode: string
 }
+
+export interface MiniAppBrowserAuthorizationResult {
+  readonly status: "success"
+  readonly authorizationCode: string
+}
+
+export type MiniAppAuthorizationResult =
+  | MiniAppBackendAuthorizationResult
+  | MiniAppBrowserAuthorizationResult
 
 export interface MiniAppComposeDraft {
   readonly text?: string
@@ -147,7 +169,8 @@ export interface FediverseMiniAppSDK {
   connect(): Promise<MiniAppBootstrap>
   ready(): Promise<void>
   getContext(): Promise<MiniAppLaunchContext>
-  requestAuth(request: MiniAppAuthorizationRequest): Promise<MiniAppAuthorizationResult>
+  requestAuth(request: MiniAppBackendAuthorizationRequest): Promise<MiniAppBackendAuthorizationResult>
+  requestAuth(request: MiniAppBrowserAuthorizationRequest): Promise<MiniAppBrowserAuthorizationResult>
   composeNote(draft: MiniAppComposeDraft): Promise<MiniAppComposeResult>
   close(): Promise<void>
   openExternal(url: string): Promise<{readonly status: "approved" | "denied"}>

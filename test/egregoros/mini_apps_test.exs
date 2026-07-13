@@ -1,5 +1,5 @@
 defmodule Egregoros.MiniAppsTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   import ExUnit.CaptureLog
   import Mox
@@ -208,12 +208,19 @@ defmodule Egregoros.MiniAppsTest do
           ~s(<a href="https://app.example/read">reader</a>)
       )
 
+    previous_logger_level = :logger.get_primary_config()[:level]
+    Logger.configure(level: :debug)
+
     log =
-      capture_log([level: :debug], fn ->
-        Egregoros.Config.with_impl(Egregoros.Config.Mock, fn ->
-          assert {:ok, _resolved} = MiniApps.resolve_note(note)
+      try do
+        capture_log([level: :debug], fn ->
+          Egregoros.Config.with_impl(Egregoros.Config.Mock, fn ->
+            assert {:ok, _resolved} = MiniApps.resolve_note(note)
+          end)
         end)
-      end)
+      after
+        Logger.configure(level: previous_logger_level)
+      end
 
     assert log =~ "miniapp lookup started candidate_count=2"
 

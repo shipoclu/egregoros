@@ -27,12 +27,18 @@ defmodule Egregoros.MiniApps.AuthRequest do
            ),
          {:ok, state} <- state(Map.get(params, "state")),
          {:ok, code_challenge} <- pkce(params),
-         :ok <- handoff_challenge(Map.get(params, "handoff_challenge")) do
+         {:ok, completion_mode} <- completion_mode(Map.get(params, "completion_mode")),
+         :ok <- handoff_challenge(Map.get(params, "handoff_challenge"), completion_mode) do
       {:ok,
        %{
          request_id: request_id,
          relay_state: state,
          callback_origin: app_origin,
+         application_id: application_id,
+         redirect_uri: redirect_uri,
+         scopes: scopes,
+         code_challenge: code_challenge,
+         completion_mode: completion_mode,
          authorization_url:
            authorization_url(
              client_id,
@@ -102,13 +108,19 @@ defmodule Egregoros.MiniApps.AuthRequest do
     end
   end
 
-  defp handoff_challenge(value) when is_binary(value) do
+  defp completion_mode(nil), do: {:ok, "backend_handoff"}
+  defp completion_mode("backend_handoff"), do: {:ok, "backend_handoff"}
+  defp completion_mode("browser_code"), do: {:ok, "browser_code"}
+  defp completion_mode(_value), do: {:error, :invalid_completion_mode}
+
+  defp handoff_challenge(value, "backend_handoff") when is_binary(value) do
     if String.match?(value, @base64url_sha256),
       do: :ok,
       else: {:error, :invalid_handoff_challenge}
   end
 
-  defp handoff_challenge(_value), do: {:error, :invalid_handoff_challenge}
+  defp handoff_challenge(nil, "browser_code"), do: :ok
+  defp handoff_challenge(_value, _completion_mode), do: {:error, :invalid_handoff_challenge}
 
   defp authorization_url(
          client_id,

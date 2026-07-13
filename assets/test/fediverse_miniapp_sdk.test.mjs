@@ -127,6 +127,55 @@ test("notification permission reports authentication and availability failures",
   hostPort.close()
 })
 
+test("browser-code OAuth returns only the PKCE authorization code", async () => {
+  const f = fixture()
+  const sdk = createFediverseMiniAppSDK({
+    windowObject: f.windowObject,
+    parentWindow: f.parentWindow,
+    cryptoObject: f.cryptoObject,
+    allowedHostOrigin: () => true,
+  })
+  const hostPort = f.bootstrap()
+  await sdk.connect()
+
+  const authMessage = nextMessage(hostPort)
+  const authPromise = sdk.requestAuth({
+    completionMode: "browser_code",
+    clientId: "client_1234567890",
+    redirectUri: "https://app.example/oauth/callback",
+    scopes: ["identify"],
+    state: "s".repeat(43),
+    codeChallenge: "c".repeat(43),
+  })
+  const authRequest = await authMessage
+  assert.equal(authRequest.completionMode, "browser_code")
+  assert.equal("handoffChallenge" in authRequest, false)
+
+  hostPort.postMessage({
+    type: "authResult",
+    version: "1",
+    launchId,
+    requestId: authRequest.requestId,
+    status: "success",
+    handoffCode: "wrong_completion_mode_1234",
+  })
+  hostPort.postMessage({
+    type: "authResult",
+    version: "1",
+    launchId,
+    requestId: authRequest.requestId,
+    status: "success",
+    authorizationCode: "a".repeat(43),
+  })
+
+  assert.deepEqual(await authPromise, {
+    status: "success",
+    authorizationCode: "a".repeat(43),
+  })
+  sdk.destroy()
+  hostPort.close()
+})
+
 test("correlates context and external action promises over the private port", async () => {
   const f = fixture()
   const sdk = createFediverseMiniAppSDK({

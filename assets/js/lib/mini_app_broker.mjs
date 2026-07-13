@@ -151,6 +151,7 @@ const authRequestFields = new Set([
   "codeChallenge",
   "codeChallengeMethod",
   "handoffChallenge",
+  "completionMode",
   "authorizationLifetimeSeconds",
 ])
 
@@ -168,29 +169,40 @@ const validScopes = scopes =>
     typeof scope === "string" && /^[A-Za-z][A-Za-z0-9:_-]{0,63}$/.test(scope)
   )
 
-const validAuthRequest = (message, launchId) =>
-  !!message &&
-  typeof message === "object" &&
-  !Array.isArray(message) &&
-  Object.keys(message).every(key => authRequestFields.has(key)) &&
-  Object.keys(message).length >= authRequestFields.size - 1 &&
-  Object.keys(message).length <= authRequestFields.size &&
-  message.type === "requestAuth" &&
-  message.version === protocolVersion &&
-  message.launchId === launchId &&
-  validRequestId(message.requestId) &&
-  typeof message.clientId === "string" &&
-  /^[A-Za-z0-9_-]{10,200}$/.test(message.clientId) &&
-  boundedUrl(message.redirectUri) &&
-  validScopes(message.scopes) &&
-  highEntropyState(message.state) &&
-  base64UrlSha256(message.codeChallenge) &&
-  message.codeChallengeMethod === "S256" &&
-  base64UrlSha256(message.handoffChallenge) &&
-  (message.authorizationLifetimeSeconds === undefined ||
-    (Number.isSafeInteger(message.authorizationLifetimeSeconds) &&
-      message.authorizationLifetimeSeconds >= 300 &&
-      message.authorizationLifetimeSeconds <= 31_536_000))
+const validAuthRequest = (message, launchId) => {
+  if (
+    !message ||
+    typeof message !== "object" ||
+    Array.isArray(message) ||
+    !Object.keys(message).every(key => authRequestFields.has(key)) ||
+    message.type !== "requestAuth" ||
+    message.version !== protocolVersion ||
+    message.launchId !== launchId ||
+    !validRequestId(message.requestId) ||
+    typeof message.clientId !== "string" ||
+    !/^[A-Za-z0-9_-]{10,200}$/.test(message.clientId) ||
+    !boundedUrl(message.redirectUri) ||
+    !validScopes(message.scopes) ||
+    !highEntropyState(message.state) ||
+    !base64UrlSha256(message.codeChallenge) ||
+    message.codeChallengeMethod !== "S256" ||
+    (message.authorizationLifetimeSeconds !== undefined &&
+      (!Number.isSafeInteger(message.authorizationLifetimeSeconds) ||
+        message.authorizationLifetimeSeconds < 300 ||
+        message.authorizationLifetimeSeconds > 31_536_000))
+  ) {
+    return false
+  }
+
+  const completionMode = message.completionMode || "backend_handoff"
+  if (completionMode === "browser_code") {
+    return !("handoffChallenge" in message)
+  }
+  if (completionMode === "backend_handoff") {
+    return base64UrlSha256(message.handoffChallenge)
+  }
+  return false
+}
 
 const composeDraftFields = new Set([
   "text",
@@ -472,7 +484,9 @@ export const createMiniAppBroker = ({
           state: message.state,
           codeChallenge: message.codeChallenge,
           codeChallengeMethod: message.codeChallengeMethod,
-          handoffChallenge: message.handoffChallenge,
+          ...(message.completionMode === "browser_code"
+            ? {completionMode: "browser_code"}
+            : {handoffChallenge: message.handoffChallenge}),
           ...(message.authorizationLifetimeSeconds === undefined
             ? {}
             : {authorizationLifetimeSeconds: message.authorizationLifetimeSeconds}),

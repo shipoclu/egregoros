@@ -3,10 +3,11 @@ const launchIdPattern = /^[A-Za-z0-9_-]{43}$/
 const requestIdPattern = /^[A-Za-z0-9_-]{1,64}$/
 const statePattern = /^[A-Za-z0-9_-]{43,256}$/
 const handoffCodePattern = /^[A-Za-z0-9_-]{16,512}$/
+const authorizationCodePattern = /^[A-Za-z0-9_-]{43}$/
 const completionType = "fediverse-miniapp:auth-completion"
 const channelName = (launchId, state) => `fediverse-miniapp-auth:${launchId}:${state}`
 
-const validCompletion = (message, launchId, state) => {
+const validCompletion = (message, launchId, state, expectedMode = null) => {
   if (!message || typeof message !== "object" || Array.isArray(message)) return false
   const keys = Object.keys(message)
   if (
@@ -19,14 +20,24 @@ const validCompletion = (message, launchId, state) => {
   }
 
   if (message.status === "success") {
-    return (
+    const backendHandoff =
       keys.length === 6 &&
       keys.every(key =>
         ["type", "version", "launchId", "state", "status", "handoffCode"].includes(key)
       ) &&
       typeof message.handoffCode === "string" &&
       handoffCodePattern.test(message.handoffCode)
-    )
+    const browserCode =
+      keys.length === 6 &&
+      keys.every(key =>
+        ["type", "version", "launchId", "state", "status", "authorizationCode"].includes(key)
+      ) &&
+      typeof message.authorizationCode === "string" &&
+      authorizationCodePattern.test(message.authorizationCode)
+
+    if (expectedMode === "browser_code") return browserCode
+    if (expectedMode === "backend_handoff") return backendHandoff
+    return backendHandoff || browserCode
   }
 
   return (
@@ -45,7 +56,15 @@ const completionFromHash = hash => {
   const values = Object.fromEntries(entries)
 
   const baseKeys = ["version", "launch_id", "state", "status"]
-  const expectedKeys = values.status === "success" ? [...baseKeys, "handoff_code"] : baseKeys
+  const successField =
+    "handoff_code" in values
+      ? "handoff_code"
+      : "authorization_code" in values
+        ? "authorization_code"
+        : null
+  const expectedKeys = values.status === "success" && successField
+    ? [...baseKeys, successField]
+    : baseKeys
   if (keys.length !== expectedKeys.length || !keys.every(key => expectedKeys.includes(key))) return null
   if (
     values.version !== protocolVersion ||
@@ -61,7 +80,12 @@ const completionFromHash = hash => {
     launchId: values.launch_id,
     state: values.state,
     status: values.status,
-    ...(values.status === "success" ? {handoffCode: values.handoff_code} : {}),
+    ...(values.status === "success" && successField === "handoff_code"
+      ? {handoffCode: values.handoff_code}
+      : {}),
+    ...(values.status === "success" && successField === "authorization_code"
+      ? {authorizationCode: values.authorization_code}
+      : {}),
   }
 
   return validCompletion(message, values.launch_id, values.state) ? message : null
@@ -112,7 +136,8 @@ export const createMiniAppAuthRelay = ({
       !next ||
       !launchIdPattern.test(next.launchId || "") ||
       !requestIdPattern.test(next.requestId || "") ||
-      !statePattern.test(next.state || "")
+      !statePattern.test(next.state || "") ||
+      ![undefined, "backend_handoff", "browser_code"].includes(next.completionMode)
     ) {
       return false
     }
@@ -127,9 +152,22 @@ export const createMiniAppAuthRelay = ({
       return false
     }
 
-    pending = {launchId: next.launchId, requestId: next.requestId, state: next.state}
+    pending = {
+      launchId: next.launchId,
+      requestId: next.requestId,
+      state: next.state,
+      completionMode: next.completionMode || "backend_handoff",
+    }
     channel.onmessage = event => {
-      if (!pending || !validCompletion(event?.data, pending.launchId, pending.state)) return
+      if (
+        !pending ||
+        !validCompletion(
+          event?.data,
+          pending.launchId,
+          pending.state,
+          pending.completionMode
+        )
+      ) return
 
       const completion = {
         launchId: pending.launchId,
@@ -140,7 +178,12 @@ export const createMiniAppAuthRelay = ({
         type: "authResult",
         version: protocolVersion,
         ...completion,
-        ...(event.data.status === "success" ? {handoffCode: event.data.handoffCode} : {}),
+        ...(event.data.status === "success" && pending.completionMode === "backend_handoff"
+          ? {handoffCode: event.data.handoffCode}
+          : {}),
+        ...(event.data.status === "success" && pending.completionMode === "browser_code"
+          ? {authorizationCode: event.data.authorizationCode}
+          : {}),
       }
 
       clear()

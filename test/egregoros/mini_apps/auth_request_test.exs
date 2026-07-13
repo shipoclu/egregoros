@@ -108,6 +108,45 @@ defmodule Egregoros.MiniApps.AuthRequestTest do
              )
   end
 
+  test "accepts browser-code completion without a backend handoff challenge", %{
+    application: application
+  } do
+    params =
+      application.client_id
+      |> request_params()
+      |> Map.put("completion_mode", "browser_code")
+      |> Map.delete("handoff_challenge")
+
+    assert {:ok, request} = AuthRequest.prepare("https://app.example", params)
+    assert request.completion_mode == "browser_code"
+    assert request.application_id == application.id
+    assert request.redirect_uri == "https://app.example/oauth/callback"
+    assert request.code_challenge == String.duplicate("c", 43)
+    assert request.scopes == ["identify", "write"]
+
+    assert {:error, :invalid_handoff_challenge} =
+             AuthRequest.prepare(
+               "https://app.example",
+               Map.put(params, "handoff_challenge", String.duplicate("h", 43))
+             )
+
+    assert {:error, :invalid_completion_mode} =
+             AuthRequest.prepare(
+               "https://app.example",
+               Map.put(params, "completion_mode", "token_relay")
+             )
+  end
+
+  test "accepts the explicit backend-handoff completion mode", %{application: application} do
+    params =
+      application.client_id
+      |> request_params()
+      |> Map.put("completion_mode", "backend_handoff")
+
+    assert {:ok, request} = AuthRequest.prepare("https://app.example", params)
+    assert request.completion_mode == "backend_handoff"
+  end
+
   defp request_params(client_id) do
     %{
       "request_id" => "auth-1",

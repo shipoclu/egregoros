@@ -147,18 +147,35 @@ export const createFediverseMiniAppSDK = ({
 
     if (message.type === "authResult") {
       const fields = ["type", "version", "launchId", "requestId", "status"]
-      const validSuccess =
+      const validBackendSuccess =
         message.status === "success" &&
         exactFields(message, [...fields, "handoffCode"]) &&
         typeof message.handoffCode === "string" &&
         /^[A-Za-z0-9_-]{16,512}$/.test(message.handoffCode)
+      const validBrowserSuccess =
+        message.status === "success" &&
+        exactFields(message, [...fields, "authorizationCode"]) &&
+        typeof message.authorizationCode === "string" &&
+        /^[A-Za-z0-9_-]{43}$/.test(message.authorizationCode)
       const validFailure =
         ["cancelled", "error", "invalid_request"].includes(message.status) &&
         exactFields(message, fields)
-      if (!requestIdPattern.test(message.requestId || "") || (!validSuccess && !validFailure)) return
-      settle(message, "requestId", "authResult", result => {
+      if (
+        !requestIdPattern.test(message.requestId || "") ||
+        (!validBackendSuccess && !validBrowserSuccess && !validFailure)
+      ) return
+      const authRequest = pending.get(message.requestId)
+      if (
+        message.status === "success" &&
+        ((authRequest?.authCompletionMode === "browser_code" && !validBrowserSuccess) ||
+          (authRequest?.authCompletionMode !== "browser_code" && !validBackendSuccess))
+      ) return
+      settle(message, "requestId", "authResult", (result, request) => {
         if (result.status !== "success") {
           throw miniAppError("AUTH_FAILED", "Authentication did not complete")
+        }
+        if (request.authCompletionMode === "browser_code") {
+          return {status: result.status, authorizationCode: result.authorizationCode}
         }
         return {status: result.status, handoffCode: result.handoffCode}
       })
@@ -379,8 +396,9 @@ export const createFediverseMiniAppSDK = ({
     connect: () => connected,
     ready: () => send({type: "ready"}),
     getContext: () => request({type: "getContext"}, "contextResult"),
-    requestAuth: auth =>
-      request(
+    requestAuth: auth => {
+      const completionMode = auth?.completionMode || "backend_handoff"
+      return request(
         {
           type: "requestAuth",
           clientId: auth?.clientId,
@@ -389,11 +407,16 @@ export const createFediverseMiniAppSDK = ({
           state: auth?.state,
           codeChallenge: auth?.codeChallenge,
           codeChallengeMethod: "S256",
-          handoffChallenge: auth?.handoffChallenge,
+          ...(completionMode === "backend_handoff"
+            ? {handoffChallenge: auth?.handoffChallenge}
+            : {completionMode}),
           authorizationLifetimeSeconds: auth?.authorizationLifetimeSeconds,
         },
-        "authResult"
-      ),
+        "authResult",
+        "requestId",
+        {authCompletionMode: completionMode}
+      )
+    },
     composeNote: draft =>
       request({type: "composeNote", draft}, "composeNoteResult", "callId"),
     close: async () => {

@@ -34,6 +34,15 @@ const notificationPermission: MiniAppNotificationPermission =
   await sdk.notifications.getPermission()
 const requestedNotificationPermission: MiniAppNotificationPermission =
   await sdk.notifications.requestPermission()
+const browserAuthorization = await sdk.requestAuth({
+  completionMode: "browser_code",
+  clientId: "browser-client",
+  redirectUri: "https://app.example/oauth/callback",
+  scopes: ["identify"],
+  state: "sssssssssssssssssssssssssssssssssssssssssss",
+  codeChallenge: "ccccccccccccccccccccccccccccccccccccccccccc",
+})
+const authorizationCode: string = browserAuthorization.authorizationCode
 
 sdk.on("composeNotePublished", (receipt: MiniAppComposePublishedReceipt) => {
   const publishedId: string = receipt.id
@@ -47,3 +56,4 @@ void signature
 void transactionHash
 void notificationPermission
 void requestedNotificationPermission
+void authorizationCode

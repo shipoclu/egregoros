@@ -115,6 +115,38 @@ defmodule Egregoros.OAuth do
     Repo.get_by(AuthorizationCode, code: code)
   end
 
+  def pending_browser_authorization_code?(
+        code,
+        application_id,
+        user_id,
+        redirect_uri,
+        scopes,
+        code_challenge
+      )
+      when is_binary(code) and is_binary(application_id) and is_binary(user_id) and
+             is_binary(redirect_uri) and is_binary(scopes) and is_binary(code_challenge) do
+    now = DateTime.utc_now()
+
+    from(c in AuthorizationCode,
+      where:
+        c.code == ^code and c.application_id == ^application_id and c.user_id == ^user_id and
+          c.redirect_uri == ^redirect_uri and c.scopes == ^scopes and
+          c.code_challenge == ^code_challenge and c.code_challenge_method == "S256" and
+          c.expires_at > ^now and (is_nil(c.grant_expires_at) or c.grant_expires_at > ^now)
+    )
+    |> Repo.exists?()
+  end
+
+  def pending_browser_authorization_code?(
+        _code,
+        _application_id,
+        _user_id,
+        _redirect_uri,
+        _scopes,
+        _code_challenge
+      ),
+      do: false
+
   def exchange_code_for_token(
         %{
           "grant_type" => "authorization_code",

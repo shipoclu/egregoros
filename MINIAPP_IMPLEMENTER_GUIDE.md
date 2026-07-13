@@ -25,8 +25,9 @@ There are three possible parts:
   mediates SDK actions.
 - **The miniapp page** is the HTML, CSS, and JavaScript running in the
   cross-origin iframe.
-- **The miniapp backend** is optional. It is needed for OAuth and any private
-  application data, but not for a basic public app.
+- **The miniapp backend** is optional. It is recommended when tokens or private
+  application data should stay outside browser JavaScript, but a static app can
+  use the browser-code OAuth profile without one.
 
 The miniapp itself does **not** need an ActivityPub actor, WebFinger, inbox,
 outbox, or ActivityPub note-creation endpoint. ActivityPub publishing and
@@ -272,9 +273,16 @@ deep links and hash routes work without page metadata.
 
 ## Optional: add OAuth and authenticated actions
 
-Add OAuth only after the static milestone works. OAuth requires an app backend;
-never register a client, exchange a code, store an Egregoros token, or make a
-bearer-token request in iframe JavaScript.
+Add OAuth only after the static milestone works. Choose one completion profile:
+
+- `browser_code` keeps the deployment completely static. The iframe exchanges
+  a PKCE-bound authorization code and holds tokens in its JavaScript session.
+- `backend_handoff` exchanges and holds Egregoros tokens on an app backend, then
+  gives the iframe a short-lived verifier-bound app-session handoff.
+
+Never put an access or refresh token in the host relay. A browser-only app has
+the normal SPA risk that an XSS vulnerability can read its tokens; a backend
+profile provides stronger token isolation.
 
 Because the declaration is immutable after first observation, develop this on
 a disposable origin or publish the final OAuth declaration before testing the
@@ -312,7 +320,106 @@ publishes and does not require that API authority.
 Manifest OAuth declarations are an immutable maximum. Each authorization
 request should ask for only the subset and lifetime needed at that moment.
 
-### Step 2: register from the backend
+### Static browser profile
+
+Use this profile when the entire application will be deployed as static files.
+
+#### Step 1: register the public client
+
+The SDK bootstrap supplies the exact `issuer`,
+`authorizationServerMetadata`, `authorizationResultRelay`, and `launchId`.
+Require the bootstrap issuer and host origin to match the exact host accepted by
+`allowedHostOrigin`.
+
+Fetch `authorizationServerMetadata`, read its advertised
+`registration_endpoint`, and post JSON containing only the canonical manifest
+URL:
+
+```json
+{"manifest_url":"https://miniapp.example/.well-known/fediverse-miniapp.json"}
+```
+
+The endpoint supports non-credentialed CORS. Store and reuse the returned
+public `client_id` for that app manifest and issuer. It has no client secret.
+
+#### Step 2: create state and PKCE values
+
+For every attempt, generate a fresh random PKCE verifier and calculate its S256
+challenge. Also generate a fresh state value. The static callback needs the
+issuer and launch ID after its opener-free navigation, so the app can encode
+these non-secret routing values plus a random nonce into a compact base64url
+state value. The complete state must be 43 through 256 base64url characters.
+
+Keep the exact state, PKCE verifier, client ID, callback URI, and metadata token
+endpoint in the iframe's `sessionStorage`. Do not place the verifier in state or
+in any URL.
+
+#### Step 3: request browser-code authorization
+
+Call the SDK directly from the user's action:
+
+```js
+const result = await sdk.requestAuth({
+  completionMode: "browser_code",
+  clientId,
+  redirectUri: "https://miniapp.example/oauth/callback",
+  scopes: ["identify"],
+  state,
+  codeChallenge,
+  authorizationLifetimeSeconds: 86400,
+})
+```
+
+`handoffChallenge` is deliberately absent in this mode. Egregoros opens its own
+opener-free OAuth window and binds the app, user, exact callback, scopes, state,
+and S256 challenge to the pending launch.
+
+#### Step 4: relay only the authorization code
+
+The static callback reads `code` and `state` from its own URL. Decode only the
+app's strict state structure, require the issuer to be the expected public HTTPS
+origin, and construct the relay as exactly
+`<issuer>/mini-apps/oauth/relay`. Redirect the callback window to:
+
+```text
+#version=1&launch_id=LAUNCH_ID&state=OAUTH_STATE&status=success&authorization_code=AUTHORIZATION_CODE
+```
+
+For an OAuth error, redirect with `status=cancelled` or `status=error` and omit
+both code fields. Do not exchange the code in the callback and do not store it
+there. Egregoros accepts only the exact unexpired code matching the pending
+application, user, callback, scopes, and PKCE challenge.
+
+#### Step 5: exchange and store the tokens
+
+When `requestAuth()` resolves, compare the still-current transaction state and
+post the returned `authorizationCode` to the metadata-advertised token endpoint
+as `application/x-www-form-urlencoded` with:
+
+```text
+grant_type=authorization_code
+client_id=PUBLIC_CLIENT_ID
+redirect_uri=https://miniapp.example/oauth/callback
+code=AUTHORIZATION_CODE
+code_verifier=PKCE_VERIFIER
+```
+
+The token endpoint supports non-credentialed CORS. Store the token response in
+the iframe's `sessionStorage`, then delete the PKCE transaction. Use the access
+token in an `Authorization: Bearer ...` header. Rotate refresh tokens and retain
+the original absolute `authorization_expires_in` deadline.
+
+A static app should use a strict CSP, avoid third-party runtime scripts, clear
+tokens on logout, and prefer `sessionStorage` over persistent `localStorage` or
+IndexedDB. Browser storage is partitioned under the Egregoros top-level site;
+the authorization-code relay avoids depending on storage shared with the
+top-level callback window.
+
+### Backend handoff profile
+
+Use this profile when Egregoros tokens should never enter iframe JavaScript.
+
+#### Step 1: register from the backend
 
 The SDK bootstrap supplies the exact `issuer`,
 `authorizationServerMetadata`, `authorizationResultRelay`, and `launchId`.
@@ -329,7 +436,7 @@ URL:
 Store and reuse the returned public `client_id` for that app manifest and
 issuer. A miniapp registration has no client secret.
 
-### Step 3: prepare one bound authorization transaction
+#### Step 2: prepare one bound authorization transaction
 
 For every attempt, the backend must store a short-lived record containing:
 
@@ -344,7 +451,7 @@ challenge, and handoff challenge to `sdk.requestAuth()`. The host fixes PKCE to
 S256 and opens its own opener-free authorization surface. Do not open a second
 popup from the iframe.
 
-### Step 4: complete the callback and relay
+#### Step 3: complete the callback and relay
 
 The backend callback validates state, exchanges the code server to server, and
 keeps all access and refresh tokens on the backend. It creates a random,
@@ -369,7 +476,7 @@ tokens must never reach the iframe, URL, host message channel, or browser log.
 Start a failed, cancelled, expired, or retried flow from scratch with new
 state, PKCE, and handoff values.
 
-### Step 5: use the host-owned composer
+### Use the host-owned composer
 
 Once the OAuth grant includes the required authority and the manifest declares
 `compose_note`, the iframe can call:
@@ -409,9 +516,10 @@ does not require the miniapp to implement any ActivityPub endpoint.
 | The frame is blank or reports framing failure | The page response's CSP `frame-ancestors` includes the exact Egregoros origin and `X-Frame-Options` is absent. |
 | The host loading screen never clears | The SDK file loads with a JavaScript MIME type; `allowedHostOrigin` accepts the exact host; `connect()` succeeds; `ready()` is called after the initial render. |
 | SDK methods time out | The page did not navigate or submit, the SDK was not recreated or destroyed, and only one pending host confirmation is active. Log the stable SDK error code. |
-| OAuth preparation fails | The backend can fetch the exact bootstrap metadata URL, uses its advertised registration endpoint, registers the canonical manifest URL, and reuses the returned client ID. |
-| Authorization succeeds but the iframe is not notified | The callback redirects to the exact bootstrap relay and the fragment has exactly `version`, `launch_id`, `state`, `status`, and `handoff_code`, all bound to the current attempt. |
+| OAuth preparation fails | The browser or backend can fetch the exact bootstrap metadata URL, uses its advertised registration endpoint, registers the canonical manifest URL, and reuses the returned client ID. |
+| Authorization succeeds but the iframe is not notified | The callback redirects to the exact bootstrap relay. Backend mode uses the exact `handoff_code` fragment; browser mode uses the exact `authorization_code` fragment. Never include both. |
 | Auth works but the iframe session does not | The handoff code is unexpired and unused, and the iframe redeems it with the verifier whose SHA-256 challenge was stored with OAuth state. Do not depend on third-party iframe cookies. |
+| Browser-code OAuth returns an error | The relayed code is the exact still-pending code, state and launch ID match the active SDK request, and token exchange has not already consumed the code. |
 | A changed manifest stops resolving | Identity, OAuth, capability, wallet, and ActivityPub declarations are immutable after observation or registration. Restore the declaration or deploy a new app identity/origin. |
 
 When diagnosing discovery on Egregoros, inspect logs for `miniapp lookup` and
@@ -444,23 +552,24 @@ useful for framing, SDK, and OAuth callback problems.
 
 ### OAuth, if used
 
-- [ ] OAuth operations and Egregoros tokens exist only on the app backend.
+- [ ] The app explicitly uses either `browser_code` or the default
+      `backend_handoff` completion profile.
 - [ ] The manifest declares exact callback URIs, the minimum scopes, and useful
       maximum authorization ages.
-- [ ] The backend validates bootstrap issuer/metadata/relay values and public
-      DNS before making requests.
+- [ ] The browser and any backend validate bootstrap issuer/metadata/relay
+      values before making requests.
 - [ ] Registration uses the metadata-advertised endpoint and canonical
       `manifest_url`; the public client ID is cached per issuer.
-- [ ] Each attempt has fresh state, S256 PKCE, handoff verifier/challenge, and a
-      short expiry.
-- [ ] State binds the issuer, exact relay, launch ID, redirect URI, scopes, PKCE,
-      and handoff challenge.
-- [ ] The callback validates state, exchanges the code server to server, and
-      redirects to the exact five-field relay fragment.
-- [ ] The handoff code is random, single-use, verifier-bound, and expires within
-      60 seconds.
-- [ ] The iframe stores only an opaque app session token and does not require
-      third-party cookies.
+- [ ] Each attempt has fresh state and S256 PKCE; backend mode also has a fresh
+      handoff verifier/challenge.
+- [ ] State binds the issuer, exact relay, launch ID, redirect URI, scopes, and
+      PKCE; backend mode also binds the handoff challenge.
+- [ ] Browser mode relays only `authorization_code`, exchanges it from the
+      iframe with the retained verifier, and stores tokens in `sessionStorage`.
+- [ ] Backend mode exchanges the code server-side and relays only a random,
+      verifier-bound, single-use handoff code that expires within 60 seconds.
+- [ ] Neither mode depends on cookies or storage shared between the top-level
+      callback and cross-site iframe.
 - [ ] Cancellation and retry create an entirely new transaction.
 
 ### Before production

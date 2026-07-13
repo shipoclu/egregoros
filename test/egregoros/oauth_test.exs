@@ -136,6 +136,55 @@ defmodule Egregoros.OAuthTest do
     assert OAuth.get_authorization_code(nil) == nil
   end
 
+  test "browser completion matches only the exact pending PKCE authorization code" do
+    user = create_user!()
+    redirect_uri = "https://example.com/callback"
+    app = create_app!(%{"redirect_uris" => redirect_uri, "scopes" => "identify"})
+    challenge = String.duplicate("c", 43)
+
+    assert {:ok, authorization_code} =
+             OAuth.create_authorization_code(app, user, redirect_uri, "identify",
+               code_challenge: challenge,
+               code_challenge_method: "S256"
+             )
+
+    assert OAuth.pending_browser_authorization_code?(
+             authorization_code.code,
+             app.id,
+             user.id,
+             redirect_uri,
+             "identify",
+             challenge
+           )
+
+    refute OAuth.pending_browser_authorization_code?(
+             authorization_code.code,
+             app.id,
+             user.id,
+             redirect_uri,
+             "identify",
+             String.duplicate("x", 43)
+           )
+
+    refute OAuth.pending_browser_authorization_code?(
+             "not-the-code",
+             app.id,
+             user.id,
+             redirect_uri,
+             "identify",
+             challenge
+           )
+
+    refute OAuth.pending_browser_authorization_code?(
+             nil,
+             app.id,
+             user.id,
+             redirect_uri,
+             "identify",
+             challenge
+           )
+  end
+
   test "redirect_uri_allowed? returns false for non-matching inputs" do
     app = create_app!(%{"redirect_uris" => ["https://example.com/callback"]})
 

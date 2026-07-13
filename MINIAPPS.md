@@ -32,12 +32,13 @@ Farcaster separates four concerns:
    content.
 3. A versioned iframe/WebView SDK provides host-to-app context and app-to-host
    actions.
-4. A seamless authenticated session is delivered to the app and verified by its
-   backend.
+4. Authentication uses a public OAuth client with PKCE; an app may keep tokens
+   on a backend or, for a static browser app, exchange and hold them in the
+   iframe.
 
 Egregoros should keep this separation. It should *not* trust iframe-provided
-identity/context, give the iframe a bearer token directly, or treat a manifest
-as a blanket permission grant.
+identity/context, put a bearer token in the host relay, or treat a manifest as
+a blanket permission grant.
 
 ## Existing Egregoros foundation
 
@@ -171,12 +172,20 @@ or other launcher. Direct, explicit app URLs remain valid entry points, while
 ### 4. OAuth sign-in
 
 The app uses OAuth 2.1 authorization code + PKCE against the **local calling
-Egregoros instance**. Egregoros is the authorization server. The app receives
-an authorization code via its registered HTTPS callback, exchanges it server to
-server, and stores its own session. Tokens are never injected into the iframe
-or exposed through `postMessage`. Apps may request the normal Egregoros/
-Mastodon-compatible scopes (including read, write, and follow), subject to the
-user's explicit consent and the instance's existing scope policy.
+Egregoros instance**. Egregoros is the authorization server. Two explicit
+completion modes are supported:
+
+- `backend_handoff` is the default. The app backend exchanges the code, keeps
+  the Egregoros tokens, and gives the iframe a verifier-bound app-session
+  handoff code.
+- `browser_code` is for static browser applications. The callback relays only
+  the short-lived authorization code to the initiating iframe, which exchanges
+  it through the non-credentialed CORS token endpoint using its PKCE verifier.
+  Bearer and refresh tokens never enter the host relay.
+
+Apps may request the normal Egregoros/Mastodon-compatible scopes (including
+read, write, and follow), subject to the user's explicit consent and the
+instance's existing scope policy.
 
 The host SDK may provide a `requestAuth` action that begins this flow in a
 top-level, host-controlled authorization window/sheet. It must not use a
@@ -198,8 +207,9 @@ consent UI must make any additional acknowledgement a browser-required control
 and must also enforce it server-side. An incomplete form must remain visibly
 incomplete instead of collapsing to an undifferentiated OAuth error. Failed,
 cancelled, stale, or interrupted attempts are transaction-bound; the app starts
-a fresh authorization request with new state, PKCE values, and handoff binding
-rather than replaying an old authorization URL.
+a fresh authorization request with new state and PKCE values, plus a fresh
+handoff binding in backend mode, rather than replaying an old authorization
+URL.
 
 Authentication is optional and app-initiated. A newly launched iframe may call
 `ready`, receive the non-user `bootstrap` object, use `openExternal` after a
@@ -210,7 +220,7 @@ public-note launch context before OAuth. It must request OAuth before
 read-only public mini apps work without a consent prompt, while ensuring that
 actions affecting the user's Egregoros account remain authenticated.
 
-The authorization handoff is as follows:
+The default backend authorization handoff is as follows:
 
 1. The app backend obtains/reuses its dynamic registration for the calling
    Egregoros issuer and creates an authorization request with PKCE.
@@ -270,11 +280,11 @@ short-lived access token and rotating refresh token. Rotation preserves the
 grant family's original absolute deadline and can never turn a one-day grant
 into a persistent grant.
 
-#### Mandatory iframe-session handoff
+#### Backend iframe-session handoff
 
 Cross-origin iframe cookies cannot be relied on: browser/user privacy controls
-may block them and the Egregoros instance cannot override those controls. Every
-conforming app therefore implements this one-time handoff after its backend
+may block them and the Egregoros instance cannot override those controls. A
+backend-mode app therefore implements this one-time handoff after its backend
 exchanges the OAuth code:
 
 1. The iframe generates a cryptographically random `handoff_verifier`; it
@@ -297,6 +307,45 @@ exchanges the OAuth code:
 Apps may use cookies or the Storage Access API as an optimization, but they
 cannot require them for a functional mini-app session. The handoff carries no
 Egregoros bearer token and is never available to a different app origin.
+
+#### Static browser authorization-code completion
+
+A static app passes `completionMode: "browser_code"` to `requestAuth` and
+omits `handoffChallenge`. It uses this flow:
+
+1. The iframe obtains or reuses its public dynamic `client_id`, creates a fresh
+   high-entropy state value and PKCE verifier/challenge, and retains the
+   verifier only in its current iframe session.
+2. The static callback needs the exact bootstrap relay URL and launch ID after
+   the opener-free navigation. The app may encode those non-secret routing
+   values with a random nonce inside its opaque, base64url state. The iframe
+   still stores and later compares the complete exact state value.
+3. The iframe calls `requestAuth` with `completionMode: "browser_code"`, the
+   public client data, exact callback, requested scope subset, state, and S256
+   challenge. Egregoros binds those values to the active launch.
+4. The callback does not exchange or store the code. After validating its
+   state structure and requiring the relay to equal
+   `<issuer>/mini-apps/oauth/relay`, it redirects to:
+
+   ```text
+   https://social.example/mini-apps/oauth/relay#version=1&launch_id=LAUNCH_ID&state=OAUTH_STATE&status=success&authorization_code=AUTHORIZATION_CODE
+   ```
+
+5. The host accepts only the exact unexpired, unconsumed code whose app, user,
+   redirect URI, scopes, and S256 challenge match the pending launch request.
+   It relays that code over the pinned SDK channel and never relays a bearer or
+   refresh token.
+6. The iframe compares the returned transaction state through the SDK's
+   correlated request, then posts the code, public client ID, exact redirect
+   URI, and retained PKCE verifier to the metadata-advertised token endpoint.
+   Only after that exchange succeeds may it use an authenticated host action.
+
+The browser app is a public client and has no secret. It SHOULD keep tokens in
+`sessionStorage`, clear them on logout or session teardown, use no third-party
+runtime scripts, and deploy a strict CSP. Persistent IndexedDB or
+`localStorage` increases the lifetime of a token theft. Frontend token storage
+has the normal browser-SPA XSS risk, but PKCE prevents a host, extension, or
+other observer that sees only the authorization code from redeeming it.
 
 ### Optional EVM wallet capability
 
@@ -486,14 +535,14 @@ Registration (RFC 7591) advertised from the instance's OAuth Authorization
 Server Metadata (RFC 8414), with a mini-app profile that makes the following
 normative:
 
-1. Registration occurs **server-to-server from the mini-app developer's
-   backend**, never from the iframe. The response is a public OAuth client:
-   it returns a stable `client_id`, declares
+1. Registration may occur from the mini-app backend or, for a static browser
+   app, directly from the iframe through non-credentialed CORS. The response is
+   a public OAuth client: it returns a stable `client_id`, declares
    `token_endpoint_auth_method: "none"`, and never returns a client secret.
 2. The registration cache key is `(authorization_server_issuer,
    canonical_manifest_url)`. A conforming app MUST reuse that client
    registration for every user of that app on that Egregoros instance and MUST
-   not register at launch time when it already has a valid cached registration.
+   not register again when it already has a valid cached registration.
 3. The instance validates that every HTTPS redirect URI is on the manifest's
    canonical app origin—exact scheme, host, and port—and it stores the
    canonical manifest URL with the client record. Redirects cannot be widened
@@ -575,8 +624,9 @@ grant:
 The identity response is intentionally a new narrow endpoint rather than
 `/api/v1/accounts/verify_credentials`: the Mastodon-compatible endpoint
 requires `read` and exposes a substantially broader account representation.
-The response to `/api/v1/mini-apps/identity` MUST be marked `no-store`, and the
-app backend—not iframe JavaScript—normally holds the bearer and refresh tokens.
+The response to `/api/v1/mini-apps/identity` MUST be marked `no-store`. Backend
+mode keeps bearer and refresh tokens on the app backend; browser-code mode
+holds them in the iframe's JavaScript session.
 
 ### 5. Host SDK
 
@@ -587,7 +637,7 @@ origin-checked `postMessage` handshake. Initial candidate methods:
 - `getContext()` — non-authoritative launch context, app/client protocol
   versions, locale/theme, the exact launch URL, and (when launched from a
   note) the author, note identifier, content, mentions, and link URL; and
-- `requestAuth(backendPreparedAuthorization)`, `close()`, and
+- `requestAuth(authorization)`, `close()`, and
   `openExternal(url)` — host-mediated actions; and
 - `notifications.getPermission()` and
   `notifications.requestPermission()` — capability-gated ActivityPub
@@ -646,10 +696,12 @@ notificationButton.addEventListener("click", async () => {
 })
 ```
 
-`requestAuth` accepts the backend-prepared dynamic client ID, exact redirect
-URI, a manifest-allowed scope subset, optional
-`authorizationLifetimeSeconds`, PKCE state/challenge, and one-time handoff challenge;
-the SDK fixes the method to `S256`. `composeNote(draft)` resolves when the host
+`requestAuth` accepts the public dynamic client ID, exact redirect URI, a
+manifest-allowed scope subset, optional `authorizationLifetimeSeconds`, and
+PKCE state/challenge. The default `backend_handoff` mode also requires a
+one-time handoff challenge. The explicit `browser_code` mode forbids that
+challenge and returns `authorizationCode` instead of `handoffCode`; the SDK
+fixes PKCE to `S256`. `composeNote(draft)` resolves when the host
 accepts or rejects the draft and `on("composeNotePublished", callback)` emits
 the later publication receipt. `wallet.getProvider()` returns a narrow
 EIP-1193-compatible provider only when `wallet.evm` appears in bootstrap
@@ -662,7 +714,7 @@ pending calls.
 | Access class | V1 methods | Prerequisite |
 | --- | --- | --- |
 | Public base | `ready`, `bootstrap`, `getContext`, `close`, `openExternal` | Valid framed app; `getContext` needs context disclosure before note details are sent; `openExternal` needs user gesture. |
-| OAuth initiation | `requestAuth` | Optional `oauth` manifest object and a server-side dynamic registration. |
+| OAuth initiation | `requestAuth` | Optional `oauth` manifest object and a public dynamic registration obtained by the backend or browser. |
 | Wallet | `wallet.evm.getProvider` and its allowlisted EIP-1193 calls | Immutable wallet declaration, host wallet availability, and per-app wallet connection/confirmation. No OAuth required. |
 | Transactional notifications | `notifications.getPermission`, `notifications.requestPermission` | Immutable ActivityPub declaration and OAuth; prompting additionally requires a user gesture and host confirmation. |
 | OAuth-gated | `composeNote` | Immutable `compose_note` declaration plus an unexpired OAuth grant containing `identify` (or legacy `read`). |
@@ -959,9 +1011,11 @@ handoff values, access tokens, and refresh tokens MUST be redacted from logs,
 error reporting, analytics, URLs shown to other origins, and browser history
 where possible.
 
-Dynamic registration occurs only from the app backend. Egregoros registers a
-mini app as a public client and never issues it a client secret. Refresh/access
-tokens MUST never enter the iframe or host message channel.
+Dynamic registration may occur from a backend or static browser app. Egregoros
+registers a mini app as a public client and never issues it a client secret.
+Refresh/access tokens MUST never enter the host relay or host message channel.
+They remain backend-only in `backend_handoff` mode and iframe-only after the
+token response in `browser_code` mode.
 Registration, authorization, token exchange, refresh, revocation, and every
 bearer-token API request MUST re-check the current exact app origin, immutable
 maximum scope set, requested subset, absolute authorization deadline, and
@@ -971,9 +1025,10 @@ Revocation and a newly matching
 deny rule invalidate the whole token family immediately.
 
 The callback completion message uses the same exact-origin/source/channel
-rules. Its one-time handoff code is bound to the iframe's secret verifier,
-single-use, non-loggable, and expires within 60 seconds. Egregoros may relay it
-but cannot redeem it because it never receives the verifier. OAuth consent is
+rules. A backend-mode handoff code is bound to the iframe's secret verifier,
+single-use, non-loggable, and expires within 60 seconds. A browser-mode
+authorization code is short-lived, single-use, and bound to the iframe's PKCE
+verifier; Egregoros verifies its exact pending record before relaying it. OAuth consent is
 not permission to compose through the host; conversely, a granted `write`
 scope allows the app backend to use the documented API and must be presented to
 the user as such.
@@ -1142,14 +1197,14 @@ The choices are:
 | Topic | Decision | Rationale |
 | --- | --- | --- |
 | Protocol relationship | Fediverse-native; inspired by Farcaster, not compatible | OAuth and ActivityPub provide different primitives. |
-| Identity transport | OAuth authorization code + PKCE | Reuses Egregoros's existing provider and keeps bearer tokens out of the iframe. |
+| Identity transport | OAuth authorization code + PKCE | Backend mode keeps bearer tokens server-side; browser mode delivers only the PKCE-bound code before the iframe exchanges it. |
 | Initial presentation | Desktop lower-right collapsible iframe | Required target behavior. |
 | Discovery | Rich card when a note includes a valid mini-app URL | The app must still be explicitly opened by the viewer. |
 | OAuth scopes | Existing scopes may be requested | Supports applications beyond Farcaster's identity-only model. |
 | Publishing | Anybody may publish a manifest-bearing HTTPS mini app | No directory/admin approval is required to publish. |
 | Platforms | Desktop and mobile/PWA | Desktop floating panel; mobile full-screen sheet. |
 | App installation | Not in v1 | No saved/pinned-app launcher or app notifications. |
-| Registration | Anonymous dynamic registration | One registration per mini-app manifest and Egregoros issuer, cached by the app backend. |
+| Registration | Anonymous dynamic registration | One public registration per mini-app manifest and Egregoros issuer, cached by the app backend or browser. |
 | Launch context | Available through SDK after once-per-app disclosure | It is untrusted; the user approves sending public-note details to the app domain. |
 | Context source visibility | Fully public notes only | Non-public notes retain ordinary links in v1. |
 | OAuth callback origin | Exact manifest origin | Prevents callback widening to sibling/subdomains. |
@@ -1174,13 +1229,13 @@ The choices are:
 | Pre-auth SDK data | Bootstrap issuer/origin only | Enables dynamic registration without exposing user or note context. |
 | Authentication trigger | App calls `requestAuth` | No automatic prompt merely from card display or launch. |
 | Authentication requirement | On demand | OAuth is required for compose/auth-gated capabilities, not for public/read-only apps. |
-| OAuth callback completion | Opener-free popup redirects to a host-owned fragment relay and launch-secret `BroadcastChannel` | The hostile callback cannot navigate Egregoros; OAuth code/tokens stay with the app backend and the handoff code still needs the iframe verifier. |
+| OAuth callback completion | Opener-free popup redirects to a host-owned fragment relay and launch-secret `BroadcastChannel` | Backend mode relays a verifier-bound app handoff; browser mode relays only the exact PKCE-bound authorization code. Bearer tokens never traverse the relay. |
 | Repeat consent | Reuse valid immutable grant | Authorization UI still provides account identity, switch, and cancel. |
-| Token renewal | Short-lived access + refresh token | Backend refreshes server-to-server. |
-| Iframe session establishment | Mandatory verifier-bound one-time handoff | Works when third-party cookies/storage are unavailable. |
+| Token renewal | Short-lived access + rotating refresh token | Backend or browser refreshes without extending the absolute grant deadline. |
+| Iframe session establishment | Backend handoff or browser code exchange | Both work when third-party cookies/storage are unavailable. |
 | `ready()` timeout | Keep branded loading UI | Retry and external-open are offered; app is not auto-closed. |
 | EVM wallet declaration | Immutable `wallet.evm.enabled` manifest capability | Provider is available only when host/user support it. |
-| EVM app interface | Host-mediated EIP-1193 provider | Private keys and OAuth tokens never enter the iframe. |
+| EVM app interface | Host-mediated EIP-1193 provider | Private keys never enter the iframe and wallet access stays separate from OAuth tokens. |
 | Wallet availability | Optional by default | `required: true` fails with a compatible-wallet error; otherwise app falls back. |
 | Initial wallet methods | Discovery/connect, message/typed signing, one transaction | Batch/delegation/headless wallet operations wait. |
 | Wallet implementation seam | Host `EvmWalletAdapter` | Injected wallet now; admin-configured JAW adapter later. |
@@ -1263,9 +1318,8 @@ The first-party SDK source and declarations live at
 example with optional wallet support lives at `examples/fediverse-miniapp/`;
 its manifest is parsed by the Elixir suite and its SDK transport is exercised
 through the same-origin broker, nested sandbox, and transferred ports by the
-asset interoperability suite. The example intentionally omits an OAuth backend
-because registration, code exchange, refresh, and bearer-token API calls are
-server-to-server responsibilities.
+asset interoperability suite. A separate static React example exercises the
+`browser_code` OAuth completion profile without an app backend.
 
 ## Domain paths and cards
 

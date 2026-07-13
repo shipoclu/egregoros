@@ -428,6 +428,33 @@ test("auth requests require the active launch and a strict PKCE handoff schema",
     },
   ])
 
+  const {handoffChallenge: _handoffChallenge, ...browserValid} = valid
+  appPort.postMessage({
+    ...browserValid,
+    requestId: "auth-browser",
+    completionMode: "browser_code",
+  })
+  await tick()
+  assert.deepEqual(requests[1], {
+    requestId: "auth-browser",
+    clientId: "client_1234567890",
+    redirectUri: "https://app.example/oauth/callback",
+    scopes: ["read", "write"],
+    state: "s".repeat(43),
+    codeChallenge: "c".repeat(43),
+    codeChallengeMethod: "S256",
+    completionMode: "browser_code",
+    authorizationLifetimeSeconds: 86_400,
+  })
+
+  appPort.postMessage({
+    ...valid,
+    requestId: "auth-invalid-browser",
+    completionMode: "browser_code",
+  })
+  await tick()
+  assert.equal(requests.length, 2)
+
   broker.destroy()
 })
 

@@ -95,6 +95,55 @@ test("relays only a strict completion over a launch-secret same-origin channel",
   relay.destroy()
 })
 
+test("relays a browser authorization code only for a browser-code request", () => {
+  const broadcasts = broadcastFixture()
+  const results = []
+  const relay = createMiniAppAuthRelay({
+    broadcastChannelFactory: broadcasts.factory,
+    sendResult: result => results.push(result),
+  })
+
+  relay.begin({
+    launchId,
+    requestId: "auth-browser",
+    state: oauthState,
+    completionMode: "browser_code",
+  })
+
+  const publisher = broadcasts.factory(
+    `fediverse-miniapp-auth:${launchId}:${oauthState}`
+  )
+  publisher.postMessage({
+    type: "fediverse-miniapp:auth-completion",
+    version: "1",
+    launchId,
+    state: oauthState,
+    status: "success",
+    handoffCode: "wrong_completion_mode_1234",
+  })
+  assert.deepEqual(results, [])
+
+  publisher.postMessage({
+    type: "fediverse-miniapp:auth-completion",
+    version: "1",
+    launchId,
+    state: oauthState,
+    status: "success",
+    authorizationCode: "a".repeat(43),
+  })
+
+  assert.deepEqual(results, [
+    {
+      type: "authResult",
+      version: "1",
+      launchId,
+      requestId: "auth-browser",
+      status: "success",
+      authorizationCode: "a".repeat(43),
+    },
+  ])
+})
+
 test("accepts bounded failure callbacks without a handoff code", () => {
   const broadcasts = broadcastFixture()
   const results = []
@@ -157,6 +206,39 @@ test("completion page parses an exact fragment, broadcasts once, and never uses 
     },
   ])
   assert.equal(closed, 1)
+})
+
+test("completion page parses the exact browser authorization-code fragment", () => {
+  const broadcasts = broadcastFixture()
+  const listener = broadcasts.factory(
+    `fediverse-miniapp-auth:${launchId}:${oauthState}`
+  )
+  const messages = []
+  listener.onmessage = event => messages.push(event.data)
+
+  assert.equal(
+    createMiniAppAuthCompletionRelay({
+      locationObject: {
+        hash:
+          `#version=1&launch_id=${launchId}&state=${oauthState}&status=success&authorization_code=${"a".repeat(43)}`,
+      },
+      broadcastChannelFactory: broadcasts.factory,
+      schedule: callback => callback(),
+      closeWindow: () => {},
+    }),
+    true
+  )
+
+  assert.deepEqual(messages, [
+    {
+      type: "fediverse-miniapp:auth-completion",
+      version: "1",
+      launchId,
+      state: oauthState,
+      status: "success",
+      authorizationCode: "a".repeat(43),
+    },
+  ])
 })
 
 test("completion page rejects duplicate, oversized, and token-smuggling fragments", () => {

@@ -493,6 +493,79 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
              Objects.get_by_ap_id(published_id)
   end
 
+  test "browser-code completion accepts only its exact pending PKCE code", %{
+    conn: conn,
+    user: user
+  } do
+    {:ok, note} =
+      Pipeline.ingest(
+        Note.build(user, ~s(<a href="https://app.example/shared/browser-auth">browser auth</a>)),
+        local: true
+      )
+
+    resolved = resolved_card(oauth?: true)
+    assert {:ok, _registration} = OAuthRegistrations.register(resolved.manifest)
+    assert {:ok, _card} = Cards.put(note, resolved)
+
+    application =
+      Egregoros.OAuth.get_application_by_client_id(client_id_for("https://app.example"))
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/?timeline=public")
+    view |> element("[data-role='open-mini-app']") |> render_click()
+
+    launch_id = :sys.get_state(view.pid).socket.assigns.mini_app_host.launch_id
+    render_hook(view, "mini_app_ready", %{"launch_id" => launch_id})
+
+    browser_auth =
+      launch_id
+      |> auth_params(application.client_id)
+      |> Map.put("completion_mode", "browser_code")
+      |> Map.delete("handoff_challenge")
+
+    render_hook(view, "mini_app_auth_request", browser_auth)
+
+    assert has_element?(
+             view,
+             "#mini-app-auth-open[data-auth-completion-mode='browser_code']"
+           )
+
+    assert {:ok, authorization_code} =
+             Egregoros.OAuth.create_authorization_code(
+               application,
+               user,
+               "https://app.example/oauth/callback",
+               "identify write",
+               code_challenge: String.duplicate("c", 43),
+               code_challenge_method: "S256",
+               grant_ttl_seconds: 86_400
+             )
+
+    render_hook(view, "mini_app_auth_complete", %{
+      "launch_id" => launch_id,
+      "request_id" => "auth-1",
+      "status" => "success",
+      "authorization_code" => String.duplicate("x", 43)
+    })
+
+    refute :sys.get_state(view.pid).socket.assigns.mini_app_host.oauth_authenticated?
+
+    render_hook(
+      view,
+      "mini_app_auth_request",
+      %{browser_auth | "request_id" => "auth-2"}
+    )
+
+    render_hook(view, "mini_app_auth_complete", %{
+      "launch_id" => launch_id,
+      "request_id" => "auth-2",
+      "status" => "success",
+      "authorization_code" => authorization_code.code
+    })
+
+    assert :sys.get_state(view.pid).socket.assigns.mini_app_host.oauth_authenticated?
+  end
+
   test "compose revalidates the live OAuth grant at request and submit boundaries", %{
     conn: conn,
     user: user

@@ -17,6 +17,7 @@ defmodule EgregorosWeb.MiniAppHost do
   alias Egregoros.MiniApps.Permissions
   alias Egregoros.MiniApps.WalletConnections
   alias Egregoros.MiniApps.WalletRequest
+  alias Egregoros.OAuth
   alias Egregoros.Publish
   alias Egregoros.Repo
   alias Egregoros.User
@@ -370,6 +371,7 @@ defmodule EgregorosWeb.MiniAppHost do
                 data-request-id={@state.auth_request.request_id}
                 data-auth-state={@state.auth_request.relay_state}
                 data-auth-url={@state.auth_request.authorization_url}
+                data-auth-completion-mode={@state.auth_request.completion_mode}
                 class="cursor-pointer border-2 border-[color:var(--border-default)] bg-[color:var(--text-primary)] px-4 py-2 text-sm font-bold text-[color:var(--bg-base)] transition hover:shadow-[3px_3px_0_var(--accent)] focus-visible:outline-none focus-brutal"
               >
                 Continue
@@ -903,7 +905,7 @@ defmodule EgregorosWeb.MiniAppHost do
 
   defp handle_host_event(
          "mini_app_auth_complete",
-         %{"launch_id" => launch_id, "request_id" => request_id, "status" => status},
+         %{"launch_id" => launch_id, "request_id" => request_id, "status" => status} = params,
          socket
        )
        when status in ["success", "cancelled", "error"] do
@@ -912,11 +914,7 @@ defmodule EgregorosWeb.MiniAppHost do
     if (state.launch_id == launch_id and state.auth_request) &&
          state.auth_request.request_id == request_id do
       authenticated? =
-        status == "success" and
-          OAuthRegistrations.active_user_grant?(
-            state.card.app_origin,
-            socket.assigns.mini_app_user_id
-          )
+        auth_completion_valid?(state, socket.assigns.mini_app_user_id, status, params)
 
       {:halt, %{accepted: true, authenticated: authenticated?},
        Phoenix.Component.assign(socket, :mini_app_host, %{
@@ -1479,6 +1477,27 @@ defmodule EgregorosWeb.MiniAppHost do
        do: {:halt, socket}
 
   defp handle_host_event(_event, _params, socket), do: {:cont, socket}
+
+  defp auth_completion_valid?(_state, _user_id, status, _params) when status != "success",
+    do: false
+
+  defp auth_completion_valid?(%{auth_request: request} = state, user_id, "success", params) do
+    case request.completion_mode do
+      "backend_handoff" ->
+        not Map.has_key?(params, "authorization_code") and
+          OAuthRegistrations.active_user_grant?(state.card.app_origin, user_id)
+
+      "browser_code" ->
+        OAuth.pending_browser_authorization_code?(
+          Map.get(params, "authorization_code"),
+          request.application_id,
+          user_id,
+          request.redirect_uri,
+          Enum.join(request.scopes, " "),
+          request.code_challenge
+        )
+    end
+  end
 
   defp update_status(socket, status) do
     state = socket.assigns.mini_app_host
