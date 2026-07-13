@@ -16,7 +16,7 @@ defmodule EgregorosWeb.OAuthServerMetadataController do
       "grant_types_supported" => ["authorization_code", "refresh_token"],
       "code_challenge_methods_supported" => ["S256"],
       "token_endpoint_auth_methods_supported" => ["client_secret_post", "none"],
-      "scopes_supported" => ["read", "write", "follow", "push"],
+      "scopes_supported" => ["identify", "read", "write", "follow", "push"],
       "fediverse_miniapp_profile" => "1"
     })
   end

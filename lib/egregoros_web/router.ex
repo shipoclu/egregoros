@@ -162,6 +162,8 @@ defmodule EgregorosWeb.Router do
         MiniAppNotificationPermissionController,
         :show
 
+    get "/api/v1/mini-apps/identity", MiniAppIdentityController, :show
+
     get "/api/pleroma/frontend_configurations", PleromaFrontendConfigurationsController, :index
     get "/api/pleroma/emoji.json", PleromaEmojiController, :index
     post "/inbox", InstanceInboxController, :inbox

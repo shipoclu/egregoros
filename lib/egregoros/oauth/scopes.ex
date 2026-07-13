@@ -11,7 +11,7 @@ defmodule Egregoros.OAuth.Scopes do
 
   def contains_all?(token_scopes, required_scopes)
       when is_binary(token_scopes) and is_list(required_scopes) do
-    token_scopes = MapSet.new(parse(token_scopes))
+    token_scopes = token_scopes |> parse() |> expand()
     required_scopes = MapSet.new(required_scopes)
     MapSet.subset?(required_scopes, token_scopes)
   end
@@ -21,5 +21,13 @@ defmodule Egregoros.OAuth.Scopes do
     requested_scopes = MapSet.new(parse(requested_scopes))
     allowed_scopes = MapSet.new(parse(allowed_scopes))
     MapSet.subset?(requested_scopes, allowed_scopes)
+  end
+
+  defp expand(scopes) do
+    scopes = MapSet.new(scopes)
+
+    if MapSet.member?(scopes, "read"),
+      do: MapSet.put(scopes, "identify"),
+      else: scopes
   end
 end

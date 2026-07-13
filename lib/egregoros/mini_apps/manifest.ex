@@ -124,7 +124,7 @@ defmodule Egregoros.MiniApps.Manifest do
          {:ok, scopes} <- string_list(attrs["scopes"], 1, 32),
          :ok <- unique(scopes),
          true <- Enum.all?(scopes, &valid_scope?/1) or {:error, :invalid_scope},
-         true <- "read" in scopes or {:error, :read_scope_required} do
+         true <- "identify" in scopes or "read" in scopes or {:error, :identify_scope_required} do
       {:ok, %{redirect_uris: redirect_uris, scopes: scopes}}
     end
   end

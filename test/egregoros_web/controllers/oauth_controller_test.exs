@@ -246,7 +246,7 @@ defmodule EgregorosWeb.OAuthControllerTest do
         "homeUrl" => "https://app.example/",
         "oauth" => %{
           "redirectUris" => ["https://app.example/oauth/callback"],
-          "scopes" => ["read", "write"]
+          "scopes" => ["identify", "read", "write"]
         },
         "capabilities" => ["compose_note"]
       })
@@ -266,7 +266,7 @@ defmodule EgregorosWeb.OAuthControllerTest do
       "client_id" => app.client_id,
       "redirect_uri" => "https://app.example/oauth/callback",
       "response_type" => "code",
-      "scope" => "read write",
+      "scope" => "identify read write",
       "state" => "state-1",
       "code_challenge" => challenge,
       "code_challenge_method" => "S256"
@@ -293,6 +293,18 @@ defmodule EgregorosWeb.OAuthControllerTest do
 
     assert document |> LazyHTML.query("#oauth-mini-app-capabilities") |> LazyHTML.text() =~
              "prefilled note draft"
+
+    assert document |> LazyHTML.query("#oauth-permission-identify") |> LazyHTML.text() =~
+             "Link your Fediverse identity"
+
+    assert document |> LazyHTML.query("#oauth-permission-identify") |> LazyHTML.text() =~
+             "does not permit reading timelines or posts"
+
+    assert document |> LazyHTML.query("#oauth-permission-read") |> LazyHTML.text() =~
+             "Read authenticated account data"
+
+    assert document |> LazyHTML.query("#oauth-permission-write") |> LazyHTML.text() =~
+             "create, edit, and delete"
 
     assert LazyHTML.query(document, "#oauth-write-confirmation[required]") |> LazyHTML.to_tree() !=
              []

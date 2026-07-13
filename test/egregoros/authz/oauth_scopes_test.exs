@@ -40,7 +40,39 @@ defmodule Egregoros.AuthZ.OAuthScopesTest do
       |> put_req_header("authorization", "Bearer " <> token.token)
 
     assert :ok == OAuthScopes.authorize(conn, ["read"])
+    assert :ok == OAuthScopes.authorize(conn, ["identify"])
     assert :ok == OAuthScopes.authorize(conn, ["follow"])
     assert {:error, :insufficient_scope} = OAuthScopes.authorize(conn, ["write", "admin"])
+  end
+
+  test "identify grants identity without granting broad read or write" do
+    {:ok, user} = Users.create_local_user("identify-only-user")
+
+    {:ok, app} =
+      OAuth.create_application(%{
+        "client_name" => "Identity linker",
+        "redirect_uris" => "urn:ietf:wg:oauth:2.0:oob",
+        "scopes" => "identify"
+      })
+
+    {:ok, auth_code} =
+      OAuth.create_authorization_code(app, user, "urn:ietf:wg:oauth:2.0:oob", "identify")
+
+    {:ok, token} =
+      OAuth.exchange_code_for_token(%{
+        "grant_type" => "authorization_code",
+        "code" => auth_code.code,
+        "client_id" => app.client_id,
+        "client_secret" => app.client_secret,
+        "redirect_uri" => "urn:ietf:wg:oauth:2.0:oob"
+      })
+
+    conn =
+      conn(:get, "/api/v1/mini-apps/identity")
+      |> put_req_header("authorization", "Bearer " <> token.token)
+
+    assert :ok == OAuthScopes.authorize(conn, ["identify"])
+    assert {:error, :insufficient_scope} = OAuthScopes.authorize(conn, ["read"])
+    assert {:error, :insufficient_scope} = OAuthScopes.authorize(conn, ["write"])
   end
 end

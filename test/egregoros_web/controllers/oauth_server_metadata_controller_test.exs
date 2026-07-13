@@ -19,7 +19,7 @@ defmodule EgregorosWeb.OAuthServerMetadataControllerTest do
     assert metadata["grant_types_supported"] == ["authorization_code", "refresh_token"]
     assert metadata["code_challenge_methods_supported"] == ["S256"]
     assert metadata["token_endpoint_auth_methods_supported"] == ["client_secret_post", "none"]
-    assert metadata["scopes_supported"] == ["read", "write", "follow", "push"]
+    assert metadata["scopes_supported"] == ["identify", "read", "write", "follow", "push"]
     assert metadata["fediverse_miniapp_profile"] == "1"
   end
 end

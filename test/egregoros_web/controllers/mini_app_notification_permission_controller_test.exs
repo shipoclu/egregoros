@@ -77,7 +77,7 @@ defmodule EgregorosWeb.MiniAppNotificationPermissionControllerTest do
       OAuth.create_application(%{
         "client_name" => "Ordinary client",
         "redirect_uris" => ["https://client.example/callback"],
-        "scopes" => "read"
+        "scopes" => "identify"
       })
 
     token = oauth_token(application, user, "https://client.example/callback")
@@ -133,7 +133,7 @@ defmodule EgregorosWeb.MiniAppNotificationPermissionControllerTest do
                application,
                user,
                redirect_uri,
-               "read",
+               "identify",
                code_challenge: challenge,
                code_challenge_method: "S256"
              )
@@ -163,7 +163,7 @@ defmodule EgregorosWeb.MiniAppNotificationPermissionControllerTest do
       "homeUrl" => "https://app.example/",
       "oauth" => %{
         "redirectUris" => ["https://app.example/oauth/callback"],
-        "scopes" => ["read"]
+        "scopes" => ["identify"]
       },
       "activityPub" => %{
         "actorUrl" => "https://app.example/ap/actor",

@@ -12,7 +12,7 @@ defmodule Egregoros.MiniApps.ManifestTest do
     assert manifest.name == "Budget Polls"
     assert manifest.origin == "https://app.example"
     assert manifest.home_url == "https://app.example/"
-    assert manifest.oauth.scopes == ["read", "write"]
+    assert manifest.oauth.scopes == ["identify", "write"]
     assert manifest.wallet.evm.enabled
     refute manifest.wallet.evm.required
     assert manifest.wallet.evm.required_chains == ["eip155:8453"]
@@ -170,14 +170,14 @@ defmodule Egregoros.MiniApps.ManifestTest do
     end
   end
 
-  test "requires read whenever oauth is declared" do
+  test "requires identify whenever oauth is declared" do
     json = valid_manifest() |> put_in(["oauth", "scopes"], ["write"]) |> Jason.encode!()
-    assert {:error, :read_scope_required} = Manifest.decode(json, @manifest_url)
+    assert {:error, :identify_scope_required} = Manifest.decode(json, @manifest_url)
   end
 
   test "rejects duplicate scopes, capabilities, redirects, and chains" do
     cases = [
-      put_in(valid_manifest(), ["oauth", "scopes"], ["read", "read"]),
+      put_in(valid_manifest(), ["oauth", "scopes"], ["identify", "identify"]),
       Map.put(valid_manifest(), "capabilities", ["compose_note", "compose_note"]),
       put_in(valid_manifest(), ["oauth", "redirectUris"], [
         "https://app.example/callback",
@@ -234,7 +234,7 @@ defmodule Egregoros.MiniApps.ManifestTest do
       },
       "oauth" => %{
         "redirectUris" => ["https://app.example/oauth/callback"],
-        "scopes" => ["read", "write"]
+        "scopes" => ["identify", "write"]
       },
       "wallet" => %{
         "evm" => %{

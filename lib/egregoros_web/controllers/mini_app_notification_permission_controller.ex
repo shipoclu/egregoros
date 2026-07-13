@@ -19,7 +19,7 @@ defmodule EgregorosWeb.MiniAppNotificationPermissionController do
       |> put_resp_header("referrer-policy", "no-referrer")
 
     with {:ok, %Token{user: user, application: application} = token} <- authenticate(conn),
-         :ok <- require_read(token),
+         :ok <- require_identify(token),
          {:ok, %OAuthRegistration{} = registration} <- registration(application.id),
          {:ok, app_actor} <- Declarations.notification_actor(registration.app_origin) do
       if NotificationConsents.granted?(user.id, registration.app_origin) do
@@ -58,8 +58,8 @@ defmodule EgregorosWeb.MiniAppNotificationPermissionController do
     end
   end
 
-  defp require_read(%Token{scopes: scopes}) do
-    if Scopes.contains_all?(scopes, ["read"]),
+  defp require_identify(%Token{scopes: scopes}) do
+    if Scopes.contains_all?(scopes, ["identify"]),
       do: :ok,
       else: {:error, :insufficient_scope}
   end
