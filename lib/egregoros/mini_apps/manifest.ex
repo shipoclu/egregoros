@@ -15,7 +15,7 @@ defmodule Egregoros.MiniApps.Manifest do
   @allowed_fields ~w(version name publisher homeUrl iconUrl splash oauth wallet activityPub capabilities cacheTtlSeconds)
   @publisher_fields ~w(name url)
   @splash_fields ~w(imageUrl backgroundColor)
-  @oauth_fields ~w(redirectUris scopes)
+  @oauth_fields ~w(redirectUris scopes scopeAuthorizationMaxAgeSeconds)
   @wallet_fields ~w(evm)
   @evm_fields ~w(enabled required requiredChains)
   @activity_pub_fields ~w(actorUrl publicNotes transactionalMentions)
@@ -124,12 +124,36 @@ defmodule Egregoros.MiniApps.Manifest do
          {:ok, scopes} <- string_list(attrs["scopes"], 1, 32),
          :ok <- unique(scopes),
          true <- Enum.all?(scopes, &valid_scope?/1) or {:error, :invalid_scope},
-         true <- "identify" in scopes or "read" in scopes or {:error, :identify_scope_required} do
-      {:ok, %{redirect_uris: redirect_uris, scopes: scopes}}
+         true <- "identify" in scopes or "read" in scopes or {:error, :identify_scope_required},
+         {:ok, scope_max_ages} <-
+           scope_authorization_max_ages(attrs["scopeAuthorizationMaxAgeSeconds"], scopes) do
+      {:ok,
+       %{
+         redirect_uris: redirect_uris,
+         scopes: scopes,
+         scope_authorization_max_age_seconds: scope_max_ages
+       }}
     end
   end
 
   defp oauth(_attrs, _origin), do: {:error, :invalid_oauth}
+
+  defp scope_authorization_max_ages(nil, _scopes), do: {:ok, %{}}
+
+  defp scope_authorization_max_ages(value, scopes) when is_map(value) do
+    valid? =
+      map_size(value) <= length(scopes) and
+        Enum.all?(value, fn {scope, seconds} ->
+          scope in scopes and is_integer(seconds) and seconds in 300..31_536_000
+        end)
+
+    if valid?,
+      do: {:ok, value},
+      else: {:error, :invalid_scope_authorization_max_age}
+  end
+
+  defp scope_authorization_max_ages(_value, _scopes),
+    do: {:error, :invalid_scope_authorization_max_age}
 
   defp wallet(nil), do: {:ok, nil}
 

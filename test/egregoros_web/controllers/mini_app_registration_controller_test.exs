@@ -25,6 +25,12 @@ defmodule EgregorosWeb.MiniAppRegistrationControllerTest do
     assert response["client_name"] == "Writer"
     assert response["redirect_uris"] == ["https://app.example/oauth/callback"]
     assert response["scope"] == "identify write"
+
+    assert response["scope_authorization_max_age_seconds"] == %{
+             "identify" => 31_536_000,
+             "write" => 86_400
+           }
+
     assert response["grant_types"] == ["authorization_code", "refresh_token"]
     assert response["response_types"] == ["code"]
     assert response["token_endpoint_auth_method"] == "none"
@@ -115,6 +121,9 @@ defmodule EgregorosWeb.MiniAppRegistrationControllerTest do
       manifest_json()
       |> Jason.decode!()
       |> put_in(["oauth", "scopes"], ["identify"])
+      |> put_in(["oauth", "scopeAuthorizationMaxAgeSeconds"], %{
+        "identify" => 31_536_000
+      })
       |> Jason.encode!()
 
     expect(Egregoros.MiniApps.Fetcher.Mock, :get, 2, fn
@@ -143,7 +152,11 @@ defmodule EgregorosWeb.MiniAppRegistrationControllerTest do
       "homeUrl" => "https://app.example/",
       "oauth" => %{
         "redirectUris" => ["https://app.example/oauth/callback"],
-        "scopes" => ["identify", "write"]
+        "scopes" => ["identify", "write"],
+        "scopeAuthorizationMaxAgeSeconds" => %{
+          "identify" => 31_536_000,
+          "write" => 86_400
+        }
       },
       "capabilities" => ["compose_note"]
     })

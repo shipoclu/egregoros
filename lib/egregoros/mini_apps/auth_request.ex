@@ -19,6 +19,12 @@ defmodule Egregoros.MiniApps.AuthRequest do
          {:ok, request_id} <- request_id(Map.get(params, "request_id")),
          {:ok, redirect_uri} <- redirect_uri(params, registration, app_origin),
          {:ok, scopes} <- scopes(Map.get(params, "scopes"), registration.scopes),
+         {:ok, authorization_lifetime_seconds} <-
+           OAuthRegistrations.authorization_lifetime(
+             application,
+             Enum.join(scopes, " "),
+             Map.get(params, "authorization_lifetime_seconds")
+           ),
          {:ok, state} <- state(Map.get(params, "state")),
          {:ok, code_challenge} <- pkce(params),
          :ok <- handoff_challenge(Map.get(params, "handoff_challenge")) do
@@ -33,7 +39,8 @@ defmodule Egregoros.MiniApps.AuthRequest do
              redirect_uri,
              scopes,
              state,
-             code_challenge
+             code_challenge,
+             authorization_lifetime_seconds
            )
        }}
     else
@@ -64,8 +71,13 @@ defmodule Egregoros.MiniApps.AuthRequest do
   end
 
   defp scopes(requested, registered) when is_list(requested) do
-    if Enum.all?(requested, &is_binary/1) and MapSet.new(requested) == MapSet.new(registered) do
-      {:ok, registered}
+    requested_set = MapSet.new(requested)
+    registered_set = MapSet.new(registered)
+
+    if length(requested) in 1..32 and Enum.all?(requested, &is_binary/1) and
+         MapSet.size(requested_set) == length(requested) and
+         MapSet.subset?(requested_set, registered_set) do
+      {:ok, Enum.filter(registered, &MapSet.member?(requested_set, &1))}
     else
       {:error, :invalid_scope}
     end
@@ -98,7 +110,14 @@ defmodule Egregoros.MiniApps.AuthRequest do
 
   defp handoff_challenge(_value), do: {:error, :invalid_handoff_challenge}
 
-  defp authorization_url(client_id, redirect_uri, scopes, state, code_challenge) do
+  defp authorization_url(
+         client_id,
+         redirect_uri,
+         scopes,
+         state,
+         code_challenge,
+         authorization_lifetime_seconds
+       ) do
     query =
       URI.encode_query(%{
         "client_id" => client_id,
@@ -107,7 +126,8 @@ defmodule Egregoros.MiniApps.AuthRequest do
         "scope" => Enum.join(scopes, " "),
         "state" => state,
         "code_challenge" => code_challenge,
-        "code_challenge_method" => "S256"
+        "code_challenge_method" => "S256",
+        "authorization_lifetime_seconds" => authorization_lifetime_seconds
       })
 
     "/oauth/authorize?" <> query

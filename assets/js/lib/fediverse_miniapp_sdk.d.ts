@@ -36,6 +36,7 @@ export interface MiniAppAuthorizationRequest {
   readonly state: string
   readonly codeChallenge: string
   readonly handoffChallenge: string
+  readonly authorizationLifetimeSeconds?: number
 }
 
 export interface MiniAppAuthorizationResult {

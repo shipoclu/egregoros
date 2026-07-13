@@ -151,6 +151,7 @@ const authRequestFields = new Set([
   "codeChallenge",
   "codeChallengeMethod",
   "handoffChallenge",
+  "authorizationLifetimeSeconds",
 ])
 
 const boundedUrl = value => typeof value === "string" && value.length <= 2048
@@ -172,7 +173,8 @@ const validAuthRequest = (message, launchId) =>
   typeof message === "object" &&
   !Array.isArray(message) &&
   Object.keys(message).every(key => authRequestFields.has(key)) &&
-  Object.keys(message).length === authRequestFields.size &&
+  Object.keys(message).length >= authRequestFields.size - 1 &&
+  Object.keys(message).length <= authRequestFields.size &&
   message.type === "requestAuth" &&
   message.version === protocolVersion &&
   message.launchId === launchId &&
@@ -184,7 +186,11 @@ const validAuthRequest = (message, launchId) =>
   highEntropyState(message.state) &&
   base64UrlSha256(message.codeChallenge) &&
   message.codeChallengeMethod === "S256" &&
-  base64UrlSha256(message.handoffChallenge)
+  base64UrlSha256(message.handoffChallenge) &&
+  (message.authorizationLifetimeSeconds === undefined ||
+    (Number.isSafeInteger(message.authorizationLifetimeSeconds) &&
+      message.authorizationLifetimeSeconds >= 300 &&
+      message.authorizationLifetimeSeconds <= 31_536_000))
 
 const composeDraftFields = new Set([
   "text",
@@ -467,6 +473,9 @@ export const createMiniAppBroker = ({
           codeChallenge: message.codeChallenge,
           codeChallengeMethod: message.codeChallengeMethod,
           handoffChallenge: message.handoffChallenge,
+          ...(message.authorizationLifetimeSeconds === undefined
+            ? {}
+            : {authorizationLifetimeSeconds: message.authorizationLifetimeSeconds}),
         })
         return
       }

@@ -11,6 +11,7 @@ defmodule Egregoros.MiniApps.OAuthRegistration do
     field :app_origin, :string
     field :redirect_uris, {:array, :string}
     field :scopes, {:array, :string}
+    field :scope_authorization_max_age_seconds, :map, default: %{}
     field :capabilities, {:array, :string}
     field :manifest_fingerprint, :binary
     field :registered_at, :utc_datetime_usec
@@ -25,6 +26,7 @@ defmodule Egregoros.MiniApps.OAuthRegistration do
       :app_origin,
       :redirect_uris,
       :scopes,
+      :scope_authorization_max_age_seconds,
       :capabilities,
       :manifest_fingerprint,
       :registered_at

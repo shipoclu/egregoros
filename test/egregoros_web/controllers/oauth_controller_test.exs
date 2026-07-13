@@ -35,6 +35,7 @@ defmodule EgregorosWeb.OAuthControllerTest do
     assert is_binary(response["access_token"])
     assert is_binary(response["refresh_token"])
     assert response["expires_in"] in 3_590..3_600
+    assert response["authorization_expires_in"] in 31_535_990..31_536_000
   end
 
   test "POST /oauth/token exchanges a refresh_token for a new bearer token", %{conn: conn} do
@@ -246,7 +247,12 @@ defmodule EgregorosWeb.OAuthControllerTest do
         "homeUrl" => "https://app.example/",
         "oauth" => %{
           "redirectUris" => ["https://app.example/oauth/callback"],
-          "scopes" => ["identify", "read", "write"]
+          "scopes" => ["identify", "read", "write"],
+          "scopeAuthorizationMaxAgeSeconds" => %{
+            "identify" => 31_536_000,
+            "read" => 2_592_000,
+            "write" => 86_400
+          }
         },
         "capabilities" => ["compose_note"]
       })
@@ -269,7 +275,8 @@ defmodule EgregorosWeb.OAuthControllerTest do
       "scope" => "identify read write",
       "state" => "state-1",
       "code_challenge" => challenge,
-      "code_challenge_method" => "S256"
+      "code_challenge_method" => "S256",
+      "authorization_lifetime_seconds" => "86400"
     }
 
     consent_conn =
@@ -309,6 +316,39 @@ defmodule EgregorosWeb.OAuthControllerTest do
     assert LazyHTML.query(document, "#oauth-write-confirmation[required]") |> LazyHTML.to_tree() !=
              []
 
+    assert LazyHTML.query(document, "#oauth-authorization-lifetime")
+           |> LazyHTML.attribute("name") == ["oauth[authorization_lifetime_seconds]"]
+
+    assert document |> LazyHTML.query("#oauth-authorization-lifetime") |> LazyHTML.text() =~
+             "1 day"
+
+    identify_conn =
+      conn
+      |> recycle()
+      |> Plug.Test.init_test_session(%{user_id: user.id})
+      |> get(
+        "/oauth/authorize",
+        oauth_params
+        |> Map.put("scope", "identify")
+        |> Map.put("authorization_lifetime_seconds", "2592000")
+      )
+
+    identify_document = identify_conn |> html_response(200) |> LazyHTML.from_document()
+
+    assert LazyHTML.query(identify_document, "#oauth-permission-identify") |> LazyHTML.to_tree() !=
+             []
+
+    assert LazyHTML.query(identify_document, "#oauth-permission-read") |> LazyHTML.to_tree() == []
+
+    assert LazyHTML.query(identify_document, "#oauth-permission-write") |> LazyHTML.to_tree() ==
+             []
+
+    assert LazyHTML.query(identify_document, "#oauth-write-confirmation") |> LazyHTML.to_tree() ==
+             []
+
+    assert identify_document |> LazyHTML.query("#oauth-authorization-lifetime") |> LazyHTML.text() =~
+             "1 month"
+
     cancel_url =
       document
       |> LazyHTML.query("#oauth-cancel")
@@ -332,9 +372,24 @@ defmodule EgregorosWeb.OAuthControllerTest do
       |> recycle()
       |> Plug.Test.init_test_session(%{user_id: user.id})
       |> post("/oauth/authorize", %{
-        "oauth" => Map.put(oauth_params, "write_confirmed", "true")
+        "oauth" =>
+          oauth_params
+          |> Map.put("write_confirmed", "true")
+          |> Map.put("authorization_lifetime_seconds", "3600")
       })
 
-    assert redirected_to(approved_conn) =~ "https://app.example/oauth/callback"
+    approved_url = redirected_to(approved_conn)
+    assert approved_url =~ "https://app.example/oauth/callback"
+
+    code =
+      approved_url
+      |> URI.parse()
+      |> Map.fetch!(:query)
+      |> URI.decode_query()
+      |> Map.fetch!("code")
+
+    authorization = OAuth.get_authorization_code(code)
+
+    assert DateTime.diff(authorization.grant_expires_at, DateTime.utc_now(), :second) in 3_590..3_600
   end
 end

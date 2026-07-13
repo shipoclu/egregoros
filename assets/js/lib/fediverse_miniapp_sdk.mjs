@@ -390,6 +390,7 @@ export const createFediverseMiniAppSDK = ({
           codeChallenge: auth?.codeChallenge,
           codeChallengeMethod: "S256",
           handoffChallenge: auth?.handoffChallenge,
+          authorizationLifetimeSeconds: auth?.authorizationLifetimeSeconds,
         },
         "authResult"
       ),

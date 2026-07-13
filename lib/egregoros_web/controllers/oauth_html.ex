@@ -53,4 +53,24 @@ defmodule EgregorosWeb.OAuthHTML do
       risk: :sensitive
     }
   end
+
+  def format_authorization_lifetime(seconds) when rem(seconds, 31_536_000) == 0,
+    do: duration(div(seconds, 31_536_000), "year")
+
+  def format_authorization_lifetime(seconds) when rem(seconds, 2_592_000) == 0,
+    do: duration(div(seconds, 2_592_000), "month")
+
+  def format_authorization_lifetime(seconds) when rem(seconds, 86_400) == 0,
+    do: duration(div(seconds, 86_400), "day")
+
+  def format_authorization_lifetime(seconds) when rem(seconds, 3_600) == 0,
+    do: duration(div(seconds, 3_600), "hour")
+
+  def format_authorization_lifetime(seconds) when rem(seconds, 60) == 0,
+    do: duration(div(seconds, 60), "minute")
+
+  def format_authorization_lifetime(seconds), do: duration(seconds, "second")
+
+  defp duration(1, unit), do: "1 #{unit}"
+  defp duration(count, unit), do: "#{count} #{unit}s"
 end

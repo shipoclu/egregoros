@@ -9,6 +9,7 @@ defmodule Egregoros.MiniApps.Declaration do
     field :app_origin, :string
     field :oauth_redirect_uris, {:array, :string}, default: []
     field :oauth_scopes, {:array, :string}, default: []
+    field :oauth_scope_authorization_max_age_seconds, :map, default: %{}
     field :capabilities, {:array, :string}, default: []
     field :wallet_evm_enabled, :boolean, default: false
     field :wallet_evm_required, :boolean, default: false
@@ -33,6 +34,7 @@ defmodule Egregoros.MiniApps.Declaration do
       :app_origin,
       :oauth_redirect_uris,
       :oauth_scopes,
+      :oauth_scope_authorization_max_age_seconds,
       :capabilities,
       :wallet_evm_enabled,
       :wallet_evm_required,

@@ -49,3 +49,11 @@ ID, username, fully qualified handle, display name, and profile URL; it does not
 grant authenticated access to posts, timelines, notifications, or
 conversations. Request broad `read` or `write` only for functionality that
 actually needs those independent permissions.
+
+The manifest may bound each declared scope with
+`scopeAuthorizationMaxAgeSeconds`. At authorization time, request only the
+subset needed for the current action and optionally pass
+`authorizationLifetimeSeconds` to `sdk.requestAuth`. Every request retains
+`identify`; a destructive step-up normally requests `identify write` with a
+short deadline. The user and instance may shorten it further, and refresh
+rotation cannot extend the resulting absolute expiration.

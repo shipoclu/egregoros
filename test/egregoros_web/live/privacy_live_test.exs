@@ -123,6 +123,8 @@ defmodule EgregorosWeb.PrivacyLiveTest do
     conn = Plug.Test.init_test_session(conn, %{user_id: alice.id})
     {:ok, view, _html} = live(conn, "/settings/privacy")
     assert has_element?(view, "#oauth-grant-#{registration.id}")
+    assert has_element?(view, "#oauth-grant-#{registration.id}-scope-identify time[datetime]")
+    assert has_element?(view, "#oauth-grant-#{registration.id}-scope-write time[datetime]")
 
     view
     |> element(

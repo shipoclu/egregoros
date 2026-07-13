@@ -120,8 +120,18 @@ defmodule Egregoros.MiniApps.Declarations do
       %Declaration{manifest_fingerprint: ^fingerprint} = declaration ->
         {declaration, :existing}
 
-      %Declaration{} ->
-        Repo.rollback(:manifest_changed)
+      %Declaration{} = declaration ->
+        if legacy_fingerprint_compatible?(declaration, manifest) do
+          declaration
+          |> Ecto.Changeset.change(
+            manifest_fingerprint: fingerprint,
+            oauth_scope_authorization_max_age_seconds: %{}
+          )
+          |> Repo.update!()
+          |> then(&{&1, :existing})
+        else
+          Repo.rollback(:manifest_changed)
+        end
 
       nil ->
         {create_declaration(manifest, fingerprint), :created}
@@ -129,7 +139,10 @@ defmodule Egregoros.MiniApps.Declarations do
   end
 
   defp create_declaration(manifest, fingerprint) do
-    oauth = manifest.oauth || %{redirect_uris: [], scopes: []}
+    oauth =
+      manifest.oauth ||
+        %{redirect_uris: [], scopes: [], scope_authorization_max_age_seconds: %{}}
+
     evm = get_in(manifest.wallet || %{}, [:evm]) || disabled_wallet()
     activity_pub = manifest.activity_pub || disabled_activity_pub()
 
@@ -137,6 +150,8 @@ defmodule Egregoros.MiniApps.Declarations do
       app_origin: manifest.origin,
       oauth_redirect_uris: oauth.redirect_uris,
       oauth_scopes: oauth.scopes,
+      oauth_scope_authorization_max_age_seconds:
+        Map.get(oauth, :scope_authorization_max_age_seconds, %{}),
       capabilities: manifest.capabilities,
       wallet_evm_enabled: evm.enabled,
       wallet_evm_required: evm.required,
@@ -155,15 +170,38 @@ defmodule Egregoros.MiniApps.Declarations do
   end
 
   defp fingerprint(manifest) do
-    oauth = manifest.oauth || %{redirect_uris: [], scopes: []}
+    oauth =
+      manifest.oauth ||
+        %{redirect_uris: [], scopes: [], scope_authorization_max_age_seconds: %{}}
+
     evm = get_in(manifest.wallet || %{}, [:evm]) || disabled_wallet()
     activity_pub = manifest.activity_pub || disabled_activity_pub()
 
-    {oauth.redirect_uris, oauth.scopes, manifest.capabilities,
-     {evm.enabled, evm.required, evm.required_chains},
+    {oauth.redirect_uris, oauth.scopes, Map.get(oauth, :scope_authorization_max_age_seconds, %{}),
+     manifest.capabilities, {evm.enabled, evm.required, evm.required_chains},
      {activity_pub.actor_url, activity_pub.public_notes, activity_pub.transactional_mentions}}
     |> :erlang.term_to_binary()
     |> then(&:crypto.hash(:sha256, &1))
+  end
+
+  defp legacy_fingerprint_compatible?(declaration, manifest) do
+    oauth = manifest.oauth || %{redirect_uris: [], scopes: []}
+
+    if Map.get(oauth, :scope_authorization_max_age_seconds, %{}) == %{} do
+      evm = get_in(manifest.wallet || %{}, [:evm]) || disabled_wallet()
+      activity_pub = manifest.activity_pub || disabled_activity_pub()
+
+      legacy =
+        {oauth.redirect_uris, oauth.scopes, manifest.capabilities,
+         {evm.enabled, evm.required, evm.required_chains},
+         {activity_pub.actor_url, activity_pub.public_notes, activity_pub.transactional_mentions}}
+        |> :erlang.term_to_binary()
+        |> then(&:crypto.hash(:sha256, &1))
+
+      declaration.manifest_fingerprint == legacy
+    else
+      false
+    end
   end
 
   defp disabled_wallet do

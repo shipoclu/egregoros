@@ -211,8 +211,10 @@ The authorization handoff is as follows:
 1. The app backend obtains/reuses its dynamic registration for the calling
    Egregoros issuer and creates an authorization request with PKCE.
 2. The iframe calls `requestAuth` with the client ID, exact registered callback
-   URL, requested manifest-declared scopes, PKCE challenge, opaque state, and a
-   host-generated request correlation ID.
+   URL, a non-empty subset of manifest-declared scopes, an optional requested
+   authorization lifetime, PKCE challenge, opaque state, and a host-generated
+   request correlation ID. Every subset retains `identify` (or legacy `read`)
+   as its identity baseline.
 3. Egregoros validates that those values match its registered client and the
    app's current manifest, then opens its own authorization/consent surface.
 4. The authorization response goes only to the app's exact-origin callback,
@@ -255,13 +257,14 @@ If `ready()` does not arrive by the host deadline, Egregoros keeps the branded
 loading screen and offers **Retry** and **Open externally**. It does not close
 the app automatically.
 
-After a user has approved the immutable client and scope set, Egregoros reuses
-that grant for later sessions when it is still valid. The authorization surface
+After a user has approved the immutable client and one requested scope subset,
+the app may reuse that grant until its absolute deadline. The authorization surface
 still identifies the current Egregoros account and provides a visible
 cancel/account-switch route. Revocation, expiry, changed login, or an invalid
-app session returns the flow to normal authorization. Egregoros issues its
-existing short-lived access token and refresh token; the app backend refreshes
-server-to-server without repeatedly interrupting the user.
+app session returns the flow to normal authorization. Egregoros issues a
+short-lived access token and rotating refresh token. Rotation preserves the
+grant family's original absolute deadline and can never turn a one-day grant
+into a persistent grant.
 
 #### Mandatory iframe-session handoff
 
@@ -375,10 +378,12 @@ separately threat-modeled.
 
 ### Consent and controls
 
-For an OAuth-enabled app, the first OAuth approval screen presents the app
-name, hosting/manifest domain, optional publisher metadata, and immutable
-requested OAuth scopes. Normal OAuth consent is sufficient for the declared
-non-write scopes. If the fixed scope set includes `write`, the user must
+For an OAuth-enabled app, the OAuth approval screen presents the app name,
+hosting/manifest domain, optional publisher metadata, and the scopes requested
+by this transaction from the immutable manifest maximum. The user also chooses
+an authorization duration no longer than the app, manifest, or instance
+maximum. Normal OAuth consent is sufficient for requested non-write scopes. If
+the request includes `write`, the user must
 complete a separate, plain-language second confirmation explaining that the app
 can perform write actions through the Egregoros API. Neither confirmation lets
 the app silently publish through the host compose action.
@@ -490,7 +495,9 @@ normative:
    canonical manifest URL with the client record. Redirects cannot be widened
    through a later authorization request.
 4. A registration contains fixed app metadata—canonical manifest URL, name,
-   website, redirect URIs, requested scopes, and OAuth grant/response types.
+   website, redirect URIs, maximum scopes, optional per-scope authorization
+   ages, and OAuth grant/response types. The registration response returns the
+   ages as `scope_authorization_max_age_seconds`.
    It has no user identity, note context, or per-user fields.
 5. Egregoros permanently deduplicates an equivalent registration while that
    app identity exists, idempotently returns the same public `client_id`,
@@ -515,11 +522,12 @@ junk registrations.
 
 #### Immutable scope declaration
 
-If an app declares OAuth, its requested OAuth scope set is fixed when first
-observed/registered on an instance. Every dynamic registration and authorization
-request MUST exactly equal that set; in v1, changing the declared set (adding,
+If an app declares OAuth, its maximum OAuth scope set is fixed when first
+observed/registered on an instance. Changing that declared maximum (adding,
 removing, or renaming scopes) invalidates the manifest for that app identity
-and is rejected. An OAuth-enabled manifest scope set MUST include `identify`,
+and is rejected. Each authorization request may select a non-empty subset of
+that maximum, but it cannot introduce a new scope and must include `identify`
+(or legacy `read`). An OAuth-enabled manifest scope set MUST include `identify`,
 which links the grant to the user's minimal Fediverse identity without granting
 authenticated access to timelines, posts, notifications, or conversations.
 The broad `read` scope is optional and implies `identify` for compatibility,
@@ -528,6 +536,25 @@ Apps that do not declare OAuth need no dynamic registration and can operate
 solely through non-authenticated capabilities. An OAuth-enabled app that needs
 a different permission set must use a new app identity/domain until a future
 version defines a safe migration and re-consent flow.
+
+`oauth.scopeAuthorizationMaxAgeSeconds` is an optional immutable object whose
+keys must also occur in `oauth.scopes`. Values are integer seconds from 300
+through 31,536,000. A missing key requests the instance maximum. Launch context
+cannot set or extend OAuth lifetime; it is untrusted presentation input.
+
+For each transaction, the effective maximum is the minimum of the app's
+`authorizationLifetimeSeconds` request, every requested scope's manifest
+maximum, and the instance maximum. The user may shorten it again on the
+host-owned consent screen. The access token expires after at most one hour and
+never after the authorization deadline. The refresh-token family has that same
+absolute authorization deadline, which rotation MUST preserve. The token
+response reports the remaining deadline as `authorization_expires_in`.
+
+Different lifetimes require separate grants. For example, an app may keep an
+`identify` grant for a year, then request `identify write` for one day when the
+user invokes a destructive operation. The shorter request does not replace the
+long identity grant. Literal non-expiring credentials are not supported;
+“until revoked” user experience still requires periodic finite reauthorization.
 
 #### Mini-app OAuth scope meanings
 
@@ -616,7 +643,8 @@ notificationButton.addEventListener("click", async () => {
 ```
 
 `requestAuth` accepts the backend-prepared dynamic client ID, exact redirect
-URI, fixed scope list, PKCE state/challenge, and one-time handoff challenge;
+URI, a manifest-allowed scope subset, optional
+`authorizationLifetimeSeconds`, PKCE state/challenge, and one-time handoff challenge;
 the SDK fixes the method to `S256`. `composeNote(draft)` resolves when the host
 accepts or rejects the draft and `on("composeNotePublished", callback)` emits
 the later publication receipt. `wallet.getProvider()` returns a narrow
@@ -633,7 +661,7 @@ pending calls.
 | OAuth initiation | `requestAuth` | Optional `oauth` manifest object and a server-side dynamic registration. |
 | Wallet | `wallet.evm.getProvider` and its allowlisted EIP-1193 calls | Immutable wallet declaration, host wallet availability, and per-app wallet connection/confirmation. No OAuth required. |
 | Transactional notifications | `notifications.getPermission`, `notifications.requestPermission` | Immutable ActivityPub declaration and OAuth; prompting additionally requires a user gesture and host confirmation. |
-| OAuth-gated | `composeNote` | Immutable `compose_note` declaration plus completed OAuth with its fixed `identify`-inclusive scope set. |
+| OAuth-gated | `composeNote` | Immutable `compose_note` declaration plus an unexpired OAuth grant containing `identify` (or legacy `read`). |
 
 #### Compose a note
 
@@ -932,8 +960,10 @@ mini app as a public client and never issues it a client secret. Refresh/access
 tokens MUST never enter the iframe or host message channel.
 Registration, authorization, token exchange, refresh, revocation, and every
 bearer-token API request MUST re-check the current exact app origin, immutable
-scope set, and operator domain policy. Refresh tokens require rotation/replay
-detection or equivalent family invalidation. Revocation and a newly matching
+maximum scope set, requested subset, absolute authorization deadline, and
+operator domain policy. Refresh tokens require rotation/replay detection or
+equivalent family invalidation and MUST retain the original family deadline.
+Revocation and a newly matching
 deny rule invalidate the whole token family immediately.
 
 The callback completion message uses the same exact-origin/source/channel
@@ -1158,7 +1188,8 @@ The choices are:
 | Page metadata authority | Presentation/launch only | It cannot change app identity, OAuth, scopes, or capabilities. |
 | Visual asset origins | Exact app origin | Prevents third-party CDN identity ambiguity; assets are proxied. |
 | Baseline OAuth scope | `identify` required when OAuth is declared | Links the app to a minimal five-field Fediverse identity without authenticated post/timeline access. Legacy broad `read` grants imply `identify`. |
-| Scope request | Exact immutable manifest set | No per-session scope variation or escalation. |
+| Scope request | Non-empty subset of an immutable manifest maximum | Every request retains `identify`; step-up grants cannot introduce undeclared scopes. |
+| Authorization lifetime | Per-scope immutable manifest maximum, then app/server/user minimum | Access tokens last at most one hour; refresh rotation never extends the absolute grant deadline. |
 | Host capabilities | Immutable manifest declaration | Consent visibly covers non-base actions such as `compose_note`. |
 | Context disclosure | Once per app, independent of OAuth | Required before public note context is sent; may be combined with OAuth consent. |
 | App public messages | Ordinary app-owned ActivityPub actor | Followers receive standard public `Create(Note)` activities. |
@@ -1260,7 +1291,11 @@ Published as `https://{app-origin}/.well-known/fediverse-miniapp.json`:
   },
   "oauth": {
     "redirectUris": ["https://app.example/oauth/callback"],
-    "scopes": ["identify", "write"]
+    "scopes": ["identify", "write"],
+    "scopeAuthorizationMaxAgeSeconds": {
+      "identify": 31536000,
+      "write": 86400
+    }
   },
   "wallet": {
     "evm": {
@@ -1292,6 +1327,10 @@ must include `identify`. Broad `read` is separate, optional authority and is
 not needed merely to link a Fediverse account. Its `scopes` and all manifests'
 `capabilities` arrays are
 de-duplicated, bounded, and immutable after first registration/observation. The
+optional `scopeAuthorizationMaxAgeSeconds` object is also immutable; every key
+must name a declared scope and every value must be 300 through 31,536,000
+seconds. Authorization requests may choose subsets and shorter durations but
+cannot exceed those declarations. The
 `wallet` and `activityPub` objects are optional and immutable when present. An
 ActivityPub actor URL must use the exact origin, have a non-root path, and have
 no query or fragment. At least one publishing mode must be enabled;

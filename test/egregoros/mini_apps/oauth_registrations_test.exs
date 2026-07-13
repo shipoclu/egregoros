@@ -2,9 +2,11 @@ defmodule Egregoros.MiniApps.OAuthRegistrationsTest do
   use Egregoros.DataCase, async: false
 
   alias Egregoros.MiniApps.Manifest
+  alias Egregoros.MiniApps.Declaration
   alias Egregoros.MiniApps.Declarations
   alias Egregoros.MiniApps.NotificationConsents
   alias Egregoros.MiniApps.OAuthRegistrations
+  alias Egregoros.MiniApps.OAuthRegistration
   alias Egregoros.MiniApps.Permissions
   alias Egregoros.OAuth
   alias Egregoros.OAuth.Application, as: OAuthApplication
@@ -40,6 +42,12 @@ defmodule Egregoros.MiniApps.OAuthRegistrationsTest do
     assert first.app_origin == "https://app.example"
     assert first.redirect_uris == ["https://app.example/oauth/callback"]
     assert first.scopes == ["identify", "write"]
+
+    assert first.scope_authorization_max_age_seconds == %{
+             "identify" => 31_536_000,
+             "write" => 86_400
+           }
+
     assert first.capabilities == ["compose_note"]
     assert first.oauth_application_id == second.oauth_application_id
     assert Repo.aggregate(OAuthApplication, :count) == 1
@@ -62,8 +70,44 @@ defmodule Egregoros.MiniApps.OAuthRegistrationsTest do
     changed = manifest_fixture(capabilities: [])
     assert {:error, :manifest_changed} = OAuthRegistrations.register(changed)
 
+    changed = manifest_fixture(scope_max_ages: %{"identify" => 31_536_000, "write" => 3_600})
+    assert {:error, :manifest_changed} = OAuthRegistrations.register(changed)
+
     assert Repo.aggregate(OAuthApplication, :count) == 1
     assert OAuthRegistrations.get_by_origin("https://app.example").id == registration.id
+  end
+
+  test "upgrades unchanged pre-lifetime fingerprints without weakening immutability" do
+    manifest = manifest_fixture(scope_max_ages: %{})
+    assert {:ok, registration} = OAuthRegistrations.register(manifest)
+    declaration = Declarations.get_by_origin(manifest.origin)
+
+    legacy_registration_fingerprint =
+      {manifest.oauth.redirect_uris, manifest.oauth.scopes, manifest.capabilities,
+       manifest.wallet}
+      |> :erlang.term_to_binary()
+      |> then(&:crypto.hash(:sha256, &1))
+
+    legacy_declaration_fingerprint =
+      {manifest.oauth.redirect_uris, manifest.oauth.scopes, manifest.capabilities,
+       {false, false, []}, {nil, false, false}}
+      |> :erlang.term_to_binary()
+      |> then(&:crypto.hash(:sha256, &1))
+
+    registration
+    |> Ecto.Changeset.change(manifest_fingerprint: legacy_registration_fingerprint)
+    |> Repo.update!()
+
+    declaration
+    |> Ecto.Changeset.change(manifest_fingerprint: legacy_declaration_fingerprint)
+    |> Repo.update!()
+
+    assert {:ok, upgraded} = OAuthRegistrations.register(manifest)
+    refute upgraded.manifest_fingerprint == legacy_registration_fingerprint
+
+    upgraded_declaration = Repo.get!(Declaration, declaration.id)
+    refute upgraded_declaration.manifest_fingerprint == legacy_declaration_fingerprint
+    assert Repo.aggregate(OAuthRegistration, :count) == 1
   end
 
   test "requires OAuth metadata and current operator permission" do
@@ -173,9 +217,16 @@ defmodule Egregoros.MiniApps.OAuthRegistrationsTest do
              )
 
     assert :ok = OAuthRegistrations.validate_token_scopes(application, "write identify")
+    assert :ok = OAuthRegistrations.validate_token_scopes(application, "identify")
+
+    assert {:error, :invalid_scope} =
+             OAuthRegistrations.validate_token_scopes(application, "write")
 
     assert {:error, :invalid_scope} =
              OAuthRegistrations.validate_token_scopes(application, "read")
+
+    assert {:error, :invalid_scope} =
+             OAuthRegistrations.validate_token_scopes(application, "identify identify")
   end
 
   test "public token endpoints reject malformed credentials, replay, and stale tokens" do
@@ -329,6 +380,15 @@ defmodule Egregoros.MiniApps.OAuthRegistrationsTest do
                code_challenge_method: "S256"
              )
 
+    assert DateTime.diff(code.grant_expires_at, DateTime.utc_now(), :second) in 86_390..86_400
+
+    assert {:error, :invalid_authorization_lifetime} =
+             OAuth.create_authorization_code(application, user, redirect_uri, "identify write",
+               code_challenge: challenge,
+               code_challenge_method: "S256",
+               grant_ttl_seconds: 86_401
+             )
+
     assert {:ok, token} =
              OAuth.exchange_code_for_token(%{
                "grant_type" => "authorization_code",
@@ -406,6 +466,10 @@ defmodule Egregoros.MiniApps.OAuthRegistrationsTest do
 
     assert [%{app_origin: "https://app.example", scopes: ["identify", "write"]}] =
              OAuthRegistrations.list_user_grants(user.id)
+
+    [listed_grant] = OAuthRegistrations.list_user_grants(user.id)
+    assert %DateTime{} = listed_grant.scope_expirations["identify"]
+    assert %DateTime{} = listed_grant.scope_expirations["write"]
 
     Permissions.subscribe(user.id)
     assert :ok = OAuthRegistrations.revoke_user_grant("https://app.example", user.id)
@@ -821,6 +885,13 @@ defmodule Egregoros.MiniApps.OAuthRegistrationsTest do
     scopes = Keyword.get(overrides, :scopes, ["identify", "write"])
     capabilities = Keyword.get(overrides, :capabilities, ["compose_note"])
 
+    scope_max_ages =
+      Keyword.get(overrides, :scope_max_ages, %{
+        "identify" => 31_536_000,
+        "write" => 86_400
+      })
+      |> Map.take(scopes)
+
     json =
       Jason.encode!(%{
         "version" => "1",
@@ -828,7 +899,8 @@ defmodule Egregoros.MiniApps.OAuthRegistrationsTest do
         "homeUrl" => "https://app.example/",
         "oauth" => %{
           "redirectUris" => ["https://app.example/oauth/callback"],
-          "scopes" => scopes
+          "scopes" => scopes,
+          "scopeAuthorizationMaxAgeSeconds" => scope_max_ages
         },
         "capabilities" => capabilities
       })

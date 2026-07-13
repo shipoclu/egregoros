@@ -357,6 +357,7 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
     assert query["client_id"] == application.client_id
     assert query["redirect_uri"] == "https://app.example/oauth/callback"
     assert query["scope"] == "identify write"
+    assert query["authorization_lifetime_seconds"] == "86400"
     refute Map.has_key?(query, "handoff_challenge")
 
     view |> element("#mini-app-auth-cancel") |> render_click()
@@ -1269,7 +1270,11 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
         if(oauth?,
           do: %{
             redirect_uris: ["https://app.example/oauth/callback"],
-            scopes: ["identify", "write"]
+            scopes: ["identify", "write"],
+            scope_authorization_max_age_seconds: %{
+              "identify" => 31_536_000,
+              "write" => 86_400
+            }
           },
           else: nil
         ),
@@ -1324,7 +1329,8 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
       "state" => String.duplicate("s", 43),
       "code_challenge" => String.duplicate("c", 43),
       "code_challenge_method" => "S256",
-      "handoff_challenge" => String.duplicate("h", 43)
+      "handoff_challenge" => String.duplicate("h", 43),
+      "authorization_lifetime_seconds" => 86_400
     }
   end
 

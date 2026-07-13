@@ -414,6 +414,7 @@ const MiniAppHost = {
             code_challenge: request.codeChallenge,
             code_challenge_method: request.codeChallengeMethod,
             handoff_challenge: request.handoffChallenge,
+            authorization_lifetime_seconds: request.authorizationLifetimeSeconds,
           }),
         onComposeRequest: request =>
           this.pushEvent("mini_app_compose_request", {

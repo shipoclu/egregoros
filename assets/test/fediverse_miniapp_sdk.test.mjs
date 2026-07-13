@@ -199,8 +199,10 @@ test("provides OAuth, compose receipts, and an EIP-1193-compatible provider", as
     state: "s".repeat(43),
     codeChallenge: "c".repeat(43),
     handoffChallenge: "h".repeat(43),
+    authorizationLifetimeSeconds: 86_400,
   })
   const authRequest = await authMessage
+  assert.equal(authRequest.authorizationLifetimeSeconds, 86_400)
   hostPort.postMessage({
     type: "authResult",
     version: "1",

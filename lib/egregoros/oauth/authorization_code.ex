@@ -7,13 +7,14 @@ defmodule Egregoros.OAuth.AuthorizationCode do
   @foreign_key_type FlakeId.Ecto.Type
 
   @required_fields ~w(code redirect_uri expires_at user_id application_id)a
-  @optional_fields ~w(scopes code_challenge code_challenge_method)a
+  @optional_fields ~w(scopes code_challenge code_challenge_method grant_expires_at)a
 
   schema "oauth_authorization_codes" do
     field :code, :string
     field :redirect_uri, :string
     field :scopes, :string, default: ""
     field :expires_at, :utc_datetime_usec
+    field :grant_expires_at, :utc_datetime_usec
     field :code_challenge, :string
     field :code_challenge_method, :string
 

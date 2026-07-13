@@ -400,6 +400,7 @@ test("auth requests require the active launch and a strict PKCE handoff schema",
     codeChallenge: "c".repeat(43),
     codeChallengeMethod: "S256",
     handoffChallenge: "h".repeat(43),
+    authorizationLifetimeSeconds: 86_400,
   }
 
   appPort.postMessage({...valid, launchId: "other"})
@@ -407,6 +408,7 @@ test("auth requests require the active launch and a strict PKCE handoff schema",
   appPort.postMessage({...valid, state: "weak"})
   appPort.postMessage({...valid, codeChallengeMethod: "plain"})
   appPort.postMessage({...valid, accessToken: "must-not-enter-the-host"})
+  appPort.postMessage({...valid, authorizationLifetimeSeconds: 86_401.5})
   await tick()
   assert.deepEqual(requests, [])
 
@@ -422,6 +424,7 @@ test("auth requests require the active launch and a strict PKCE handoff schema",
       codeChallenge: "c".repeat(43),
       codeChallengeMethod: "S256",
       handoffChallenge: "h".repeat(43),
+      authorizationLifetimeSeconds: 86_400,
     },
   ])
 

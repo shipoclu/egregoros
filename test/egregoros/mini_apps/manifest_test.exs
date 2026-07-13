@@ -13,6 +13,12 @@ defmodule Egregoros.MiniApps.ManifestTest do
     assert manifest.origin == "https://app.example"
     assert manifest.home_url == "https://app.example/"
     assert manifest.oauth.scopes == ["identify", "write"]
+
+    assert manifest.oauth.scope_authorization_max_age_seconds == %{
+             "identify" => 31_536_000,
+             "write" => 86_400
+           }
+
     assert manifest.wallet.evm.enabled
     refute manifest.wallet.evm.required
     assert manifest.wallet.evm.required_chains == ["eip155:8453"]
@@ -129,6 +135,15 @@ defmodule Egregoros.MiniApps.ManifestTest do
     assert get_in(schema, ["$defs", "oauth", "properties", "scopes", "contains", "const"]) ==
              "identify"
 
+    assert get_in(schema, [
+             "$defs",
+             "oauth",
+             "properties",
+             "scopeAuthorizationMaxAgeSeconds",
+             "additionalProperties",
+             "maximum"
+           ]) == 31_536_000
+
     activity_pub = get_in(schema, ["$defs", "activityPub"])
     assert activity_pub["additionalProperties"] == false
     assert activity_pub["required"] == ["actorUrl", "publicNotes", "transactionalMentions"]
@@ -180,7 +195,11 @@ defmodule Egregoros.MiniApps.ManifestTest do
   end
 
   test "accepts a legacy broad read grant as satisfying identity compatibility" do
-    json = valid_manifest() |> put_in(["oauth", "scopes"], ["read"]) |> Jason.encode!()
+    json =
+      valid_manifest()
+      |> put_in(["oauth", "scopes"], ["read"])
+      |> put_in(["oauth", "scopeAuthorizationMaxAgeSeconds"], %{"read" => 86_400})
+      |> Jason.encode!()
 
     assert {:ok, manifest} = Manifest.decode(json, @manifest_url)
     assert manifest.oauth.scopes == ["read"]
@@ -202,6 +221,24 @@ defmodule Egregoros.MiniApps.ManifestTest do
 
     for manifest <- cases do
       assert {:error, :duplicate_value} = Manifest.decode(Jason.encode!(manifest), @manifest_url)
+    end
+  end
+
+  test "strictly validates per-scope authorization maximum ages" do
+    base = valid_manifest()
+
+    for value <- [
+          %{"missing" => 86_400},
+          %{"identify" => 299},
+          %{"identify" => 31_536_001},
+          %{"identify" => 86_400.0},
+          %{"identify" => "86400"},
+          %{"identify" => 86_400, "write" => nil}
+        ] do
+      json = put_in(base, ["oauth", "scopeAuthorizationMaxAgeSeconds"], value)
+
+      assert {:error, :invalid_scope_authorization_max_age} =
+               Manifest.decode(Jason.encode!(json), @manifest_url)
     end
   end
 
@@ -245,7 +282,11 @@ defmodule Egregoros.MiniApps.ManifestTest do
       },
       "oauth" => %{
         "redirectUris" => ["https://app.example/oauth/callback"],
-        "scopes" => ["identify", "write"]
+        "scopes" => ["identify", "write"],
+        "scopeAuthorizationMaxAgeSeconds" => %{
+          "identify" => 31_536_000,
+          "write" => 86_400
+        }
       },
       "wallet" => %{
         "evm" => %{

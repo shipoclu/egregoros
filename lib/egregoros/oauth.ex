@@ -68,10 +68,18 @@ defmodule Egregoros.OAuth do
              redirect_uri,
              scopes,
              opts
+           ),
+         {:ok, grant_ttl_seconds} <-
+           MiniAppOAuthRegistrations.authorization_lifetime(
+             application,
+             scopes,
+             Keyword.get(opts, :grant_ttl_seconds)
            ) do
       if redirect_uri_allowed?(application, redirect_uri) do
         if Scopes.subset?(scopes, application.scopes) do
-          with {:ok, pkce_attrs} <- pkce_attrs(application, opts) do
+          with {:ok, pkce_attrs} <- pkce_attrs(application, opts),
+               {:ok, grant_expires_at} <-
+                 grant_expiration(Keyword.put(opts, :grant_ttl_seconds, grant_ttl_seconds)) do
             ttl_seconds =
               Egregoros.Config.get(:oauth_code_ttl_seconds, @default_code_ttl_seconds)
 
@@ -83,6 +91,7 @@ defmodule Egregoros.OAuth do
                 redirect_uri: redirect_uri,
                 scopes: scopes,
                 expires_at: expires_at,
+                grant_expires_at: grant_expires_at,
                 user_id: user.id,
                 application_id: application.id
               })
@@ -230,8 +239,10 @@ defmodule Egregoros.OAuth do
     ttl_seconds = access_token_ttl_seconds()
     refresh_ttl_seconds = refresh_token_ttl_seconds()
 
-    expires_at = DateTime.add(now, ttl_seconds, :second)
-    refresh_expires_at = DateTime.add(now, refresh_ttl_seconds, :second)
+    refresh_expires_at =
+      absolute_grant_expiration(now, refresh_ttl_seconds, Keyword.get(opts, :grant_expires_at))
+
+    expires_at = earlier(DateTime.add(now, ttl_seconds, :second), refresh_expires_at)
 
     raw_token = generate_token(48)
     raw_refresh_token = generate_token(48)
@@ -263,8 +274,10 @@ defmodule Egregoros.OAuth do
     ttl_seconds = access_token_ttl_seconds()
     refresh_ttl_seconds = refresh_token_ttl_seconds()
 
-    expires_at = DateTime.add(now, ttl_seconds, :second)
-    refresh_expires_at = DateTime.add(now, refresh_ttl_seconds, :second)
+    refresh_expires_at =
+      absolute_grant_expiration(now, refresh_ttl_seconds, Keyword.get(opts, :grant_expires_at))
+
+    expires_at = earlier(DateTime.add(now, ttl_seconds, :second), refresh_expires_at)
 
     raw_token = generate_token(48)
     raw_refresh_token = generate_token(48)
@@ -344,12 +357,14 @@ defmodule Egregoros.OAuth do
                     true <- grant_user_matches?(auth_code, grant_lock),
                     true <- auth_code.redirect_uri == redirect_uri,
                     true <- DateTime.compare(auth_code.expires_at, DateTime.utc_now()) == :gt,
+                    true <- grant_active?(auth_code.grant_expires_at),
                     :ok <- verify_pkce(auth_code, params),
                     {:ok, %Token{} = token} <-
                       create_token(
                         current_application,
                         auth_code.user_id,
-                        auth_code.scopes
+                        auth_code.scopes,
+                        grant_expires_at: auth_code.grant_expires_at
                       ),
                     {:ok, _deleted} <- Repo.delete(auth_code) do
                  token
@@ -499,7 +514,10 @@ defmodule Egregoros.OAuth do
              })
              |> Repo.update(),
            {:ok, %Token{} = token} <-
-             create_token(application, old_token.user_id, scopes, family_id: old_token.family_id) do
+             create_token(application, old_token.user_id, scopes,
+               family_id: old_token.family_id,
+               grant_expires_at: old_token.refresh_expires_at
+             ) do
         {:ok, token}
       else
         {:error, reason} -> Repo.rollback(reason)
@@ -530,6 +548,14 @@ defmodule Egregoros.OAuth do
   end
 
   defp refresh_token_active?(_), do: false
+
+  defp grant_active?(nil), do: true
+
+  defp grant_active?(%DateTime{} = expires_at) do
+    DateTime.compare(expires_at, DateTime.utc_now()) == :gt
+  end
+
+  defp grant_active?(_), do: false
 
   defp refresh_scopes(params, %Token{} = old_token, %OAuthApplication{} = application) do
     case Map.get(params, "scope") do
@@ -822,6 +848,31 @@ defmodule Egregoros.OAuth do
       ttl when is_integer(ttl) and ttl >= 1 -> ttl
       _invalid -> @default_refresh_token_ttl_seconds
     end
+  end
+
+  defp grant_expiration(opts) do
+    case Keyword.get(opts, :grant_ttl_seconds) do
+      nil ->
+        {:ok, nil}
+
+      seconds when is_integer(seconds) and seconds >= 1 ->
+        seconds = min(seconds, refresh_token_ttl_seconds())
+        {:ok, DateTime.add(DateTime.utc_now(), seconds, :second)}
+
+      _ ->
+        {:error, :invalid_authorization_lifetime}
+    end
+  end
+
+  defp absolute_grant_expiration(now, refresh_ttl_seconds, nil),
+    do: DateTime.add(now, refresh_ttl_seconds, :second)
+
+  defp absolute_grant_expiration(now, refresh_ttl_seconds, %DateTime{} = grant_expires_at) do
+    earlier(DateTime.add(now, refresh_ttl_seconds, :second), grant_expires_at)
+  end
+
+  defp earlier(left, right) do
+    if DateTime.compare(left, right) == :gt, do: right, else: left
   end
 
   defp parse_redirect_uris(nil), do: []

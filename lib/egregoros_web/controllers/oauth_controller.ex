@@ -54,6 +54,15 @@ defmodule EgregorosWeb.OAuthController do
               nil
           end
 
+        authorization_expires_in =
+          case token.refresh_expires_at do
+            %DateTime{} = expires_at ->
+              max(DateTime.diff(expires_at, DateTime.utc_now(), :second), 0)
+
+            _ ->
+              nil
+          end
+
         response =
           %{
             "access_token" => token.token,
@@ -63,6 +72,7 @@ defmodule EgregorosWeb.OAuthController do
             "created_at" => DateTime.to_unix(token.inserted_at)
           }
           |> maybe_put("expires_in", expires_in)
+          |> maybe_put("authorization_expires_in", authorization_expires_in)
 
         json(conn, response)
 
@@ -106,6 +116,12 @@ defmodule EgregorosWeb.OAuthController do
              scope,
              code_challenge: Map.get(params, "code_challenge"),
              code_challenge_method: Map.get(params, "code_challenge_method")
+           ),
+         {:ok, authorization_lifetime_seconds} <-
+           MiniAppOAuthRegistrations.authorization_lifetime(
+             app,
+             scope,
+             Map.get(params, "authorization_lifetime_seconds")
            ) do
       mini_app_registration = MiniAppOAuthRegistrations.get_by_application_id(app.id)
 
@@ -119,6 +135,7 @@ defmodule EgregorosWeb.OAuthController do
             "state" => Map.get(params, "state", ""),
             "code_challenge" => Map.get(params, "code_challenge", ""),
             "code_challenge_method" => Map.get(params, "code_challenge_method", ""),
+            "authorization_lifetime_seconds" => authorization_lifetime_seconds,
             "write_confirmed" => "false"
           },
           as: :oauth
@@ -130,6 +147,8 @@ defmodule EgregorosWeb.OAuthController do
         form: form,
         app: app,
         scope: scope,
+        requested_scopes: Egregoros.OAuth.Scopes.parse(scope),
+        authorization_lifetime_options: lifetime_options(authorization_lifetime_seconds),
         mini_app_registration: mini_app_registration,
         cancel_url:
           oauth_cancel_url(
@@ -169,11 +188,18 @@ defmodule EgregorosWeb.OAuthController do
            Map.get(params, "redirect_uri"),
          true <- OAuth.redirect_uri_allowed?(app, redirect_uri),
          scope when is_binary(scope) <- Map.get(params, "scope"),
+         {:ok, authorization_lifetime_seconds} <-
+           MiniAppOAuthRegistrations.authorization_lifetime(
+             app,
+             scope,
+             Map.get(params, "authorization_lifetime_seconds")
+           ),
          :ok <- validate_write_confirmation(app, scope, params),
          {:ok, auth_code} <-
            OAuth.create_authorization_code(app, user, redirect_uri, scope,
              code_challenge: Map.get(params, "code_challenge"),
-             code_challenge_method: Map.get(params, "code_challenge_method")
+             code_challenge_method: Map.get(params, "code_challenge_method"),
+             grant_ttl_seconds: authorization_lifetime_seconds
            ) do
       state = params |> Map.get("state", "") |> to_string()
 
@@ -234,6 +260,36 @@ defmodule EgregorosWeb.OAuthController do
       :ok
     end
   end
+
+  defp lifetime_options(nil), do: []
+
+  defp lifetime_options(max_seconds) when is_integer(max_seconds) do
+    [300, 3_600, 86_400, 2_592_000, 31_536_000, max_seconds]
+    |> Enum.filter(&(&1 <= max_seconds))
+    |> Enum.uniq()
+    |> Enum.sort()
+    |> Enum.map(&{format_lifetime(&1), &1})
+  end
+
+  defp format_lifetime(seconds) when rem(seconds, 31_536_000) == 0,
+    do: plural(div(seconds, 31_536_000), "year")
+
+  defp format_lifetime(seconds) when rem(seconds, 2_592_000) == 0,
+    do: plural(div(seconds, 2_592_000), "month")
+
+  defp format_lifetime(seconds) when rem(seconds, 86_400) == 0,
+    do: plural(div(seconds, 86_400), "day")
+
+  defp format_lifetime(seconds) when rem(seconds, 3_600) == 0,
+    do: plural(div(seconds, 3_600), "hour")
+
+  defp format_lifetime(seconds) when rem(seconds, 60) == 0,
+    do: plural(div(seconds, 60), "minute")
+
+  defp format_lifetime(seconds), do: plural(seconds, "second")
+
+  defp plural(1, unit), do: "1 #{unit}"
+  defp plural(count, unit), do: "#{count} #{unit}s"
 
   defp append_query_params(url, params) when is_binary(url) and is_map(params) do
     uri = URI.parse(url)

@@ -30,6 +30,7 @@ defmodule EgregorosWeb.MiniAppRegistrationController do
         "client_uri" => application.website,
         "redirect_uris" => registration.redirect_uris,
         "scope" => Enum.join(registration.scopes, " "),
+        "scope_authorization_max_age_seconds" => registration.scope_authorization_max_age_seconds,
         "grant_types" => ["authorization_code", "refresh_token"],
         "response_types" => ["code"],
         "token_endpoint_auth_method" => "none"

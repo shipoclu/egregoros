@@ -474,9 +474,25 @@ defmodule EgregorosWeb.PrivacyLive do
                     <p class="truncate font-mono text-sm font-bold text-[color:var(--text-primary)]">
                       {grant.app_origin}
                     </p>
-                    <p class="mt-1 text-xs text-[color:var(--text-muted)]">
-                      Scopes: {Enum.join(grant.scopes, ", ")}
-                    </p>
+                    <div class="mt-2 space-y-1">
+                      <p
+                        :for={scope <- grant.scopes}
+                        id={"#{id}-scope-#{scope}"}
+                        data-role="mini-app-oauth-scope"
+                        class="text-xs text-[color:var(--text-muted)]"
+                      >
+                        <span class="font-bold text-[color:var(--text-secondary)]">{scope}</span>
+                        <%= if grant.scope_expirations[scope] do %>
+                          — authorized until
+                          <time datetime={DateTime.to_iso8601(grant.scope_expirations[scope])}>
+                            {Calendar.strftime(
+                              grant.scope_expirations[scope],
+                              "%Y-%m-%d %H:%M UTC"
+                            )}
+                          </time>
+                        <% end %>
+                      </p>
+                    </div>
                   </div>
                   <button
                     type="button"

@@ -151,6 +151,19 @@
             "maxLength": 64,
             "pattern": "^[a-z][a-z0-9:_-]*$"
           }
+        },
+        "scopeAuthorizationMaxAgeSeconds": {
+          "$comment": "Every property name must also occur in oauth.scopes; JSON Schema cannot express that cross-field relationship, so implementations must enforce it.",
+          "type": "object",
+          "maxProperties": 32,
+          "propertyNames": {
+            "pattern": "^[a-z][a-z0-9:_-]*$"
+          },
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 300,
+            "maximum": 31536000
+          }
         }
       }
     },

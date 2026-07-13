@@ -347,6 +347,93 @@ defmodule Egregoros.OAuthTest do
     assert old == nil
   end
 
+  test "refresh rotation preserves the grant family's absolute expiration" do
+    user = create_user!()
+    app = create_app!()
+
+    assert {:ok, auth_code} =
+             OAuth.create_authorization_code(
+               app,
+               user,
+               "urn:ietf:wg:oauth:2.0:oob",
+               "read",
+               grant_ttl_seconds: 86_400
+             )
+
+    assert {:ok, token} =
+             OAuth.exchange_code_for_token(%{
+               "grant_type" => "authorization_code",
+               "code" => auth_code.code,
+               "client_id" => app.client_id,
+               "client_secret" => app.client_secret,
+               "redirect_uri" => "urn:ietf:wg:oauth:2.0:oob"
+             })
+
+    assert {:ok, refreshed} =
+             OAuth.exchange_code_for_token(%{
+               "grant_type" => "refresh_token",
+               "refresh_token" => token.refresh_token,
+               "client_id" => app.client_id,
+               "client_secret" => app.client_secret
+             })
+
+    assert refreshed.refresh_expires_at == token.refresh_expires_at
+    assert DateTime.diff(token.refresh_expires_at, DateTime.utc_now(), :second) in 86_390..86_400
+  end
+
+  test "a short absolute grant also caps its access-token expiration" do
+    user = create_user!()
+    app = create_app!()
+
+    assert {:ok, auth_code} =
+             OAuth.create_authorization_code(
+               app,
+               user,
+               "urn:ietf:wg:oauth:2.0:oob",
+               "read",
+               grant_ttl_seconds: 600
+             )
+
+    assert {:ok, token} =
+             OAuth.exchange_code_for_token(%{
+               "grant_type" => "authorization_code",
+               "code" => auth_code.code,
+               "client_id" => app.client_id,
+               "client_secret" => app.client_secret,
+               "redirect_uri" => "urn:ietf:wg:oauth:2.0:oob"
+             })
+
+    assert DateTime.diff(token.expires_at, DateTime.utc_now(), :second) in 590..600
+    assert token.expires_at == token.refresh_expires_at
+  end
+
+  test "an authorization code cannot mint a token after its grant deadline" do
+    user = create_user!()
+    app = create_app!()
+
+    assert {:ok, auth_code} =
+             OAuth.create_authorization_code(
+               app,
+               user,
+               "urn:ietf:wg:oauth:2.0:oob",
+               "read",
+               grant_ttl_seconds: 300
+             )
+
+    auth_code
+    |> Ecto.Changeset.change(grant_expires_at: DateTime.add(DateTime.utc_now(), -1, :second))
+    |> Repo.update!()
+
+    assert {:error, :invalid_grant} =
+             OAuth.exchange_code_for_token(%{
+               "grant_type" => "authorization_code",
+               "code" => auth_code.code,
+               "client_id" => app.client_id,
+               "client_secret" => app.client_secret,
+               "redirect_uri" => "urn:ietf:wg:oauth:2.0:oob"
+             })
+  end
+
   test "reusing a consumed refresh token revokes its token family" do
     user = create_user!()
     app = create_app!()

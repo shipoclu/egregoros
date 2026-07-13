@@ -40,6 +40,7 @@ defmodule Egregoros.MiniApps.AuthRequestTest do
     assert query["state"] == String.duplicate("s", 43)
     assert query["code_challenge"] == String.duplicate("c", 43)
     assert query["code_challenge_method"] == "S256"
+    assert query["authorization_lifetime_seconds"] == "86400"
     refute Map.has_key?(query, "handoff_challenge")
     assert request.relay_state == String.duplicate("s", 43)
   end
@@ -72,8 +73,24 @@ defmodule Egregoros.MiniApps.AuthRequestTest do
                %{params | "redirect_uri" => "https://app.example/other"}
              )
 
+    assert {:ok, identify_request} =
+             AuthRequest.prepare("https://app.example", %{
+               params
+               | "scopes" => ["identify"],
+                 "authorization_lifetime_seconds" => 2_592_000
+             })
+
+    assert URI.decode_query(URI.parse(identify_request.authorization_url).query)["scope"] ==
+             "identify"
+
     assert {:error, :invalid_scope} =
-             AuthRequest.prepare("https://app.example", %{params | "scopes" => ["identify"]})
+             AuthRequest.prepare("https://app.example", %{params | "scopes" => ["read"]})
+
+    assert {:error, :invalid_authorization_lifetime} =
+             AuthRequest.prepare("https://app.example", %{
+               params
+               | "authorization_lifetime_seconds" => 86_401
+             })
 
     assert {:error, :invalid_state} =
              AuthRequest.prepare("https://app.example", %{params | "state" => "weak"})
@@ -100,7 +117,8 @@ defmodule Egregoros.MiniApps.AuthRequestTest do
       "state" => String.duplicate("s", 43),
       "code_challenge" => String.duplicate("c", 43),
       "code_challenge_method" => "S256",
-      "handoff_challenge" => String.duplicate("h", 43)
+      "handoff_challenge" => String.duplicate("h", 43),
+      "authorization_lifetime_seconds" => 86_400
     }
   end
 
@@ -112,7 +130,11 @@ defmodule Egregoros.MiniApps.AuthRequestTest do
         "homeUrl" => "https://app.example/",
         "oauth" => %{
           "redirectUris" => ["https://app.example/oauth/callback"],
-          "scopes" => ["identify", "write"]
+          "scopes" => ["identify", "write"],
+          "scopeAuthorizationMaxAgeSeconds" => %{
+            "identify" => 31_536_000,
+            "write" => 86_400
+          }
         },
         "capabilities" => ["compose_note"]
       })

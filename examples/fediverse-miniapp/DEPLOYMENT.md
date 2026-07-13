@@ -256,6 +256,14 @@ A backend deployment should:
    Request `identify` for ordinary account linking and call
    `/api/v1/mini-apps/identity` for the minimal identity DTO. Do not request
    `read` merely to identify the user.
+   Treat manifest scopes as an immutable maximum, not a requirement to request
+   all authority every time. Use a long finite `identify` grant for ordinary
+   linking and a separate short `identify write` step-up grant for a
+   consequential operation. Bound scopes with
+   `scopeAuthorizationMaxAgeSeconds`, pass the desired
+   `authorizationLifetimeSeconds` to `requestAuth`, and persist the returned
+   `authorization_expires_in` as an absolute backend deadline. Refreshing must
+   never extend it.
 5. Use transaction-specific S256 PKCE, high-entropy state, the exact registered
    callback, and the verifier-bound one-time iframe handoff. Bind the exact
    relay URL and launch ID to the OAuth state.
@@ -354,6 +362,9 @@ opener reference, or poll the authorization window.
 - [ ] Any OAuth secrets and bearer tokens remain backend-only.
 - [ ] Ordinary account linking requests `identify`, not broad `read`, and uses
       `/api/v1/mini-apps/identity` rather than `verify_credentials`.
+- [ ] Scope requests are manifest-declared subsets, lifetime requests stay
+      within each scope maximum, and refresh rotation preserves the original
+      absolute authorization deadline.
 - [ ] OAuth retries create fresh state, PKCE, and handoff values.
 - [ ] The server's OAuth consent CSP dynamically names the exact registered
       callback origin, and no proxy replaces or appends that CSP.
