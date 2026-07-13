@@ -35,3 +35,10 @@ Mini apps use stable public client IDs and Egregoros never returns them a client
 secret. The SDK's bootstrap gives that backend the exact issuer, OAuth
 metadata URL, opener-free authorization-result relay URL, and launch ID needed
 to validate and bind the flow to OAuth state.
+
+When adding OAuth, always start retries with fresh state, PKCE, and handoff
+values. The calling server must generate a consent-page `form-action` containing
+the exact validated callback origin; this is dynamic server behavior, not a
+domain that the app developer asks an nginx administrator to hardcode. See the
+OAuth section of [DEPLOYMENT.md](./DEPLOYMENT.md) for the callback and CSP
+checks.

@@ -261,11 +261,32 @@ A backend deployment should:
    `<authorizationResultRelay>#version=1&launch_id=...&state=...&status=success&handoff_code=...`.
    The handoff code belongs in the fragment, never a query parameter. For
    cancellation or error, omit it and use `status=cancelled` or `status=error`.
+8. Begin every retry as a new OAuth transaction. Generate new state, PKCE, and
+   handoff verifier/challenge values; do not bookmark or replay a previously
+   displayed authorization URL after a deployment, cancellation, timeout, or
+   failed callback.
 
 The backend must accept the relay URL only when it is exactly
 `<trusted issuer>/mini-apps/oauth/relay`. It must never derive or accept an
 arbitrary relay domain from request input. The callback must not use
 `window.opener` or send its result directly to the Egregoros page.
+
+The Egregoros authorization server is responsible for generating a consent-page
+CSP whose `form-action` contains only `'self'` and this app's validated callback
+origin. The app developer does not configure their domain in the Egregoros
+proxy and must not ask an operator to add a wildcard CSP. If authorization is
+blocked with a `form-action 'self'` console error, verify that the server is
+running a version with callback-aware OAuth CSP and that no proxy/CDN replaces
+or appends CSP. On a correct response for
+`https://miniapp.example/oauth/callback`, the directive is:
+
+```text
+form-action 'self' https://miniapp.example
+```
+
+The callback endpoint itself should be a no-store server route. It exchanges
+the code and redirects to the exact host relay bound into OAuth state; it does
+not need to relax the miniapp page's ordinary `form-action 'none'` policy.
 
 If the backend listens locally on port `4100`, narrowly proxy only its required
 paths instead of proxying the whole site:
@@ -293,6 +314,28 @@ include the same CSP and security-header snippet inside proxied locations. The
 backend must also validate method, content type, request size, CSRF/origin where
 cookies are involved, and every OAuth state transition independently.
 
+## 9. Browser action lifecycle
+
+SDK calls such as `getContext`, notification permission, OAuth, compose,
+external navigation, and wallet requests are asynchronous message exchanges.
+They must not assign `window.location`, submit the miniapp page, or reload the
+iframe. If an action control is inside a form, use `type="button"` or prevent
+the form's default submission before calling the SDK.
+
+Disable the initiating control while its promise is pending, restore it after
+success or failure, and display stable SDK error codes. A host may allow only
+one host-owned confirmation at a time; a concurrent request should fail
+promptly (wallets use EIP-1193 `-32002`) and the app should let the user retry
+after the visible prompt is resolved. Do not interpret that failure as a reason
+to call `location.reload()` or recreate the SDK. `sdk.destroy()` intentionally
+makes the current app channel inert, while `sdk.close()` intentionally asks the
+host to tear down the whole miniapp surface.
+
+OAuth authorization windows are opened by the trusted host after its own
+confirmation. The iframe should call `requestAuth` from its user gesture and
+await the correlated result; it must not open a competing popup, retain an
+opener reference, or poll the authorization window.
+
 ## Deployment checklist
 
 - [ ] Manifest and application URLs use one exact HTTPS origin.
@@ -306,3 +349,8 @@ cookies are involved, and every OAuth state transition independently.
 - [ ] Manifest, page, SDK, context, external action, and optional wallet flows
       are tested from a fully public note.
 - [ ] Any OAuth secrets and bearer tokens remain backend-only.
+- [ ] OAuth retries create fresh state, PKCE, and handoff values.
+- [ ] The server's OAuth consent CSP dynamically names the exact registered
+      callback origin, and no proxy replaces or appends that CSP.
+- [ ] SDK action buttons do not submit or reload the iframe and handle a
+      correlated host-busy failure without recreating the SDK.

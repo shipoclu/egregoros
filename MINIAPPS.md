@@ -146,6 +146,19 @@ strip or app launcher. Collapsing the active app retains its live iframe and
 session while the user navigates Egregoros; closing or replacing it tears down
 the iframe.
 
+In a server-rendered or morphing frontend such as LiveView, the active frame is
+a persistent client-owned island. Trusted JavaScript creates and navigates the
+broker iframe; server patches may update bounded host metadata but MUST NOT
+render, replace, move, or re-parent that iframe. The ignored island must keep a
+stable DOM identity and sibling position across every loading, consent,
+compose, notification, external-navigation, wallet, collapse, and expansion
+patch. In particular, conditionally inserting a dialog before the ignored node
+can cause a DOM reconciler to treat the iframe as a different child and reload
+it. Place the island at a fixed structural position (Egregoros uses the first
+direct child), render overlays after it, and use CSS ordering for visual layout.
+Requesting context or any other SDK operation is a message exchange, never a
+frame navigation or launch restart.
+
 Cards never launch an app merely from an image/title click: the user must select
 the explicit **Open** button. There is no v1 app directory, saved-app surface,
 or other launcher. Direct, explicit app URLs remain valid entry points, while
@@ -164,6 +177,25 @@ user's explicit consent and the instance's existing scope policy.
 The host SDK may provide a `requestAuth` action that begins this flow in a
 top-level, host-controlled authorization window/sheet. It must not use a
 third-party iframe for consent or rely on third-party cookies.
+
+The authorization page's ordinary CSP may retain `form-action 'self'` globally,
+but the concrete consent response MUST add the origin of the exact registered
+and validated callback URI to `form-action`. Browsers can enforce
+`form-action` across the POST's redirect chain, so a self-only policy can block
+the otherwise valid redirect to the app callback. This exception is generated
+per authorization request after client, redirect URI, manifest, scope, and PKCE
+validation. It contains only the normalized HTTPS origin (including a
+non-default port), never a wildcard, path, query, fragment, credential, or
+unvalidated request value. Reverse proxies must preserve this response-specific
+policy rather than replacing it with a static CSP.
+
+When a mini app requests a consequential OAuth scope such as `write`, the
+consent UI must make any additional acknowledgement a browser-required control
+and must also enforce it server-side. An incomplete form must remain visibly
+incomplete instead of collapsing to an undifferentiated OAuth error. Failed,
+cancelled, stale, or interrupted attempts are transaction-bound; the app starts
+a fresh authorization request with new state, PKCE values, and handoff binding
+rather than replaying an old authorization URL.
 
 Authentication is optional and app-initiated. A newly launched iframe may call
 `ready`, receive the non-user `bootstrap` object, use `openExternal` after a
@@ -832,6 +864,16 @@ any ceiling, or attempting to overwrite a pending prompt is rejected; a budget
 violation closes the private port and launch. A new iframe load does not reset
 these per-launch counters; only a new random launch ID does.
 
+Because the UI can present only one host-owned prompt or privileged operation
+at a time, an additional valid request received while one is pending MUST get
+an immediate, exactly correlated protocol response using that operation's
+documented failure shape. It MUST NOT replace the visible request and MUST NOT
+be silently dropped: a dropped response leaves the SDK promise pending and
+leaks a broker outstanding-request slot until timeout. For EIP-1193 requests,
+use the standard `-32002` request-already-pending error. The response must
+preserve the original prompt, launch ID, message channel, iframe identity, and
+per-launch budgets.
+
 `ready`, `getContext`, wallet, compose, and OAuth messages all pass through the
 same broker. The host MUST re-check the current manifest identity,
 capabilities, user state, disclosure state, OAuth state, and domain policy at
@@ -984,14 +1026,17 @@ Before release, automated tests MUST cover at least:
   deny during a request, and message floods;
 - OAuth redirect confusion, state/PKCE/issuer mismatch, code reuse, mix-up,
   scope/capability mutation, refresh replay, callback spoofing, handoff theft,
-  registration floods, token use after revoke/deny, and secret-redaction tests;
+  registration floods, token use after revoke/deny, callback redirects blocked
+  by self-only `form-action`, hostile callback values attempting to widen CSP,
+  and secret-redaction tests;
 - context access before disclosure, non-public-note context, viewer/internal
   field leakage, compose without OAuth/capability, synthetic submit attempts,
   invalid reply/visibility/URL, and receipt-before-commit cases; and
 - wallet account access before connection, RPC allowlist bypass, chain/account
   substitution, transaction mutation after preview, signing without gesture,
-  concurrent prompt races, disconnect/deny during confirmation, provider
-  object escape, and attempts to obtain injected/JAW secrets.
+  concurrent prompt races including a correlated busy response without iframe
+  replacement, disconnect/deny during confirmation, provider object escape,
+  and attempts to obtain injected/JAW secrets.
 
 Security controls are release gates. Tests MUST assert outcomes and absence of
 side effects, not merely that an error was rendered.

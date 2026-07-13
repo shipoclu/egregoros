@@ -21,6 +21,22 @@ base-uri 'self'
 form-action 'self'
 ```
 
+OAuth authorization consent is the narrow exception to the last line. After
+Egregoros validates the client and its exact registered HTTPS redirect URI, it
+generates that consent response with the callback's normalized origin added:
+
+```text
+form-action 'self' https://miniapp.example
+```
+
+This is dynamic per OAuth request and is not a configured or hardcoded mini-app
+domain. A non-default callback port is retained; callback paths, queries,
+fragments, credentials, malformed values, and unregistered origins are never
+copied into CSP. The global policy remains self-only. Browsers may apply
+`form-action` to the redirect following the authorization POST, so replacing
+this generated response with a static `form-action 'self'` policy breaks valid
+cross-origin OAuth callbacks.
+
 `frame-src 'self'` does **not** frame the remote app directly. It permits only
 the trusted same-origin broker. Each broker response replaces the ordinary CSP
 with a launch-specific policy whose `frame-src` is exactly the one validated
@@ -151,3 +167,8 @@ max-age=0`. Confirm neither response has `X-Frame-Options` and neither proxy nor
 CDN rewrites these values. Confirm that the OAuth relay is no-store, has
 `Cross-Origin-Opener-Policy: same-origin`, `Referrer-Policy: no-referrer`, and
 an enforced CSP with `frame-ancestors 'none'` and only its same-origin script.
+For an authenticated OAuth consent page, also confirm that its one CSP contains
+exactly `form-action 'self' CALLBACK_ORIGIN`, where `CALLBACK_ORIGIN` is the
+registered app origin rather than a wildcard or full callback URL. Complete
+this check with a fresh OAuth transaction; old state, PKCE, and handoff values
+are intentionally not reusable after a failed or interrupted attempt.
