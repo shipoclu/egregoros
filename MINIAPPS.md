@@ -271,6 +271,15 @@ If `ready()` does not arrive by the host deadline, Egregoros keeps the branded
 loading screen and offers **Retry** and **Open externally**. It does not close
 the app automatically.
 
+The host sends bootstrap only once when the iframe load completes. An app MUST
+create the SDK synchronously during initial module startup, before framework
+rendering or lazy-loaded code can run after that event. The SDK installs its
+bootstrap listener when it is created. A deferred `import()`/code-split SDK can
+miss the one-time message permanently, leaving `connect()` pending and producing
+the host's “miniapp did not become ready” state. Framework apps should create one
+SDK instance before rendering and pass that instance into their component tree;
+they must not recreate it during component renders or retries.
+
 After a user has approved the immutable client and one requested scope subset,
 the app may reuse that grant until its absolute deadline. The authorization surface
 still identifies the current Egregoros account and provides a visible

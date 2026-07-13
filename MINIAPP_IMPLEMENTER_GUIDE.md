@@ -201,6 +201,37 @@ Call `connect()` as soon as the page loads. Call `ready()` as soon as the first
 usable view is rendered; do not wait for authentication or optional data. Until
 then, the host intentionally keeps its loading state visible.
 
+#### Framework startup timing: create the SDK before rendering
+
+The host sends its one-time bootstrap message when the iframe finishes loading.
+Create the SDK synchronously during initial module startup, before React, Vue,
+Svelte, or another framework starts rendering. The SDK installs the bootstrap
+message listener when it is created.
+
+Do **not** lazy-load the SDK with `import()` and create it later. Code splitting,
+hydration, deferred initialization, or an asynchronous import can let the iframe
+`load` event win the race. The host then sends the bootstrap before the listener
+exists; the message cannot be replayed and the host reports that the miniapp did
+not become ready.
+
+For example, create one SDK instance before React renders and pass that instance
+into the app:
+
+```js
+import {createRoot} from "react-dom/client"
+import {createFediverseMiniAppSDK} from "./fediverse-miniapp-sdk-v1.js"
+import App from "./App.jsx"
+
+const sdk = createFediverseMiniAppSDK({
+  allowedHostOrigin: isAllowedHostOrigin,
+})
+
+createRoot(document.querySelector("#root")).render(<App sdk={sdk} />)
+```
+
+The instance should live for the iframe's entire lifetime. Do not recreate it on
+component renders, route changes, retries, or ordinary errors.
+
 `allowedHostOrigin` must fail closed. A private app can use an exact set as
 above. A generally published app may accept public HTTPS Fediverse origins,
 but both its browser code and backend must implement the public-DNS and exact
@@ -514,7 +545,7 @@ does not require the miniapp to implement any ActivityPub endpoint.
 | The URL stays an ordinary link | The note is fully public; miniapps are enabled; domain policy allows the hostname; the well-known manifest returns `200` JSON without a redirect; all DNS addresses are public. |
 | A card appears but the app does not open | The launch URL uses the manifest's exact origin and its TLS certificate is valid. |
 | The frame is blank or reports framing failure | The page response's CSP `frame-ancestors` includes the exact Egregoros origin and `X-Frame-Options` is absent. |
-| The host loading screen never clears | The SDK file loads with a JavaScript MIME type; `allowedHostOrigin` accepts the exact host; `connect()` succeeds; `ready()` is called after the initial render. |
+| The host loading screen never clears | The SDK file loads with a JavaScript MIME type; the SDK was created synchronously before framework rendering; `allowedHostOrigin` accepts the exact host; `connect()` succeeds; `ready()` is called after the initial render. |
 | SDK methods time out | The page did not navigate or submit, the SDK was not recreated or destroyed, and only one pending host confirmation is active. Log the stable SDK error code. |
 | OAuth preparation fails | The browser or backend can fetch the exact bootstrap metadata URL, uses its advertised registration endpoint, registers the canonical manifest URL, and reuses the returned client ID. |
 | Authorization succeeds but the iframe is not notified | The callback redirects to the exact bootstrap relay. Backend mode uses the exact `handoff_code` fragment; browser mode uses the exact `authorization_code` fragment. Never include both. |
@@ -539,6 +570,8 @@ useful for framing, SDK, and OAuth callback problems.
 - [ ] The SDK JavaScript and TypeScript declarations come from the same pinned
       build and are served by the app.
 - [ ] `allowedHostOrigin` fails closed and accepts the intended exact host.
+- [ ] The SDK is created synchronously before framework rendering or lazy-loaded
+      code can miss the one-time iframe bootstrap message.
 - [ ] The page calls `connect()` on load and `ready()` after its first usable
       render.
 - [ ] Every action button has `type="button"`, awaits its SDK call, and shows a
