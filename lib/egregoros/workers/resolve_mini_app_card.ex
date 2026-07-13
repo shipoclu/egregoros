@@ -13,6 +13,8 @@ defmodule Egregoros.Workers.ResolveMiniAppCard do
   alias Egregoros.Object
   alias Egregoros.Repo
 
+  require Logger
+
   @impl Oban.Worker
   def perform(%Oban.Job{args: %{"object_id" => object_id} = args}) when is_binary(object_id) do
     case get_object(object_id) do
@@ -34,12 +36,21 @@ defmodule Egregoros.Workers.ResolveMiniAppCard do
     candidates = Discovery.candidate_urls(object)
 
     cond do
-      not MiniApps.enabled?() or candidates == [] ->
+      not MiniApps.enabled?() ->
+        log_lookup_skipped(object_id, :disabled)
+        Cards.delete(object)
+
+      candidates == [] ->
+        log_lookup_skipped(object_id, :no_candidates)
         Cards.delete(object)
 
       true ->
         invalidate_changed_source(object, candidates)
         enqueue(object_id, %{})
+
+        Logger.debug(
+          "miniapp card lookup enqueued object_id=#{inspect(object_id)} candidate_count=#{length(candidates)}"
+        )
     end
 
     :ok
@@ -63,18 +74,30 @@ defmodule Egregoros.Workers.ResolveMiniAppCard do
 
     cond do
       not MiniApps.enabled?() ->
+        log_lookup_skipped(object.id, :disabled)
         Cards.delete(object)
 
       candidates == [] ->
+        log_lookup_skipped(object.id, :no_candidates)
         Cards.delete(object)
 
       true ->
+        Logger.debug(
+          "miniapp card resolution started object_id=#{inspect(object.id)} " <>
+            "candidate_count=#{length(candidates)}"
+        )
+
         invalidate_changed_source(object, candidates)
 
         case MiniApps.resolve_note(object) do
           {:ok, resolved} ->
             case put_if_current(object, resolved) do
               {:ok, _card} ->
+                Logger.debug(
+                  "miniapp card resolution stored object_id=#{inspect(object.id)} " <>
+                    "app_origin=#{inspect(resolved.app_origin)}"
+                )
+
                 :ok
 
               {:stale, current} when revision_retries > 0 ->
@@ -91,6 +114,11 @@ defmodule Egregoros.Workers.ResolveMiniAppCard do
             end
 
           {:error, reason} when reason in [:disabled, :no_mini_app] ->
+            Logger.debug(
+              "miniapp card resolution did not find a miniapp " <>
+                "object_id=#{inspect(object.id)} reason=#{inspect(reason)}"
+            )
+
             Cards.delete(object)
 
           {:error, reason} ->
@@ -106,6 +134,12 @@ defmodule Egregoros.Workers.ResolveMiniAppCard do
   end
 
   defp expected_resolution?(_object, _resolution_token), do: false
+
+  defp log_lookup_skipped(object_id, reason) do
+    Logger.debug(
+      "miniapp card lookup skipped object_id=#{inspect(object_id)} reason=#{inspect(reason)}"
+    )
+  end
 
   defp invalidate_changed_source(object, candidates) do
     case Cards.get_cached(object) do

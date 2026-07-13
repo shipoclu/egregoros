@@ -1,6 +1,7 @@
 defmodule Egregoros.MiniAppsTest do
   use ExUnit.Case, async: true
 
+  import ExUnit.CaptureLog
   import Mox
 
   alias Egregoros.MiniApps
@@ -184,6 +185,43 @@ defmodule Egregoros.MiniAppsTest do
       assert resolved.launch_url == "https://app.example/book/chapter-2"
       assert resolved.image_url == "https://app.example/chapter.png"
     end)
+  end
+
+  test "logs each candidate lookup decision" do
+    manifest = manifest_json("Reader")
+    enable_mini_apps()
+
+    expect(Egregoros.MiniApps.Fetcher.Mock, :get, 3, fn
+      "https://ordinary.example/.well-known/fediverse-miniapp.json", :manifest ->
+        {:error, {:unexpected_status, 404}}
+
+      "https://app.example/.well-known/fediverse-miniapp.json", :manifest ->
+        ok_response(manifest, "application/json")
+
+      "https://app.example/read", :page ->
+        ok_response("<html><body>Reader</body></html>", "text/html")
+    end)
+
+    note =
+      public_note(
+        ~s(<a href="https://ordinary.example/a">ordinary</a>) <>
+          ~s(<a href="https://app.example/read">reader</a>)
+      )
+
+    log =
+      capture_log([level: :debug], fn ->
+        Egregoros.Config.with_impl(Egregoros.Config.Mock, fn ->
+          assert {:ok, _resolved} = MiniApps.resolve_note(note)
+        end)
+      end)
+
+    assert log =~ "miniapp lookup started candidate_count=2"
+
+    assert log =~
+             "miniapp lookup candidate rejected candidate_host=\"ordinary.example\" reason={:unexpected_status, 404}"
+
+    assert log =~
+             "miniapp lookup candidate accepted candidate_host=\"app.example\" app_origin=\"https://app.example\""
   end
 
   test "uses the generic manifest card when page metadata is absent or invalid" do

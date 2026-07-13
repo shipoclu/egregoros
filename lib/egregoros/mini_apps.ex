@@ -18,6 +18,8 @@ defmodule Egregoros.MiniApps do
   alias Egregoros.MiniApps.ResolvedCard
   alias Egregoros.PublicHostPolicy
 
+  require Logger
+
   @manifest_path "/.well-known/fediverse-miniapp.json"
 
   def enabled? do
@@ -54,12 +56,30 @@ defmodule Egregoros.MiniApps do
 
   def resolve_note(object) do
     with :ok <- require_enabled() do
-      object
-      |> Discovery.candidate_urls()
+      candidates = Discovery.candidate_urls(object)
+
+      Logger.debug("miniapp lookup started candidate_count=#{length(candidates)}")
+
+      candidates
       |> Enum.reduce_while({:error, :no_mini_app}, fn url, _acc ->
         case resolve_candidate(url) do
-          {:ok, %ResolvedCard{} = card} -> {:halt, {:ok, card}}
-          {:error, _reason} -> {:cont, {:error, :no_mini_app}}
+          {:ok, %ResolvedCard{} = card} ->
+            Logger.debug(
+              "miniapp lookup candidate accepted " <>
+                "candidate_host=#{inspect(candidate_host(url))} " <>
+                "app_origin=#{inspect(card.app_origin)}"
+            )
+
+            {:halt, {:ok, card}}
+
+          {:error, reason} ->
+            Logger.debug(
+              "miniapp lookup candidate rejected " <>
+                "candidate_host=#{inspect(candidate_host(url))} " <>
+                "reason=#{inspect(reason, limit: 20, printable_limit: 512)}"
+            )
+
+            {:cont, {:error, :no_mini_app}}
         end
       end)
     end
@@ -123,6 +143,13 @@ defmodule Egregoros.MiniApps do
     case URI.parse(origin) do
       %URI{host: domain} when is_binary(domain) -> require_domain_allowed(domain)
       _ -> {:error, :invalid_origin}
+    end
+  end
+
+  defp candidate_host(url) do
+    case URI.parse(url) do
+      %URI{host: host} when is_binary(host) and host != "" -> host
+      _ -> "invalid"
     end
   end
 
