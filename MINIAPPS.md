@@ -47,6 +47,62 @@ registered applications, explicit redirect-URI validation, token revocation,
 and scoped bearer-token authorization. The mini-app protocol can build on that
 provider rather than introduce a second identity system.
 
+## Interoperability profile for Fediverse-server implementers
+
+This document is also the reference profile for another Fediverse server that
+wants to host compatible mini apps. A compatible host implements the security
+and wire behaviour below; it does not need to share Egregoros's language,
+database schema, UI, or ActivityPub implementation. The Egregoros paths in
+this section describe the current **v1 compatibility surface**, not an
+endorsement of a particular internal architecture.
+
+An implementer MUST preserve these externally observable rules:
+
+| Surface | v1 compatibility requirement |
+| --- | --- |
+| App identity | Fetch the manifest only from `https://<app-origin>/.well-known/fediverse-miniapp.json`; validate and pin its exact HTTPS origin before registering or launching the app. |
+| Iframe transport | Give each launch a fresh, origin-pinned `MessagePort`/nonce channel. Never expose host DOM, cookies, CSRF values, host storage, bearer tokens, or a general `postMessage` authority to the iframe. |
+| SDK startup | Bootstrap is a one-time message sent when the iframe loads. The app must create its SDK listener synchronously before framework rendering or lazy imports; a host must not treat a missed bootstrap as an authorization success. |
+| Authorization metadata | Serve RFC 8414 metadata at `https://<issuer>/.well-known/oauth-authorization-server`, including `fediverse_miniapp_profile: "1"`, S256 PKCE support, and the advertised registration, authorization, token, and revocation endpoints. The current SDK validates this exact metadata location. |
+| Authorization relay | Provide the host-owned, fragment-only relay at `https://<issuer>/mini-apps/oauth/relay`. The current v1 SDK/bootstrap binds this exact URL. It accepts no token, does not use `window.opener`, broadcasts only the correlated result, and uses `no-store`, no-referrer, and `frame-ancestors 'none'`. |
+| Browser OAuth | Support public clients with `token_endpoint_auth_method: "none"`, authorization-code + required S256 PKCE, exact redirect-URI matching, single-use short-lived codes, and no implicit, password, or client-credentials grant. |
+| Dynamic registration | Deduplicate public registrations by `(issuer, canonical manifest URL)` and return the same public `client_id` for an equivalent registration. No client secret may be issued or required. |
+| Narrow identity | Expose `GET /api/v1/mini-apps/identity` for an `identify` bearer grant, returning only the documented narrow identity representation and `Cache-Control: no-store`. This is a current v1 profile endpoint; a future version can advertise an alternative explicitly. |
+
+The metadata-advertised registration, authorization, token, and revocation URLs
+may have different paths on another server. The fixed metadata, relay, and
+identity paths above are part of compatibility with the current v1 SDK and
+implementer examples. A server that changes one needs a versioned SDK/profile
+extension rather than silently changing it.
+
+### Browser CORS interoperability
+
+`browser_code` is deliberately usable by a static app: it has no backend and
+no client secret. Therefore every issuer endpoint used directly by that
+cross-origin iframe MUST implement non-credentialed CORS. This is a protocol
+requirement, not merely an nginx convenience:
+
+- `GET /.well-known/oauth-authorization-server` MUST include
+  `Access-Control-Allow-Origin` for the calling app origin (or `*`). Although a
+  simple `GET` normally has no preflight, the browser still rejects its response
+  without this header.
+- Dynamic registration and token/revocation `POST`s MUST answer preflight and
+  allow the requested method and `content-type`; bearer-protected identity/API
+  requests MUST also allow `authorization` when that header is used.
+- Responses must not depend on an issuer session cookie and must not use
+  `Access-Control-Allow-Credentials`. Authorization itself remains a
+  top-level, host-controlled navigation where the user can authenticate and
+  consent; it is not a credentialed XHR from the iframe.
+- Hosts should return CORS headers on error responses too. Otherwise an
+  ordinary OAuth error becomes an opaque browser network error that an app
+  cannot safely diagnose.
+
+For the Egregoros v1 reference endpoints, that means CORS is required for
+metadata, `POST /oauth/mini-app/register`, `POST /oauth/token`,
+`POST /oauth/revoke`, and `GET /api/v1/mini-apps/identity`. A host may use a
+strict allowlist of validated mini-app origins instead of `*`; it must make the
+same decision on the preflight and actual response.
+
 ## V1 architecture
 
 ### 1. Manifest
@@ -320,7 +376,9 @@ Egregoros bearer token and is never available to a different app origin.
 #### Static browser authorization-code completion
 
 A static app passes `completionMode: "browser_code"` to `requestAuth` and
-omits `handoffChallenge`. It uses this flow:
+omits `handoffChallenge`. Before starting this flow, its issuer must satisfy
+the non-credentialed CORS requirements above: metadata is a cross-origin `GET`
+and registration/token requests are cross-origin `POST`s. It uses this flow:
 
 1. The iframe obtains or reuses its public dynamic `client_id`, creates a fresh
    high-entropy state value and PKCE verifier/challenge, and retains the
@@ -349,12 +407,23 @@ omits `handoffChallenge`. It uses this flow:
    URI, and retained PKCE verifier to the metadata-advertised token endpoint.
    Only after that exchange succeeds may it use an authenticated host action.
 
+The registered callback may be a query-driven route at the static app root,
+such as `https://app.example/?oauth=callback`; it need not require a server
+callback handler. It still MUST be the exact HTTPS URI in both the manifest,
+registration, authorization request, and token exchange. Static-site rewrite
+rules must serve the SPA entry document for that callback without replacing or
+dropping its query string. The callback may briefly load after the popup
+navigation, but it must neither render a token nor exchange the code itself.
+
 The browser app is a public client and has no secret. It SHOULD keep tokens in
 `sessionStorage`, clear them on logout or session teardown, use no third-party
 runtime scripts, and deploy a strict CSP. Persistent IndexedDB or
 `localStorage` increases the lifetime of a token theft. Frontend token storage
 has the normal browser-SPA XSS risk, but PKCE prevents a host, extension, or
-other observer that sees only the authorization code from redeeming it.
+other observer that sees only the authorization code from redeeming it. Iframe
+storage can be partitioned, cleared, or denied by browser privacy settings, so
+an app MUST NOT depend on persistent storage to complete registration or OAuth;
+it must work with only its current in-memory/session state.
 
 ### Optional EVM wallet capability
 
@@ -549,9 +618,12 @@ normative:
    a public OAuth client: it returns a stable `client_id`, declares
    `token_endpoint_auth_method: "none"`, and never returns a client secret.
 2. The registration cache key is `(authorization_server_issuer,
-   canonical_manifest_url)`. A conforming app MUST reuse that client
-   registration for every user of that app on that Egregoros instance and MUST
-   not register again when it already has a valid cached registration.
+   canonical_manifest_url)`. A conforming app MUST reuse a valid known client
+   registration for every user of that app on that issuer and MUST NOT register
+   again merely because a new user opens it. Persistent browser storage is an
+   optimization, not a prerequisite: privacy controls may partition or deny
+   `localStorage`/IndexedDB in an iframe. If the cache is unavailable or empty,
+   the app may register again and relies on the host's idempotent result.
 3. The instance validates that every HTTPS redirect URI is on the manifest's
    canonical app origin—exact scheme, host, and port—and it stores the
    canonical manifest URL with the client record. Redirects cannot be widened
@@ -561,8 +633,8 @@ normative:
    ages, and OAuth grant/response types. The registration response returns the
    ages as `scope_authorization_max_age_seconds`.
    It has no user identity, note context, or per-user fields.
-5. Egregoros permanently deduplicates an equivalent registration while that
-   app identity exists, idempotently returns the same public `client_id`,
+5. A compatible host permanently deduplicates an equivalent registration while
+   that app identity exists, idempotently returns the same public `client_id`,
    rate-limits/abuse-monitors anonymous registration, and allows instance
    operators to disable it. It rejects registrations whose manifest cannot be
    securely fetched and validated. A conflicting immutable manifest returns
