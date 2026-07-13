@@ -6,7 +6,11 @@ defmodule EgregorosWeb.OAuthServerMetadataControllerTest do
   test "GET /.well-known/oauth-authorization-server advertises the mini-app profile", %{
     conn: conn
   } do
-    conn = get(conn, "/.well-known/oauth-authorization-server")
+    conn =
+      conn
+      |> put_req_header("origin", "https://app.example")
+      |> get("/.well-known/oauth-authorization-server")
+
     metadata = json_response(conn, 200)
     issuer = Endpoint.url()
 
@@ -21,5 +25,6 @@ defmodule EgregorosWeb.OAuthServerMetadataControllerTest do
     assert metadata["token_endpoint_auth_methods_supported"] == ["client_secret_post", "none"]
     assert metadata["scopes_supported"] == ["identify", "read", "write", "follow", "push"]
     assert metadata["fediverse_miniapp_profile"] == "1"
+    assert get_resp_header(conn, "access-control-allow-origin") == ["*"]
   end
 end

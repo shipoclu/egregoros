@@ -7,6 +7,7 @@ defmodule EgregorosWeb.Plugs.CORS do
     "/api",
     "/oauth",
     "/nodeinfo",
+    "/.well-known/oauth-authorization-server",
     "/.well-known/nodeinfo",
     "/uploads",
     "/objects",
