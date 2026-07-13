@@ -64,6 +64,12 @@ can independently revoke mini-app context, OAuth, and wallet access from
 Settings → Privacy; revocation closes a matching active mini app in all open
 Egregoros tabs immediately.
 
+To build an app, start with the beginner-friendly
+[`MINIAPP_IMPLEMENTER_GUIDE.md`](MINIAPP_IMPLEMENTER_GUIDE.md). The guide walks
+through a minimal static SPA, discovery, framing, the SDK, optional OAuth, and a
+production checklist. [`MINIAPPS.md`](MINIAPPS.md) is the complete protocol and
+security reference.
+
 For developers considering app-owned public ActivityPub notes and
 consent-gated transactional mentions, see
 [`MINIAPP_ACTIVITYPUB_MESSAGES.md`](MINIAPP_ACTIVITYPUB_MESSAGES.md). The

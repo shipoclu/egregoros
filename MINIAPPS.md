@@ -1,5 +1,9 @@
 # Fediverse Mini Apps — V1 Design and Reference Implementation
 
+New implementers should begin with the step-by-step
+[`MINIAPP_IMPLEMENTER_GUIDE.md`](MINIAPP_IMPLEMENTER_GUIDE.md). This document
+is the deeper protocol, security, and implementation reference.
+
 > Status: v1 implementation candidate on the `miniapps` branch. The feature is
 > disabled by default. Automated protocol, authorization, wallet, broker, and
 > interoperability gates pass; production enablement still requires a
