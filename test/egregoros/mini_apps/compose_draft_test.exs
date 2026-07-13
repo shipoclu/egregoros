@@ -143,7 +143,7 @@ defmodule Egregoros.MiniApps.ComposeDraftTest do
       home_url: "https://app.example/",
       oauth: %{
         redirect_uris: ["https://app.example/oauth/callback"],
-        scopes: ["read", "write"]
+        scopes: ["identify", "write"]
       },
       capabilities: ["compose_note"],
       cache_ttl_seconds: 600

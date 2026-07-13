@@ -143,7 +143,7 @@
           "maxItems": 32,
           "uniqueItems": true,
           "contains": {
-            "const": "read"
+            "const": "identify"
           },
           "items": {
             "type": "string",

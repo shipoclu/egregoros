@@ -256,7 +256,7 @@ defmodule Egregoros.MiniApps.ActorActivationTest do
       "homeUrl" => origin <> "/",
       "oauth" => %{
         "redirectUris" => [origin <> "/oauth/callback"],
-        "scopes" => ["read"]
+        "scopes" => ["identify"]
       },
       "activityPub" => %{
         "actorUrl" => actor,

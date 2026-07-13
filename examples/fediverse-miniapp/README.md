@@ -42,3 +42,10 @@ the exact validated callback origin; this is dynamic server behavior, not a
 domain that the app developer asks an nginx administrator to hardcode. See the
 OAuth section of [DEPLOYMENT.md](./DEPLOYMENT.md) for the callback and CSP
 checks.
+
+Use the `identify` OAuth scope and `/api/v1/mini-apps/identity` when the app only
+needs to link a Fediverse account. `identify` returns the account's ActivityPub
+ID, username, fully qualified handle, display name, and profile URL; it does not
+grant authenticated access to posts, timelines, notifications, or
+conversations. Request broad `read` or `write` only for functionality that
+actually needs those independent permissions.

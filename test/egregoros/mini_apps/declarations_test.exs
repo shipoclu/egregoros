@@ -19,7 +19,7 @@ defmodule Egregoros.MiniApps.DeclarationsTest do
     assert first.app_origin == "https://wallet.example"
     assert first.capabilities == []
     assert first.oauth_redirect_uris == ["https://wallet.example/oauth/callback"]
-    assert first.oauth_scopes == ["read"]
+    assert first.oauth_scopes == ["identify"]
     assert first.wallet_evm_enabled
     refute first.wallet_evm_required
     assert first.wallet_evm_required_chains == ["eip155:8453"]
@@ -41,7 +41,7 @@ defmodule Egregoros.MiniApps.DeclarationsTest do
     refute_manifest_change(%{"requiredChains" => ["eip155:1"]})
     refute_manifest_change(%{"enabled" => false, "requiredChains" => []})
 
-    changed_oauth = manifest_fixture(oauth_scopes: ["read", "write"])
+    changed_oauth = manifest_fixture(oauth_scopes: ["identify", "write"])
     assert {:error, :manifest_changed} = Declarations.ensure(changed_oauth)
 
     changed_capabilities = %{changed_oauth | capabilities: ["compose_note"]}
@@ -82,7 +82,7 @@ defmodule Egregoros.MiniApps.DeclarationsTest do
 
   defp manifest_fixture(options) when is_list(options) do
     oauth? = Keyword.get(options, :oauth?, true)
-    oauth_scopes = Keyword.get(options, :oauth_scopes, ["read"])
+    oauth_scopes = Keyword.get(options, :oauth_scopes, ["identify"])
 
     attrs = %{
       "version" => "1",

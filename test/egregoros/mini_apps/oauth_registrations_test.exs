@@ -39,7 +39,7 @@ defmodule Egregoros.MiniApps.OAuthRegistrationsTest do
     assert first.id == second.id
     assert first.app_origin == "https://app.example"
     assert first.redirect_uris == ["https://app.example/oauth/callback"]
-    assert first.scopes == ["read", "write"]
+    assert first.scopes == ["identify", "write"]
     assert first.capabilities == ["compose_note"]
     assert first.oauth_application_id == second.oauth_application_id
     assert Repo.aggregate(OAuthApplication, :count) == 1
@@ -49,14 +49,14 @@ defmodule Egregoros.MiniApps.OAuthRegistrationsTest do
     assert application.name == "Writer"
     assert application.website == "https://app.example/"
     assert application.redirect_uris == ["https://app.example/oauth/callback"]
-    assert application.scopes == "read write"
+    assert application.scopes == "identify write"
     assert application.client_type == :public_mini_app
   end
 
   test "rejects immutable OAuth or capability changes without creating another client" do
     assert {:ok, registration} = OAuthRegistrations.register(manifest_fixture())
 
-    changed = manifest_fixture(scopes: ["read"])
+    changed = manifest_fixture(scopes: ["identify"])
     assert {:error, :manifest_changed} = OAuthRegistrations.register(changed)
 
     changed = manifest_fixture(capabilities: [])
@@ -133,7 +133,7 @@ defmodule Egregoros.MiniApps.OAuthRegistrationsTest do
              OAuthRegistrations.validate_authorization(
                stale_application,
                redirect_uri,
-               "read write",
+               "identify write",
                code_challenge: challenge,
                code_challenge_method: "S256"
              )
@@ -142,7 +142,7 @@ defmodule Egregoros.MiniApps.OAuthRegistrationsTest do
              OAuthRegistrations.validate_authorization(
                application,
                "https://app.example/not-registered",
-               "read write",
+               "identify write",
                code_challenge: challenge,
                code_challenge_method: "S256"
              )
@@ -160,7 +160,7 @@ defmodule Egregoros.MiniApps.OAuthRegistrationsTest do
              OAuthRegistrations.validate_authorization(
                application,
                redirect_uri,
-               "read write",
+               "identify write",
                code_challenge: challenge
              )
 
@@ -168,11 +168,11 @@ defmodule Egregoros.MiniApps.OAuthRegistrationsTest do
              OAuthRegistrations.validate_authorization(
                application,
                redirect_uri,
-               "read write",
+               "identify write",
                code_challenge_method: "S256"
              )
 
-    assert :ok = OAuthRegistrations.validate_token_scopes(application, "write read")
+    assert :ok = OAuthRegistrations.validate_token_scopes(application, "write identify")
 
     assert {:error, :invalid_scope} =
              OAuthRegistrations.validate_token_scopes(application, "read")
@@ -191,7 +191,7 @@ defmodule Egregoros.MiniApps.OAuthRegistrationsTest do
                application,
                user,
                redirect_uri,
-               "read write",
+               "identify write",
                code_challenge: challenge,
                code_challenge_method: "S256"
              )
@@ -314,7 +314,7 @@ defmodule Egregoros.MiniApps.OAuthRegistrationsTest do
                application,
                user,
                redirect_uri,
-               "read write"
+               "identify write"
              )
 
     assert {:error, :invalid_scope} =
@@ -324,7 +324,7 @@ defmodule Egregoros.MiniApps.OAuthRegistrationsTest do
              )
 
     assert {:ok, code} =
-             OAuth.create_authorization_code(application, user, redirect_uri, "read write",
+             OAuth.create_authorization_code(application, user, redirect_uri, "identify write",
                code_challenge: challenge,
                code_challenge_method: "S256"
              )
@@ -383,7 +383,7 @@ defmodule Egregoros.MiniApps.OAuthRegistrationsTest do
                application,
                user,
                "https://app.example/oauth/callback",
-               "read write",
+               "identify write",
                code_challenge: challenge,
                code_challenge_method: "S256"
              )
@@ -404,7 +404,7 @@ defmodule Egregoros.MiniApps.OAuthRegistrationsTest do
                "client_id" => application.client_id
              })
 
-    assert [%{app_origin: "https://app.example", scopes: ["read", "write"]}] =
+    assert [%{app_origin: "https://app.example", scopes: ["identify", "write"]}] =
              OAuthRegistrations.list_user_grants(user.id)
 
     Permissions.subscribe(user.id)
@@ -432,7 +432,7 @@ defmodule Egregoros.MiniApps.OAuthRegistrationsTest do
                application,
                user,
                "https://app.example/oauth/callback",
-               "read write",
+               "identify write",
                code_challenge: challenge,
                code_challenge_method: "S256"
              )
@@ -477,7 +477,7 @@ defmodule Egregoros.MiniApps.OAuthRegistrationsTest do
                application,
                user,
                "https://app.example/oauth/callback",
-               "read write",
+               "identify write",
                code_challenge: challenge,
                code_challenge_method: "S256"
              )
@@ -528,7 +528,7 @@ defmodule Egregoros.MiniApps.OAuthRegistrationsTest do
                application,
                user,
                "https://app.example/oauth/callback",
-               "read write",
+               "identify write",
                code_challenge: challenge,
                code_challenge_method: "S256"
              )
@@ -547,7 +547,7 @@ defmodule Egregoros.MiniApps.OAuthRegistrationsTest do
                application,
                user,
                "https://app.example/oauth/callback",
-               "read write",
+               "identify write",
                code_challenge: challenge,
                code_challenge_method: "S256"
              )
@@ -601,7 +601,7 @@ defmodule Egregoros.MiniApps.OAuthRegistrationsTest do
                application,
                user,
                "https://app.example/oauth/callback",
-               "read write",
+               "identify write",
                code_challenge: challenge,
                code_challenge_method: "S256"
              )
@@ -800,7 +800,7 @@ defmodule Egregoros.MiniApps.OAuthRegistrationsTest do
         token_digest: token_digest(raw_token),
         refresh_token_digest: token_digest(raw_refresh_token),
         family_id: Ecto.UUID.generate(),
-        scopes: "read write",
+        scopes: "identify write",
         user_id: user.id,
         application_id: application.id,
         expires_at: DateTime.add(DateTime.utc_now(), 3_600, :second),
@@ -818,7 +818,7 @@ defmodule Egregoros.MiniApps.OAuthRegistrationsTest do
   end
 
   defp manifest_fixture(overrides \\ []) do
-    scopes = Keyword.get(overrides, :scopes, ["read", "write"])
+    scopes = Keyword.get(overrides, :scopes, ["identify", "write"])
     capabilities = Keyword.get(overrides, :capabilities, ["compose_note"])
 
     json =

@@ -356,7 +356,7 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
     query = href |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
     assert query["client_id"] == application.client_id
     assert query["redirect_uri"] == "https://app.example/oauth/callback"
-    assert query["scope"] == "read write"
+    assert query["scope"] == "identify write"
     refute Map.has_key?(query, "handoff_challenge")
 
     view |> element("#mini-app-auth-cancel") |> render_click()
@@ -1269,7 +1269,7 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
         if(oauth?,
           do: %{
             redirect_uris: ["https://app.example/oauth/callback"],
-            scopes: ["read", "write"]
+            scopes: ["identify", "write"]
           },
           else: nil
         ),
@@ -1320,7 +1320,7 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
       "request_id" => request_id,
       "client_id" => client_id,
       "redirect_uri" => "https://app.example/oauth/callback",
-      "scopes" => ["read", "write"],
+      "scopes" => ["identify", "write"],
       "state" => String.duplicate("s", 43),
       "code_challenge" => String.duplicate("c", 43),
       "code_challenge_method" => "S256",
@@ -1337,7 +1337,7 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
                application,
                user,
                "https://app.example/oauth/callback",
-               "read write",
+               "identify write",
                code_challenge: challenge,
                code_challenge_method: "S256"
              )
@@ -1369,7 +1369,7 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
       token_digest: token_digest(raw_token),
       refresh_token_digest: token_digest(raw_refresh_token),
       family_id: Ecto.UUID.generate(),
-      scopes: "read write",
+      scopes: "identify write",
       user_id: user.id,
       application_id: application.id,
       expires_at: DateTime.add(DateTime.utc_now(), 3_600, :second),

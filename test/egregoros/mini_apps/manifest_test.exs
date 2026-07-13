@@ -125,6 +125,10 @@ defmodule Egregoros.MiniApps.ManifestTest do
     assert get_in(schema, ["properties", "version", "const"]) == "1"
 
     assert get_in(schema, ["properties", "activityPub", "$ref"]) == "#/$defs/activityPub"
+
+    assert get_in(schema, ["$defs", "oauth", "properties", "scopes", "contains", "const"]) ==
+             "identify"
+
     activity_pub = get_in(schema, ["$defs", "activityPub"])
     assert activity_pub["additionalProperties"] == false
     assert activity_pub["required"] == ["actorUrl", "publicNotes", "transactionalMentions"]
@@ -135,7 +139,7 @@ defmodule Egregoros.MiniApps.ManifestTest do
       ~s|{"version":"1","version":"1","name":"Reader","homeUrl":"https://app.example/","capabilities":[]}|
 
     duplicate_nested =
-      ~s|{"version":"1","name":"Reader","homeUrl":"https://app.example/","oauth":{"redirectUris":["https://app.example/cb"],"scopes":["read"],"scopes":["read"]},"capabilities":[]}|
+      ~s|{"version":"1","name":"Reader","homeUrl":"https://app.example/","oauth":{"redirectUris":["https://app.example/cb"],"scopes":["identify"],"scopes":["identify"]},"capabilities":[]}|
 
     assert {:error, :duplicate_json_key} = Manifest.decode(duplicate_top, @manifest_url)
     assert {:error, :duplicate_json_key} = Manifest.decode(duplicate_nested, @manifest_url)
@@ -173,6 +177,13 @@ defmodule Egregoros.MiniApps.ManifestTest do
   test "requires identify whenever oauth is declared" do
     json = valid_manifest() |> put_in(["oauth", "scopes"], ["write"]) |> Jason.encode!()
     assert {:error, :identify_scope_required} = Manifest.decode(json, @manifest_url)
+  end
+
+  test "accepts a legacy broad read grant as satisfying identity compatibility" do
+    json = valid_manifest() |> put_in(["oauth", "scopes"], ["read"]) |> Jason.encode!()
+
+    assert {:ok, manifest} = Manifest.decode(json, @manifest_url)
+    assert manifest.oauth.scopes == ["read"]
   end
 
   test "rejects duplicate scopes, capabilities, redirects, and chains" do

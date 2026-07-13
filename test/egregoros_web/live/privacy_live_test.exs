@@ -106,7 +106,7 @@ defmodule EgregorosWeb.PrivacyLiveTest do
                application,
                alice,
                "https://writer.example/oauth/callback",
-               "read write",
+               "identify write",
                code_challenge: challenge,
                code_challenge_method: "S256"
              )
@@ -149,7 +149,7 @@ defmodule EgregorosWeb.PrivacyLiveTest do
                application,
                alice,
                "https://alerts.example/oauth/callback",
-               "read",
+               "identify",
                code_challenge: challenge,
                code_challenge_method: "S256"
              )
@@ -257,7 +257,7 @@ defmodule EgregorosWeb.PrivacyLiveTest do
       "homeUrl" => "https://writer.example/",
       "oauth" => %{
         "redirectUris" => ["https://writer.example/oauth/callback"],
-        "scopes" => ["read", "write"]
+        "scopes" => ["identify", "write"]
       },
       "capabilities" => ["compose_note"]
     }
@@ -278,7 +278,7 @@ defmodule EgregorosWeb.PrivacyLiveTest do
       "homeUrl" => "https://alerts.example/",
       "oauth" => %{
         "redirectUris" => ["https://alerts.example/oauth/callback"],
-        "scopes" => ["read"]
+        "scopes" => ["identify"]
       },
       "activityPub" => %{
         "actorUrl" => "https://alerts.example/ap/actor",

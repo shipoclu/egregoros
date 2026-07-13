@@ -36,7 +36,7 @@ defmodule Egregoros.MiniApps.AuthRequestTest do
     assert query["client_id"] == application.client_id
     assert query["redirect_uri"] == "https://app.example/oauth/callback"
     assert query["response_type"] == "code"
-    assert query["scope"] == "read write"
+    assert query["scope"] == "identify write"
     assert query["state"] == String.duplicate("s", 43)
     assert query["code_challenge"] == String.duplicate("c", 43)
     assert query["code_challenge_method"] == "S256"
@@ -52,7 +52,7 @@ defmodule Egregoros.MiniApps.AuthRequestTest do
       |> OAuthApplication.changeset(%{
         name: "Other",
         redirect_uris: ["https://other.example/callback"],
-        scopes: "read write",
+        scopes: "identify write",
         client_id: String.duplicate("o", 32),
         client_secret: String.duplicate("x", 48)
       })
@@ -73,7 +73,7 @@ defmodule Egregoros.MiniApps.AuthRequestTest do
              )
 
     assert {:error, :invalid_scope} =
-             AuthRequest.prepare("https://app.example", %{params | "scopes" => ["read"]})
+             AuthRequest.prepare("https://app.example", %{params | "scopes" => ["identify"]})
 
     assert {:error, :invalid_state} =
              AuthRequest.prepare("https://app.example", %{params | "state" => "weak"})
@@ -96,7 +96,7 @@ defmodule Egregoros.MiniApps.AuthRequestTest do
       "request_id" => "auth-1",
       "client_id" => client_id,
       "redirect_uri" => "https://app.example/oauth/callback",
-      "scopes" => ["read", "write"],
+      "scopes" => ["identify", "write"],
       "state" => String.duplicate("s", 43),
       "code_challenge" => String.duplicate("c", 43),
       "code_challenge_method" => "S256",
@@ -112,7 +112,7 @@ defmodule Egregoros.MiniApps.AuthRequestTest do
         "homeUrl" => "https://app.example/",
         "oauth" => %{
           "redirectUris" => ["https://app.example/oauth/callback"],
-          "scopes" => ["read", "write"]
+          "scopes" => ["identify", "write"]
         },
         "capabilities" => ["compose_note"]
       })

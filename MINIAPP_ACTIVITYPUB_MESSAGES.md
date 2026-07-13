@@ -723,7 +723,8 @@ at any time.
 
 - [ ] Everything required for the actor and signed delivery boundary above.
 - [x] Immutable mini-app actor declaration and host-side actor activation.
-- [ ] OAuth `read` grant used server-side to identify the recipient.
+- [ ] OAuth `identify` grant used server-side to identify the recipient; broad
+      `read` is not required merely to link the Fediverse account.
 - [ ] Separate host-owned notification confirmation completed from a gesture.
 - [ ] Authoritative backend permission check returns `granted` before enqueue.
 - [ ] Independent transactional and promotional decisions and revocation.

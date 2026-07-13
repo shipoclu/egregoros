@@ -253,6 +253,9 @@ A backend deployment should:
    no secret.
 4. Keep access/refresh tokens only on the backend. Omit `client_secret` from
    token and revocation requests; `client_credentials` is unavailable.
+   Request `identify` for ordinary account linking and call
+   `/api/v1/mini-apps/identity` for the minimal identity DTO. Do not request
+   `read` merely to identify the user.
 5. Use transaction-specific S256 PKCE, high-entropy state, the exact registered
    callback, and the verifier-bound one-time iframe handoff. Bind the exact
    relay URL and launch ID to the OAuth state.
@@ -349,6 +352,8 @@ opener reference, or poll the authorization window.
 - [ ] Manifest, page, SDK, context, external action, and optional wallet flows
       are tested from a fully public note.
 - [ ] Any OAuth secrets and bearer tokens remain backend-only.
+- [ ] Ordinary account linking requests `identify`, not broad `read`, and uses
+      `/api/v1/mini-apps/identity` rather than `verify_credentials`.
 - [ ] OAuth retries create fresh state, PKCE, and handoff values.
 - [ ] The server's OAuth consent CSP dynamically names the exact registered
       callback origin, and no proxy replaces or appends that CSP.

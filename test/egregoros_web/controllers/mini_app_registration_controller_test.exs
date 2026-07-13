@@ -24,7 +24,7 @@ defmodule EgregorosWeb.MiniAppRegistrationControllerTest do
     refute Map.has_key?(response, "client_secret")
     assert response["client_name"] == "Writer"
     assert response["redirect_uris"] == ["https://app.example/oauth/callback"]
-    assert response["scope"] == "read write"
+    assert response["scope"] == "identify write"
     assert response["grant_types"] == ["authorization_code", "refresh_token"]
     assert response["response_types"] == ["code"]
     assert response["token_endpoint_auth_method"] == "none"
@@ -114,7 +114,7 @@ defmodule EgregorosWeb.MiniAppRegistrationControllerTest do
     changed_manifest =
       manifest_json()
       |> Jason.decode!()
-      |> put_in(["oauth", "scopes"], ["read"])
+      |> put_in(["oauth", "scopes"], ["identify"])
       |> Jason.encode!()
 
     expect(Egregoros.MiniApps.Fetcher.Mock, :get, 2, fn
@@ -143,7 +143,7 @@ defmodule EgregorosWeb.MiniAppRegistrationControllerTest do
       "homeUrl" => "https://app.example/",
       "oauth" => %{
         "redirectUris" => ["https://app.example/oauth/callback"],
-        "scopes" => ["read", "write"]
+        "scopes" => ["identify", "write"]
       },
       "capabilities" => ["compose_note"]
     })

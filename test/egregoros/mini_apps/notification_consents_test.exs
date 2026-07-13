@@ -211,7 +211,7 @@ defmodule Egregoros.MiniApps.NotificationConsentsTest do
       "homeUrl" => "https://app.example/",
       "oauth" => %{
         "redirectUris" => ["https://app.example/oauth/callback"],
-        "scopes" => ["read"]
+        "scopes" => ["identify"]
       },
       "activityPub" => %{
         "actorUrl" => "https://app.example/ap/actor",
@@ -239,7 +239,7 @@ defmodule Egregoros.MiniApps.NotificationConsentsTest do
                application,
                user,
                "https://app.example/oauth/callback",
-               "read",
+               "identify",
                code_challenge: challenge,
                code_challenge_method: "S256"
              )

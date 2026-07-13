@@ -519,12 +519,33 @@ If an app declares OAuth, its requested OAuth scope set is fixed when first
 observed/registered on an instance. Every dynamic registration and authorization
 request MUST exactly equal that set; in v1, changing the declared set (adding,
 removing, or renaming scopes) invalidates the manifest for that app identity
-and is rejected. An OAuth-enabled manifest scope set MUST include the existing
-`read` scope, which provides the minimum authenticated session/identity access.
+and is rejected. An OAuth-enabled manifest scope set MUST include `identify`,
+which links the grant to the user's minimal Fediverse identity without granting
+authenticated access to timelines, posts, notifications, or conversations.
+The broad `read` scope is optional and implies `identify` for compatibility,
+but new mini apps MUST declare `identify` explicitly.
 Apps that do not declare OAuth need no dynamic registration and can operate
 solely through non-authenticated capabilities. An OAuth-enabled app that needs
 a different permission set must use a new app identity/domain until a future
 version defines a safe migration and re-consent flow.
+
+#### Mini-app OAuth scope meanings
+
+The authorization screen MUST list each requested permission separately and
+must not describe `identify`, `read`, and `write` as one combined account-access
+grant:
+
+| Scope | Authority granted | Typical use |
+| --- | --- | --- |
+| `identify` | Call `GET /api/v1/mini-apps/identity`, which returns only the user's ActivityPub ID, local username, fully qualified account name, display name, and profile URL. | Link a Fediverse account to an app. This is the normal and least-privilege choice. |
+| `read` | Use authenticated read APIs, including data such as timelines, posts, notifications, conversations, and visibility-limited resources where the endpoint permits it. It also implies `identify`. | Apps whose actual feature requires account data, not merely the user's identity. |
+| `write` | Use write APIs permitted by Egregoros, including creating, editing, or deleting content. It does not imply `read` or `identify`, and mini apps receive the additional write confirmation required by this profile. | Apps that perform API writes as the user. Host-mediated `composeNote` remains a separate prefill-only capability. |
+
+The identity response is intentionally a new narrow endpoint rather than
+`/api/v1/accounts/verify_credentials`: the Mastodon-compatible endpoint
+requires `read` and exposes a substantially broader account representation.
+The response to `/api/v1/mini-apps/identity` MUST be marked `no-store`, and the
+app backend—not iframe JavaScript—normally holds the bearer and refresh tokens.
 
 ### 5. Host SDK
 
@@ -612,7 +633,7 @@ pending calls.
 | OAuth initiation | `requestAuth` | Optional `oauth` manifest object and a server-side dynamic registration. |
 | Wallet | `wallet.evm.getProvider` and its allowlisted EIP-1193 calls | Immutable wallet declaration, host wallet availability, and per-app wallet connection/confirmation. No OAuth required. |
 | Transactional notifications | `notifications.getPermission`, `notifications.requestPermission` | Immutable ActivityPub declaration and OAuth; prompting additionally requires a user gesture and host confirmation. |
-| OAuth-gated | `composeNote` | Immutable `compose_note` declaration plus completed OAuth with its fixed `read`-inclusive scope set. |
+| OAuth-gated | `composeNote` | Immutable `compose_note` declaration plus completed OAuth with its fixed `identify`-inclusive scope set. |
 
 #### Compose a note
 
@@ -1136,7 +1157,7 @@ The choices are:
 | Publisher metadata | Optional, informational | Hosting domain remains the only built-in trust signal. |
 | Page metadata authority | Presentation/launch only | It cannot change app identity, OAuth, scopes, or capabilities. |
 | Visual asset origins | Exact app origin | Prevents third-party CDN identity ambiguity; assets are proxied. |
-| Baseline OAuth scope | `read` required when OAuth is declared | Supplies minimum authenticated session/identity access. |
+| Baseline OAuth scope | `identify` required when OAuth is declared | Links the app to a minimal five-field Fediverse identity without authenticated post/timeline access. Legacy broad `read` grants imply `identify`. |
 | Scope request | Exact immutable manifest set | No per-session scope variation or escalation. |
 | Host capabilities | Immutable manifest declaration | Consent visibly covers non-base actions such as `compose_note`. |
 | Context disclosure | Once per app, independent of OAuth | Required before public note context is sent; may be combined with OAuth consent. |
@@ -1161,7 +1182,7 @@ The choices are:
    ordinary-link fallback.
 3. **OAuth profile.** Publish authorization-server metadata plus the
    mini-app dynamic-registration profile; enforce one app–issuer registration
-   for OAuth-enabled apps, immutable `read`-inclusive scopes/capabilities,
+   for OAuth-enabled apps, immutable `identify`-inclusive scopes/capabilities,
    exact callbacks, grants, write confirmation, token refresh/revocation, and
    instance policy on token use.
 4. **Host UI and SDK.** Deliver desktop floating panel and mobile full-height
@@ -1239,7 +1260,7 @@ Published as `https://{app-origin}/.well-known/fediverse-miniapp.json`:
   },
   "oauth": {
     "redirectUris": ["https://app.example/oauth/callback"],
-    "scopes": ["read", "write"]
+    "scopes": ["identify", "write"]
   },
   "wallet": {
     "evm": {
@@ -1267,7 +1288,9 @@ Required fields are `version`, `name`, `homeUrl`, and `capabilities`. The
 `oauth` object is optional; when present, `oauth.redirectUris` and
 `oauth.scopes` are required. `homeUrl` and every OAuth redirect URI must use
 the manifest's exact HTTPS origin. An OAuth-enabled manifest's `oauth.scopes`
-must include `read`. Its `scopes` and all manifests' `capabilities` arrays are
+must include `identify`. Broad `read` is separate, optional authority and is
+not needed merely to link a Fediverse account. Its `scopes` and all manifests'
+`capabilities` arrays are
 de-duplicated, bounded, and immutable after first registration/observation. The
 `wallet` and `activityPub` objects are optional and immutable when present. An
 ActivityPub actor URL must use the exact origin, have a non-root path, and have
