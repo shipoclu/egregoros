@@ -1,14 +1,49 @@
-# Fediverse Mini Apps — V1 Design and Reference Implementation
+# Fediverse Mini Apps — Normative V1 Host and App Protocol
 
-New implementers should begin with the step-by-step
-[`MINIAPP_IMPLEMENTER_GUIDE.md`](MINIAPP_IMPLEMENTER_GUIDE.md). This document
-is the deeper protocol, security, and implementation reference.
+This document is the self-contained interoperability specification. It is
+intended to be sufficient input for a person or coding agent implementing a
+compatible host in different ActivityPub server software, or implementing a
+mini app without access to Egregoros source code. The optional
+[`MINIAPP_IMPLEMENTER_GUIDE.md`](MINIAPP_IMPLEMENTER_GUIDE.md) is a tutorial;
+it is not required to discover any wire rule.
 
-> Status: v1 implementation candidate on the `miniapps` branch. The feature is
-> disabled by default. Automated protocol, authorization, wallet, broker, and
-> interoperability gates pass; production enablement still requires a
-> deployment-specific browser/PWA matrix and adversarial review of the release
-> build and egress controls.
+> Status: **V1 implementation candidate.** Egregoros implements this candidate
+> on the `miniapps` branch, disabled by default. “V1” below means this exact
+> candidate, not a claim that an external standards body has frozen it.
+> Implementations advertise it as `version: "1"` and
+> `fediverse_miniapp_profile: "1"`. Incompatible changes require a new version.
+
+### How to read this specification
+
+The key words **MUST**, **MUST NOT**, **REQUIRED**, **SHOULD**, **SHOULD NOT**,
+and **MAY** are to be interpreted as described by RFC 2119 and RFC 8174 when
+they appear in uppercase. Closed JSON objects reject unknown members. Unless a
+field explicitly says otherwise, JSON member names and string values are
+case-sensitive, arrays retain order, and repeated array values are invalid.
+
+The final “Clean-room V1 implementation contract” consolidates every custom
+data shape and browser message. It is normative and takes precedence if older
+design rationale elsewhere in this document is less precise. Referenced RFCs,
+HTML, CSP, ActivityPub, EIP-1193, and OAuth specifications remain normative for
+their standard protocols; no Egregoros source file, JSON Schema file, SDK
+implementation, example app, or other Markdown document is needed to fill in a
+Fediverse-mini-app-specific rule.
+
+V1 conformance has two levels:
+
+- A **core host** implements discovery, cards, the isolated iframe host,
+  `ready`, launch information, permissioned context, OAuth, identity,
+  `compose_note`, and external navigation.
+- A host MAY additionally advertise `wallet.evm` and/or
+  `notifications.activitypub`. Apps MUST feature-detect them. The current
+  ActivityPub notification declaration is an optional V1 extension, not a core
+  requirement. The richer provenance/purpose vocabulary and delegated
+  `app_activities` publishing are V2 and MUST NOT be inferred from V1 fields.
+
+An implementation is compatible only if it implements every REQUIRED rule for
+the surfaces it advertises. UI layout and persistence technology may differ;
+security boundaries, exact-origin decisions, data-release rules, and wire
+messages may not.
 
 ## Goal
 
@@ -1658,10 +1693,12 @@ no query or fragment. At least one publishing mode must be enabled;
 default applies when `cacheTtlSeconds` is absent; an explicit shorter TTL is
 honored.
 
-The normative JSON Schema is
+The machine-readable JSON Schema mirror is
 [`docs/schemas/fediverse-miniapp-manifest-v1.schema.json`](docs/schemas/fediverse-miniapp-manifest-v1.schema.json).
-The schema cannot express equality with the origin from which it was fetched,
-so hosts must still perform the exact-origin validation described here.
+It is useful for tooling but is not an additional source of normative rules.
+It cannot express equality with the origin from which it was fetched, duplicate
+key rejection, or the complete origin policy, so implementations use the
+clean-room contract below as the authority.
 
 ### Page card metadata
 
@@ -1707,3 +1744,418 @@ permitted origin/path boundary. Page metadata may override only card title,
 image, button label, and launch URL; it cannot override the domain app name,
 icon, publisher metadata, OAuth client registration, scopes, or host
 capabilities.
+
+## Clean-room V1 implementation contract
+
+This section turns the design above into a finite implementation target. A
+coding agent should implement this section first, then use the earlier sections
+for rationale and UI guidance. “Character” means a Unicode scalar value;
+“byte” means a UTF-8 byte. All size limits apply before interpretation.
+
+### 1. Common parsers and origin model
+
+Every security-sensitive JSON parser MUST reject invalid UTF-8, duplicate
+member names at any nesting level, a nesting depth greater than 16, and input
+that is not one complete JSON value. Objects in this protocol are closed:
+members not listed in the applicable table are invalid. A host MUST NOT use a
+parser mode in which the last duplicate member silently wins.
+
+Every protocol URL is at most 2,048 UTF-8 bytes. Parse URLs with one consistent
+standards-conforming URL implementation, then apply all of these rules:
+
+1. Require `https`, except that a public ActivityPub Note ID supplied as
+   `sourceNoteId` may use `http` for federation compatibility.
+2. Require a hostname and reject user names, passwords, malformed ports, and
+   IP literals. The effective port is the explicit port or 443 for HTTPS.
+3. Convert an international hostname to its ASCII/Punycode form, lowercase it,
+   and remove exactly one terminal dot before policy comparison. Reject a DNS
+   name longer than 253 bytes, fewer than two labels, an empty label, or a
+   label that is longer than 63 bytes or does not match
+   `[a-z0-9](?:[a-z0-9-]*[a-z0-9])?`.
+4. Reject WHATWG IPv4-number candidates, including a final decimal-only label
+   or a `0x` hexadecimal form, even if the URL library would reinterpret it.
+5. Reject raw C0 controls, space, backslash, DEL, invalid percent escapes, and
+   any percent escape that decodes to a control, backslash, or DEL.
+6. Require an empty path or a path beginning `/`. A manifest-declared URL MUST
+   have no fragment. Rules below say explicitly when a query is forbidden.
+
+An **origin** is the tuple `(scheme, normalized ASCII hostname, effective
+port)`. “Exact origin” always means equality of all three values; it never
+means a suffix, registrable-domain, textual-prefix, wildcard, or redirect
+match. Serialize default HTTPS port 443 without `:443`.
+
+Before any outbound connection, resolve the hostname and require **every** A
+and AAAA answer to be globally routable. Reject loopback, private, link-local,
+multicast, unspecified, documentation, benchmark, carrier-grade NAT, reserved,
+and IPv4-mapped non-global IPv6 addresses. Pin the accepted address set to the
+connection while retaining the original hostname for TLS SNI and certificate
+verification. Re-resolve and repeat the complete check for every later fetch;
+never trust a prior browser fetch or cache entry as an SSRF decision.
+
+### 2. Domain manifest
+
+For any candidate app URL, derive its origin and fetch exactly:
+
+`https://<candidate-origin>/.well-known/fediverse-miniapp.json`
+
+The well-known URL has no query or fragment. The response body is at most
+65,536 bytes and is strict JSON as defined above. The top-level object permits
+only these members:
+
+| Member | Required | Exact V1 rule |
+| --- | --- | --- |
+| `version` | yes | String exactly `"1"`. |
+| `name` | yes | 1–64 characters, valid UTF-8, no leading or trailing whitespace. |
+| `publisher` | no | Closed object described below. Informational only. |
+| `homeUrl` | yes | URL on the exact manifest origin. |
+| `iconUrl` | no | URL on the exact manifest origin. |
+| `splash` | no | Closed object described below. |
+| `oauth` | no | Closed object described below. |
+| `wallet` | no | Closed object described below. |
+| `activityPub` | no | Optional V1 notification extension described below. |
+| `capabilities` | yes | Unique array of 0–16 core capability strings. V1 permits only `compose_note`. |
+| `cacheTtlSeconds` | no | Integer 60–3,600; default 3,600. |
+
+`publisher` has exactly required `name` and `url` members. Its name is 1–100
+trimmed characters and its URL is exact-origin. It is never an identity proof.
+
+`splash` has exactly required `imageUrl` and `backgroundColor` members. The
+image is exact-origin. The color matches `^#[0-9A-Fa-f]{6}$`; hosts may
+normalize it to lowercase after validation.
+
+`oauth` has these members and no others:
+
+| Member | Required | Exact V1 rule |
+| --- | --- | --- |
+| `redirectUris` | yes | 1–8 unique exact-origin HTTPS URLs. |
+| `scopes` | yes | 1–32 unique strings, each 1–64 UTF-8 bytes and matching `^[a-z][a-z0-9:_-]*$`. New manifests include `identify`. |
+| `scopeAuthorizationMaxAgeSeconds` | no | Closed object whose keys are declared scopes and values are integers 300–31,536,000. It contains no more entries than `scopes`. |
+
+`identify` is the V1 narrow identity baseline. `read` does not imply
+`identify` on the identity endpoint. A host MAY continue to register a legacy
+manifest whose scope list contains `read` but not `identify`, but such a client
+cannot use the V1 narrow identity endpoint and is not a conforming new app.
+`compose_note` requires `oauth` and a declared `identify` scope. The broad OAuth
+scope `write` is not required for `compose_note`: compose opens host UI and the
+user submits; it is not delegated API publishing.
+
+`wallet` contains exactly required member `evm`. `evm` contains required
+boolean `enabled`, optional boolean `required` (default `false`), and optional
+`requiredChains` (default `[]`). Chains are a unique array of at most 16
+strings, each at most 64 bytes and matching `^eip155:[1-9][0-9]*$`. If
+`enabled` is false, `required` MUST be false and `requiredChains` MUST be empty.
+A host that does not advertise `wallet.evm` may still show and launch an app
+whose wallet is optional; it MUST refuse an app whose wallet is required or
+whose required chain cannot be satisfied.
+
+`activityPub` is the optional, current V1 notification extension. It contains
+exactly required `actorUrl`, `publicNotes`, and `transactionalMentions` members.
+The latter two are booleans and at least one is true. `actorUrl` is an
+exact-origin HTTPS URL with a non-root path and no query or fragment.
+`transactionalMentions: true` requires `oauth`. It does not authorize
+promotional messages, delegated posting as the user, `mentionPurposes`, or
+`app_activities`; those are outside core V1. A core host MAY reject this object
+as an unsupported optional extension while continuing to support apps that do
+not declare it.
+
+The app origin is the app identity. On first successful registration or
+observation the host stores a cryptographic fingerprint over the canonical
+manifest identity declarations: origin, OAuth redirect URIs/scopes/scope age
+ceilings, capabilities, wallet declaration, and ActivityPub declaration.
+Changing any of those fields is an identity change and MUST fail closed until
+the prior registration is administratively removed or a future migration
+protocol authorizes the change. Display `name`, `publisher`, `homeUrl`, icon,
+splash, and cache TTL may refresh after validation but never widen authority.
+
+The JSON Schema in this repository is a convenience and test artifact. The
+rules in this section are the complete normative schema, including constraints
+that ordinary JSON Schema cannot express, such as equality with the fetched
+origin and duplicate-key rejection.
+
+### 3. Public-note discovery and page cards
+
+V1 discovery runs only for an ActivityStreams `Note` that is fully public: its
+`to` array contains `https://www.w3.org/ns/activitystreams#Public`. Do not
+discover from followers-only, direct, local-only, or merely unlisted notes.
+The discovery result is derived local state and MUST NOT be inserted into the
+canonical ActivityPub object.
+
+Accept at most 100,000 UTF-8 bytes of Note HTML. Parse it as HTML, not with a
+single regular expression. In source order, collect at most ten URL candidates:
+
+1. Take `href` values from anchors except anchors whose class-token list
+   contains `mention`, `mention-link`, or `hashtag`.
+2. Ignore text inside `script`, `style`, `template`, `noscript`, `iframe`,
+   `object`, and `embed`.
+3. From text not already inside an anchor, recognize strings beginning
+   `https://` through the first whitespace or `<`, `>`, `"`, or `'` character.
+   Repeatedly trim terminal `. , ! ? ; : ) ] }` characters.
+4. Preserve the exact candidate string, reject it if it fails the common URL
+   rules, and de-duplicate exact strings while preserving first occurrence.
+
+Try candidates in that order. For each candidate, fetch and validate its
+origin manifest and linked HTML page. The first valid app produces exactly one
+card; later candidates remain ordinary links. Failure is isolated: retain the
+ordinary link and do not fail ActivityPub ingestion or timeline rendering.
+
+The linked page body is at most 1,000,000 UTF-8 bytes. Parse HTML and inspect
+`meta` elements whose `name` value is `fediverse:miniapp` under normal HTML DOM
+attribute matching. More than one matching element is invalid. Zero means use
+the generic card. Exactly one requires a non-empty `content` value of at most
+32,768 UTF-8 bytes containing a strict closed JSON object with exactly:
+
+| Member | Rule |
+| --- | --- |
+| `version` | String exactly `"1"`. |
+| `title` | 1–80 trimmed characters. |
+| `imageUrl` | Exact-app-origin HTTPS URL. |
+| `buttonTitle` | 1–32 trimmed characters. |
+| `launchUrl` | Exact-app-origin HTTPS URL. |
+
+Invalid or duplicate page metadata has no authority and MUST be treated as
+absent for presentation: the host uses a generic manifest card and launches
+the **exact linked URL**, including its path and query, rather than `homeUrl`.
+Valid page metadata may change only the title, preview image, button label, and
+launch URL. It cannot change app identity, OAuth, scopes, or capabilities.
+
+Every card visibly shows the verified app hostname and uses an explicit Open
+button. It states that opening discloses the public Note ID and exact linked
+URL to that app origin, but not the viewer's identity. Opening records:
+
+- `launchUrl`: valid metadata `launchUrl`, otherwise the exact linked URL;
+- `linkedUrl`: always the exact link found in the Note; and
+- `sourceNoteId`: the original public Note's canonical ActivityPub `id`, not an
+  Announce/boost ID.
+
+The card image and manifest image assets are fetched through a host image
+proxy. Accept at most 5,000,000 bytes, permit only AVIF, WebP, PNG, and JPEG,
+decode as a raster image, enforce dimension/pixel ceilings, and re-encode to a
+safe raster response. Never reflect SVG, HTML, remote headers, cookies, or
+active content. Do not persistently cache remote mini-app images in V1.
+
+### 4. Bounded outbound HTTP contract
+
+Manifest, page, actor, and image requests are credential-free `GET` requests.
+Send no user cookies, authorization header, client certificate, referrer,
+OAuth value, or private Note data. Send `Accept-Encoding: identity`; reject a
+response whose `Content-Encoding` is present and not `identity`.
+
+Use these `Accept` values:
+
+| Resource | `Accept` | Maximum body |
+| --- | --- | --- |
+| manifest | `application/json` | 65,536 bytes |
+| page | `text/html` | 1,000,000 bytes |
+| image | `image/avif,image/webp,image/png,image/jpeg` | 5,000,000 bytes |
+| optional ActivityPub actor | `application/activity+json,application/ld+json,application/json` | 65,536 bytes |
+
+Allow at most two redirects. Resolve a relative `Location` against the current
+URL, then require the result to retain the exact original origin and pass all
+URL, DNS, policy, and TLS checks again. A redirect has exactly one `Location`
+of at most 2,048 bytes and a body no larger than 8,192 bytes. Only status 200 is
+a final success.
+
+Bound a response to 64 header fields, 32,768 aggregate header bytes, and 8,192
+bytes per field line. A final response has exactly one parseable
+`Content-Type`; parameters are allowed but the normalized media type must match
+the table. If `Content-Length` exists, require exactly one non-negative decimal
+value no larger than the resource maximum and require the received byte count
+to equal it. Reject a response containing both `Content-Length` and
+`Transfer-Encoding`. Abort while streaming as soon as the maximum is crossed.
+Use ceilings of 2 seconds to connect, 3 seconds without receive progress, and
+8 seconds total per fetch.
+
+Required app responses include exactly one effective
+`X-Content-Type-Options: nosniff`. HTML pages need an enforced CSP
+`frame-ancestors` policy that permits the exact calling host and no conflicting
+`X-Frame-Options`. A generally published app SHOULD send
+`Content-Security-Policy: frame-ancestors https:` so it works from arbitrary
+compatible HTTPS hosts. It SHOULD also send `Referrer-Policy: no-referrer`, a
+positive HSTS `max-age`, and a `Permissions-Policy` denying camera, microphone,
+geolocation, payment, USB, serial, Bluetooth, HID, MIDI, and display capture.
+These headers belong on the app's responses and may be emitted by the app
+server; a reverse proxy MUST NOT duplicate or weaken them.
+
+### 5. OAuth issuer profile and HTTP APIs
+
+The host's issuer is its canonical HTTPS origin. It serves RFC 8414 JSON at the
+fixed URL `<issuer>/.well-known/oauth-authorization-server`. In addition to
+standard validation, a V1 app requires these values:
+
+```json
+{
+  "issuer": "https://social.example",
+  "authorization_endpoint": "https://social.example/oauth/authorize",
+  "token_endpoint": "https://social.example/oauth/token",
+  "revocation_endpoint": "https://social.example/oauth/revoke",
+  "registration_endpoint": "https://social.example/oauth/mini-app/register",
+  "response_types_supported": ["code"],
+  "grant_types_supported": ["authorization_code", "refresh_token"],
+  "code_challenge_methods_supported": ["S256"],
+  "token_endpoint_auth_methods_supported": ["none"],
+  "scopes_supported": ["identify", "read", "write", "follow", "push"],
+  "fediverse_miniapp_profile": "1"
+}
+```
+
+Endpoint paths other than the fixed metadata, relay, and identity paths may
+differ when advertised. Every advertised endpoint is an absolute HTTPS URL on
+the exact issuer origin. Arrays may include additional supported standard
+values, but they MUST include the values shown; `none` is required for public
+mini-app clients. Metadata and all custom OAuth responses use
+`Cache-Control: no-store`, `Pragma: no-cache`, and
+`Referrer-Policy: no-referrer`.
+
+Dynamic registration sends `POST` with `Content-Type: application/json` to the
+advertised registration endpoint and the closed body:
+
+```json
+{"manifest_url":"https://app.example/.well-known/fediverse-miniapp.json"}
+```
+
+The URL must be that app origin's canonical well-known URL. The host fetches it
+itself and creates a public client once per `(issuer, canonical manifest URL)`.
+An identical retry returns the same `client_id`; it MUST NOT create one client
+per user or browser. First creation returns 201 and reuse returns 200 with:
+
+```json
+{
+  "client_id": "opaque-public-client-id",
+  "client_name": "Budget Polls",
+  "client_uri": "https://app.example/",
+  "redirect_uris": ["https://app.example/oauth/callback"],
+  "scope": "identify write",
+  "scope_authorization_max_age_seconds": {"identify":31536000,"write":86400},
+  "grant_types": ["authorization_code", "refresh_token"],
+  "response_types": ["code"],
+  "token_endpoint_auth_method": "none"
+}
+```
+
+No response contains `client_secret`. Closed error bodies have
+`{"error":"code","error_description":"human-readable text"}`. Use 422
+`invalid_request`, `invalid_manifest_url`, `oauth_not_declared`, or
+`invalid_manifest`; 409 `manifest_changed`; 403 `disabled` or
+`domain_denied`; and 429 for a registration-rate limit. An implementation may
+vary descriptions but not codes or their meaning.
+
+Authorization uses code + mandatory S256 PKCE, exact redirect matching,
+single-use short-lived codes, and public-client token exchange. Do not support
+implicit, resource-owner-password, or client-credentials grants for a mini-app
+registration. An authorization request contains standard `response_type=code`,
+`client_id`, `redirect_uri`, space-separated `scope`, `state`,
+`code_challenge`, and `code_challenge_method=S256`, plus optional
+`authorization_lifetime_seconds`. State is 43–256 base64url characters without
+padding. The challenge is exactly 43 such characters. Requested scopes are a
+non-empty subset of the immutable registered scopes and include `identify`.
+The optional lifetime is an integer from 300 to 31,536,000 seconds and cannot
+exceed any declared per-scope maximum. Omitting it uses the shortest applicable
+server/manifest ceiling.
+
+Issue access tokens for no more than one hour. A refresh token belongs to one
+grant family, rotates on use with replay detection (or equivalent family
+invalidation), and never moves the family's absolute authorization deadline.
+Token success responses include standard `access_token`, `token_type`,
+`expires_in`, `refresh_token`, and `scope`, plus
+`authorization_expires_in`, the remaining absolute grant lifetime in seconds.
+Revocation, logout, app-origin denial, immutable-manifest mismatch, or deadline
+expiry invalidates the applicable family immediately.
+
+The fixed narrow identity API is `GET <issuer>/api/v1/mini-apps/identity` with
+`Authorization: Bearer <access-token>`. It requires an allowed mini-app client
+and the `identify` scope. Its closed success object is:
+
+```json
+{
+  "id": "https://social.example/users/alice",
+  "username": "alice",
+  "acct": "alice@social.example",
+  "display_name": "Alice",
+  "url": "https://social.example/@alice"
+}
+```
+
+`id` is the user's actual ActivityPub actor ID; `url` is the public profile
+page and may differ. All five values are strings. Failure is 401
+`{"error":"unauthorized"}`, 403 `{"error":"insufficient_scope"}`, or 403
+`{"error":"not_mini_app"}`. The response is never cacheable.
+
+Metadata, registration, token, revocation, identity, and any browser-used
+extension API support non-credentialed CORS. Return an allowed exact app origin
+or `*`, never require cookies, never set `Access-Control-Allow-Credentials`,
+and answer preflight for the actual method and `content-type` and/or
+`authorization` headers. Apply CORS to error responses too.
+
+### 6. Host data transfer objects
+
+Opening the explicit card makes this immutable, prompt-free object available
+after `ready` through `getLaunchInfo`:
+
+```json
+{
+  "version": "1",
+  "launchUrl": "https://app.example/polls/2026-budget?view=full",
+  "linkedUrl": "https://app.example/polls/2026-budget?ref=post",
+  "sourceNoteId": "https://social.example/objects/123"
+}
+```
+
+The object has exactly those four members. Both app URLs pass the common HTTPS
+rules and may retain a fragment because they record exact browser launch/link
+values. `sourceNoteId` is an absolute HTTP(S) URL without credentials or
+fragment. This object contains no viewer identity, Note content, author,
+mentions, recipients, moderation state, OAuth state, or Announce attribution.
+
+`getContext` is a distinct, once-per-user-per-exact-app-origin permission. On
+approval, and only for the same still-public source Note, return this closed
+object:
+
+```json
+{
+  "version": "1",
+  "launchUrl": "https://app.example/polls/2026-budget?view=full",
+  "sourceUrl": "https://app.example/polls/2026-budget?ref=post",
+  "note": {
+    "id": "https://social.example/objects/123",
+    "url": "https://social.example/objects/123",
+    "content": "Plain text, tags removed",
+    "author": "https://remote.example/users/bob",
+    "mentions": ["https://social.example/users/alice"]
+  }
+}
+```
+
+The outer and `note` objects are closed. `content` is HTML-stripped, trimmed,
+and at most 5,000 characters. `mentions` contains at most 32 unique non-empty
+ActivityStreams Mention `href`/`id` strings, each at most 2,048 bytes. `id` is
+the original Note's canonical ActivityPub ID; V1 sets `url` to that same value.
+`sourceUrl` is the exact `linkedUrl`. OAuth is not required for either public
+DTO. Context denial never changes the prompt-free launch object.
+
+### 7. Compose draft and receipt
+
+`composeNote` requires current OAuth authorization containing `identify`, the
+immutable `compose_note` capability, a public-note launch, current domain
+allowance, and the active channel. The draft is a closed object with optional:
+
+| Member | Rule and default |
+| --- | --- |
+| `text` | String up to 5,000 characters; default empty. |
+| `spoilerText` | String up to 500 characters; default empty. |
+| `language` | Empty or up to 35 characters matching `^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$`; default empty. |
+| `visibility` | `public`, `unlisted`, `followers`, or `direct`; default `public`. |
+| `inReplyTo` | Empty/absent or an HTTPS URL exactly equal to this launch's `note.id`. |
+| `links` | At most eight valid HTTPS URLs. Exact duplicates are removed in first-seen order. Default empty. |
+
+The host appends unique links to trimmed-right text after one blank line, one
+URL per line, and rejects the draft if the result exceeds 5,000 characters.
+Acceptance opens a host-owned, editable composer; it never publishes. The user
+may edit every normal field and must submit using trusted host UI. The app
+receives no edit stream.
+
+The initial result status is one of `accepted`, `auth_required`, `unavailable`,
+or `invalid_draft`. Only `accepted` also contains a fresh `requestId`. After a
+successful database commit, the host emits a receipt for that request with
+only the canonical ActivityPub Note `id`/URL and final `scope` (`public`,
+`unlisted`, `followers`, or `direct`). It emits no receipt on cancel or failed
+submission and makes no claim that federation delivery has completed.
