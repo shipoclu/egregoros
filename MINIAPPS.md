@@ -637,8 +637,10 @@ complete receiver contract is consolidated below; the longer
 [`MINIAPP_ACTIVITYPUB_MESSAGES.md`](MINIAPP_ACTIVITYPUB_MESSAGES.md) adds app-
 developer guidance and future vocabulary rationale. The app
 operates one normal ActivityPub `Application` or `Service` actor. Public notes
-are delivered to its followers; transactional notes are non-public, address
-exactly one consenting actor, and contain one matching `Mention`.
+use ordinary federation and may include normal public `Mention` tags without
+invoking the mini-app notification extension. Transactional notes are
+non-public, address exactly one consenting actor, and contain one matching
+`Mention`.
 
 Notification permission is deliberately separate from launch context. The
 SDK `notifications.getPermission()`/`requestPermission()` surface reports and

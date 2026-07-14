@@ -135,6 +135,10 @@ defmodule Egregoros.MiniApps.TransactionalMessages do
     inbox_user = opts |> Keyword.get(:inbox_user_ap_id) |> local_user()
 
     cond do
+      match?(%User{}, inbox_user) and targets_local_user?(create, note) and
+          public?(create, note) and declaration.activity_pub_public_notes ->
+        :allow
+
       match?(%User{}, inbox_user) and
           (targets_local_user?(create, note) or not public?(create, note)) ->
         classify_transaction(

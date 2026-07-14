@@ -64,6 +64,20 @@ defmodule Egregoros.MiniApps.TransactionalMessagesTest do
     |> transactional_create("public-only-direct", public_actor)
     |> assert_ignored(user)
 
+    public_mention =
+      user.ap_id
+      |> transactional_create("public-only-mention", public_actor)
+      |> Map.put("cc", ["https://www.w3.org/ns/activitystreams#Public"])
+      |> put_in(["object", "cc"], ["https://www.w3.org/ns/activitystreams#Public"])
+
+    assert {:ok, _create} =
+             Pipeline.ingest(public_mention,
+               local: false,
+               inbox_user_ap_id: user.ap_id
+             )
+
+    assert %{} = Objects.get_by_ap_id(public_mention["object"]["id"])
+
     transactional_origin = "https://transactional-only.example"
     transactional_actor = transactional_origin <> "/ap/actor"
     declare_actor!(transactional_origin, public_notes: false, transactional_mentions: true)
