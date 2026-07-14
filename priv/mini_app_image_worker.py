@@ -43,6 +43,7 @@ def main():
         return 70
 
     decoder, policy_dir, work_dir, image_format, input_path, output_path = sys.argv[1:]
+    decoder_name = os.path.basename(decoder)
     decoder = os.path.realpath(decoder)
     policy_dir = os.path.realpath(policy_dir)
     work_dir = os.path.realpath(work_dir)
@@ -50,7 +51,7 @@ def main():
     output_path = os.path.realpath(output_path)
 
     if (
-        os.path.basename(decoder) not in DECODERS
+        decoder_name not in DECODERS
         or image_format not in FORMATS
         or not all(os.path.isabs(path) for path in (decoder, policy_dir, work_dir, input_path, output_path))
         or not inside(work_dir, input_path)
