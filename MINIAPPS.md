@@ -1265,6 +1265,93 @@ Before release, automated tests MUST cover at least:
 Security controls are release gates. Tests MUST assert outcomes and absence of
 side effects, not merely that an error was rendered.
 
+### Opt-in developer conformance workbench
+
+Egregoros provides an authenticated, user-opt-in conformance workbench at
+`/developer/mini-apps`. A user enables **Show developer tools in the sidebar**
+under Settings → Account; only then is the **Developer** sidebar item shown.
+The route rechecks the persisted preference on mount and before starting a
+probe. Turning the preference off invalidates that user's existing diagnostic
+launch immediately.
+
+The user enters the exact shareable miniapp URL, not merely its origin or home
+page. A server-side diagnostic then uses the production policy, fetcher,
+parsers, and image sanitizer to check, as applicable:
+
+1. canonical public HTTPS input and current instance allow/deny policy;
+2. `/.well-known/fediverse-miniapp.json` retrieval, MIME type, strict manifest
+   schema, immutable declarations, and exact-origin URLs;
+3. the linked page, manifest home page, and resolved launch page, deduplicating
+   identical `(resource kind, URL)` pairs;
+4. optional manifest icon, splash image, and card image retrieval plus actual
+   raster decode and normalization through the production sanitizer;
+5. an optional declared ActivityPub actor response and actor/key document
+   validation without activating or persisting the declaration; and
+6. relevant HTTP hardening headers on every fetched resource.
+
+For pages, the required header checks are an unambiguous
+`X-Content-Type-Options: nosniff`, an enforced CSP `frame-ancestors` policy that
+permits the exact calling Egregoros origin, and the absence of a conflicting
+`X-Frame-Options`. `Referrer-Policy: no-referrer`, an explicit
+`Permissions-Policy` denial of host-denied device capabilities, and a positive
+HSTS `max-age` are reported as recommended hardening. Non-page resources are
+required to use `nosniff`; HSTS is recommended. HTTP status, direct/safe
+redirect behavior, TLS, DNS/IP safety, response size, content encoding,
+header ambiguity, MIME type, and body bounds remain enforced by the production
+fetcher rather than reimplemented by the workbench.
+
+Every attempted check is displayed as required or recommended and as passed or
+failed. A failed prerequisite stops dependent requests, and the checklist says
+so; the tool MUST NOT make speculative requests after it can no longer derive
+their URLs safely. Recommended failures do not fail conformance. Full
+conformance requires both all attempted required server checks and a browser
+`ready()` check.
+
+When a valid manifest and structurally safe card can be derived, the workbench
+shows the shared rich-card component even if a later framing or hardening check
+failed. Opening it uses the production sanitized image proxy, same-origin
+broker, sandboxed remote iframe, exact-origin channel, launch ID, message
+budgets, and readiness timeout. The result becomes conformant only after that
+particular iframe calls SDK `ready()` for its current launch. Loading,
+navigation, timeout, and retry reset or fail the readiness result rather than
+reusing a stale success.
+
+A diagnostic preview is deliberately not backed by a fabricated ActivityPub
+Note. It receives this launch information:
+
+```json
+{
+  "version": "1",
+  "launchUrl": "https://miniapp.example/exact/path",
+  "linkedUrl": "https://miniapp.example/exact/path",
+  "sourceNoteId": "https://social.example/developer/mini-apps"
+}
+```
+
+The `sourceNoteId` is a protocol-valid synthetic developer-page URL, not an
+ActivityPub object ID and not evidence that a public Note exists. The card
+disclosure says this explicitly. A miniapp MUST NOT award or verify sharing
+from diagnostic launch information; reward logic must fetch and validate a
+real public Note ID supplied by an ordinary public-note launch.
+
+Diagnostic cards are non-persistent, kept in bounded server memory for at most
+15 minutes, and limited to one current card per developer user. Broker and
+asset routes require the exact authenticated owner and immutable resolution
+token, recheck the current developer preference and domain policy, and recheck
+authorization after an image fetch before returning bytes. A new probe replaces
+the user's previous diagnostic card. The workbench permits at most five probe
+starts per user per minute in addition to global fetch concurrency, size,
+timeout, and network limits.
+
+The server sends no user cookies, OAuth tokens, authorization headers, client
+certificates, identity, or private note context to probed resources. Requests
+are bounded credential-free `GET`s. Remote strings are rendered only through
+normal HTML escaping, and images are never reflected without sanitization.
+Because any server-side probe reveals the instance's network address and
+request timing to the remote host, the feature remains explicitly opt-in. It is
+a development aid, not a third-party trust certification or a substitute for
+the adversarial tests above.
+
 ### Normative security references
 
 - [OAuth 2.0 Security Best Current Practice (RFC 9700)](https://www.rfc-editor.org/info/rfc9700/)

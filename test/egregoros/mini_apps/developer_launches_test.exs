@@ -82,6 +82,33 @@ defmodule Egregoros.MiniApps.DeveloperLaunchesTest do
              DeveloperLaunches.put(user, resolved_card(%{manifest: wrong_manifest}))
   end
 
+  test "rejects callers without developer mode and handles non-card values" do
+    {:ok, user} = Users.create_local_user("developer-launch-guards")
+
+    assert {:error, :developer_mode_required} =
+             DeveloperLaunches.put(user, resolved_card())
+
+    assert DeveloperLaunches.get_active("card", "token", user) == nil
+    refute DeveloperLaunches.active?(nil)
+    assert DeveloperLaunches.launch_info(nil) == nil
+  end
+
+  test "cleanup removes an expired diagnostic card" do
+    user = developer_user!("developer-launch-expired")
+    assert {:ok, card} = DeveloperLaunches.put(user, resolved_card())
+    server = Process.whereis(DeveloperLaunches)
+
+    :sys.replace_state(server, fn state ->
+      expired = %{card | expires_at: DateTime.add(DateTime.utc_now(), -1, :second)}
+      put_in(state, [:cards, card.id], expired)
+    end)
+
+    send(server, :cleanup)
+    _state_after_cleanup = :sys.get_state(server)
+
+    assert DeveloperLaunches.get_active(card.id, card.resolution_token, user) == nil
+  end
+
   defp developer_user!(nickname) do
     {:ok, user} = Users.create_local_user(nickname)
     {:ok, user} = Users.update_profile(user, %{"developer_mode" => true})

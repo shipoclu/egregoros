@@ -70,6 +70,14 @@ through a minimal static SPA, discovery, framing, the SDK, optional OAuth, and a
 production checklist. [`MINIAPPS.md`](MINIAPPS.md) is the complete protocol and
 security reference.
 
+An authenticated user who is developing or reviewing an app can enable **Show
+developer tools in the sidebar** under Settings → Account. The resulting
+**Developer** page runs a bounded conformance probe for an exact miniapp URL,
+shows the detected rich card, opens it through the production broker, verifies
+the SDK `ready()` handshake, and reports required and recommended checks. Its
+preview uses a synthetic diagnostic source URL and does not fabricate a public
+ActivityPub Note.
+
 For developers considering app-owned public ActivityPub notes and
 consent-gated transactional mentions, see
 [`MINIAPP_ACTIVITYPUB_MESSAGES.md`](MINIAPP_ACTIVITYPUB_MESSAGES.md). The

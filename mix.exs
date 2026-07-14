@@ -119,7 +119,7 @@ defmodule Egregoros.MixProject do
       ],
       "assets.test": [
         "cmd --cd assets node --test",
-        "cmd deno check assets/typecheck/fediverse_miniapp_sdk_types.ts"
+        "cmd deno check --node-modules-dir=manual assets/typecheck/fediverse_miniapp_sdk_types.ts"
       ],
       "assets.build": [
         "compile",

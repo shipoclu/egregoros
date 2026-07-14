@@ -4,6 +4,13 @@ import test from "node:test"
 import {createMiniAppBroker} from "../js/lib/mini_app_broker.mjs"
 
 const tick = () => new Promise(resolve => setImmediate(resolve))
+const transferredPorts = new Set()
+
+test.afterEach(() => {
+  for (const port of transferredPorts) port.close()
+  transferredPorts.clear()
+})
+
 const launchInfo = Object.freeze({
   version: "1",
   launchUrl: "https://app.example/read?chapter=2",
@@ -23,8 +30,10 @@ const iframeFixture = () => {
     posts,
     iframe: {
       contentWindow: {
-        postMessage: (message, targetOrigin, transfer) =>
-          posts.push({message, targetOrigin, transfer}),
+        postMessage: (message, targetOrigin, transfer) => {
+          for (const port of transfer || []) transferredPorts.add(port)
+          posts.push({message, targetOrigin, transfer})
+        },
       },
       addEventListener: (name, callback) => listeners.set(name, callback),
       removeEventListener: (name, callback) => {
@@ -262,6 +271,10 @@ test("closes a launch that exceeds message, request, outstanding, byte, or rate 
 test("an iframe reload cannot reset or revive the active launch budget", async () => {
   const fixture = iframeFixture()
   const violations = []
+  let resolveReady
+  const firstReady = new Promise(resolve => {
+    resolveReady = resolve
+  })
   let resolveViolation
   const violation = new Promise(resolve => {
     resolveViolation = resolve
@@ -271,7 +284,8 @@ test("an iframe reload cannot reset or revive the active launch budget", async (
     appOrigin: "https://app.example",
     hostOrigin: "https://social.example",
     launchId: "launch-reload-budget",
-    limits: {maxMessages: 2, maxRequests: 8, maxOutstanding: 8, rateCapacity: 8},
+    limits: {maxMessages: 1, maxRequests: 8, maxOutstanding: 8, rateCapacity: 8},
+    onReady: () => resolveReady(),
     onProtocolViolation: reason => {
       violations.push(reason)
       resolveViolation()
@@ -281,8 +295,7 @@ test("an iframe reload cannot reset or revive the active launch budget", async (
   fixture.load()
   const firstPort = fixture.posts[0].transfer[0]
   firstPort.postMessage({type: "ready", version: "1", launchId: "launch-reload-budget"})
-  firstPort.postMessage({type: "unknown", version: "1", launchId: "launch-reload-budget"})
-  await tick()
+  await firstReady
 
   fixture.load()
   const secondPort = fixture.posts[1].transfer[0]

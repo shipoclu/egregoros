@@ -261,6 +261,25 @@ The production nginx example and the rest of the recommended headers are in
 
 ### Step 6: verify discovery and launch
 
+On an Egregoros development account, open Settings → Account, enable **Show
+developer tools in the sidebar**, save, and select **Developer**. Enter the
+exact URL that users will share. The conformance workbench checks the manifest,
+strict schemas, the linked/home/launch pages, declared images and actor when
+present, production-safe fetching, and the relevant headers for the exact
+Egregoros origin.
+
+If Egregoros detects a structurally valid card, it displays the same rich-card
+component used on public notes. Open that preview to run the browser-only test.
+The workbench is not complete until the real broker iframe receives `ready()`
+from the SDK. A diagnostic preview uses a synthetic developer-page source URL,
+not a fabricated public Note, so do not use it to test share rewards or public
+Note verification.
+
+The checklist distinguishes required failures from recommended hardening. A
+failed prerequisite can prevent later resources from being requested. Fix each
+required failure and run the exact URL again; a new run replaces the prior
+short-lived preview.
+
 First verify the resources directly:
 
 ```sh
@@ -583,6 +602,10 @@ useful for framing, SDK, and OAuth callback problems.
 - [ ] `X-Frame-Options` does not block cross-origin framing.
 - [ ] A fully public note produces a card and the explicit **Open** action
       launches the exact linked route.
+- [ ] The Egregoros developer workbench passes every required server check and
+      the real iframe `ready()` handshake for the exact shareable URL.
+- [ ] The app treats the workbench's synthetic developer-page source as a
+      diagnostic only, never as proof of a public ActivityPub Note or share.
 - [ ] Context, external navigation, and close are tested inside Egregoros, not
       only in a top-level browser tab.
 
@@ -625,6 +648,9 @@ useful for framing, SDK, and OAuth callback problems.
 - [ ] The app has been tested at the host's desktop and mobile iframe sizes.
 - [ ] The Egregoros operator has enabled miniapps and its allow/deny policy
       permits the app domain.
+- [ ] Each distinct public deep link that the app expects users to share has
+      been run through the workbench; testing only the origin home page is not
+      sufficient.
 
 ## Reference implementations
 
