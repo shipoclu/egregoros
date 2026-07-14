@@ -233,9 +233,9 @@ read or modify Egregoros. It must not receive top-navigation, downloads,
 pointer-lock, or unmediated popup permissions; OAuth is opened by a
 host-controlled top-level surface instead.
 
-`openExternal` is allowed only after an app-originating user gesture. For a
-cross-origin destination, Egregoros displays a host-owned confirmation naming
-the destination domain before opening it. The iframe receives no device or
+`openExternal` is accepted by the SDK only after an app-originating user
+gesture assertion, then requires a real click on host-owned UI naming the exact
+destination origin before any new top-level context opens. The iframe receives no device or
 browser permissions in v1: camera, microphone, geolocation, clipboard read,
 downloads, and notifications are denied until each has a dedicated capability,
 consent, and threat-model design.
@@ -285,13 +285,15 @@ model.
 
 Cards never launch an app merely from an image/title click: the user must select
 the explicit **Open** button. There is no v1 app directory, saved-app surface,
-or other launcher. Direct, explicit app URLs remain valid entry points, while
-`homeUrl` establishes the app's canonical base and supports future surfaces.
+or other launcher. V1 ordinary launches come from explicit cards on fully
+public Notes. The developer workbench may create a clearly labeled synthetic
+diagnostic launch; `homeUrl` establishes the app's canonical base and supports
+future launchers.
 
 ### 4. OAuth sign-in
 
 The app uses OAuth 2.1 authorization code + PKCE against the **local calling
-Egregoros instance**. Egregoros is the authorization server. Two explicit
+Fediverse instance**. That instance is the authorization server. Two explicit
 completion modes are supported:
 
 - `backend_handoff` is the default. The app backend exchanges the code, keeps
@@ -629,9 +631,11 @@ links revert to ordinary links.
 
 #### ActivityPub messaging and notification consent
 
-Public app messages and consent-gated transactional mentions are specified as
-a post-v1 extension in
-[`MINIAPP_ACTIVITYPUB_MESSAGES.md`](MINIAPP_ACTIVITYPUB_MESSAGES.md). The app
+Public app messages need no host extension. Consent-gated transactional
+mentions are the optional `notifications.activitypub` V1 extension whose
+complete receiver contract is consolidated below; the longer
+[`MINIAPP_ACTIVITYPUB_MESSAGES.md`](MINIAPP_ACTIVITYPUB_MESSAGES.md) adds app-
+developer guidance and future vocabulary rationale. The app
 operates one normal ActivityPub `Application` or `Service` actor. Public notes
 are delivered to its followers; transactional notes are non-public, address
 exactly one consenting actor, and contain one matching `Mention`.
@@ -669,7 +673,7 @@ three distinct vocabulary properties:
 - optional `fma:miniAppLink` is an ActivityStreams `Link` on an ordinary public
   `Note` that identifies one exact, visible candidate launch URL.
 
-The provenance marker is required for an object to claim mini-app production,
+In that future revision, the provenance marker is required for an object to claim mini-app production,
 but is trusted only when its manifest, declared actor, activated signing-key
 pin, and current domain policy all agree. Public app notes with no individual
 recipient or mention carry the marker and omit purpose. Direct mentions must be
@@ -677,9 +681,11 @@ non-public, carry one purpose on both activity and object, and have an
 independent user grant for that exact purpose. Missing, unknown, conflicting,
 or array-valued purposes are suppressed; mixed operational and promotional
 content is labeled promotional. Classification is sender-declared moderation
-evidence rather than something Egregoros infers from prose. The complete wire
-profile is normative in
-[`MINIAPP_ACTIVITYPUB_MESSAGES.md`](MINIAPP_ACTIVITYPUB_MESSAGES.md#31-mini-app-provenance-and-message-purpose-wire-profile).
+evidence rather than something Egregoros infers from prose. This future wire
+profile is developed in
+[`MINIAPP_ACTIVITYPUB_MESSAGES.md`](MINIAPP_ACTIVITYPUB_MESSAGES.md#31-mini-app-provenance-and-message-purpose-wire-profile),
+but it is not part of `fediverse_miniapp_profile: "1"` and is not needed to
+implement this document's transactional-Boolean V1 extension.
 
 `fma:miniAppLink` is discovery metadata, not mini-app provenance or trust. Its
 `href` must exactly match a URL parsed from sanitized note content, and its
@@ -894,7 +900,7 @@ pending calls.
 
 | Access class | V1 methods | Prerequisite |
 | --- | --- | --- |
-| Public base | `ready`, `bootstrap`, `getLaunchInfo`, `getContext`, `close`, `openExternal` | Valid framed app; `getLaunchInfo` needs no OAuth or prompt, `getContext` needs enriched-context disclosure, and `openExternal` needs user gesture. |
+| Public base | `ready`, `bootstrap`, `getLaunchInfo`, `getContext`, `close`, `openExternal` | Valid framed app; `getLaunchInfo` needs no OAuth or prompt, `getContext` needs enriched-context disclosure, and `openExternal` needs the SDK gesture assertion plus a trusted host click. |
 | OAuth initiation | `requestAuth` | Optional `oauth` manifest object and a public dynamic registration obtained by the backend or browser. |
 | Wallet | `wallet.evm.getProvider` and its allowlisted EIP-1193 calls | Immutable wallet declaration, host wallet availability, and per-app wallet connection/confirmation. No OAuth required. |
 | Transactional notifications | `notifications.getPermission`, `notifications.requestPermission` | Immutable ActivityPub declaration and OAuth; prompting additionally requires a user gesture and host confirmation. |
@@ -1479,8 +1485,8 @@ The enriched-context consent choices are:
 ## Deferred from v1 unless explicitly selected
 
 - app directory/search and user-installed/pinned apps;
-- the ActivityPub messaging/notification-consent extension and any webhook or
-  browser-push notification mechanism;
+- promotional-purpose ActivityPub messages, webhooks, and browser-push
+  notification mechanisms (the transactional-mention extension is optional V1);
 - payments, non-EVM wallets, EIP-5792 batching, and device permissions;
 - host-side profile-navigation actions beyond `openExternal`;
 - cross-instance app reputation/discovery federation; and
@@ -1497,8 +1503,8 @@ The enriched-context consent choices are:
 | OAuth scopes | Existing scopes may be requested | Supports applications beyond Farcaster's identity-only model. |
 | Publishing | Anybody may publish a manifest-bearing HTTPS mini app | No directory/admin approval is required to publish. |
 | Platforms | Desktop and mobile/PWA | Desktop floating panel; mobile full-screen sheet. |
-| App installation | Not in v1 | No saved/pinned-app launcher or app notifications. |
-| Registration | Anonymous dynamic registration | One public registration per mini-app manifest and Egregoros issuer, cached by the app backend or browser. |
+| App installation | Not in v1 | No saved/pinned-app launcher; optional ActivityPub transactional mentions do not install an app. |
+| Registration | Anonymous dynamic registration | One public registration per mini-app manifest and calling issuer, cached by the app backend or browser. |
 | Public launch information | `getLaunchInfo()` after explicit card open, without a second prompt | Exact launch URL, linked URL, and original public Note ID only; no viewer identity or Announce attribution. |
 | Enriched context | `getContext()` after once-per-app disclosure | Untrusted public-note text, author, and mentions are shared with the app domain. |
 | Context source visibility | Fully public notes only | Non-public notes retain ordinary links in v1. |
@@ -1512,10 +1518,10 @@ The enriched-context consent choices are:
 | Generic-card launch URL | Exact linked URL | Preserves deep links; missing page metadata does not silently fall back home. |
 | In-app navigation | Any exact-origin path | Cross-origin destinations are opened externally only after a user gesture. |
 | Collapse behavior | Retain live iframe | Navigation around Egregoros does not reset the active app session. |
-| Launcher | None in v1 | Apps open from an explicit card action or direct explicit URL. |
+| Launcher | None in v1 | Apps open from an explicit card action on a fully public Note; the opt-in developer workbench is diagnostic only. |
 | Card activation | Explicit **Open** button only | Incidental image/title clicks do not launch remote code. |
 | Mobile surface | Full-height safe-area-aware sheet | Provides clear close/back control rather than desktop floating UI. |
-| External navigation | User gesture + host confirmation | Cross-origin destination domain is shown before opening. |
+| External navigation | SDK gesture assertion + host confirmation | The exact destination origin is shown before any top-level context opens. |
 | Iframe permissions | Deny by default | Device/browser privileges require future capability-specific design. |
 | Framing failure | Explicit error + external-open action | Never silently navigates the Egregoros surface away. |
 | Federated cards | Supported for public incoming notes | Resolution failure leaves the source link intact. |
@@ -1547,7 +1553,7 @@ The enriched-context consent choices are:
 | Host capabilities | Immutable manifest declaration | Consent visibly covers non-base actions such as `compose_note`. |
 | Context disclosure | Once per app, independent of OAuth | Required before public note context is sent; may be combined with OAuth consent. |
 | App public messages | Ordinary app-owned ActivityPub actor | Followers receive standard public `Create(Note)` activities. |
-| Transactional messages | Proposed post-v1 direct-mention profile | One non-public recipient and matching mention; sender and receiver both enforce consent. |
+| Transactional messages | Optional V1 `notifications.activitypub` extension | One non-public recipient and matching mention; sender and receiver both enforce consent. |
 | Notification permission | Separate from launch context and OAuth | Dedicated host UI/API avoids leaking user authority through public launch context. |
 | `write` scope | Separate second confirmation | Makes high-impact API authority unmistakable. |
 | User revocation | Settings disconnect revokes grants/tokens/context approval | A later launch must gain fresh approval. |
@@ -1603,9 +1609,10 @@ key or host OAuth token.
 
 All currently identified v1 product and protocol decisions have been resolved.
 Future work should treat wallet delegation, transaction batching, other wallet
-types, the documented ActivityPub messaging/notification-consent profile,
-device permissions, an app directory, and non-public note launches as new
-design efforts rather than implicit extensions.
+types, promotional-purpose/provenance ActivityPub vocabulary, device
+permissions, an app directory, and non-public note launches as new design
+efforts rather than implicit extensions. The narrowly specified transactional-
+mention receiver remains an optional V1 extension.
 
 The first-party SDK source and declarations live in the standalone
 [`fediverse-miniapp-sdk`](https://github.com/shipoclu/fediverse-miniapp-sdk)
@@ -1997,7 +2004,7 @@ standard validation, a V1 app requires these values:
   "grant_types_supported": ["authorization_code", "refresh_token"],
   "code_challenge_methods_supported": ["S256"],
   "token_endpoint_auth_methods_supported": ["none"],
-  "scopes_supported": ["identify", "read", "write", "follow", "push"],
+  "scopes_supported": ["identify"],
   "fediverse_miniapp_profile": "1"
 }
 ```
@@ -2005,8 +2012,9 @@ standard validation, a V1 app requires these values:
 Endpoint paths other than the fixed metadata, relay, and identity paths may
 differ when advertised. Every advertised endpoint is an absolute HTTPS URL on
 the exact issuer origin. Arrays may include additional supported standard
-values, but they MUST include the values shown; `none` is required for public
-mini-app clients. Metadata and all custom OAuth responses use
+values, but they MUST include the values shown; only `identify` is a mandatory
+portable scope, and `none` is required for public mini-app clients. Metadata
+and all custom OAuth responses use
 `Cache-Control: no-store`, `Pragma: no-cache`, and
 `Referrer-Policy: no-referrer`.
 
@@ -2055,6 +2063,30 @@ non-empty subset of the immutable registered scopes and include `identify`.
 The optional lifetime is an integer from 300 to 31,536,000 seconds and cannot
 exceed any declared per-scope maximum. Omitting it uses the shortest applicable
 server/manifest ceiling.
+
+The token and revocation endpoints MUST accept
+`application/x-www-form-urlencoded` requests from a public client. A code
+exchange contains exactly the standard security fields shown (in either form
+order) and no client secret:
+
+```text
+grant_type=authorization_code
+code=<single-use-code>
+client_id=<profile-public-client-id>
+redirect_uri=<exact-registered-uri>
+code_verifier=<43..128-RFC7636-verifier>
+```
+
+A refresh request contains `grant_type=refresh_token`, the rotating
+`refresh_token`, and `client_id`; an optional `scope` may only narrow the
+existing grant and MUST include `identify`. It cannot add authority or extend
+the deadline. Revocation contains `token`, `client_id`, and optional standard
+`token_type_hint`; it returns 200 for a syntactically valid request whether the
+token was current or already unknown, and revokes the whole mini-app grant
+family when either of its tokens is identified. Mini-app requests omit
+`client_secret` in all three operations. OAuth failures use the standard JSON
+`error` and optional `error_description` values and the status behavior of RFC
+6749/7009 without host stack traces.
 
 Issue access tokens for no more than one hour. A refresh token belongs to one
 grant family, rotates on use with replay detection (or equivalent family
@@ -2660,7 +2692,7 @@ Widths are value/gas-price/fee/chainId 256 bits, gas/nonce 64 bits, and type 8
 bits. Contract creation requires non-empty data when `to` is absent. Legacy
 `gasPrice` is mutually exclusive with EIP-1559 fee fields, and
 `maxPriorityFeePerGas <= maxFeePerGas`. An access list has at most 128 closed
-`{address, storageKeys}` objects; each has at most 256 unique 32-byte hex keys.
+`{address, storageKeys}` objects; each has at most 256 32-byte hex keys.
 
 Typed data is a strict JSON string at most 65,536 UTF-8 bytes. Reject duplicate
 keys, floats/exponents, integers outside JavaScript's safe range when encoded
@@ -2674,7 +2706,8 @@ declared structs, `address`, `bool`, `string`, dynamic/fixed `bytes1`–`bytes32
 or `int`/`uint` with omitted width or a multiple-of-eight width 8–256, with at
 most four array dimensions and a fixed dimension no greater than 128. Domain
 fields are limited to the correctly typed `name`, `version`, `chainId`,
-`verifyingContract`, and `salt`. Validate every value recursively and
+`verifyingContract`, and `salt`. Dynamic `bytes` values are at most 32,768
+bytes. Validate every value recursively and
 canonicalize the resulting object before showing or sending it.
 
 Wallet success is the closed result envelope:
@@ -2701,3 +2734,453 @@ a fresh host-owned review and confirmation; section 14 makes the confirmation
 and execution binding mandatory. Disconnect, logout, app close, OAuth revoke,
 domain denial, account/chain change, or wallet adapter loss cancels pending work
 and immediately removes authority as applicable.
+
+### 14. Mandatory hostile-app security boundary
+
+Treat the remote iframe, every app response, every manifest/card/ActivityPub
+document, every URL, and every MessagePort value as malicious. Treat the
+browser, host server, OAuth issuer, and wallet adapter as separate components
+that must each enforce their own boundary. No check performed in one component
+is proof to another.
+
+#### Trusted user actions
+
+`userActivation: true` is an assertion made by attacker-controlled app code.
+The SDK uses `navigator.userActivation.isActive` to reject accidental calls by
+honest apps, but an attacker can bypass the SDK and write any value to its port.
+A host MUST NOT use this boolean as authorization or as proof of a click.
+
+Every consequential operation therefore ends at trusted host UI:
+
+| Request | Required trusted interaction |
+| --- | --- |
+| `requestAuth` | Show the exact app origin, issuer, scopes, and duration in host UI. A real click there opens the opener-free authorization surface. `write` receives a second explicit acknowledgement. |
+| `getContext` first use | Host-owned once-per-app disclosure naming the exact app origin and fields. Denial releases nothing. |
+| `composeNote` | Host-owned editable composer; a real click on its ordinary submit control is the only publication path. |
+| `openExternal` | Host-owned control naming the exact destination origin. Its click opens a new top-level context with `noopener,noreferrer`. A port message alone never calls `window.open`. |
+| `requestNotificationPermission` | Host-owned confirmation naming exact app origin and activated actor. |
+| `eth_requestAccounts` | Host-owned connection confirmation naming exact origin, account(s), chain, and wallet source. |
+| signature or transaction | A fresh host-owned confirmation showing exact account, chain, method, payload/destination, value, and fees. |
+
+Trusted prompts render outside the broker subtree, cannot be covered by app
+content, retain a visible issuer/app-origin header, trap focus appropriately,
+and remain operable with keyboard and assistive technology. The app cannot set
+their HTML, labels, hidden inputs, action URL, z-index, submit event, or default
+choice. Only bounded escaped text values are interpolated.
+
+#### Origin, frame, cookie, and CORS invariants
+
+- Validate both `event.origin` and `event.source` for the two bootstrap window
+  messages, use exact non-wildcard `targetOrigin`, then abandon window
+  messaging for the transferred port. A correct origin with a wrong window, or
+  a correct window after navigation, fails.
+- A port is only a transport binding. Every operation still checks current
+  launch, origin, user, policy, declaration, permission, and grant. Never turn
+  readiness or port possession into a durable authorization flag.
+- The main authenticated page frames only its same-origin broker. Its CSP needs
+  `frame-src 'self'` (or the exact broker origin); the broker alone names the
+  exact app origin in `frame-src`. Preserve route-specific CSP headers.
+- Use host-only `Secure`, `HttpOnly`, and appropriate `SameSite` cookies, with
+  `__Host-` names when possible. Never configure a parent-domain cookie that
+  an app or media sibling can receive. Enforce CSRF on cookie-authenticated
+  mutations even though the iframe lacks cookies.
+- Mini-app CORS endpoints are bearer/public-client APIs only. They never read a
+  browser session cookie, allow credentials, or reflect an unvalidated Origin.
+  The authorization page remains top-level and cookie-authenticated.
+- The concrete authorization consent response adds only the already validated
+  callback **origin** to `form-action`, because browsers may enforce that
+  directive across a form redirect. Never use `*` or copy an unparsed callback
+  string into CSP. Other host pages retain the ordinary stricter policy.
+- Reject an app origin equal to any host cookie domain. `allow-same-origin` in
+  the remote sandbox is safe only because the app is cross-origin from every
+  host principal.
+
+#### Payload-smuggling invariants
+
+Parse each untrusted representation once into a closed typed value. Do not
+validate one representation and execute another. In particular:
+
+1. JSON uses duplicate-rejecting parsing before object construction. HTML is
+   parsed as inert data. ActivityPub extension fields are read from the parsed
+   JSON object, not from JSON-LD remote-context expansion.
+2. Structured-clone envelopes are copied member-by-member from an allowlist.
+   Never spread the original object into a server event, merge unknown maps,
+   trust getters/prototypes, or stringify and reparse after validation.
+3. Browser camel-case to server snake-case conversion is an explicit mapping.
+   The server validates the mapped object again and ignores any client-supplied
+   user ID, app origin, manifest URL, actor URL, OAuth application ID, policy
+   decision, or permission bit.
+4. Preserve exact `linkedUrl` and `launchUrl` as separately validated values.
+   Do not decode twice, normalize a hostile URL into equality, reorder/drop a
+   query, replace it with `homeUrl`, or compare only hosts. Use the canonical
+   origin tuple only for origin decisions.
+5. Reconstruct authorization URLs from typed fields with a URL builder. Never
+   concatenate state, redirect, scope, or challenge into HTML. Form actions and
+   redirects come from persisted registration/transaction data, not request
+   echoing.
+6. Wallet review and execution use one immutable normalized request or a
+   cryptographic semantic hash bound to launch ID, request ID, execution nonce,
+   origin, account, and chain. Any change between display and adapter execution
+   cancels and requires a new confirmation.
+7. Host-rendered remote names, titles, errors, URLs, and ActivityPub content are
+   escaped/sanitized in the final output context. Remote images are decoded and
+   re-encoded; they are never served as supplied bytes with supplied headers.
+
+Malformed messages, unknown fields, wrong types, overlong values, replayed
+identifiers, and wrong-launch values have zero side effects. A failure response
+uses the fixed status/error shape, never a reflected payload. Repeated schema or
+budget violations terminate the launch.
+
+#### Authorization and lifecycle invariants
+
+- Registration, authorization, token exchange/refresh, identity, compose,
+  wallet, notification permission, and every authenticated native API request
+  recheck current immutable registration and domain policy. Deny wins
+  immediately over caches and existing tokens.
+- Bind authorization state to exact issuer, user, client, app origin, redirect,
+  scope set, duration, PKCE challenge, completion mode, launch, and one request.
+  Codes and relay results are short-lived, single-use, and accepted once.
+- Access/refresh tokens, client/native secrets, cookies, PKCE/handoff verifiers,
+  private keys, wallet objects, and CSRF tokens never enter bootstrap, launch
+  context, MessagePort, card HTML, URLs visible to another origin, analytics,
+  or logs.
+- Serialize consent/revocation and privileged effects on a per-user/app lock.
+  Logout, revoke, app close/replacement, source Note becoming non-public,
+  manifest/policy change, and account deletion cancel pending prompts and cause
+  stale callbacks/responses to fail.
+- One app may be active. Collapse retains the exact iframe and port; close or
+  replacement destroys them. In a morphing/SPA frontend, keep the broker frame
+  in a stable client-owned DOM island so ordinary state patches cannot reload,
+  re-parent, or duplicate it.
+- A global kill switch disables discovery fetches, cards, broker creation,
+  registration/authorization, identity, compose, wallet, notifications, and
+  active frames without impairing ordinary ActivityPub or OAuth clients.
+
+Log bounded security decisions with time, action, outcome, app origin, and a
+local correlation identifier. Redact URL queries where they may contain
+secrets, Note/context content, OAuth material, handoff data, wallet payloads,
+cookies, key material, and remote network topology. Apply quotas/circuit
+breakers per IP, origin, user, client, and instance so a mini app cannot block
+federation ingest, timelines, login, or the ordinary composer.
+
+### 15. Optional V1 ActivityPub transactional-mention extension
+
+This section is required only when a host advertises
+`notifications.activitypub`. The current V1 extension supports one permission
+class: transactional mentions. It does **not** support promotional consent,
+`mentionPurposes`, `fma:miniApp`, `fma:notificationPurpose`, a custom JSON-LD
+namespace, or user-attributed delegated publishing. Those require a later
+version. Do not infer them from `transactionalMentions: true`.
+
+An app operates one stable backend-controlled `Application` or `Service` actor
+for all users. The manifest declaration is stored inactive. A unique bounded
+background activation fetches `actorUrl` with no redirect, the common DNS/TLS
+boundary, a 65,536-byte limit, and an ActivityStreams JSON media type. The
+closed security projection must satisfy:
+
+- actor `id` exactly equals declared `actorUrl` and `type` is `Application` or
+  `Service`;
+- `inbox`, `outbox`, `followers`, and `publicKey.id` are HTTPS URLs on the
+  actor/manifest exact origin; inbox/outbox/followers paths are non-root;
+- `publicKey.owner` exactly equals actor ID;
+- `publicKeyPem` decodes to one RSA public key with modulus 2,048–8,192 bits;
+  and
+- app origin, manifest fingerprint, actor, endpoints, key ID, key PEM, and
+  SHA-256 key fingerprint are atomically pinned.
+
+Activation never silently follows a moved actor, fetches a later key from a
+signature `keyId`, or repins a changed document. A changed security projection
+disables the extension until explicit operator/user recovery. Advertise the
+capability only after successful activation and current policy approval.
+
+Permission is keyed by `(local user, exact app origin, exact activated actor)`
+and is independent of context, wallet, and generic OAuth consent. The SDK grant
+requires an active mini-app OAuth grant satisfying `identify` plus the
+host-owned confirmation. OAuth revoke/expiry, app/actor invalidation, domain
+denial, permission revoke, or account deletion disables it immediately. The
+backend permission endpoint derives app/actor from the bearer token and never
+accepts either as caller input. It returns the user actor ID only while granted,
+using the response specified in section 11.
+
+An inbound transactional delivery is accepted for user-visible processing only
+if all of these hold in one locked transaction:
+
+1. It is a normal signed ActivityPub `Create` with one embedded `Note`.
+2. Activity `actor` and Note `attributedTo` exactly equal the activated actor.
+   The HTTP signature verifies using only the pinned key ID and key; no network
+   key fetch occurs.
+3. Neither activity nor Note has ActivityStreams Public in `to`, `cc`, `bto`,
+   or `bcc`. Each addresses exactly one actor: the same local recipient.
+4. The Note has exactly one `Mention` whose `href`/`id` exactly equals that
+   recipient. It has no other mentioned or addressed actor.
+5. The recipient is local, the app registration/identify grant and
+   transactional permission are current, the actor/origin is allowed, and
+   normal federation signature, block, moderation, content, and size policies
+   also pass.
+6. A secret-keyed HMAC over local user ID, app actor, and stable activity ID has
+   not already been consumed. Store the HMAC, never the raw activity ID, in the
+   notification-specific replay/audit table.
+
+On success, persist the ordinary private Note/activity and create normal local
+notification/direct-message effects. On any extension failure, create no
+object, notification, or side effect, but return the same non-oracular
+successful inbox status used for an accepted duplicate so the sender cannot
+probe permission/account state. Ordinary invalid ActivityPub may still receive
+the host's normal generic rejection before this check.
+
+The notification audit stores only local user ID, exact app origin, exact app
+actor, grant/deny/revoke or accepted/suppressed reason, and timestamp. It has no
+content, raw activity/note ID, recipient URL, OAuth value, or key. Keep at most
+500 rows per user. Consent authorization, replay consumption, persistence, and
+the audit decision are serialized to prevent revoke/delivery races.
+
+Public notes authored by the app actor use ordinary ActivityPub and require no
+mini-app host feature. A useful producer supplies WebFinger, actor, inbox,
+outbox, followers, public activity/note dereferencing, signed `Follow`/`Undo`
+handling and `Accept`, and durable signed delivery. Public app notes must not
+mention an individual merely to trigger this extension.
+
+### 16. Deterministic conformance vectors
+
+Use `https://app.example` as app origin, `https://social.example` as issuer,
+`A` repeated 43 times as a syntactically valid launch/challenge value, and
+`req_1` as a valid request ID. These are parser vectors, not entropy examples;
+production IDs are random.
+
+| ID | Input or condition | Required outcome |
+| --- | --- | --- |
+| URL-01 | `https://App.Example:443/a?x=1` | Accept; origin is `https://app.example`; preserve exact path/query value for launch/link attribution. |
+| URL-02 | `https://app.example.evil.test/` compared with app origin | Reject exact-origin equality. |
+| URL-03 | `https://app.example@evil.test/`, `https://127.0.0.1/`, `https://0x7f000001/`, or a percent-encoded backslash | Reject before DNS/connect. |
+| URL-04 | DNS returns one public and one private address | Reject the entire fetch; do not choose the public answer. |
+| FETCH-01 | 302 from app origin to another path on same origin, then 200 | Accept if both hops independently pass and redirect budget remains. |
+| FETCH-02 | Redirect to another origin or encoded body with `gzip` | Reject without parsing body. |
+| FETCH-03 | Both `Content-Length` and `Transfer-Encoding`, duplicate content type, or body length mismatch | Reject as ambiguous/smuggled. |
+| MAN-01 | Minimal `{"version":"1","name":"A","homeUrl":"https://app.example/","capabilities":[]}` | Accept as unauthenticated core app. |
+| MAN-02 | The same JSON with a second `name` key or unknown top-level key | Reject manifest. |
+| MAN-03 | OAuth scopes `["identify"]`, exact redirect, empty capabilities | Accept; registration is public and identity-only. |
+| MAN-04 | `compose_note` without OAuth/identify, cross-origin icon/redirect, or mutable scope maximum after registration | Reject/fail closed. |
+| MAN-05 | Optional wallet enabled false with required true or a required chain `eip155:0` | Reject manifest. |
+| CARD-01 | No mini-app meta on valid linked page | Generic card; launch exact linked URL, not home URL. |
+| CARD-02 | Two matching meta tags, duplicate JSON key, cross-origin launch/image, or overlong title | Treat metadata as absent; never apply its authority. |
+| DISC-01 | Public Note has mention anchor first and ordinary app anchor second | Skip mention link; test the ordinary link. |
+| DISC-02 | Followers-only Note contains a valid app link | Do not fetch manifest/page or create a card. |
+| BOOT-01 | Eight-field bootstrap from immediate parent, exact allowed host origin, one port | Accept once; first port message must be exact `ready`. |
+| BOOT-02 | Correct object from wrong `event.source`, correct source with `targetOrigin=*`, extra bootstrap key, or two ports | Reject and release no data. |
+| PORT-01 | Valid `getLaunchInfo` after ready | Return exactly the four-field launch DTO without prompt/OAuth/viewer. |
+| PORT-02 | Any request before ready, `undefined` optional property, accessor/custom prototype, duplicate ID, stale launch, ninth outstanding request, or oversized message | No side effect; apply specified violation/close behavior. |
+| CTX-01 | First `getContext`, user denies | Correlated `denied` with `context:null`; launch info remains available. |
+| CTX-02 | Approved context after source Note becomes non-public | `unavailable` with null; do not use cached public state. |
+| OAUTH-01 | New app requests only `identify` on Egregoros, Mastodon-adapter, Pleroma-adapter, or Misskey-adapter host | Same profile flow and same five-field identity DTO; native mapping is not visible. |
+| OAUTH-02 | App asks for undeclared/unsupported scope, wrong redirect, wrong state/PKCE/mode, expired code, or second code use | Reject without token or grant mutation. |
+| OAUTH-03 | Repeat registration for same issuer + canonical manifest | Same client ID; no new row per user. |
+| RELAY-01 | Exact one-time browser-code fragment for active request | Relay only authorization code to matching port; iframe must still present verifier at token endpoint. |
+| RELAY-02 | Duplicate/extra fragment key, wrong state/launch/mode, both code fields, or fragment over 1,024 chars | Ignore/close; no app response containing a code. |
+| COMP-01 | Valid compose after identify, then user edits and submits | `accepted` first; receipt only after commit with final ID/scope. |
+| COMP-02 | App sends a submit-like field/event, arbitrary reply target, ninth link, or total text over 5,000 chars | Reject/ignore; no post. |
+| EXT-01 | App sends `userActivation:true` without any real gesture | Do not open; require host-owned click. |
+| WAL-01 | `eth_accounts` before exact-origin connection | Return `[]`. |
+| WAL-02 | Signature/transaction boolean says true but host confirmation absent | Do not call adapter; return rejection/cancel result. |
+| WAL-03 | Reviewed request's account, chain, data, value, or execution nonce changes | Cancel; require a new review. |
+| AP-01 | Signed exact-actor direct Note to one consenting local mention with pinned key | Optional extension may persist once and notify. |
+| AP-02 | Public audience hidden in `bcc`, second recipient/mention, stale consent/OAuth, wrong/rotated key, or replay | Acknowledge non-oracularly; persist nothing and create no notification. |
+
+Tests MUST assert both the response and absence/presence of durable side
+effects. Run the browser vectors in at least current Chromium, Firefox, and
+WebKit desktop plus installed mobile/PWA modes supported by the product. Test
+third-party-cookie/storage blocking even though the protocol does not rely on
+cross-origin cookies.
+
+### 17. Clean-room implementation order and acceptance checklist
+
+Use this order so untrusted network/browser surfaces never precede their
+validators:
+
+1. **Feature and policy core.** Add disabled-by-default global enablement,
+   exact/suffix host allow and deny rules (deny wins), cookie-host rejection,
+   quotas, and immediate invalidation hooks.
+2. **Pure parsers.** Implement strict duplicate-rejecting JSON, URL/origin/DNS
+   policy, manifest, card, launch/context, compose, message, and wallet schemas
+   as side-effect-free functions with the vectors above.
+3. **Bounded egress.** Implement the credential-free DNS-pinned streaming HTTP
+   client, content/header/redirect limits, and raster image sanitizer. Do not
+   reuse a generic federation client unless it meets every bound.
+4. **Local data model.** Store immutable app declaration/fingerprint, derived
+   card records, public OAuth registration, grants/token-family deadline,
+   context consent, wallet connection, and active launch separately. Never add
+   derived card/permission data to canonical ActivityPub JSON.
+5. **Asynchronous discovery.** Queue public Notes, extract bounded candidates,
+   stop at first valid app, persist one derived card, and isolate failures from
+   federation/timelines.
+6. **Host UI and broker.** Build the desktop floating/collapsible and mobile
+   full-height surfaces, stable client-owned iframe island, same-origin broker,
+   nested sandbox, CSP, loading/error/retry state, and trusted prompt layer.
+7. **Port protocol.** Implement exact bootstrap, ready state machine, schemas,
+   budgets, replay/correlation, one-prompt behavior, live rechecks, teardown,
+   and every core response. Verify with an app written independently from the
+   host.
+8. **OAuth adapter.** Add RFC 8414 profile metadata, idempotent manifest-based
+   public registration, exact consent, S256 authorization code flow, duration
+   and rotating refresh family, relay, CORS, revocation, and native-provider
+   mapping. Implement literal portable `identify` and the fixed identity DTO
+   before any broader local scope.
+9. **Core actions.** Add prompt-free launch info, once-per-app context,
+   host-owned compose and post-commit receipt, close, and confirmed external
+   navigation. Test revoke/policy/logout races at every commit boundary.
+10. **Optional capabilities.** Add wallet only behind the adapter and full
+    method/confirmation suite. Advertise ActivityPub notifications only after
+    actor activation, permission API, pinned-key receiver checks, replay/audit,
+    and revocation all pass. Partial optional work remains unadvertised.
+11. **Operator/developer surfaces.** Add per-app revoke/disconnect, wallet
+    disconnect, context/notification controls, domain policy, kill switch,
+    redacted audit, and the conformance workbench with a real `ready` test.
+12. **Release gate.** Run deterministic, adversarial, SDK interoperability,
+    CSP/header, OAuth-family, browser/PWA, accessibility, load, and rollback
+    tests against the production build and production egress configuration.
+
+A core host is ready to claim `fediverse_miniapp_profile: "1"` only when every
+item below is true:
+
+- [ ] A valid app hosted once can launch from arbitrary compatible canonical
+      HTTPS instance origins; no example or header assumes one Egregoros host.
+- [ ] The fixed well-known manifest and RFC 8414 metadata paths, relay path,
+      identity path, exact schemas, CORS, and HTTP security headers match this
+      document.
+- [ ] Public-note discovery produces at most one derived card and never mutates
+      or delays the canonical ActivityPub object.
+- [ ] The remote app is nested behind the same-origin broker with the exact
+      sandbox, CSP, origin/source validation, and transferred-port state
+      machine.
+- [ ] The reference V1 SDK can connect, call `ready`, receive launch info,
+      request/deny/approve context, authorize with both completion modes,
+      obtain the exact identity DTO, compose and receive a receipt, and close.
+- [ ] No app-controlled value can directly open a window, approve a grant,
+      submit a post, expose an account, sign data, send a transaction, or grant
+      transactional mentions.
+- [ ] Anonymous registration is idempotent per issuer+manifest, never returns a
+      secret, and cannot create one client per user.
+- [ ] `identify` works identically over the host's native auth model without
+      granting native read/write access; additional scopes are advertised and
+      consented according to actual local semantics.
+- [ ] Policy/revoke/logout/manifest change invalidates frames, tokens, prompts,
+      and operations immediately, including races at commit/execution time.
+- [ ] Payload, header, URL, origin, redirect, structured-clone, OAuth, wallet,
+      and ActivityPub smuggling vectors fail without side effects or secret
+      disclosure.
+- [ ] The runtime SDK and its TypeScript declarations describe the same API and
+      protocol version. Apps can vendor the raw module without a build step.
+- [ ] Logs, audits, metrics, error pages, HTML, URLs, relay messages, and launch
+      DTOs contain none of the prohibited secrets or private user data.
+- [ ] Optional capability names appear in bootstrap only when their complete
+      declaration, UI, server enforcement, revocation, and tests are live.
+
+Internal language, framework, database schema, job runner, OAuth library, and
+ActivityPub storage model are implementation choices. Passing this checklist
+requires matching externally observable values and security outcomes, not
+copying Egregoros internals.
+
+### 18. App SDK compatibility surface
+
+A host implementation does not have to publish its own app SDK, but it MUST
+interoperate with the V1 SDK surface below. An independently written SDK uses
+the same method behavior and exact port messages. The reference package is a
+raw ECMAScript module with no runtime dependency or build step; apps vendor a
+pinned copy on their own exact origin rather than hot-linking an arbitrary
+calling instance.
+
+Construction is synchronous so the bootstrap listener exists immediately:
+
+```js
+const sdk = createFediverseMiniAppSDK({
+  allowedHostOrigin(origin) {
+    return acceptsCanonicalPublicHttpsOrigin(origin)
+  },
+  timeoutMs: 30_000,
+})
+```
+
+`allowedHostOrigin` is required and returns exactly boolean true to accept. A
+generally published app validates a canonical public HTTPS origin rather than
+hard-coding one instance; a private app may use an exact list. The SDK still
+requires the event/source/issuer equality in section 8. Browser test injection
+may additionally supply window, parent, navigator, and crypto objects; apps do
+not use those options in production.
+
+The frozen public API is:
+
+```ts
+interface FediverseMiniAppSDK {
+  readonly bootstrap: MiniAppBootstrap | null
+  connect(): Promise<MiniAppBootstrap>
+  ready(): Promise<void>
+  getLaunchInfo(): Promise<MiniAppLaunchInfo>
+  getContext(): Promise<MiniAppLaunchContext>
+  requestAuth(request: MiniAppBackendAuthorizationRequest): Promise<{status: "success", handoffCode: string}>
+  requestAuth(request: MiniAppBrowserAuthorizationRequest): Promise<{status: "success", authorizationCode: string}>
+  composeNote(draft: MiniAppComposeDraft): Promise<MiniAppComposeResult>
+  close(): Promise<void>
+  openExternal(url: string): Promise<{status: "approved" | "denied"}>
+  on(event: "composeNotePublished", callback: (receipt: MiniAppComposePublishedReceipt) => void): () => void
+  readonly wallet: {getProvider(): MiniAppEvmProvider}
+  readonly notifications: {
+    getPermission(): Promise<MiniAppNotificationPermission>
+    requestPermission(): Promise<MiniAppNotificationPermission>
+  }
+  destroy(): void
+}
+```
+
+The types are exactly the DTO, authorization, draft, receipt, notification,
+and wallet shapes in sections 6–13. `connect()` resolves to the frozen bootstrap
+after strict validation. `ready()` sends the ready message. Correlated calls
+after connection use a fresh request ID and time out after the configured
+interval. `composeNote` and
+`openExternal` return their status objects; the later compose receipt is an
+event and unsubscribe is the function returned by `on`. `destroy()` is
+idempotent, removes the bootstrap listener, closes the port, rejects pending
+calls, and clears event listeners.
+
+SDK exceptions are `Error` objects named `MiniAppError` with a string or
+numeric `code`. The stable string codes are:
+
+| Code | Meaning |
+| --- | --- |
+| `HOST_VALIDATOR_REQUIRED` | Construction omitted the exact host-origin policy. |
+| `DESTROYED` | The SDK/port was destroyed before completion. |
+| `TIMEOUT` | No valid correlated result arrived within the call timeout. |
+| `CONTEXT_UNAVAILABLE` | Context status was denied or unavailable. |
+| `AUTH_FAILED` | OAuth status was cancelled, invalid, or unsuccessful. |
+| `CAPABILITY_UNAVAILABLE` | An optional capability is absent/unavailable. |
+| `AUTH_REQUIRED` | The requested extension requires a current OAuth grant. |
+| `USER_ACTIVATION_REQUIRED` | Honest-SDK preflight did not observe current browser activation. This is not host proof. |
+
+Wallet failures use the numeric codes in section 13. Before port traffic, the
+provider throws 4200 when `wallet.evm` is not advertised and -32602 for invalid
+method parameters; a malformed correlated provider result becomes -32603.
+Notification methods check `notifications.activitypub` before sending.
+
+Every JavaScript SDK release MUST ship a matching `index.d.ts`, even when the
+runtime is JavaScript. The declarations include readonly DTOs, the two mutually
+exclusive OAuth overloads, compose/event types, optional capabilities, and
+method-specific EIP-1193 overloads. Runtime and declarations are one atomic
+versioned change. The wire version remains string `"1"` even if the package's
+own semantic version changes.
+
+The reference package is
+[`@fediverse-miniapps/sdk`](https://github.com/shipoclu/fediverse-miniapp-sdk).
+When installed from Git, pin a full commit or tag and commit the consuming
+lockfile. When served without bundling, copy `index.js`, `index.d.ts`, and the
+complete imported `wallet/` directory; copying only the entry module breaks its
+relative imports. Serve JavaScript with a JavaScript MIME type and `nosniff`.
+
+### Informative native-provider references
+
+These links explain why the adapter boundary is necessary; the mini-app
+profile above remains the normative app-facing contract:
+
+- [Mastodon OAuth and proprietary application registration](https://docs.joinmastodon.org/spec/oauth/)
+- [Mastodon application registration API](https://docs.joinmastodon.org/methods/apps/)
+- [Mastodon OAuth scopes](https://docs.joinmastodon.org/api/oauth-scopes/)
+- [Pleroma OAuth application administration](https://docs.pleroma.social/backend/development/API/admin_api/)
+- [Misskey OAuth/IndieAuth authorization](https://misskey-hub.net/en/docs/for-developers/api/token/oauth/)
+- [Misskey API permissions](https://misskey-hub.net/en/docs/for-developers/api/permission/)
