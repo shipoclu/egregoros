@@ -151,7 +151,7 @@
       <.card data_role="settings-account" class="p-6">
         <.header>
           Account
-          <:subtitle>Update email and follow settings.</:subtitle>
+          <:subtitle>Update email, follow settings, and optional developer tools.</:subtitle>
         </.header>
 
         <.form
@@ -172,6 +172,17 @@
             field={@account_form[:locked]}
             label="Require follow requests (locked account)"
           />
+
+          <.input
+            type="checkbox"
+            field={@account_form[:developer_mode]}
+            label="Show developer tools in the sidebar"
+          />
+
+          <p class="text-xs leading-relaxed text-[color:var(--text-muted)]">
+            Developer tools can make bounded server-side requests to public HTTPS miniapp URLs.
+            Leave this disabled unless you are building or reviewing a miniapp.
+          </p>
 
           <.button type="submit" variant="secondary" class="w-full">Update account</.button>
         </.form>

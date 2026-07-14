@@ -20,6 +20,7 @@ defmodule Egregoros.User do
     assertion_method
     local
     admin
+    developer_mode
     locked
     email
     password_hash
@@ -49,6 +50,7 @@ defmodule Egregoros.User do
     field :assertion_method, Egregoros.Types.JsonValue
     field :local, :boolean, default: true
     field :admin, :boolean, default: false
+    field :developer_mode, :boolean, default: false
     field :locked, :boolean, default: false
     field :email, :string
     field :password_hash, :string

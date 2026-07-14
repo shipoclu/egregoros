@@ -94,6 +94,7 @@ defmodule EgregorosWeb.Router do
     live_session :mini_app_host,
       on_mount: [{EgregorosWeb.MiniAppHost, :default}] do
       live "/settings/privacy", PrivacyLive
+      live "/developer/mini-apps", MiniAppDeveloperLive
       live "/search", SearchLive
       live "/explore", ExploreLive
       live "/tags/:tag", TagLive

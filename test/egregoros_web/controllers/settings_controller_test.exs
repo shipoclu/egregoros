@@ -30,6 +30,7 @@ defmodule EgregorosWeb.SettingsControllerTest do
     assert html =~ "/settings/privacy"
     assert html =~ ~s(data-role="app-shell")
     assert html =~ ~s(data-role="nav-settings")
+    assert html =~ "Show developer tools in the sidebar"
   end
 
   test "GET /settings shows current avatar and header image", %{conn: conn} do
@@ -132,7 +133,11 @@ defmodule EgregorosWeb.SettingsControllerTest do
       conn
       |> Plug.Test.init_test_session(%{user_id: user.id})
       |> post("/settings/account", %{
-        "account" => %{"email" => "alice2@example.com", "locked" => "true"}
+        "account" => %{
+          "email" => "alice2@example.com",
+          "locked" => "true",
+          "developer_mode" => "true"
+        }
       })
 
     assert redirected_to(conn) == "/settings"
@@ -141,6 +146,7 @@ defmodule EgregorosWeb.SettingsControllerTest do
     updated = Users.get(user.id)
     assert updated.email == "alice2@example.com"
     assert updated.locked == true
+    assert updated.developer_mode == true
 
     conn =
       Phoenix.ConnTest.build_conn()

@@ -34,7 +34,8 @@ defmodule EgregorosWeb.SettingsController do
             Phoenix.Component.to_form(
               %{
                 "email" => user.email || "",
-                "locked" => user.locked
+                "locked" => user.locked,
+                "developer_mode" => user.developer_mode
               },
               as: :account
             ),
@@ -84,7 +85,8 @@ defmodule EgregorosWeb.SettingsController do
          {:ok, _user} <-
            Users.update_profile(user, %{
              "email" => Map.get(params, "email"),
-             "locked" => Map.get(params, "locked")
+             "locked" => Map.get(params, "locked"),
+             "developer_mode" => Map.get(params, "developer_mode")
            }) do
       conn
       |> put_flash(:info, "Account updated.")

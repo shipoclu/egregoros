@@ -19,6 +19,7 @@ defmodule EgregorosWeb.AppShell do
       :bookmarks,
       :profile,
       :settings,
+      :developer,
       :admin,
       :login,
       :register
@@ -178,6 +179,15 @@ defmodule EgregorosWeb.AppShell do
                     icon="hero-cog-6-tooth"
                     label="Settings"
                     navigate={~p"/settings"}
+                  />
+
+                  <.nav_link
+                    :if={Map.get(@current_user, :developer_mode) == true}
+                    role="nav-developer"
+                    active={@active == :developer}
+                    icon="hero-code-bracket"
+                    label="Developer"
+                    navigate={~p"/developer/mini-apps"}
                   />
 
                   <.nav_link

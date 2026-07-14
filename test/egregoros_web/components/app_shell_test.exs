@@ -28,6 +28,20 @@ defmodule EgregorosWeb.AppShellTest do
     assert html =~ ~s(data-role="nav-messages")
     assert html =~ ~s(data-role="nav-profile")
     assert html =~ ~s(data-role="nav-notifications-count")
+    refute html =~ ~s(data-role="nav-developer")
+  end
+
+  test "renders developer navigation only when the user enables it" do
+    html =
+      render_component(&AppShell.app_shell/1, %{
+        active: :developer,
+        current_user: %{nickname: "alice", developer_mode: true},
+        notifications_count: 0,
+        inner_block: [%{inner_block: fn _, _ -> "Developer tools" end}]
+      })
+
+    assert html =~ ~r/<a[^>]*data-role="nav-developer"[^>]*aria-current="page"/
+    assert html =~ ~s(href="/developer/mini-apps")
   end
 
   test "renders navigation links for signed-out users" do
