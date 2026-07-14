@@ -26,7 +26,8 @@ defmodule EgregorosWeb.Endpoint do
     only: EgregorosWeb.static_paths(),
     raise_on_missing_only: code_reloading?
 
-  if Code.ensure_loaded?(Tidewave) do
+  if Code.ensure_loaded?(Tidewave) and
+       System.get_env("EGREGOROS_TIDEWAVE_ENABLED", "false") in ["true", "1"] do
     plug Tidewave
   end
 
