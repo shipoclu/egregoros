@@ -82,6 +82,14 @@ defmodule EgregorosWeb.MiniAppDeveloperLiveTest do
            )
 
     assert has_element?(view, "#mini-app-diagnostic-check-ready[data-status='not_run']")
+
+    assert has_element?(
+             view,
+             "#mini-app-diagnostic-ready-availability[data-available='true']",
+             "safe launch card"
+           )
+
+    assert has_element?(view, "#mini-app-diagnostic-ready-availability", "other required")
     assert has_element?(view, "[data-role='mini-app-launch-disclosure']", "synthetic")
     assert has_element?(view, "[data-role='mini-app-launch-disclosure']", "does not claim")
 
@@ -130,6 +138,13 @@ defmodule EgregorosWeb.MiniAppDeveloperLiveTest do
 
     assert has_element?(view, "#mini-app-diagnostic-check-manifest_fetch[data-status='fail']")
     assert has_element?(view, "#mini-app-diagnostic-check-ready[data-status='fail']")
+
+    assert has_element?(
+             view,
+             "#mini-app-diagnostic-ready-availability[data-available='false']",
+             "early required"
+           )
+
     refute has_element?(view, "#mini-app-diagnostic-preview")
   end
 

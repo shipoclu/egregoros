@@ -316,6 +316,23 @@ defmodule EgregorosWeb.MiniAppDeveloperLive do
                 <p class="mt-2 text-xs leading-relaxed text-[color:var(--text-secondary)]">
                   {ready_detail(ready_status(assigns))}
                 </p>
+                <p
+                  id="mini-app-diagnostic-ready-availability"
+                  data-available={to_string(not is_nil(@developer_card))}
+                  class="mt-2 border-l-2 border-[color:var(--accent)] pl-3 text-xs leading-relaxed text-[color:var(--text-muted)]"
+                >
+                  <%= if @developer_card do %>
+                    Egregoros produced a safe launch card, so this browser test is available from
+                    <strong class="text-[color:var(--text-secondary)]">Open</strong>
+                    above. Later header or recommended failures may still leave it runnable, but
+                    <code class="font-mono">ready()</code>
+                    cannot override any other required failure.
+                  <% else %>
+                    This browser test cannot run because the server scan did not produce a safe
+                    launch card. An early required URL, domain, manifest, or card failure blocks it;
+                    fix those checks and test again.
+                  <% end %>
+                </p>
               </li>
             </ul>
           </.card>
