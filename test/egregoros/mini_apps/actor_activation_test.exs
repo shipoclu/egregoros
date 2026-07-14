@@ -63,6 +63,20 @@ defmodule Egregoros.MiniApps.ActorActivationTest do
              ActorActivation.authorize_signing_key(@actor, @actor <> "#rotated-key", key)
   end
 
+  test "validates a manifest actor document without creating or pinning a declaration", %{
+    public_key: public_key
+  } do
+    manifest = manifest_fixture()
+
+    assert :ok =
+             ActorActivation.validate_document(
+               Jason.encode!(valid_actor(public_key)),
+               manifest
+             )
+
+    assert Declarations.get_by_origin(@origin) == nil
+  end
+
   test "does not refetch or silently repin an activated actor", %{public_key: public_key} do
     assert {:ok, _declaration, :created} = Declarations.ensure(manifest_fixture())
     expect_actor_fetch(valid_actor(public_key))

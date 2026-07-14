@@ -7,6 +7,7 @@ defmodule Egregoros.MiniApps.ActorActivation do
   alias Egregoros.MiniApps
   alias Egregoros.MiniApps.Declaration
   alias Egregoros.MiniApps.Fetcher
+  alias Egregoros.MiniApps.Manifest
   alias Egregoros.MiniApps.Origin
   alias Egregoros.MiniApps.StrictJSON
   alias Egregoros.Repo
@@ -39,6 +40,23 @@ defmodule Egregoros.MiniApps.ActorActivation do
   end
 
   def activate(_origin), do: {:error, :declaration_not_found}
+
+  def validate_document(body, %Manifest{
+        origin: origin,
+        activity_pub: %{actor_url: actor_url}
+      })
+      when is_binary(body) and is_binary(origin) and is_binary(actor_url) do
+    declaration = %Declaration{app_origin: origin, activity_pub_actor_url: actor_url}
+
+    with {:ok, actor} <- StrictJSON.decode(body),
+         {:ok, _security} <- validate_actor(actor, declaration) do
+      :ok
+    else
+      _ -> {:error, :invalid_actor_document}
+    end
+  end
+
+  def validate_document(_body, _manifest), do: {:error, :actor_not_declared}
 
   def authorize_signing_key(actor_url, key_id, key)
       when is_binary(actor_url) and is_binary(key_id) do
