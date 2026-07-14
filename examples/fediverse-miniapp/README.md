@@ -20,8 +20,9 @@ caching, validation, and an optional OAuth-backend proxy, see
 Before deploying:
 
 1. Replace every `https://miniapp.example` URL in `public/.well-known/fediverse-miniapp.json`.
-2. Replace the trusted Egregoros origin in `public/app.mjs`; do not use an
-   accept-any-origin callback.
+2. Keep the canonical HTTPS validator in `public/host_origin.mjs` for a
+   generally published app. It accepts different exact HTTPS host origins but
+   rejects malformed origins; it is deliberately not `() => true`.
 3. Build and copy the pinned SDK artifact:
 
    ```sh
@@ -35,7 +36,7 @@ Before deploying:
 4. Serve `public/` from the exact HTTPS origin in the manifest, without
    redirects. The manifest must be available at
    `/.well-known/fediverse-miniapp.json` and the page must permit framing by the
-   Egregoros instances you support through CSP `frame-ancestors`.
+   compatible HTTPS Fediverse hosts through CSP `frame-ancestors https:`.
 
 The reference intentionally has no backend and therefore does not demonstrate
 dynamic OAuth registration or token exchange. Those operations belong on an

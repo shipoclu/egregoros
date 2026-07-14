@@ -19,6 +19,14 @@ A basic miniapp is an ordinary HTTPS web application that:
 The app can be a vanilla single-page application. It does not need a special
 framework.
 
+A generally published miniapp must be deployable once and work when launched
+from different canonical HTTPS domains running Egregoros or another compatible
+ActivityPub server. Do not compile one instance hostname into public app
+settings. Every launch is still pinned to one exact host origin; open-host
+interoperability does not mean accepting malformed origins or trusting origin
+strings carried only inside messages. A deliberately private app may use a
+fixed host list, but is not generally interoperable.
+
 There are three possible parts:
 
 - **The Egregoros host** discovers the app, displays its card, frames it, and
@@ -149,23 +157,34 @@ iframe.
 </html>
 ```
 
-Create `app.js`. For the first deployment, trust the exact Egregoros origin
-where the app will be tested:
+Create `app.js`. For a generally published app, accept any syntactically exact
+canonical HTTPS host origin:
 
 ```js
 import {createFediverseMiniAppSDK} from "/vendor/fediverse-miniapp-sdk/index.js"
 
-const trustedHosts = new Set(["https://social.example"])
 const status = document.querySelector("#status")
 const output = document.querySelector("#output")
 
 /**
- * Returns whether an origin may host this miniapp.
+ * Returns whether a value is one exact canonical HTTPS host origin.
  *
  * @param {string} origin - The exact origin offered by the SDK bootstrap.
- * @returns {boolean} Whether the host is trusted.
+ * @returns {boolean} Whether the host origin is syntactically allowed.
  */
-const isAllowedHostOrigin = origin => trustedHosts.has(origin)
+const isAllowedHostOrigin = origin => {
+  if (typeof origin !== "string") return false
+
+  try {
+    const parsed = new URL(origin)
+    return parsed.protocol === "https:" &&
+      parsed.origin === origin &&
+      !parsed.username &&
+      !parsed.password
+  } catch {
+    return false
+  }
+}
 
 const sdk = createFediverseMiniAppSDK({
   allowedHostOrigin: isAllowedHostOrigin,
@@ -235,25 +254,38 @@ createRoot(document.querySelector("#root")).render(<App sdk={sdk} />)
 The instance should live for the iframe's entire lifetime. Do not recreate it on
 component renders, route changes, retries, or ordinary errors.
 
-`allowedHostOrigin` must fail closed. A private app can use an exact set as
-above. A generally published app may accept public HTTPS Fediverse origins,
-but both its browser code and backend must implement the public-DNS and exact
-origin rules from [`MINIAPPS.md`](MINIAPPS.md#hostile-mini-app-security-boundary).
-Do not replace the callback with `() => true`.
+`allowedHostOrigin` must fail closed. A generally published app applies the
+canonical HTTPS syntax check above, while a private app can replace it with an
+exact set. The SDK additionally requires the browser event origin, bootstrap
+host origin, and OAuth issuer to be equal and pins that one origin for the
+channel lifetime. Browser JavaScript cannot perform DNS pinning. A backend that
+fetches issuer URLs must independently apply the public-DNS, redirect, TLS,
+timeout, and DNS-pinning rules from
+[`MINIAPPS.md`](MINIAPPS.md#hostile-mini-app-security-boundary). Do not replace
+the callback with `() => true`.
 
 ### Step 5: permit framing
 
-The app's HTTP response must allow the intended Egregoros origin to frame it.
-For an app tested only on `https://social.example`, a suitable response header
-starts with:
+The app's HTTP response must allow compatible hosts to frame it. A generally
+published static app uses:
 
 ```text
-Content-Security-Policy: default-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors https://social.example
+Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; connect-src https:; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; frame-ancestors https:
+Referrer-Policy: no-referrer
+X-Content-Type-Options: nosniff
+Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), bluetooth=(), hid=(), midi=(), display-capture=()
+Strict-Transport-Security: max-age=31536000; includeSubDomains
 ```
 
 Set `frame-ancestors` as an HTTP response header; browsers ignore it in an HTML
 `<meta>` element. Do not also send `X-Frame-Options: DENY` or `SAMEORIGIN`,
 because either can block the cross-origin host.
+
+`frame-ancestors https:` permits arbitrary HTTPS frame ancestors, including a
+compatible host and its same-origin broker. It does not authenticate the host;
+the exact SDK handshake does that binding for each launch. A private app may
+replace `https:` with fixed exact origins, but a generally published app must
+not require developers to rebuild it for every Egregoros domain.
 
 Add only the network, image, or style sources the application actually uses.
 The production nginx example and the rest of the recommended headers are in
@@ -279,6 +311,13 @@ The checklist distinguishes required failures from recommended hardening. A
 failed prerequisite can prevent later resources from being requested. Fix each
 required failure and run the exact URL again; a new run replaces the prior
 short-lived preview.
+
+The current workbench follows manifest/card declarations and does not crawl
+every HTML script or stylesheet dependency. Its real `ready()` test proves that
+startup JavaScript executed, but you must also inspect every runtime
+subresource's direct response, MIME type, `nosniff`, HSTS, CSP, and caching
+policy. Apply the security headers at the server level so page, manifest,
+script, stylesheet, and later asset locations inherit them consistently.
 
 First verify the resources directly:
 
@@ -432,7 +471,8 @@ and S256 challenge to the pending launch.
 The static callback reads `code` and `state` from its own URL. Decode only the
 app's strict state structure, require the issuer to be the expected public HTTPS
 origin, and construct the relay as exactly
-`<issuer>/mini-apps/oauth/relay`. Redirect the callback window to:
+`<issuer>/mini-apps/oauth/relay`. Automatically replace the callback window
+with:
 
 ```text
 #version=1&launch_id=LAUNCH_ID&state=OAUTH_STATE&status=success&authorization_code=AUTHORIZATION_CODE
@@ -442,6 +482,22 @@ For an OAuth error, redirect with `status=cancelled` or `status=error` and omit
 both code fields. Do not exchange the code in the callback and do not store it
 there. Egregoros accepts only the exact unexpired code matching the pending
 application, user, callback, scopes, and PKCE challenge.
+
+Do not add a second confirmation solely for this return navigation. The open
+static profile deliberately optimizes for the familiar OAuth flow in which the
+callback returns immediately. Use `location.replace`, validate a canonical
+exact HTTPS issuer, force the fixed relay path, reject duplicate or malformed
+callback fields, and never accept a complete relay URL from state or a query
+parameter.
+
+This choice has a documented residual cost: because a purely static callback
+has no independent server-held transaction record, an attacker can construct
+state that turns the callback into a constrained open redirect to an arbitrary
+canonical HTTPS origin's `/mini-apps/oauth/relay` path. PKCE and Egregoros's
+pending-request checks still prevent a forged or stolen code from granting
+access, but redirect/phishing-reputation abuse remains possible. If that is not
+acceptable for an app's threat model, use the backend profile or another
+independently authenticated pre-authorization issuer binding.
 
 #### Step 5: exchange and store the tokens
 
@@ -591,14 +647,19 @@ useful for framing, SDK, and OAuth callback problems.
 - [ ] Undeveloped optional sections are omitted, not filled with placeholders.
 - [ ] The SDK JavaScript and TypeScript declarations come from the same pinned
       build and are served by the app.
-- [ ] `allowedHostOrigin` fails closed and accepts the intended exact host.
+- [ ] A generally published build accepts different exact canonical HTTPS host
+      origins without a compiled instance list; a private build clearly
+      documents its fixed list.
+- [ ] `allowedHostOrigin` rejects HTTP, credentials, paths, queries, fragments,
+      trailing slashes, non-canonical ports, and malformed values.
 - [ ] The SDK is created synchronously before framework rendering or lazy-loaded
       code can miss the one-time iframe bootstrap message.
 - [ ] The page calls `connect()` on load and `ready()` after its first usable
       render.
 - [ ] Every action button has `type="button"`, awaits its SDK call, and shows a
       useful stable error code.
-- [ ] The response CSP permits only intended framing hosts.
+- [ ] A public app sends HTTP `frame-ancestors https:`; a private app sends its
+      documented exact origins. The policy is not supplied only through meta.
 - [ ] `X-Frame-Options` does not block cross-origin framing.
 - [ ] A fully public note produces a card and the explicit **Open** action
       launches the exact linked route.
@@ -637,6 +698,11 @@ useful for framing, SDK, and OAuth callback problems.
       unknown or duplicate fields.
 - [ ] Production CSP, MIME types, caching, TLS, and direct non-redirecting
       responses have been checked with `curl`.
+- [ ] Page, manifest, JavaScript, stylesheet, and declared asset responses all
+      receive the intended security headers and correct MIME types.
+- [ ] `Permissions-Policy` denies camera, microphone, geolocation, payment,
+      USB, serial, Bluetooth, HID, MIDI, and display capture; production HTTPS
+      responses carry a positive HSTS `max-age`.
 - [ ] App pages expose no unnecessary camera, microphone, geolocation, popup,
       download, or top-navigation permissions.
 - [ ] Launch context is treated as untrusted input even though it describes a

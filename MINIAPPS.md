@@ -75,6 +75,17 @@ identity paths above are part of compatibility with the current v1 SDK and
 implementer examples. A server that changes one needs a versioned SDK/profile
 extension rather than silently changing it.
 
+Open-host interoperability is a v1 deployment requirement, not an
+Egregoros-specific convenience. A generally published miniapp is built and
+deployed once and MUST be capable of launching from different canonical HTTPS
+origins running Egregoros or another compatible ActivityPub server. Required
+and recommended app settings therefore MUST NOT assume one calling instance
+domain. Each individual launch remains bound to one exact origin; accepting a
+canonical HTTPS origin says only which issuer controls that namespace, not
+which software it runs or whether it is honest. A deliberately private app MAY
+use a fixed host list, but it must describe itself as instance-restricted and
+will not be generally interoperable.
+
 ### Browser CORS interoperability
 
 `browser_code` is deliberately usable by a static app: it has no backend and
@@ -204,6 +215,12 @@ matching, bootstrap issuer equality, message-port pinning, backend public-DNS
 validation, OAuth, and per-capability consent remain the authorization
 boundaries. A private or instance-specific app may use a narrower
 `frame-ancestors` policy.
+
+Consequently, conformance guidance MUST present `frame-ancestors https:` as the
+normal static policy for a generally published app. A copied example that
+names one Egregoros domain without labelling the app private is
+non-interoperable. The directive must be an HTTP response header; a CSP `<meta>`
+element cannot set `frame-ancestors`.
 
 Only one mini app may be active at a time. Launching another app explicitly
 closes/replaces the active panel or sheet; v1 has no background/minimized app
@@ -418,6 +435,27 @@ and registration/token requests are cross-origin `POST`s. It uses this flow:
    correlated request, then posts the code, public client ID, exact redirect
    URI, and retained PKCE verifier to the metadata-advertised token endpoint.
    Only after that exchange succeeds may it use an authenticated host action.
+
+For the open-host static profile, the callback automatically performs the
+redirect in step 4 without another user confirmation. This is a deliberate
+interoperability and usability decision. The callback MUST still require a
+strictly decoded state structure, a canonical exact HTTPS issuer accepted by
+its host policy, the fixed `/mini-apps/oauth/relay` path, bounded fields, and a
+valid success-or-error result shape. It MUST use `location.replace` or
+equivalent replacement navigation and MUST NOT accept an arbitrary relay URL,
+path, query, credentials, HTTP origin, or code format.
+
+A purely static, generally published app has no independent server-held record
+with which to authenticate an issuer supplied through OAuth state. Its callback
+is therefore intentionally usable as a constrained open redirect to an
+arbitrary canonical HTTPS origin at exactly `/mini-apps/oauth/relay`. This does
+not authorize the attacker or make a forged/stolen code redeemable: the host
+still requires its pending app, user, launch, state, exact redirect URI, scopes,
+single-use code, and S256 challenge, while the iframe retains the verifier. It
+does leave redirect and phishing-reputation risk. This v1 profile accepts that
+residual risk instead of requiring an unfamiliar post-OAuth confirmation. An
+app that cannot accept it MUST use a backend-held transaction binding or an
+equivalent issuer record established independently before authorization.
 
 The registered callback may be a query-driven route at the static app root,
 such as `https://app.example/?oauth=callback`; it need not require a server
@@ -747,14 +785,20 @@ pinned copy from its own origin rather than hot-linking an arbitrary user's
 instance. Construction requires an `allowedHostOrigin(origin)` callback; there
 is deliberately no accept-any-host default. The app can allow a known instance
 exactly, but a generally published Fediverse mini app SHOULD instead accept any
-syntactically exact public HTTPS domain under a fail-closed public-DNS policy.
+syntactically exact canonical HTTPS origin. This is not `() => true`: the
+browser callback rejects HTTP, credentials, paths, queries, fragments,
+non-canonical ports, trailing slashes, and malformed values.
 This is not a static instance allowlist: the bootstrap still requires
 `event.origin === hostOrigin === issuer`, and the SDK pins that one exact origin
-for the channel lifetime. The app backend MUST independently reject private,
-local, reserved, mixed public/private, redirected, or malformed issuer
-destinations and connect to a DNS-pinned public address while preserving the
-original hostname for Host, SNI, and TLS certificate verification. The
-connected SDK exposes a frozen `bootstrap` containing
+for the channel lifetime. Browser JavaScript cannot securely perform or pin DNS
+resolution. When an app has a backend that dereferences issuer-controlled URLs,
+that backend MUST independently reject private, local, reserved, mixed
+public/private, redirected, or malformed destinations and connect to a
+DNS-pinned public address while preserving the original hostname for Host,
+SNI, and TLS certificate verification. A fully static app instead treats the
+accepted host as an open-world issuer authoritative only for its own namespace;
+claims about an actor outside that namespace require independent verification.
+The connected SDK exposes a frozen `bootstrap` containing
 `hostOrigin`, OAuth `issuer`, `authorizationServerMetadata`, the exact
 `authorizationResultRelay`, protocol version, launch ID, and the currently
 available capability names.
@@ -1299,6 +1343,17 @@ required to use `nosniff`; HSTS is recommended. HTTP status, direct/safe
 redirect behavior, TLS, DNS/IP safety, response size, content encoding,
 header ambiguity, MIME type, and body bounds remain enforced by the production
 fetcher rather than reimplemented by the workbench.
+
+For a generally published app, `frame-ancestors https:` satisfies the framing
+check for every canonical HTTPS compatible host; the workbench does not require
+the current Egregoros domain to be compiled into the app. The current v1
+server-side probe follows manifest and card declarations, not arbitrary HTML
+dependency graphs. It therefore does not enumerate every `<script src>` or
+stylesheet link. The real `ready()` handshake proves that the startup
+JavaScript executed, while implementers must separately verify correct MIME,
+`nosniff`, HSTS, CSP, and caching headers for scripts, styles, and other runtime
+subresources. A future bounded exact-origin dependency probe may make those
+checks explicit without weakening fetch limits.
 
 Every attempted check is displayed as required or recommended and as passed or
 failed. A failed prerequisite stops dependent requests, and the checklist says

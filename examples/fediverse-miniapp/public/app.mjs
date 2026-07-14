@@ -1,7 +1,6 @@
 import {createFediverseMiniAppSDK} from "./fediverse-miniapp-sdk-v1.js"
+import {isCanonicalHttpsHostOrigin} from "./host_origin.mjs"
 
-// Replace this exact origin list with the instances your deployment trusts.
-const trustedHosts = new Set(["https://social.example"])
 const output = document.querySelector("#output")
 const show = value => {
   output.textContent = JSON.stringify(value, null, 2)
@@ -9,7 +8,7 @@ const show = value => {
 const showError = error => show({error: error?.message || "Unknown error", code: error?.code})
 
 const sdk = createFediverseMiniAppSDK({
-  allowedHostOrigin: origin => trustedHosts.has(origin),
+  allowedHostOrigin: isCanonicalHttpsHostOrigin,
 })
 
 try {

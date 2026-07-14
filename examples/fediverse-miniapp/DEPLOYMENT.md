@@ -1,8 +1,9 @@
 # Deploying the reference Fediverse mini app
 
 This guide deploys the static reference app behind nginx at the exact origin
-`https://miniapp.example`. Substitute your real hostname and the exact
-Egregoros origins you trust everywhere they appear.
+`https://miniapp.example`. Substitute your real app hostname everywhere it
+appears. The generally published configuration works from different canonical
+HTTPS domains running Egregoros or another compatible ActivityPub server.
 
 The reference app works without OAuth. It can read the narrow public launch
 information disclosed by the card, separately request enriched public-note
@@ -16,11 +17,9 @@ backend.
 - A publicly trusted TLS certificate for that exact hostname.
 - nginx with access to the certificate files.
 - A checkout of Egregoros to build a pinned copy of the SDK.
-- One or more exact Egregoros origins that are allowed to frame the app, such
-  as `https://social.example`. Include a non-default port when applicable.
-
 Use a dedicated origin for the mini app. Do not deploy it beneath the Egregoros
-origin, and do not broaden trust to `https:` or `*`.
+origin. A public app deliberately permits HTTPS framing; its SDK still binds
+each launch to one exact canonical host origin.
 
 ## 2. Configure the app identity
 
@@ -28,7 +27,14 @@ Edit `public/.well-known/fediverse-miniapp.json` and replace every occurrence
 of `https://miniapp.example`. All manifest URLs must remain on the exact same
 scheme, host, and effective port as the manifest itself.
 
-Edit `public/app.mjs` and replace the example host allowlist:
+The public example imports `public/host_origin.mjs`. Its validator accepts any
+syntactically exact canonical HTTPS host origin so one static deployment works
+across the Fediverse. It rejects HTTP, credentials, paths, queries, fragments,
+trailing slashes, non-canonical ports, and malformed values.
+
+Do not replace it with `() => true`: SDK equality, launch-ID, and MessagePort
+checks are additional boundaries. If the app is intentionally private, replace
+the validator with a documented exact set such as:
 
 ```js
 const trustedHosts = new Set([
@@ -37,8 +43,7 @@ const trustedHosts = new Set([
 ])
 ```
 
-Do not implement this callback as `() => true`. The SDK deliberately requires
-the app to make an exact host-origin trust decision.
+That private variant will not work from arbitrary compatible servers.
 
 If the app does not need an EVM wallet, remove the `wallet` object from the
 manifest and remove the wallet controls from the page. If wallet support is
@@ -73,6 +78,7 @@ One possible filesystem layout is:
 ├── app.mjs
 ├── fediverse-miniapp-sdk-v1.d.ts
 ├── fediverse-miniapp-sdk-v1.js
+├── host_origin.mjs
 └── index.html
 ```
 
@@ -91,8 +97,8 @@ Adapt the group name on systems where nginx uses a group other than
 
 ## 5. nginx configuration
 
-The configuration below is self-contained. Replace the hostname, certificate
-paths, and `frame-ancestors` origins. The reference HTML currently contains an
+The configuration below is self-contained. Replace the hostname and certificate
+paths. The reference HTML currently contains an
 inline style block, so `style-src` includes `'unsafe-inline'`. A production app
 can move that CSS into a same-origin file and then remove `'unsafe-inline'`.
 
@@ -117,9 +123,12 @@ server {
     ssl_certificate_key /etc/letsencrypt/live/miniapp.example/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
 
-    # Replace these exact origins with the Egregoros instances you trust.
-    # Never use "frame-ancestors *" or a bare "https:" source here.
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; font-src 'self'; media-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; frame-ancestors https://social.example https://community.example" always;
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+
+    # A generally published app permits arbitrary HTTPS Fediverse ancestors.
+    # A deliberately private app may replace https: with exact origins.
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; font-src 'self'; media-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; frame-ancestors https:" always;
 
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
     add_header X-Content-Type-Options "nosniff" always;
@@ -153,6 +162,13 @@ server {
     }
 
     location = /app.mjs {
+        default_type application/javascript;
+        try_files $uri =404;
+        expires -1;
+        limit_except GET { deny all; }
+    }
+
+    location = /host_origin.mjs {
         default_type application/javascript;
         try_files $uri =404;
         expires -1;
@@ -214,7 +230,8 @@ Confirm all of the following:
 - The page and manifest return `200` directly over HTTPS.
 - The manifest has `Content-Type: application/json`.
 - `.js` and `.mjs` files have a JavaScript MIME type.
-- CSP `frame-ancestors` contains only the intended exact Egregoros origins.
+- A public app's CSP contains `frame-ancestors https:`; a private app contains
+  only its documented exact host origins.
 - No `X-Frame-Options: DENY` or `SAMEORIGIN` header is present.
 - The SDK JavaScript and `.d.ts` came from the same Egregoros build.
 
@@ -251,7 +268,11 @@ A backend deployment should:
 1. Read the exact issuer, metadata URL, `authorizationResultRelay`, and
    `launchId` from the SDK bootstrap and send them to the app backend as
    untrusted input.
-2. Validate the issuer against the same trusted-host policy used by the app.
+2. Require one canonical HTTPS issuer and bind it immutably to the transaction.
+   Before dereferencing it, resolve and pin only public DNS addresses, preserve
+   the hostname for Host/SNI/TLS verification, reject unsafe redirects, and
+   apply strict timeout and response limits. Do not treat the issuer as proof
+   of any software brand or of actors outside its own namespace.
 3. Register one public client per app manifest and issuer, cache its stable
    `client_id`, and reuse it. Equivalent registration returns that same ID and
    no secret.
@@ -282,9 +303,18 @@ A backend deployment should:
    failed callback.
 
 The backend must accept the relay URL only when it is exactly
-`<trusted issuer>/mini-apps/oauth/relay`. It must never derive or accept an
-arbitrary relay domain from request input. The callback must not use
+`<transaction-bound issuer>/mini-apps/oauth/relay`. It must never replace that
+issuer from callback request input. The callback must not use
 `window.opener` or send its result directly to the Egregoros page.
+
+For a backend-free static OAuth implementation, the callback may automatically
+return to the canonical HTTPS issuer encoded in strict state at the fixed
+`/mini-apps/oauth/relay` path. That seamless behavior deliberately accepts a
+constrained open-redirect and phishing-reputation risk because the callback has
+no independent backend transaction record. It does not weaken PKCE or the
+host's pending-request checks. An app that does not accept the residual risk
+must add a backend-held issuer binding; adding a second confirmation is not a
+requirement of the open static profile.
 
 The Egregoros authorization server is responsible for generating a consent-page
 CSP whose `form-action` contains only `'self'` and this app's validated callback
@@ -355,9 +385,11 @@ opener reference, or poll the authorization window.
 
 - [ ] Manifest and application URLs use one exact HTTPS origin.
 - [ ] SDK `.js` and `.d.ts` are copied from the same pinned build.
-- [ ] `allowedHostOrigin` contains exact trusted Egregoros origins.
+- [ ] A public `allowedHostOrigin` accepts different exact canonical HTTPS
+      origins without a compiled instance list; a private app documents its list.
 - [ ] nginx serves JSON and JavaScript with correct MIME types.
-- [ ] CSP `frame-ancestors` names only trusted Egregoros origins.
+- [ ] Public CSP uses `frame-ancestors https:`; private CSP names only its
+      documented exact compatible hosts.
 - [ ] `X-Frame-Options` does not block the trusted broker.
 - [ ] Device permissions, top navigation, popups, and downloads are not added.
 - [ ] Egregoros operator allow/deny policy permits the app domain.
