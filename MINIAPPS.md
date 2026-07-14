@@ -799,7 +799,8 @@ holds them in the iframe's JavaScript session.
 ### 5. Host SDK
 
 Publish a small versioned JavaScript SDK. Its transport uses a nonce-bound,
-origin-checked `postMessage` handshake. Initial candidate methods:
+origin-checked bootstrap followed by the transferred-port protocol specified
+in the clean-room contract. The V1 methods are:
 
 - `ready()` — app declares that its first render is usable;
 - `getLaunchInfo()` — immediately available, non-authoritative public
@@ -911,7 +912,7 @@ The initial draft schema is deliberately narrow and host-validated:
 - `text` (string, optional), `spoilerText` (string, optional), and `language`
   (BCP 47 tag, optional);
 - `visibility` (optional), always presented to the user as an editable
-  selection and defaulting to Egregoros's normal composer default; and
+  selection and defaulting to `public` in the V1 wire contract; and
 - `inReplyTo` only when the target is the public note from which this app was
   launched, plus a bounded list of HTTPS links to include as ordinary text.
 
@@ -1831,10 +1832,13 @@ normalize it to lowercase after validation.
 | `scopes` | yes | 1–32 unique strings, each 1–64 UTF-8 bytes and matching `^[a-z][a-z0-9:_-]*$`. New manifests include `identify`. |
 | `scopeAuthorizationMaxAgeSeconds` | no | Closed object whose keys are declared scopes and values are integers 300–31,536,000. It contains no more entries than `scopes`. |
 
-`identify` is the V1 narrow identity baseline. `read` does not imply
-`identify` on the identity endpoint. A host MAY continue to register a legacy
-manifest whose scope list contains `read` but not `identify`, but such a client
-cannot use the V1 narrow identity endpoint and is not a conforming new app.
+`identify` is the V1 narrow identity baseline. It is independently requestable
+and does not grant a broad read API. For compatibility with older
+Mastodon/Pleroma-style scope hierarchies, a token containing `read` also
+satisfies the narrow identity check; `write` does not. A host MAY continue to
+register a legacy manifest whose scope list contains `read` but not `identify`,
+but every conforming new app declares and normally requests `identify`
+explicitly.
 `compose_note` requires `oauth` and a declared `identify` scope. The broad OAuth
 scope `write` is not required for `compose_note`: compose opens host UI and the
 user submits; it is not delegated API publishing.
@@ -2086,6 +2090,59 @@ or `*`, never require cookies, never set `Access-Control-Allow-Credentials`,
 and answer preflight for the actual method and `content-type` and/or
 `authorization` headers. Apply CORS to error responses too.
 
+#### Native OAuth compatibility adapters
+
+`identify` is the only portable OAuth permission every V1 host MUST implement.
+It is a mini-app-profile scope even when the underlying server calls the nearest
+native permission `profile`, `read`, `read:accounts`, `read:account`, or
+something else. The host maps that native account proof to a profile-scoped
+grant and the exact five-field identity API above. The mapping MUST NOT make an
+`identify` token valid on broader native read endpoints. Thus the mini app does
+not need to know which server software issued the token.
+
+The profile is an adapter boundary, not a claim that an unmodified ActivityPub
+server already conforms:
+
+| Native family | Typical native difference | Required V1 adapter behavior |
+| --- | --- | --- |
+| Mastodon | Proprietary `POST /api/v1/apps`; current releases issue confidential clients and a secret, and scope granularity varies by version. | Add the manifest-driven public-client registration endpoint. Never expose or require a native client secret in a mini app. Map `identify` to the least identity authority and issue a profile-conforming public-client grant. |
+| Pleroma/Akkoma-style | Mastodon-compatible app registration commonly returns a client secret and uses its own scope/application records. | Add the same public-client facade, immutable manifest binding, PKCE enforcement, and narrow identity API while reusing native user consent internally. |
+| Misskey | Modern releases use OAuth/IndieAuth client URLs and permissions such as `read:account`; older deployments may use MiAuth or legacy app secrets. | Present the V1 RFC 8414/public-registration facade and an opaque profile `client_id`; map `identify` to account identity only. MiAuth or a URL client ID may be an internal adapter detail but MUST NOT change the app-facing V1 messages. |
+
+The mini-app-facing authorization, token, and registration endpoints may be a
+thin layer over the server's native implementation or a separate restricted
+OAuth client type. Either way, their observable behavior remains this profile:
+public client, mandatory S256, exact redirects, profile scope records, bounded
+grant lifetime, fixed identity DTO, and no client secret. A native provider
+that has non-expiring tokens, no refresh rotation, confidential clients only,
+or no PKCE cannot be exposed directly; the adapter must supply the stricter V1
+behavior.
+
+`oauth.scopes` is the app's immutable maximum set, not a claim that every host
+supports every name. A host MUST advertise `identify` in `scopes_supported`.
+It MAY advertise `read`, `write`, `follow`, `push`, granular native scopes, or
+future portable scopes. Registration records and echoes the manifest maximum,
+including names this issuer does not support, so a single manifest can target
+several server families. At authorization time the requested subset must be
+both manifest-declared and issuer-supported; otherwise return standard
+`invalid_scope`. Apps inspect metadata and request only a supported subset,
+always including `identify`.
+
+Only `identify` and its fixed endpoint are cross-server API semantics in core
+V1. `read` means access to the issuer's documented authenticated read APIs;
+`write` means access to its documented write APIs and may include deletion;
+their exact endpoint sets differ across software. Consent MUST describe the
+actual local authority. A host MUST NOT guess mappings from similar names or
+silently broaden an unknown scope. Portable delegated publishing with the
+narrower `app_activities` authority is V2; V1 apps use `compose_note` when they
+need portable user-reviewed posting.
+
+The profile-facing `client_id` returned by registration is an opaque string of
+10–200 base64url characters. A server whose native layer uses a URL client ID
+or confidential-client row stores an internal alias from this public ID; it
+does not put the native URL or secret on the browser MessagePort. This keeps the
+V1 SDK identical across native OAuth families.
+
 ### 6. Host data transfer objects
 
 Opening the explicit card makes this immutable, prompt-free object available
@@ -2134,7 +2191,8 @@ DTO. Context denial never changes the prompt-free launch object.
 
 ### 7. Compose draft and receipt
 
-`composeNote` requires current OAuth authorization containing `identify`, the
+`composeNote` requires current OAuth authorization satisfying `identify`
+(including the explicitly documented legacy `read` expansion), the
 immutable `compose_note` capability, a public-note launch, current domain
 allowance, and the active channel. The draft is a closed object with optional:
 
@@ -2159,3 +2217,487 @@ successful database commit, the host emits a receipt for that request with
 only the canonical ActivityPub Note `id`/URL and final `scope` (`public`,
 `unlisted`, `followers`, or `direct`). It emits no receipt on cancel or failed
 submission and makes no claim that federation delivery has completed.
+
+### 8. Browser isolation and bootstrap
+
+The authenticated host page MUST NOT frame the remote app directly. It frames
+a minimal same-origin broker document, and that document creates the remote
+iframe. This yields three principals:
+
+```text
+authenticated host UI (issuer origin; cookies and trusted prompts)
+  └─ same-origin broker document (no secrets; exact frame-src app origin)
+       └─ remote app iframe (app origin; sandboxed)
+```
+
+The broker response is private/no-store HTML with
+`X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, and a unique
+nonce policy equivalent to:
+
+```text
+default-src 'none'; script-src 'self'; style-src 'nonce-<random>';
+frame-src <exact-app-origin>; frame-ancestors 'self'; base-uri 'none';
+form-action 'none'; object-src 'none'; connect-src 'none'; img-src 'none';
+```
+
+It contains only bounded, HTML-escaped app origin, launch URL, and display
+title values plus first-party relay code. It has no user data or OAuth value.
+The remote iframe has `sandbox="allow-scripts allow-forms allow-same-origin"`,
+`referrerpolicy="no-referrer"`, and a Permissions Policy that denies all
+undeclared browser/device capabilities. It has no `allow-popups`, downloads,
+top navigation, storage-access escape, pointer lock, or presentation authority.
+The app's exact origin MUST differ from every cookie-bearing hostname of the
+host installation, including media or alternate frontend hosts.
+
+Create a cryptographically random 32-byte launch nonce and encode it as exactly
+43 unpadded base64url characters. This `launchId` identifies one active launch,
+not an app or user. Reload/navigation closes old ports but does not reset
+per-launch budgets. Replacement, logout, policy denial, or close destroys the
+broker and all ports. A new app launch gets a new `launchId`.
+
+The authenticated host creates a `MessageChannel`. After the broker iframe
+loads, it sends one closed three-member window message to that iframe with
+`targetOrigin` equal to the exact issuer origin, `event.source` equal to the
+broker iframe window, and one transferred port:
+
+```js
+{
+  type: "fediverse-miniapp:host-bootstrap",
+  appOrigin: "https://app.example",
+  bootstrap: { /* object below */ }
+}
+```
+
+The broker validates the exact host origin/source, exact app origin, and one
+port. On each remote iframe load it creates another `MessageChannel`, forwards
+structured messages between the two ports, and sends the following object to
+the remote iframe with `targetOrigin` equal to the exact app origin,
+`event.source` equal to the remote iframe's immediate parent, and exactly one
+transferred port:
+
+```json
+{
+  "type": "fediverse-miniapp:bootstrap",
+  "version": "1",
+  "launchId": "43-character-base64url-launch-id",
+  "hostOrigin": "https://social.example",
+  "issuer": "https://social.example",
+  "authorizationServerMetadata": "https://social.example/.well-known/oauth-authorization-server",
+  "authorizationResultRelay": "https://social.example/mini-apps/oauth/relay",
+  "capabilities": ["wallet.evm", "notifications.activitypub"]
+}
+```
+
+That object has exactly eight members. `hostOrigin` and `issuer` are identical
+canonical origins. The metadata and relay values are exactly those fixed paths
+on that origin. `capabilities` is a unique array of host capabilities usable in
+this launch; V1 permits `wallet.evm` and `notifications.activitypub`. Core
+methods, OAuth, and `compose_note` are not advertised in this array: their
+availability follows the manifest and live authorization checks.
+
+An app installs its bootstrap listener synchronously, before deferred imports
+or framework rendering. It accepts at most one bootstrap, only from its
+immediate `parent`, only with one transferred port, only when
+`event.origin === bootstrap.hostOrigin`, and only after its app-defined
+`allowedHostOrigin` function accepts that canonical HTTPS origin. It validates
+all eight fields before starting the port. It never replies with window
+`postMessage`; all later traffic uses the transferred port.
+
+The first app-to-host port message MUST be exactly:
+
+```json
+{"type":"ready","version":"1","launchId":"43-character-base64url-launch-id"}
+```
+
+Traffic before it is a protocol violation and closes the port. A repeated
+identical `ready` after readiness is ignored. `ready` means the first usable
+app render exists; it is not authentication, consent, or proof of safety. If it
+does not arrive by the host's UI deadline, show Retry and Open externally while
+keeping the host usable. Retry reloads the broker/app and requires a new
+`ready`; it never fabricates success.
+
+### 9. Port value grammar, budgets, and correlation
+
+Although examples use JSON, the transport is HTML structured clone. Accept
+only values representable as null, a string, a boolean, a finite number, a
+dense ordinary array, or an ordinary/null-prototype object with enumerable
+data properties. Reject `undefined`, bigint, symbol, function, accessor,
+Date, RegExp, Map, Set, Blob, typed array, DOM object, custom prototype, sparse
+array, cycle, repeated object reference, and prototype-pollution structure.
+Security-sensitive envelopes are closed and reject extra members. Optional
+members are either present with a valid value or entirely absent; sending an
+own property whose value is JavaScript `undefined` is invalid.
+
+Measure a deterministic JSON-like encoding before processing. Per launch,
+enforce all of these ceilings on the browser broker:
+
+| Limit | Value |
+| --- | ---: |
+| nesting depth | 16 |
+| nodes in one message | 4,096 |
+| one message | 393,216 bytes (384 KiB) |
+| total bytes, both directions | 2,097,152 bytes (2 MiB) |
+| inbound app messages | 512 |
+| unique accepted request/call IDs | 128 |
+| requests awaiting response | 8 |
+| app-message token bucket | burst 40; refill 20/second |
+
+The server-side host bridge independently enforces at most 256 accepted broker
+events, 128 requests, the same byte ceilings, and the same token bucket. It
+does not trust the browser limiter. Any budget, readiness, launch-ID, or value-
+grammar violation closes the channel and cancels pending operations.
+
+`requestId` and `callId` match `^[A-Za-z0-9_-]{1,64}$`, are unique for the
+launch, and are unpredictable for honest clients; the SDK uses 16 random bytes
+encoded as 22 unpadded base64url characters. A response must match the pending
+request type and ID. Ignore unsolicited, duplicate, wrong-type, stale-launch,
+or malformed responses. The SDK default request timeout is 30 seconds and its
+`destroy()` rejects all pending calls and closes the port.
+
+Only one host-owned prompt or privileged operation may be active. A second
+well-formed request gets an immediate correlated response without replacing
+the first: context `unavailable`, notification `unavailable`, auth `error`,
+compose `unavailable`, external navigation `denied`, or wallet error `-32002`.
+It MUST NOT be silently dropped, because that strands the SDK promise and an
+outstanding slot.
+
+### 10. Exact app-to-host requests
+
+All objects below are closed. Every message contains the shown `version: "1"`
+and current `launchId`. The host revalidates app origin, manifest fingerprint,
+domain policy, user/login state, capability, permission, and OAuth grant at the
+moment it handles each request.
+
+Prompt-free launch information:
+
+```json
+{"type":"getLaunchInfo","version":"1","launchId":"…","requestId":"…"}
+```
+
+Permissioned enriched context:
+
+```json
+{"type":"getContext","version":"1","launchId":"…","requestId":"…"}
+```
+
+OAuth, in default backend-handoff mode:
+
+```json
+{
+  "type": "requestAuth",
+  "version": "1",
+  "launchId": "…",
+  "requestId": "…",
+  "clientId": "opaque-public-client-id",
+  "redirectUri": "https://app.example/oauth/callback",
+  "scopes": ["identify"],
+  "state": "43-to-256-base64url-characters",
+  "codeChallenge": "43-character-S256-challenge",
+  "codeChallengeMethod": "S256",
+  "handoffChallenge": "43-character-SHA256-challenge"
+}
+```
+
+It may additionally contain integer `authorizationLifetimeSeconds` from 300 to
+31,536,000. `clientId` matches `^[A-Za-z0-9_-]{10,200}$`; `redirectUri` is at
+most 2,048 bytes and is later required to equal a registered URI; scopes are a
+unique array of 1–32 values matching
+`^[A-Za-z][A-Za-z0-9:_-]{0,63}$`. State is unpadded base64url, 43–256
+characters. Challenges are exactly 43 unpadded base64url characters.
+
+Static browser-code mode omits `handoffChallenge` and adds
+`"completionMode":"browser_code"`. Backend mode omits `completionMode`; the
+default is `backend_handoff`. No other mode or combination is valid.
+
+Compose uses exactly the draft defined in section 7:
+
+```json
+{"type":"composeNote","version":"1","launchId":"…","callId":"…","draft":{}}
+```
+
+Close is fire-and-forget and has no response:
+
+```json
+{"type":"close","version":"1","launchId":"…","requestId":"…"}
+```
+
+External navigation is:
+
+```json
+{
+  "type":"openExternal","version":"1","launchId":"…","requestId":"…",
+  "url":"https://outside.example/path","userActivation":true
+}
+```
+
+The URL is valid HTTPS, at most 2,048 bytes, and may include a fragment. The
+boolean is an app assertion, not trusted proof of a browser gesture; section 14
+defines the required host-owned interaction.
+
+The optional notification extension uses:
+
+```json
+{"type":"getNotificationPermission","version":"1","launchId":"…","requestId":"…"}
+```
+
+or:
+
+```json
+{
+  "type":"requestNotificationPermission","version":"1","launchId":"…",
+  "requestId":"…","userActivation":true
+}
+```
+
+Both require advertised `notifications.activitypub`, the matching immutable
+ActivityPub declaration, and a current OAuth grant satisfying `identify`.
+Prompting additionally requires trusted host confirmation.
+
+Wallet uses the seven-member envelope in section 13.
+
+### 11. Exact host-to-app responses and events
+
+Launch information always uses:
+
+```json
+{
+  "type":"launchInfoResult","version":"1","launchId":"…","requestId":"…",
+  "launchInfo":{"version":"1","launchUrl":"https://app.example/…","linkedUrl":"https://app.example/…","sourceNoteId":"https://social.example/objects/123"}
+}
+```
+
+Context always includes a `context` member. On success it is the section 6 DTO;
+otherwise it is JSON null:
+
+```json
+{
+  "type":"contextResult","version":"1","launchId":"…","requestId":"…",
+  "status":"ok","context":{"version":"1","launchUrl":"…","sourceUrl":"…","note":{}}
+}
+```
+
+Allowed statuses are `ok`, `denied`, and `unavailable`. `denied` means the user
+declined/revoked disclosure; `unavailable` covers ineligible source data,
+logout, policy, or another active prompt. Apps MUST NOT infer a private detail
+from the distinction.
+
+OAuth failure has exactly five members and status `cancelled`, `error`, or
+`invalid_request`:
+
+```json
+{"type":"authResult","version":"1","launchId":"…","requestId":"…","status":"cancelled"}
+```
+
+Success has exactly one completion value. Backend mode adds `handoffCode`
+matching `^[A-Za-z0-9_-]{16,512}$`; browser mode instead adds
+`authorizationCode`, exactly 43 unpadded base64url characters:
+
+```json
+{
+  "type":"authResult","version":"1","launchId":"…","requestId":"…",
+  "status":"success","handoffCode":"single-use-app-session-code"
+}
+```
+
+Compose result has exactly the five base members below. Only `accepted` adds a
+sixth `requestId` matching the ID grammar:
+
+```json
+{
+  "type":"composeNoteResult","version":"1","launchId":"…","callId":"…",
+  "status":"accepted","requestId":"host-compose-request-id"
+}
+```
+
+Statuses are `accepted`, `auth_required`, `unavailable`, or `invalid_draft`.
+The later event is closed and independent of the original `callId`:
+
+```json
+{
+  "type":"composeNotePublished","version":"1","launchId":"…",
+  "requestId":"host-compose-request-id",
+  "id":"https://social.example/objects/new-note","scope":"public"
+}
+```
+
+The ID is an absolute canonical ActivityPub object URL at most 2,048 bytes and
+scope is `public`, `unlisted`, `followers`, or `direct`.
+
+External navigation returns exactly:
+
+```json
+{
+  "type":"openExternalResult","version":"1","launchId":"…","requestId":"…",
+  "status":"approved"
+}
+```
+
+Status is `approved` or `denied`.
+
+Notification success contains exactly:
+
+```json
+{
+  "type":"notificationPermissionResult","version":"1","launchId":"…",
+  "requestId":"…","status":"ok","state":"granted",
+  "actorUrl":"https://app.example/ap/actor"
+}
+```
+
+State is `prompt`, `granted`, or `denied`; actor URL is the validated declared
+HTTPS actor. Failure omits both fields and uses `auth_required` or
+`unavailable`. The bearer API counterpart, if this extension is implemented,
+is `GET <issuer>/api/v1/mini-apps/notification-permission`: a granted response
+is `{"state":"granted","recipientActor":"<user AP ID>","appActor":"<app actor ID>"}`
+and a denied response is `{"state":"denied"}`. It uses the same no-store,
+identify, app-registration, and CORS requirements as the identity endpoint.
+
+Wallet responses use the envelope in section 13. Malformed or unknown
+app messages have no side effect. Do not invent a catch-all successful
+response, leak stack traces, or reflect hostile values into trusted UI.
+
+### 12. OAuth popup completion relay
+
+The host opens authorization only after a real click on a host-owned control,
+using an opener-free top-level popup/sheet. The registered app callback handles
+the OAuth response, validates exact state, and navigates with replacement to
+the bootstrap `authorizationResultRelay`. The URL has no query; its fragment is
+at most 1,024 characters and has no duplicate or extra key.
+
+Backend success:
+
+```text
+#version=1&launch_id=<43-base64url>&state=<43..256-base64url>&status=success&handoff_code=<16..512-base64url>
+```
+
+Browser-code success replaces the last key with
+`authorization_code=<43-base64url>`. Cancellation/error has only `version`,
+`launch_id`, `state`, and `status=cancelled` or `status=error`. The two success
+code keys are mutually exclusive.
+
+The relay response is private/no-store HTML with `Pragma: no-cache`,
+`Referrer-Policy: no-referrer`, `X-Content-Type-Options: nosniff`,
+`Cross-Origin-Opener-Policy: same-origin`,
+`Cross-Origin-Resource-Policy: same-origin`, and CSP:
+
+```text
+default-src 'none'; script-src 'self'; frame-ancestors 'none';
+base-uri 'none'; form-action 'none'; object-src 'none'; connect-src 'none';
+img-src 'none'; style-src 'none';
+```
+
+It never reads `window.opener`. After strict parsing it opens the same-origin
+`BroadcastChannel` named exactly
+`fediverse-miniapp-auth:<launchId>:<state>` and posts one closed camel-case
+object:
+
+```json
+{
+  "type":"fediverse-miniapp:auth-completion","version":"1",
+  "launchId":"…","state":"…","status":"success","handoffCode":"…"
+}
+```
+
+Browser mode uses `authorizationCode`; failure has only the five base members.
+The active host listener accepts a message only for its one pending launch,
+request, exact state, completion mode, redirect, scopes, client, user, and
+unexpired server-side OAuth transaction. It then closes the BroadcastChannel,
+marks the transaction consumed, and sends the corresponding `authResult` on
+the pinned app port. The relay never receives, stores, or forwards an access
+token, refresh token, PKCE verifier, handoff verifier, app session, or cookie.
+
+Backend handoff codes are app-generated, single-use, expire within 60 seconds,
+and are bound to a SHA-256 `handoffChallenge`. The app iframe alone retains the
+verifier and redeems code + verifier directly with its backend. Browser-mode
+authorization codes remain issuer-generated, single-use, short-lived, and
+bound to the iframe's PKCE verifier; the iframe exchanges one at the advertised
+token endpoint. A host-visible code is never sufficient without its verifier.
+
+### 13. Optional EIP-1193 wallet wire
+
+Advertise `wallet.evm` only when the manifest enables it, host policy permits
+it, an injected/future embedded adapter is available, and all required chains
+can be handled. The SDK exposes a frozen provider with one
+`request({method, params})` function. It never exposes `window.ethereum`, a
+private key, wallet object, RPC URL, seed, or administrator credential.
+
+The app request is exactly:
+
+```json
+{
+  "type":"walletRequest","version":"1","launchId":"…","requestId":"…",
+  "method":"personal_sign","params":["0x6869","0x1111111111111111111111111111111111111111"],
+  "userActivation":true
+}
+```
+
+`userActivation` is boolean. It must be true for `eth_requestAccounts`,
+`personal_sign`, `eth_signTypedData_v4`, and `eth_sendTransaction`; it may be
+false for `eth_accounts` and `eth_chainId`. It remains untrusted advisory input
+and never replaces host confirmation.
+
+Only these methods and parameter orders exist:
+
+| Method | Exact `params` | Result |
+| --- | --- | --- |
+| `eth_accounts` | `[]` | 0–16 unique lowercase 20-byte hex addresses; `[]` before per-origin connection. |
+| `eth_chainId` | `[]` | Canonical EVM quantity string. |
+| `eth_requestAccounts` | `[]` | 1–16 unique lowercase addresses after host connection approval. |
+| `personal_sign` | `[data, address]` | 65-byte hex signature. Data is even-length hex, at most 65,536 bytes. |
+| `eth_signTypedData_v4` | `[address, typedDataJsonString]` | 65-byte hex signature. |
+| `eth_sendTransaction` | `[transaction]` | 32-byte transaction-hash hex. |
+
+An address matches `^0x[0-9a-fA-F]{40}$` and is normalized lowercase. Hex data
+is `0x` plus an even count of digits and is normalized lowercase. A quantity
+is `0x0` or `0x` followed by a non-zero hex digit and further hex digits; no
+leading zeroes. Quantities are bounded to the field width below.
+
+A transaction is a closed object. `from` is required and must be one of the
+exact app's connected accounts. Optional fields are `to`, `data`, `value`,
+`gas`, `gasPrice`, `maxFeePerGas`, `maxPriorityFeePerGas`, `nonce`, `chainId`,
+`type`, and `accessList`. `to` is an address. `data` is at most 65,536 bytes.
+Widths are value/gas-price/fee/chainId 256 bits, gas/nonce 64 bits, and type 8
+bits. Contract creation requires non-empty data when `to` is absent. Legacy
+`gasPrice` is mutually exclusive with EIP-1559 fee fields, and
+`maxPriorityFeePerGas <= maxFeePerGas`. An access list has at most 128 closed
+`{address, storageKeys}` objects; each has at most 256 unique 32-byte hex keys.
+
+Typed data is a strict JSON string at most 65,536 UTF-8 bytes. Reject duplicate
+keys, floats/exponents, integers outside JavaScript's safe range when encoded
+as numbers, `-0`, dangerous names `__proto__`, `constructor`, or `prototype`,
+depth over 12, more than 4,096 nodes, more than 128 entries in a container,
+more than 32 types or 32 fields per type, and a string over 8,192 bytes. The
+top object has exactly `types`, `primaryType`, `domain`, and `message`.
+Identifiers match `^[A-Za-z_][A-Za-z0-9_]{0,63}$`. Require an
+`EIP712Domain` definition and a declared non-domain primary type. Types may be
+declared structs, `address`, `bool`, `string`, dynamic/fixed `bytes1`–`bytes32`,
+or `int`/`uint` with omitted width or a multiple-of-eight width 8–256, with at
+most four array dimensions and a fixed dimension no greater than 128. Domain
+fields are limited to the correctly typed `name`, `version`, `chainId`,
+`verifyingContract`, and `salt`. Validate every value recursively and
+canonicalize the resulting object before showing or sending it.
+
+Wallet success is the closed result envelope:
+
+```json
+{
+  "type":"walletResult","version":"1","launchId":"…","requestId":"…",
+  "result":"0x…"
+}
+```
+
+`result` has the method-specific shape above. Failure replaces `result` with
+closed `error: {"code": <integer>, "message": "<at most 256 chars>"}`. Codes
+are integers from -32,768 through 49,999; invalid adapter codes normalize to
+4001. Use standard EIP-1193/JSON-RPC codes where applicable: 4001 user rejected,
+4100 unauthorized/unavailable, 4200 unsupported, 4900 disconnected, 4901 wrong
+chain, -32602 invalid parameters, -32603 invalid response, and -32002 another
+request pending. Error messages contain no wallet/provider internals.
+
+`eth_accounts` returns only the intersection of the current wallet accounts
+and the remembered exact-app-origin connection. `eth_requestAccounts` creates
+that connection only after host approval. Each signature and transaction gets
+a fresh host-owned review and confirmation; section 14 makes the confirmation
+and execution binding mandatory. Disconnect, logout, app close, OAuth revoke,
+domain denial, account/chain change, or wallet adapter loss cancels pending work
+and immediately removes authority as applicable.
