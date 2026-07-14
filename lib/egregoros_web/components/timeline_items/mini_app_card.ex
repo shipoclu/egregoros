@@ -5,6 +5,7 @@ defmodule EgregorosWeb.Components.TimelineItems.MiniAppCard do
 
   attr :id, :string, required: true
   attr :card, :map, required: true
+  attr :developer, :boolean, default: false
 
   def mini_app_card(assigns) do
     ~H"""
@@ -48,9 +49,15 @@ defmodule EgregorosWeb.Components.TimelineItems.MiniAppCard do
             data-role="mini-app-launch-disclosure"
             class="mt-3 max-w-xl text-xs leading-relaxed text-[color:var(--text-muted)]"
           >
-            Opening shares this public post’s Fediverse ID and exact app link with <span class="font-mono font-bold text-[color:var(--text-secondary)]">
-              {display_origin(@card.app_origin)}
-            </span>. It does not share your identity.
+            <%= if @developer do %>
+              Opening shares the exact tested URL and a synthetic Egregoros developer-page source URL with <span class="font-mono font-bold text-[color:var(--text-secondary)]">{display_origin(
+                @card.app_origin
+              )}</span>. It does not claim a public ActivityPub Note or share your identity.
+            <% else %>
+              Opening shares this public post’s Fediverse ID and exact app link with <span class="font-mono font-bold text-[color:var(--text-secondary)]">{display_origin(
+                @card.app_origin
+              )}</span>. It does not share your identity.
+            <% end %>
           </p>
 
           <button
