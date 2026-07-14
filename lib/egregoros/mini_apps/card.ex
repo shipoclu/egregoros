@@ -25,6 +25,7 @@ defmodule Egregoros.MiniApps.Card do
     field :image_url, :string
     field :resolved_at, :utc_datetime_usec
     field :expires_at, :utc_datetime_usec
+    field :developer_user_id, FlakeId.Ecto.Type, virtual: true
 
     timestamps(type: :utc_datetime_usec)
   end

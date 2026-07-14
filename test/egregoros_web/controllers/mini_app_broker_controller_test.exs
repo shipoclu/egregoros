@@ -2,9 +2,11 @@ defmodule EgregorosWeb.MiniAppBrokerControllerTest do
   use EgregorosWeb.ConnCase, async: false
 
   alias Egregoros.MiniApps.Cards
+  alias Egregoros.MiniApps.DeveloperLaunches
   alias Egregoros.MiniApps.Manifest
   alias Egregoros.MiniApps.ResolvedCard
   alias Egregoros.Objects
+  alias Egregoros.Users
 
   @public "https://www.w3.org/ns/activitystreams#Public"
   @launch_id "abcdefghijklmnopqrstuvwxyzABCDEFGH123456789"
@@ -98,6 +100,25 @@ defmodule EgregorosWeb.MiniAppBrokerControllerTest do
            )
   end
 
+  test "serves developer cards only to their exact opted-in session", %{conn: conn} do
+    {:ok, owner} = Users.create_local_user("broker-developer-owner")
+    {:ok, owner} = Users.update_profile(owner, %{"developer_mode" => true})
+    {:ok, other} = Users.create_local_user("broker-developer-other")
+    {:ok, other} = Users.update_profile(other, %{"developer_mode" => true})
+    {:ok, card} = DeveloperLaunches.put(owner, resolved_card())
+
+    path =
+      "/mini-apps/broker/#{card.id}?launch_id=#{@launch_id}&resolution_token=#{card.resolution_token}"
+
+    assert conn
+           |> Plug.Test.init_test_session(%{user_id: owner.id})
+           |> get(path)
+           |> html_response(200) =~ ~s(data-app-origin="https://app.example")
+
+    assert conn |> Plug.Test.init_test_session(%{user_id: other.id}) |> get(path) |> response(404)
+    assert conn |> get(path) |> response(404)
+  end
+
   defp card_fixture(origin \\ "https://app.example") do
     {:ok, object} =
       Objects.create_object(%{
@@ -107,6 +128,13 @@ defmodule EgregorosWeb.MiniAppBrokerControllerTest do
         data: %{"type" => "Note", "content" => "reader", "to" => [@public]}
       })
 
+    resolved = resolved_card(origin)
+
+    {:ok, card} = Cards.put(object, resolved)
+    card
+  end
+
+  defp resolved_card(origin \\ "https://app.example") do
     manifest = %Manifest{
       version: "1",
       name: "Reader",
@@ -116,7 +144,7 @@ defmodule EgregorosWeb.MiniAppBrokerControllerTest do
       cache_ttl_seconds: 600
     }
 
-    resolved = %ResolvedCard{
+    %ResolvedCard{
       source_url: origin <> "/read/chapter-2",
       app_origin: origin,
       app_name: "Reader",
@@ -126,8 +154,5 @@ defmodule EgregorosWeb.MiniAppBrokerControllerTest do
       image_url: nil,
       manifest: manifest
     }
-
-    {:ok, card} = Cards.put(object, resolved)
-    card
   end
 end

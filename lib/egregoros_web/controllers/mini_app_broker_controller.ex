@@ -3,6 +3,7 @@ defmodule EgregorosWeb.MiniAppBrokerController do
 
   alias Egregoros.MiniApps.Cards
   alias Egregoros.MiniApps.Card
+  alias Egregoros.MiniApps.DeveloperLaunches
   alias Egregoros.PublicHostPolicy
 
   def show(conn, %{
@@ -11,7 +12,7 @@ defmodule EgregorosWeb.MiniAppBrokerController do
         "resolution_token" => resolution_token
       }) do
     with true <- valid_launch_id?(launch_id),
-         %Card{} = card <- Cards.get_active_by_id(card_id, resolution_token),
+         %Card{} = card <- active_card(conn, card_id, resolution_token),
          false <- cookie_host_app?(card, conn.host) do
       nonce = :crypto.strong_rand_bytes(18) |> Base.url_encode64(padding: false)
 
@@ -29,6 +30,15 @@ defmodule EgregorosWeb.MiniAppBrokerController do
   end
 
   def show(conn, _params), do: send_resp(conn, 404, "Not Found")
+
+  defp active_card(conn, card_id, resolution_token) do
+    Cards.get_active_by_id(card_id, resolution_token) ||
+      DeveloperLaunches.get_active(
+        card_id,
+        resolution_token,
+        conn.assigns[:current_user]
+      )
+  end
 
   defp valid_launch_id?(value) when is_binary(value),
     do: String.match?(value, ~r/^[A-Za-z0-9_-]{43}$/)

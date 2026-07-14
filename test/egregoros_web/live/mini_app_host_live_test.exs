@@ -5,6 +5,7 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
 
   alias Egregoros.Activities.Note
   alias Egregoros.MiniApps.Cards
+  alias Egregoros.MiniApps.DeveloperLaunches
   alias Egregoros.MiniApps.Manifest
   alias Egregoros.MiniApps.OAuthRegistrations
   alias Egregoros.MiniApps.NotificationConsents
@@ -39,6 +40,48 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
     enable_mini_apps()
     {:ok, user} = Users.create_local_user("mini-app-host-user")
     %{user: user}
+  end
+
+  test "developer launches use synthetic diagnostic context and track ready across retries", %{
+    conn: conn,
+    user: user
+  } do
+    {:ok, user} = Users.update_profile(user, %{"developer_mode" => true})
+    {:ok, card} = DeveloperLaunches.put(user, resolved_card())
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/?timeline=public")
+
+    render_click(view, "mini_app_open", %{
+      "card_id" => card.id,
+      "resolution_token" => card.resolution_token
+    })
+
+    state = :sys.get_state(view.pid).socket.assigns
+    launch_id = state.mini_app_host.launch_id
+
+    assert state.mini_app_developer_check == :pending
+    assert state.mini_app_developer_card_id == card.id
+
+    assert state.mini_app_host.launch_info == %{
+             "version" => "1",
+             "launchUrl" => "https://app.example/book/chapter-2",
+             "linkedUrl" => "https://app.example/shared/chapter-2",
+             "sourceNoteId" => EgregorosWeb.Endpoint.url() <> "/developer/mini-apps"
+           }
+
+    render_hook(view, "mini_app_ready", %{"launch_id" => launch_id})
+    assert :sys.get_state(view.pid).socket.assigns.mini_app_developer_check == :pass
+
+    render_hook(view, "mini_app_loading", %{"launch_id" => launch_id})
+    assert :sys.get_state(view.pid).socket.assigns.mini_app_developer_check == :pending
+
+    render_hook(view, "mini_app_ready_timeout", %{"launch_id" => launch_id})
+    assert :sys.get_state(view.pid).socket.assigns.mini_app_developer_check == :fail
+
+    view |> element("#mini-app-frame-retry") |> render_click()
+    state = :sys.get_state(view.pid).socket.assigns
+    assert state.mini_app_developer_check == :pending
+    assert state.mini_app_host.launch_id != launch_id
   end
 
   test "opens only a trusted cached card and supports collapse, expand, and close", %{

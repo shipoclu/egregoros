@@ -3,10 +3,12 @@ defmodule EgregorosWeb.MiniAppAssetControllerTest do
 
   alias Egregoros.MiniApps.Card
   alias Egregoros.MiniApps.Cards
+  alias Egregoros.MiniApps.DeveloperLaunches
   alias Egregoros.MiniApps.Manifest
   alias Egregoros.MiniApps.ResolvedCard
   alias Egregoros.Objects
   alias Egregoros.Repo
+  alias Egregoros.Users
 
   @public "https://www.w3.org/ns/activitystreams#Public"
 
@@ -208,6 +210,36 @@ defmodule EgregorosWeb.MiniAppAssetControllerTest do
     assert get_resp_header(conn, "cache-control") == ["private, no-store, max-age=0"]
   end
 
+  test "proxies developer-card images only for their exact opted-in session", %{conn: conn} do
+    {:ok, owner} = Users.create_local_user("asset-developer-owner")
+    {:ok, owner} = Users.update_profile(owner, %{"developer_mode" => true})
+    {:ok, other} = Users.create_local_user("asset-developer-other")
+    {:ok, other} = Users.update_profile(other, %{"developer_mode" => true})
+    {:ok, card} = DeveloperLaunches.put(owner, resolved_card("https://app.example/card.png"))
+    png = image_binary(3, 2, ".png")
+
+    expect(Egregoros.MiniApps.Fetcher.Mock, :get, fn
+      "https://app.example/card.png", :asset ->
+        {:ok, %{status: 200, body: png, headers: [{"content-type", "image/png"}]}}
+    end)
+
+    path = "/mini-app-assets/#{card.id}/image?resolution_token=#{card.resolution_token}"
+
+    assert conn
+           |> Plug.Test.init_test_session(%{user_id: owner.id})
+           |> get(path)
+           |> response(200)
+
+    expect(Egregoros.MiniApps.Fetcher.Mock, :get, 0, fn _url, _kind ->
+      flunk("another user's diagnostic card must not trigger a fetch")
+    end)
+
+    assert conn
+           |> Plug.Test.init_test_session(%{user_id: other.id})
+           |> get(path)
+           |> response(404)
+  end
+
   defp card_fixture(image_url) do
     {:ok, object} =
       Objects.create_object(%{
@@ -221,6 +253,11 @@ defmodule EgregorosWeb.MiniAppAssetControllerTest do
         }
       })
 
+    {:ok, card} = Cards.put(object, resolved_card(image_url))
+    card
+  end
+
+  defp resolved_card(image_url) do
     manifest = %Manifest{
       version: "1",
       name: "Reader",
@@ -230,7 +267,7 @@ defmodule EgregorosWeb.MiniAppAssetControllerTest do
       cache_ttl_seconds: 600
     }
 
-    resolved = %ResolvedCard{
+    %ResolvedCard{
       source_url: "https://app.example/read",
       app_origin: "https://app.example",
       app_name: "Reader",
@@ -240,9 +277,6 @@ defmodule EgregorosWeb.MiniAppAssetControllerTest do
       image_url: image_url,
       manifest: manifest
     }
-
-    {:ok, card} = Cards.put(object, resolved)
-    card
   end
 
   defp enable_mini_apps do

@@ -4,6 +4,7 @@ defmodule EgregorosWeb.MiniAppAssetController do
   alias Egregoros.MiniApps
   alias Egregoros.MiniApps.Card
   alias Egregoros.MiniApps.Cards
+  alias Egregoros.MiniApps.DeveloperLaunches
   alias Egregoros.MiniApps.Fetcher
   alias Egregoros.MiniApps.ImageSanitizer
   alias Egregoros.MiniApps.Origin
@@ -19,7 +20,7 @@ defmodule EgregorosWeb.MiniAppAssetController do
     with :ok <- rate_limit(conn),
          %Card{app_origin: app_origin, image_url: image_url}
          when is_binary(app_origin) and is_binary(image_url) and image_url != "" <-
-           Cards.get_active_by_id(card_id, resolution_token),
+           active_card(conn, card_id, resolution_token),
          :ok <- Origin.validate_url(image_url, app_origin),
          true <- origin_allowed?(app_origin),
          {:ok, %{body: body, headers: headers}} <- Fetcher.get(image_url, :asset),
@@ -27,7 +28,7 @@ defmodule EgregorosWeb.MiniAppAssetController do
          {:ok, %{body: safe_body, content_type: safe_content_type}} <-
            ImageSanitizer.sanitize(body, content_type),
          :ok <-
-           authorize_response(card_id, resolution_token, app_origin, image_url) do
+           authorize_response(conn, card_id, resolution_token, app_origin, image_url) do
       conn
       |> put_resp_content_type(safe_content_type, nil)
       |> put_resp_header("x-content-type-options", "nosniff")
@@ -98,14 +99,23 @@ defmodule EgregorosWeb.MiniAppAssetController do
     end
   end
 
-  defp authorize_response(card_id, resolution_token, app_origin, image_url) do
-    case Cards.get_active_by_id(card_id, resolution_token) do
+  defp authorize_response(conn, card_id, resolution_token, app_origin, image_url) do
+    case active_card(conn, card_id, resolution_token) do
       %Card{app_origin: ^app_origin, image_url: ^image_url} ->
         if origin_allowed?(app_origin), do: :ok, else: {:error, :stale_card}
 
       _card ->
         {:error, :stale_card}
     end
+  end
+
+  defp active_card(conn, card_id, resolution_token) do
+    Cards.get_active_by_id(card_id, resolution_token) ||
+      DeveloperLaunches.get_active(
+        card_id,
+        resolution_token,
+        conn.assigns[:current_user]
+      )
   end
 
   defp rate_limit(conn) do

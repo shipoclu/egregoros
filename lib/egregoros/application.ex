@@ -17,6 +17,7 @@ defmodule Egregoros.Application do
       {Task.Supervisor, name: Egregoros.MiniAppFetchTaskSupervisor, max_children: 32},
       {Task.Supervisor, name: Egregoros.MiniAppImageTaskSupervisor, max_children: 2},
       Egregoros.MiniApps.FetchGate,
+      Egregoros.MiniApps.DeveloperLaunches,
       {Oban, Application.fetch_env!(:egregoros, Oban)},
       {DNSCluster, query: Egregoros.Config.get(:dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Egregoros.PubSub},

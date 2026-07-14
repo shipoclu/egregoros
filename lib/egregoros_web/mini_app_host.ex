@@ -9,6 +9,7 @@ defmodule EgregorosWeb.MiniAppHost do
   alias Egregoros.MiniApps.ComposeDraft
   alias Egregoros.MiniApps.ContextConsents
   alias Egregoros.MiniApps.Declarations
+  alias Egregoros.MiniApps.DeveloperLaunches
   alias Egregoros.MiniApps.ExternalURL
   alias Egregoros.MiniApps.GrantLock
   alias Egregoros.MiniApps.LaunchContext
@@ -50,6 +51,8 @@ defmodule EgregorosWeb.MiniAppHost do
       socket
       |> Phoenix.Component.assign(:mini_app_host, closed_state())
       |> Phoenix.Component.assign(:mini_app_user_id, user_id)
+      |> Phoenix.Component.assign(:mini_app_developer_check, nil)
+      |> Phoenix.Component.assign(:mini_app_developer_card_id, nil)
       |> Phoenix.LiveView.attach_hook(
         :mini_app_broker_budget,
         :handle_event,
@@ -733,9 +736,21 @@ defmodule EgregorosWeb.MiniAppHost do
          %{"card_id" => card_id, "resolution_token" => resolution_token},
          socket
        ) do
-    with %Card{} = card <- Cards.get_active_by_id(card_id, resolution_token),
-         {:ok, launch_info} <- LaunchContext.public_for_card(card) do
-      wallet_declaration = Declarations.get_by_origin(card.app_origin)
+    current_user = Users.get(socket.assigns.mini_app_user_id)
+
+    with %Card{} = card <- active_card(card_id, resolution_token, current_user),
+         {:ok, launch_info} <- launch_info(card) do
+      wallet_declaration =
+        if developer_card?(card), do: nil, else: Declarations.get_by_origin(card.app_origin)
+
+      socket =
+        if developer_card?(card) do
+          socket
+          |> Phoenix.Component.assign(:mini_app_developer_check, :pending)
+          |> Phoenix.Component.assign(:mini_app_developer_card_id, card.id)
+        else
+          socket
+        end
 
       {:halt,
        Phoenix.Component.assign(socket, :mini_app_host, %{
@@ -1058,7 +1073,16 @@ defmodule EgregorosWeb.MiniAppHost do
     state = socket.assigns.mini_app_host
 
     if state.status in [:open, :collapsed] and state.launch_id == launch_id and not state.ready? do
-      {:halt, Phoenix.Component.assign(socket, :mini_app_host, %{state | load_error?: true})}
+      socket = Phoenix.Component.assign(socket, :mini_app_host, %{state | load_error?: true})
+
+      socket =
+        if developer_card?(state.card) do
+          Phoenix.Component.assign(socket, :mini_app_developer_check, :fail)
+        else
+          socket
+        end
+
+      {:halt, socket}
     else
       {:halt, socket}
     end
@@ -1070,22 +1094,31 @@ defmodule EgregorosWeb.MiniAppHost do
     if state.status == :open and state.load_error? and active_card?(state.card) do
       launch_id = launch_id()
 
-      {:halt,
-       Phoenix.Component.assign(socket, :mini_app_host, %{
-         state
-         | launch_id: launch_id,
-           ready?: false,
-           load_error?: false,
-           auth_request: nil,
-           oauth_authenticated?: false,
-           context_request: nil,
-           notification_request: nil,
-           compose_request: nil,
-           external_request: nil,
-           wallet_request: nil,
-           wallet_incompatible?: false,
-           broker_budget: new_broker_budget()
-       })}
+      socket =
+        Phoenix.Component.assign(socket, :mini_app_host, %{
+          state
+          | launch_id: launch_id,
+            ready?: false,
+            load_error?: false,
+            auth_request: nil,
+            oauth_authenticated?: false,
+            context_request: nil,
+            notification_request: nil,
+            compose_request: nil,
+            external_request: nil,
+            wallet_request: nil,
+            wallet_incompatible?: false,
+            broker_budget: new_broker_budget()
+        })
+
+      socket =
+        if developer_card?(state.card) do
+          Phoenix.Component.assign(socket, :mini_app_developer_check, :pending)
+        else
+          socket
+        end
+
+      {:halt, socket}
     else
       {:halt, socket}
     end
@@ -1424,21 +1457,36 @@ defmodule EgregorosWeb.MiniAppHost do
 
     if state.status in [:open, :collapsed] and state.launch_id == launch_id and
          active_card?(state.card) do
-      {:halt,
-       Phoenix.Component.assign(socket, :mini_app_host, %{
-         state
-         | ready?: event == "mini_app_ready",
-           load_error?: false,
-           auth_request: if(event == "mini_app_loading", do: nil, else: state.auth_request),
-           notification_request:
-             if(event == "mini_app_loading", do: nil, else: state.notification_request),
-           oauth_authenticated?:
-             if(event == "mini_app_loading", do: false, else: state.oauth_authenticated?),
-           compose_request: if(event == "mini_app_loading", do: nil, else: state.compose_request),
-           external_request:
-             if(event == "mini_app_loading", do: nil, else: state.external_request),
-           wallet_request: if(event == "mini_app_loading", do: nil, else: state.wallet_request)
-       })}
+      socket =
+        Phoenix.Component.assign(socket, :mini_app_host, %{
+          state
+          | ready?: event == "mini_app_ready",
+            load_error?: false,
+            auth_request: if(event == "mini_app_loading", do: nil, else: state.auth_request),
+            notification_request:
+              if(event == "mini_app_loading", do: nil, else: state.notification_request),
+            oauth_authenticated?:
+              if(event == "mini_app_loading", do: false, else: state.oauth_authenticated?),
+            compose_request:
+              if(event == "mini_app_loading", do: nil, else: state.compose_request),
+            external_request:
+              if(event == "mini_app_loading", do: nil, else: state.external_request),
+            wallet_request: if(event == "mini_app_loading", do: nil, else: state.wallet_request)
+        })
+
+      socket =
+        cond do
+          not developer_card?(state.card) ->
+            socket
+
+          event == "mini_app_ready" ->
+            Phoenix.Component.assign(socket, :mini_app_developer_check, :pass)
+
+          event == "mini_app_loading" ->
+            Phoenix.Component.assign(socket, :mini_app_developer_check, :pending)
+        end
+
+      {:halt, socket}
     else
       {:halt, socket}
     end
@@ -1510,8 +1558,30 @@ defmodule EgregorosWeb.MiniAppHost do
     end
   end
 
-  defp active_card?(%Card{} = card), do: Cards.active?(card)
+  defp active_card?(%Card{} = card) do
+    if developer_card?(card), do: DeveloperLaunches.active?(card), else: Cards.active?(card)
+  end
+
   defp active_card?(_card), do: false
+
+  defp active_card(card_id, resolution_token, current_user) do
+    Cards.get_active_by_id(card_id, resolution_token) ||
+      DeveloperLaunches.get_active(card_id, resolution_token, current_user)
+  end
+
+  defp launch_info(%Card{} = card) do
+    if developer_card?(card) do
+      case DeveloperLaunches.launch_info(card) do
+        %{} = info -> {:ok, info}
+        _ -> {:error, :invalid_developer_launch}
+      end
+    else
+      LaunchContext.public_for_card(card)
+    end
+  end
+
+  defp developer_card?(%Card{developer_user_id: user_id}), do: is_binary(user_id)
+  defp developer_card?(_card), do: false
 
   defp launch_id do
     32
