@@ -8,10 +8,22 @@
 > permission endpoint, actor-document activation, and inbound
 > transactional-message consent enforcement are available.
 >
-> User-attributed delegated publishing in section 4 is a normative proposal for
-> a future protocol revision. Its narrow OAuth scope, endpoint, structured
-> activity record, application attribution, visual disclosure, and application
-> muting are not implemented yet.
+> User-attributed delegated publishing in section 4 is a normative V2 proposal.
+> Its narrow OAuth scope, endpoint, structured activity record, application
+> attribution, visual disclosure, and application muting are not implemented
+> yet.
+
+### Version boundary
+
+Section 4 in its entirety is V2. This includes generator stamping for ordinary
+OAuth application posts, `write:app_activities`, its dedicated endpoint and
+token-family rules, `fma:appActivity`, public application identity records,
+visible application attribution, and application muting. A V1 implementation
+is not required to implement those capabilities, and their absence is not a V1
+conformance failure. Incremental development may occur behind disabled feature
+flags, but an implementation MUST NOT advertise partial V2 behavior as V2
+conformant. The app-owned public and transactional message profiles outside
+section 4 remain the V1/current design.
 
 This guide defines two mini-app messaging authorities and one reusable
 third-party application publishing authority:
@@ -21,7 +33,7 @@ third-party application publishing authority:
 2. **Transactional messages** delivered as non-public notes that mention one
    user who explicitly consented to messages from that exact mini app and
    actor.
-3. **User-attributed delegated application publishing** in which an
+3. **V2 user-attributed delegated application publishing** in which an
    OAuth-authorized application, including a mini app, asks the user's
    Egregoros server to publish a bounded, visibly app-attributed progress or
    event post as that user.
@@ -31,7 +43,7 @@ These authorities are not interchangeable:
 | Publishing path | ActivityPub author | Per-post user action | Authority |
 | --- | --- | --- | --- |
 | Host-owned `composeNote` | The user | Required: the user reviews, may edit, and submits in Egregoros | `identify` plus the `compose_note` host capability |
-| Delegated application activity | The user, through a named application | Not required after the time-bounded grant | Proposed `write:app_activities` OAuth scope |
+| V2 delegated application activity | The user, through a named application | Not required after the time-bounded grant | Proposed V2 `write:app_activities` OAuth scope |
 | App-owned public or mention message | The declared `Application` or `Service` actor | Not required; follows and notification-purpose consent govern delivery | App actor key plus the relevant app-message permission |
 
 `composeNote` is deliberately not delegated publishing. The mini app supplies
@@ -236,7 +248,7 @@ types or side effects. When a `Note` is dereferenced independently, its
 standalone representation includes the same ActivityStreams and inline `fma`
 context.
 
-User-attributed delegated publications do not satisfy this app-authored rule.
+V2 user-attributed delegated publications do not satisfy this app-authored rule.
 Their actor is the user, their HTTP signature is made by the user's home server,
 and the application is identified with the standard ActivityStreams
 `generator` property plus the structured `fma:appActivity` record defined
@@ -245,8 +257,8 @@ trust. Receivers therefore have two unambiguous provenance modes:
 
 - `fma:miniApp` plus the declared app actor and pinned app key means **authored
   by the app**; and
-- a home-server-authored object with a canonical application `generator` means
-  **authored by the user through the identified app**.
+- a V2 home-server-authored object with a canonical application `generator`
+  means **authored by the user through the identified app**.
 
 #### Explicit mini-app launch-link hint
 
@@ -354,14 +366,14 @@ full IRI when a vocabulary term appears as a `rel` value:
 | `fma:miniApp` | `…#miniApp` | One canonical manifest identity object; app-production provenance. |
 | `fma:notificationPurpose` | `…#notificationPurpose` | Optional scalar `transactional` or `promotional` classification. |
 | `fma:miniAppLink` | `…#miniAppLink` | One ActivityStreams `Link`; exact candidate launch-link discovery hint. |
-| `fma:appActivity` | `…#appActivity` | One embedded, inert Activity tuple describing a user event published through an application. |
-| `fma:verb` | `…#verb` | One bounded plain-text display verb inside `fma:appActivity`; never an ActivityPub side-effect instruction. |
+| `fma:appActivity` | `…#appActivity` | V2: one embedded, inert Activity tuple describing a user event published through an application. |
+| `fma:verb` | `…#verb` | V2: one bounded plain-text display verb inside `fma:appActivity`; never an ActivityPub side-effect instruction. |
 
 Here `…` abbreviates the provisional namespace base only in this explanatory
 table; it is never legal wire syntax.
 
-The namespace originated with mini apps, but `fma:appActivity` is intentionally
-generic. A conventional OAuth application may use it through
+The namespace originated with mini apps, but the V2 `fma:appActivity` term is
+intentionally generic. A conventional OAuth application may use it through
 `write:app_activities`; its presence does not claim that the application has a
 manifest, iframe entry point, or any other mini-app capability.
 
@@ -554,10 +566,10 @@ purposes fail closed and never fall back to `transactional`. Existing draft
 `transactionalMentions: true` data is equivalent only to
 `mentionPurposes: ["transactional"]`; it never grants promotional permission.
 
-## 4. User-attributed publishing through an application
+## 4. V2: User-attributed publishing through an application
 
-> Design status: normative proposal for a future protocol revision. Nothing in
-> this section grants authority in the current implementation. The manifest
+> Design status: normative V2 proposal. Nothing in this section grants
+> authority in the current implementation. The manifest
 > schema, OAuth server, publication endpoint, persistence model, ActivityPub
 > serializer, REST renderer, timeline UI, and application-mute controls must all
 > implement this section before the feature is advertised.
@@ -1175,7 +1187,7 @@ content moderation retains its separate object record. Publication receipts and
 logs must not make a private/followers-only object dereferenceable to the app or
 another user.
 
-### 4.11 Delegated-publishing acceptance checklist
+### 4.11 V2 delegated-publishing acceptance checklist
 
 - [ ] A mini-app manifest maximum or immutable OAuth application registration
       accepts the exact narrow scope.
@@ -1452,7 +1464,7 @@ plus the SDK/broker browser boundary. Continued interoperability testing across
 additional Fediverse implementations is release validation rather than a
 missing protocol component.
 
-User-attributed application publishing is separate future work. None of
+V2 user-attributed application publishing is separate future work. None of
 section 4's `write:app_activities` scope, separated token family, generic
 structured endpoint, canonical generator stamping, public application record,
 Status `application` mapping, visible attribution, application muting, or
