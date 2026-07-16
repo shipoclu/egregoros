@@ -548,6 +548,48 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
              Objects.get_by_ap_id(published_id)
   end
 
+  test "compose accepts an active grant created before the current mini app launch", %{
+    conn: conn,
+    user: user
+  } do
+    {:ok, note} =
+      Pipeline.ingest(
+        Note.build(user, ~s(<a href="https://app.example/shared/existing-grant">writer</a>)),
+        local: true
+      )
+
+    resolved = resolved_card(oauth?: true)
+    assert {:ok, registration} = OAuthRegistrations.register(resolved.manifest)
+    assert {:ok, _card} = Cards.put(note, resolved)
+
+    application =
+      Egregoros.Repo.get!(Egregoros.OAuth.Application, registration.oauth_application_id)
+
+    complete_oauth_grant(application, user)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/?timeline=public")
+    view |> element("[data-role='open-mini-app']") |> render_click()
+
+    launch_id = :sys.get_state(view.pid).socket.assigns.mini_app_host.launch_id
+    render_hook(view, "mini_app_ready", %{"launch_id" => launch_id})
+
+    render_hook(view, "mini_app_compose_request", %{
+      "launch_id" => launch_id,
+      "call_id" => "compose-existing-grant",
+      "draft" => %{"text" => "Restored app session", "visibility" => "public"}
+    })
+
+    assert has_element?(view, "#mini-app-compose-sheet")
+
+    assert_push_event(view, "mini_app_compose_response", %{
+      launch_id: ^launch_id,
+      call_id: "compose-existing-grant",
+      request_id: _,
+      status: "accepted"
+    })
+  end
+
   test "browser-code completion accepts only its exact pending PKCE code", %{
     conn: conn,
     user: user

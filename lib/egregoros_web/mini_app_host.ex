@@ -2235,11 +2235,10 @@ defmodule EgregorosWeb.MiniAppHost do
   end
 
   defp current_compose_grant?(socket, state) do
-    state.oauth_authenticated? and
-      OAuthRegistrations.active_user_grant?(
-        state.card.app_origin,
-        socket.assigns.mini_app_user_id
-      )
+    OAuthRegistrations.active_user_grant?(
+      state.card.app_origin,
+      socket.assigns.mini_app_user_id
+    )
   end
 
   defp assign_oauth_authenticated(socket, authenticated?) when is_boolean(authenticated?) do
