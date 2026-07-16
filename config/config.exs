@@ -35,6 +35,13 @@ config :egregoros, Egregoros.Discovery, Egregoros.Discovery.DNS
 config :egregoros, Egregoros.HTTP, Egregoros.HTTP.Req
 config :egregoros, Egregoros.MiniApps.Fetcher, Egregoros.MiniApps.Fetcher.Req
 config :egregoros, Egregoros.MiniApps.ImageSanitizer, Egregoros.MiniApps.ImageProxy
+
+config :egregoros, Egregoros.MiniApps.ImageCache,
+  ttl_ms: 300_000,
+  max_entries: 512,
+  max_bytes: 67_108_864,
+  cleanup_interval_ms: 60_000
+
 config :egregoros, Egregoros.DNS, Egregoros.DNS.Cached
 config :egregoros, Egregoros.AvatarStorage, Egregoros.AvatarStorage.Local
 config :egregoros, Egregoros.MediaStorage, Egregoros.MediaStorage.Local

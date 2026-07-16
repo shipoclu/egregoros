@@ -71,6 +71,23 @@ defmodule Egregoros.MiniApps.CardsTest do
     assert Cards.get_active_by_id(first.id, first.resolution_token) == nil
   end
 
+  test "rotates the resolution token when the rich-card image URL changes" do
+    object = object_fixture()
+
+    assert {:ok, first} = Cards.put(object, resolved_card("First"))
+
+    replacement = %{
+      resolved_card("Second")
+      | image_url: "https://app.example/card-v2.png"
+    }
+
+    assert {:ok, second} = Cards.put(object, replacement)
+
+    assert first.id == second.id
+    refute first.resolution_token == second.resolution_token
+    assert Cards.get_active_by_id(first.id, first.resolution_token) == nil
+  end
+
   test "pins security declarations before caching a resolved card" do
     object = object_fixture()
     resolved = resolved_card("Wallet", wallet?: true)

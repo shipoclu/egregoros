@@ -363,6 +363,13 @@ All URLs must stay on the app's exact origin. Without this element, Egregoros
 uses the generic manifest card and still launches the exact linked URL, so SPA
 deep links and hash routes work without page metadata.
 
+Hosts cache the safe raster produced from a rich-card image for a short,
+bounded period and may let the user's browser cache it privately. Publish image
+changes at a new URL when they must appear immediately. Hosts must rotate the
+card resolution token when `imageUrl` changes, coalesce repeated requests for
+the same resolution, and never cache unsanitized source bytes or failed image
+processing results.
+
 ## Optional: add OAuth and authenticated actions
 
 Add OAuth only after the static milestone works. Choose one completion profile:

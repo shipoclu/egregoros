@@ -180,8 +180,9 @@ users should treat it as untrusted unless it is independently established by
 the same domain.
 
 All manifest icon/splash URLs and page-card image URLs must use the manifest's
-exact HTTPS origin. Egregoros proxies them without persistent caching;
-third-party CDN asset origins are not accepted in v1.
+exact HTTPS origin. Egregoros proxies and sanitizes them, then caches only the
+safe re-encoded raster for a bounded lifetime; third-party CDN asset origins
+are not accepted in v1.
 
 ### 2. Discovery and launch
 
@@ -1068,9 +1069,22 @@ outside explicit length/count bounds. HTML parsing extracts only the one
 declared meta element; it never evaluates markup. The image proxy MUST accept a
 small raster allowlist (for example PNG, JPEG, WebP, and AVIF), decode in a
 resource-limited worker, reject SVG and animated/decompression bombs, and serve
-safe output with `Cache-Control: no-store`, no cookies, no referrer, and a fixed
-image content type. It MUST re-run URL/DNS policy on every view because assets
-are intentionally not persistently cached.
+safe output with no cookies, no referrer, and a fixed image content type. A
+successful sanitized image response MUST permit bounded private user-agent
+caching; five minutes is the v1 recommended maximum age. Error responses MUST
+use `Cache-Control: no-store`, and shared intermediary caches MUST NOT retain
+the response.
+
+The host MUST also keep a bounded cache of successfully sanitized rich-card
+images so repeated cards do not repeat remote fetch and decoder work. It MUST
+cache only the safe re-encoded raster, never the untrusted source response or a
+failure. The key MUST bind the exact image URL and current card resolution
+token, and that token MUST change when the resolved image URL changes. Cache
+storage MUST have finite entry, byte, and time limits. Concurrent misses for an
+identical key SHOULD be coalesced into one fetch and decode. Before returning a
+host-cache hit, the host MUST still verify that the exact card resolution is
+active and that current app/domain policy permits it. URL, DNS, redirect, and
+egress policy MUST run again whenever a cache miss causes a remote fetch.
 
 ### Iframe and browser containment
 
@@ -1527,7 +1541,7 @@ The enriched-context consent choices are:
 | Iframe permissions | Deny by default | Device/browser privileges require future capability-specific design. |
 | Framing failure | Explicit error + external-open action | Never silently navigates the Egregoros surface away. |
 | Federated cards | Supported for public incoming notes | Resolution failure leaves the source link intact. |
-| Card assets | Proxied, not persistently cached | Protects viewer IP privacy without retaining remote assets. |
+| Card assets | Proxied, sanitized, and boundedly cached | Protects viewer IP privacy while preventing repeated cards from multiplying remote fetch and decoder work. |
 | Metadata refresh | One-hour default; shorter explicit TTL honored | User can manually refresh app details. |
 | Pre-auth SDK data | Bootstrap plus public `getLaunchInfo()` attribution | Enables dynamic registration and organic-share discovery without exposing viewer identity; enriched context remains permissioned. |
 | Authentication trigger | App calls `requestAuth` | No automatic prompt merely from card display or launch. |
@@ -1944,7 +1958,12 @@ The card image and manifest image assets are fetched through a host image
 proxy. Accept at most 5,000,000 bytes, permit only AVIF, WebP, PNG, and JPEG,
 decode as a raster image, enforce dimension/pixel ceilings, and re-encode to a
 safe raster response. Never reflect SVG, HTML, remote headers, cookies, or
-active content. Do not persistently cache remote mini-app images in V1.
+active content. Cache only successfully sanitized output under bounded entry,
+byte, and time limits; never cache the untrusted source response or failures.
+The cache key binds the image URL and card resolution token, identical
+concurrent misses are coalesced, and authorization plus current domain policy
+are checked before each host-cache response. Successful responses use bounded
+private browser caching; failures remain `no-store`.
 
 ### 4. Bounded outbound HTTP contract
 

@@ -1,9 +1,12 @@
 defmodule EgregorosWeb.MiniAppAssetControllerTest do
   use EgregorosWeb.ConnCase, async: false
 
+  import ExUnit.CaptureLog
+
   alias Egregoros.MiniApps.Card
   alias Egregoros.MiniApps.Cards
   alias Egregoros.MiniApps.DeveloperLaunches
+  alias Egregoros.MiniApps.ImageCache
   alias Egregoros.MiniApps.Manifest
   alias Egregoros.MiniApps.ResolvedCard
   alias Egregoros.Objects
@@ -17,6 +20,7 @@ defmodule EgregorosWeb.MiniAppAssetControllerTest do
     Application.put_env(:egregoros, :mini_apps_enabled, true)
     on_exit(fn -> Application.put_env(:egregoros, :mini_apps_enabled, previous_enabled) end)
     enable_mini_apps()
+    :ok = ImageCache.clear()
 
     safe_webp = image_binary(3, 2, ".webp")
 
@@ -31,7 +35,7 @@ defmodule EgregorosWeb.MiniAppAssetControllerTest do
     :ok
   end
 
-  test "proxies a card image without persistent or shared caching", %{conn: conn} do
+  test "proxies and caches a sanitized card image by exact resolution", %{conn: conn} do
     card = card_fixture("https://app.example/card.png")
     png = image_binary(3, 2, ".png")
 
@@ -40,23 +44,34 @@ defmodule EgregorosWeb.MiniAppAssetControllerTest do
         {:ok, %{status: 200, body: png, headers: [{"content-type", "image/png"}]}}
     end)
 
-    conn =
+    path =
+      "/mini-app-assets/#{card.id}/image?resolution_token=#{card.resolution_token}"
+
+    first_conn =
       get(
         conn,
-        "/mini-app-assets/#{card.id}/image?resolution_token=#{card.resolution_token}"
+        path
       )
 
-    assert conn.status == 200
-    refute conn.resp_body == png
-    assert <<"RIFF", _size::little-32, "WEBP", _rest::binary>> = conn.resp_body
-    assert get_resp_header(conn, "content-type") == ["image/webp"]
-    assert get_resp_header(conn, "cache-control") == ["private, no-store, max-age=0"]
-    assert get_resp_header(conn, "pragma") == ["no-cache"]
-    assert get_resp_header(conn, "x-content-type-options") == ["nosniff"]
-    assert get_resp_header(conn, "referrer-policy") == ["no-referrer"]
-    assert get_resp_header(conn, "cross-origin-resource-policy") == ["same-origin"]
-    assert get_resp_header(conn, "content-security-policy") == ["default-src 'none'; sandbox"]
-    assert get_resp_header(conn, "set-cookie") == []
+    second_conn = get(conn, path)
+
+    for response_conn <- [first_conn, second_conn] do
+      assert response_conn.status == 200
+      refute response_conn.resp_body == png
+      assert <<"RIFF", _size::little-32, "WEBP", _rest::binary>> = response_conn.resp_body
+      assert get_resp_header(response_conn, "content-type") == ["image/webp"]
+      assert get_resp_header(response_conn, "cache-control") == ["private, max-age=300"]
+      assert get_resp_header(response_conn, "pragma") == []
+      assert get_resp_header(response_conn, "x-content-type-options") == ["nosniff"]
+      assert get_resp_header(response_conn, "referrer-policy") == ["no-referrer"]
+      assert get_resp_header(response_conn, "cross-origin-resource-policy") == ["same-origin"]
+
+      assert get_resp_header(response_conn, "content-security-policy") == [
+               "default-src 'none'; sandbox"
+             ]
+
+      assert get_resp_header(response_conn, "set-cookie") == []
+    end
   end
 
   test "does not become an arbitrary image proxy", %{conn: conn} do
@@ -89,21 +104,30 @@ defmodule EgregorosWeb.MiniAppAssetControllerTest do
     assert response(conn, 404)
   end
 
-  test "returns a generic gateway error without exposing fetch details", %{conn: conn} do
+  test "logs fetch failures while returning a generic gateway error", %{conn: conn} do
     card = card_fixture("https://app.example/card.png")
 
     expect(Egregoros.MiniApps.Fetcher.Mock, :get, fn
       "https://app.example/card.png", :asset -> {:error, :timeout}
     end)
 
-    conn =
-      get(
-        conn,
-        "/mini-app-assets/#{card.id}/image?resolution_token=#{card.resolution_token}"
-      )
+    log =
+      capture_log(fn ->
+        conn =
+          get(
+            conn,
+            "/mini-app-assets/#{card.id}/image?resolution_token=#{card.resolution_token}"
+          )
 
-    assert response(conn, 502) == "Unable to load image"
-    assert get_resp_header(conn, "cache-control") == ["private, no-store, max-age=0"]
+        assert response(conn, 502) == "Unable to load image"
+        assert get_resp_header(conn, "cache-control") == ["private, no-store, max-age=0"]
+      end)
+
+    assert log =~ "mini-app image delivery failed"
+    assert log =~ "stage=:fetch"
+    assert log =~ "card_id=#{inspect(card.id)}"
+    assert log =~ ~s(target="https://app.example/card.png")
+    assert log =~ "reason=:timeout"
   end
 
   test "rejects MIME-spoofed or undecodable images without reflecting remote bytes", %{conn: conn} do
@@ -115,15 +139,21 @@ defmodule EgregorosWeb.MiniAppAssetControllerTest do
         {:ok, %{status: 200, body: png, headers: [{"content-type", "image/jpeg"}]}}
     end)
 
-    conn =
-      get(
-        conn,
-        "/mini-app-assets/#{card.id}/image?resolution_token=#{card.resolution_token}"
-      )
+    log =
+      capture_log(fn ->
+        conn =
+          get(
+            conn,
+            "/mini-app-assets/#{card.id}/image?resolution_token=#{card.resolution_token}"
+          )
 
-    assert response(conn, 502) == "Unable to load image"
-    refute conn.resp_body =~ png
-    assert get_resp_header(conn, "cache-control") == ["private, no-store, max-age=0"]
+        assert response(conn, 502) == "Unable to load image"
+        refute conn.resp_body =~ png
+        assert get_resp_header(conn, "cache-control") == ["private, no-store, max-age=0"]
+      end)
+
+    assert log =~ "stage=:sanitize"
+    assert log =~ "reason=:invalid_image"
   end
 
   test "rechecks the immediate domain policy before proxying a stored card", %{conn: conn} do
@@ -147,6 +177,27 @@ defmodule EgregorosWeb.MiniAppAssetControllerTest do
       )
 
     assert response(conn, 404) == "Not found"
+  end
+
+  test "rechecks card activity before serving a sanitized cache hit", %{conn: conn} do
+    card = card_fixture("https://app.example/card.png")
+    png = image_binary(3, 2, ".png")
+
+    expect(Egregoros.MiniApps.Fetcher.Mock, :get, fn
+      "https://app.example/card.png", :asset ->
+        {:ok, %{status: 200, body: png, headers: [{"content-type", "image/png"}]}}
+    end)
+
+    path = "/mini-app-assets/#{card.id}/image?resolution_token=#{card.resolution_token}"
+
+    assert conn |> get(path) |> response(200)
+    Repo.delete!(card)
+
+    expect(Egregoros.MiniApps.Fetcher.Mock, :get, 0, fn _url, _kind ->
+      flunk("an inactive cached card must not trigger another fetch")
+    end)
+
+    assert conn |> get(path) |> response(404) == "Not found"
   end
 
   test "does not send fetched bytes after the card is deleted", %{conn: conn} do

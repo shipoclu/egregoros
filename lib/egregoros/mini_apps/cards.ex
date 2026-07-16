@@ -168,10 +168,11 @@ defmodule Egregoros.MiniApps.Cards do
         source_url: source_url,
         app_origin: app_origin,
         launch_url: launch_url,
+        image_url: image_url,
         resolution_token: resolution_token
       }
       when source_url == resolved.source_url and app_origin == resolved.app_origin and
-             launch_url == resolved.launch_url ->
+             launch_url == resolved.launch_url and image_url == resolved.image_url ->
         resolution_token
 
       _ ->
