@@ -77,7 +77,12 @@ defmodule EgregorosWeb.StatusCardTest do
            |> LazyHTML.query("#post-mini-app-mini-app > div > div:first-child")
            |> LazyHTML.attribute("class")
            |> List.first()
-           |> then(&String.contains?(&1, "aspect-[3/2] shrink-0 self-stretch"))
+           |> then(&String.contains?(&1, "w-0 shrink-0 self-stretch"))
+
+    assert LazyHTML.attribute(
+             LazyHTML.query(document, "#post-mini-app-mini-app"),
+             "phx-hook"
+           ) == ["MiniAppCardMedia"]
   end
 
   test "renders a post with attachments and actions" do

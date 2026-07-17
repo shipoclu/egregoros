@@ -41,6 +41,7 @@ import AudioPlayer from "./hooks/audio_player"
 import VideoPlayer from "./hooks/video_player"
 import MiniAppHost from "./hooks/mini_app_host"
 import MiniAppLibrary from "./hooks/mini_app_library"
+import MiniAppCardMedia from "./hooks/mini_app_card_media"
 import {initImageCropper} from "./hooks/image_cropper"
 import {BIP39_ENGLISH_WORDS} from "./bip39_english_words"
 import {decryptE2EEDM as decryptE2EEDMOffline, encryptE2EEDM} from "./lib/e2ee_dm.mjs"
@@ -1469,6 +1470,7 @@ const liveSocket = new LiveSocket("/live", Socket, {
     VideoPlayer,
     MiniAppHost,
     MiniAppLibrary,
+    MiniAppCardMedia,
     E2EEDMComposer,
     E2EEDMMessage,
   },

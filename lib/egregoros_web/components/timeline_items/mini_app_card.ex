@@ -12,17 +12,21 @@ defmodule EgregorosWeb.Components.TimelineItems.MiniAppCard do
     <section
       id={@id}
       data-role="mini-app-card"
+      phx-hook="MiniAppCardMedia"
       class="mt-4 overflow-hidden border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] shadow-[4px_4px_0_var(--border-default)]"
     >
       <div class="flex min-w-0 items-stretch">
-        <div class="relative flex aspect-[3/2] shrink-0 self-stretch items-center justify-center overflow-hidden border-r-2 border-[color:var(--border-default)] bg-[color:var(--accent-subtle)]">
+        <div
+          data-role="mini-app-card-media"
+          class="relative flex w-0 shrink-0 self-stretch items-center justify-center overflow-hidden border-r-2 border-[color:var(--border-default)] bg-[color:var(--accent-subtle)]"
+        >
           <img
             :if={is_binary(@card.image_url)}
             src={~p"/mini-app-assets/#{@card.id}/image?resolution_token=#{@card.resolution_token}"}
             alt=""
             loading="lazy"
             decoding="async"
-            class="block h-full w-auto max-w-none object-cover"
+            class="absolute inset-0 h-full w-full object-cover"
           />
           <.icon
             :if={!is_binary(@card.image_url)}
