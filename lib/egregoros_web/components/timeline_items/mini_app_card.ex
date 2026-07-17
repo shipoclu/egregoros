@@ -22,7 +22,7 @@ defmodule EgregorosWeb.Components.TimelineItems.MiniAppCard do
             alt=""
             loading="lazy"
             decoding="async"
-            class="absolute inset-0 h-full w-full object-cover"
+            class="block h-full w-auto max-w-none object-cover"
           />
           <.icon
             :if={!is_binary(@card.image_url)}
