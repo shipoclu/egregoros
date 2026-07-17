@@ -40,6 +40,7 @@ import DMChatScroller from "./hooks/dm_chat_scroller"
 import AudioPlayer from "./hooks/audio_player"
 import VideoPlayer from "./hooks/video_player"
 import MiniAppHost from "./hooks/mini_app_host"
+import MiniAppLibrary from "./hooks/mini_app_library"
 import {initImageCropper} from "./hooks/image_cropper"
 import {BIP39_ENGLISH_WORDS} from "./bip39_english_words"
 import {decryptE2EEDM as decryptE2EEDMOffline, encryptE2EEDM} from "./lib/e2ee_dm.mjs"
@@ -1467,6 +1468,7 @@ const liveSocket = new LiveSocket("/live", Socket, {
     AudioPlayer,
     VideoPlayer,
     MiniAppHost,
+    MiniAppLibrary,
     E2EEDMComposer,
     E2EEDMMessage,
   },

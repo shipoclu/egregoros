@@ -74,6 +74,42 @@ defmodule EgregorosWeb.Layouts do
 
             <%= if @current_user do %>
               <.popover
+                id="mini-app-library"
+                data-role="mini-app-library"
+                phx-hook="MiniAppLibrary"
+                phx-update="ignore"
+                data-mini-app-library-user-id={Map.get(@current_user, :id)}
+                summary_class="relative flex size-9 cursor-pointer items-center justify-center text-[color:var(--text-secondary)] transition hover:bg-[color:var(--bg-muted)] hover:text-[color:var(--text-primary)] focus-visible:outline-none focus-brutal"
+                summary_aria_label="Open recently used mini apps"
+                panel_class="absolute right-0 top-full z-50 mt-2 w-80 max-w-[calc(100vw-2rem)] overflow-hidden"
+              >
+                <:trigger>
+                  <.icon name="hero-squares-2x2" class="size-5" />
+                  <span
+                    data-role="mini-app-library-count"
+                    class="absolute right-0.5 top-0.5 hidden size-2 border-2 border-[color:var(--bg-base)] bg-[color:var(--accent)]"
+                  ></span>
+                </:trigger>
+
+                <div class="max-h-[min(32rem,calc(100vh-7rem))] overflow-y-auto">
+                  <header class="flex items-center justify-between border-b-2 border-[color:var(--border-muted)] px-4 py-3">
+                    <strong class="text-sm font-bold uppercase tracking-wide text-[color:var(--text-primary)]">
+                      Mini apps
+                    </strong>
+                    <span data-role="mini-app-library-total" class="font-mono text-xs text-[color:var(--text-muted)]">
+                      0
+                    </span>
+                  </header>
+
+                  <div data-role="mini-app-library-empty" class="px-4 py-5 text-sm text-[color:var(--text-muted)]">
+                    Recently opened mini apps will appear here.
+                  </div>
+
+                  <div data-role="mini-app-library-list" class="hidden p-2"></div>
+                </div>
+              </.popover>
+
+              <.popover
                 id="user-menu"
                 data-role="user-menu"
                 summary_class="flex cursor-pointer items-center gap-2 px-3 py-2 text-sm font-medium uppercase text-[color:var(--text-secondary)] transition hover:text-[color:var(--text-primary)] hover:underline underline-offset-4 focus-visible:outline-none focus-brutal"

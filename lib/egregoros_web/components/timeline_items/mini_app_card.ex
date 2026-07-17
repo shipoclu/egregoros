@@ -69,6 +69,11 @@ defmodule EgregorosWeb.Components.TimelineItems.MiniAppCard do
             data-mini-app-origin={@card.app_origin}
             data-mini-app-source-url={@card.source_url}
             data-mini-app-launch-url={@card.launch_url}
+            data-mini-app-name={@card.app_name}
+            data-mini-app-image-url={
+              if is_binary(@card.image_url),
+                do: ~p"/mini-app-assets/#{@card.id}/image?resolution_token=#{@card.resolution_token}"
+            }
             phx-click={
               JS.dispatch("egregoros:mini-app-open",
                 detail: %{

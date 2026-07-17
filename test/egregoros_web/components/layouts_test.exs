@@ -23,6 +23,8 @@ defmodule EgregorosWeb.LayoutsTest do
       })
 
     assert html =~ ~s(data-role="user-menu")
+    assert html =~ ~s(data-role="mini-app-library")
+    assert html =~ ~s(phx-hook="MiniAppLibrary")
     assert html =~ ~s(phx-click-away=)
     assert html =~ ~s(phx-window-keydown=)
     assert html =~ ~s(phx-key="escape")
@@ -55,6 +57,7 @@ defmodule EgregorosWeb.LayoutsTest do
       })
 
     refute html =~ ~s(data-role="user-menu")
+    refute html =~ ~s(data-role="mini-app-library")
     assert html =~ ~s(href="/login")
     assert html =~ ~s(href="/register")
   end
