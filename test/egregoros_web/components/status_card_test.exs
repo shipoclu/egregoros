@@ -72,6 +72,12 @@ defmodule EgregorosWeb.StatusCardTest do
            ) == [
              "/mini-app-assets/card-1/image?resolution_token=00000000-0000-0000-0000-000000000001"
            ]
+
+    assert document
+           |> LazyHTML.query("#post-mini-app-mini-app > div > div:first-child")
+           |> LazyHTML.attribute("class")
+           |> List.first()
+           |> String.contains?("aspect-[3/2]")
   end
 
   test "renders a post with attachments and actions" do

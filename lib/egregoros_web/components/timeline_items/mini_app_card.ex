@@ -15,7 +15,7 @@ defmodule EgregorosWeb.Components.TimelineItems.MiniAppCard do
       class="mt-4 overflow-hidden border-2 border-[color:var(--border-default)] bg-[color:var(--bg-base)] shadow-[4px_4px_0_var(--border-default)]"
     >
       <div class="flex min-w-0 items-stretch">
-        <div class="relative flex w-24 shrink-0 items-center justify-center overflow-hidden border-r-2 border-[color:var(--border-default)] bg-[color:var(--accent-subtle)] sm:w-32">
+        <div class="relative flex aspect-[3/2] w-24 shrink-0 self-start items-center justify-center overflow-hidden border-r-2 border-[color:var(--border-default)] bg-[color:var(--accent-subtle)] sm:w-32">
           <img
             :if={is_binary(@card.image_url)}
             src={~p"/mini-app-assets/#{@card.id}/image?resolution_token=#{@card.resolution_token}"}
