@@ -77,7 +77,7 @@ defmodule EgregorosWeb.StatusCardTest do
            |> LazyHTML.query("#post-mini-app-mini-app > div > div:first-child")
            |> LazyHTML.attribute("class")
            |> List.first()
-           |> String.contains?("aspect-[3/2]")
+           |> then(&String.contains?(&1, "aspect-[3/2] shrink-0 self-stretch"))
   end
 
   test "renders a post with attachments and actions" do
