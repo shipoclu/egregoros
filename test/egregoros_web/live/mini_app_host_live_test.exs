@@ -221,6 +221,34 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
     assert card.id
   end
 
+  test "card state broadcasts add and remove a card without reloading the timeline", %{
+    conn: conn,
+    user: user
+  } do
+    {:ok, note} =
+      Pipeline.ingest(
+        Note.build(user, ~s(<a href="https://app.example/shared/chapter-2">reader</a>)),
+        local: true
+      )
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/?timeline=public")
+
+    refute has_element?(view, "#post-#{note.id} [data-role='mini-app-card']")
+
+    assert {:ok, _card} = Cards.put(note, resolved_card())
+    assert :ok = Timeline.broadcast_mini_app_card_updated(note)
+    _ = :sys.get_state(view.pid)
+
+    assert has_element?(view, "#post-#{note.id} [data-role='mini-app-card']")
+
+    assert :ok = Cards.delete(note)
+    assert :ok = Timeline.broadcast_mini_app_card_updated(note)
+    _ = :sys.get_state(view.pid)
+
+    refute has_element?(view, "#post-#{note.id} [data-role='mini-app-card']")
+  end
+
   test "ready timeout offers an exact-origin retry and confirmed external fallback", %{
     conn: conn,
     user: user

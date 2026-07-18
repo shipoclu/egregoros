@@ -12,6 +12,7 @@ defmodule Egregoros.Workers.ResolveMiniAppCard do
   alias Egregoros.MiniApps.Discovery
   alias Egregoros.Object
   alias Egregoros.Repo
+  alias Egregoros.Timeline
 
   require Logger
 
@@ -38,11 +39,11 @@ defmodule Egregoros.Workers.ResolveMiniAppCard do
     cond do
       not MiniApps.enabled?() ->
         log_lookup_skipped(object_id, :disabled)
-        Cards.delete(object)
+        delete_card(object)
 
       candidates == [] ->
         log_lookup_skipped(object_id, :no_candidates)
-        Cards.delete(object)
+        delete_card(object)
 
       true ->
         invalidate_changed_source(object, candidates)
@@ -75,11 +76,11 @@ defmodule Egregoros.Workers.ResolveMiniAppCard do
     cond do
       not MiniApps.enabled?() ->
         log_lookup_skipped(object.id, :disabled)
-        Cards.delete(object)
+        delete_card(object)
 
       candidates == [] ->
         log_lookup_skipped(object.id, :no_candidates)
-        Cards.delete(object)
+        delete_card(object)
 
       true ->
         Logger.debug(
@@ -98,6 +99,7 @@ defmodule Egregoros.Workers.ResolveMiniAppCard do
                     "app_origin=#{inspect(resolved.app_origin)}"
                 )
 
+                Timeline.broadcast_mini_app_card_updated(object)
                 :ok
 
               {:stale, current} when revision_retries > 0 ->
@@ -113,13 +115,16 @@ defmodule Egregoros.Workers.ResolveMiniAppCard do
                 {:error, reason}
             end
 
+          {:error, :transient_mini_app_resolution} = error ->
+            error
+
           {:error, reason} when reason in [:disabled, :no_mini_app] ->
             Logger.debug(
               "miniapp card resolution did not find a miniapp " <>
                 "object_id=#{inspect(object.id)} reason=#{inspect(reason)}"
             )
 
-            Cards.delete(object)
+            :ok
 
           {:error, reason} ->
             {:error, reason}
@@ -144,9 +149,20 @@ defmodule Egregoros.Workers.ResolveMiniAppCard do
   defp invalidate_changed_source(object, candidates) do
     case Cards.get_cached(object) do
       %Card{source_url: source_url} ->
-        if source_url not in candidates, do: Cards.delete(object)
+        if source_url not in candidates, do: delete_card(object)
 
       _ ->
+        :ok
+    end
+  end
+
+  defp delete_card(object) do
+    case Cards.get_cached(object) do
+      %Card{} ->
+        :ok = Cards.delete(object)
+        Timeline.broadcast_mini_app_card_updated(object)
+
+      nil ->
         :ok
     end
   end

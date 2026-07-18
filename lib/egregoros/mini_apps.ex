@@ -22,6 +22,12 @@ defmodule Egregoros.MiniApps do
 
   @manifest_path "/.well-known/fediverse-miniapp.json"
 
+  @transient_fetch_errors ~w(
+    timeout total_timeout
+    fetch_capacity_exhausted fetch_unavailable fetch_failed fetch_cancelled
+    fetch_gate_unavailable fetch_queue_full fetch_queue_timeout fetch_rate_limited
+  )a
+
   def enabled? do
     truthy?(Config.get(:mini_apps_enabled, false))
   end
@@ -61,7 +67,7 @@ defmodule Egregoros.MiniApps do
       Logger.debug("miniapp lookup started candidate_count=#{length(candidates)}")
 
       candidates
-      |> Enum.reduce_while({:error, :no_mini_app}, fn url, _acc ->
+      |> Enum.reduce_while([], fn url, failures ->
         case resolve_candidate(url) do
           {:ok, %ResolvedCard{} = card} ->
             Logger.debug(
@@ -79,11 +85,30 @@ defmodule Egregoros.MiniApps do
                 "reason=#{inspect(reason, limit: 20, printable_limit: 512)}"
             )
 
-            {:cont, {:error, :no_mini_app}}
+            {:cont, [reason | failures]}
         end
       end)
+      |> resolution_result()
     end
   end
+
+  defp resolution_result({:ok, %ResolvedCard{}} = result), do: result
+  defp resolution_result([]), do: {:error, :no_mini_app}
+
+  defp resolution_result(failures) when is_list(failures) do
+    if Enum.any?(failures, &transient_resolution_error?/1),
+      do: {:error, :transient_mini_app_resolution},
+      else: {:error, :no_mini_app}
+  end
+
+  defp transient_resolution_error?(%Req.TransportError{}), do: true
+
+  defp transient_resolution_error?({:unexpected_status, status})
+       when status in [408, 425, 429] or status in 500..599,
+       do: true
+
+  defp transient_resolution_error?(reason) when reason in @transient_fetch_errors, do: true
+  defp transient_resolution_error?(_reason), do: false
 
   defp resolve_candidate(url) do
     with {:ok, origin} <- Origin.from_url(url),

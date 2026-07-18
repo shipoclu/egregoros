@@ -3,6 +3,7 @@ defmodule Egregoros.Workers.ResolveMiniAppCardTest do
 
   alias Egregoros.MiniApps.Cards
   alias Egregoros.Objects
+  alias Egregoros.Timeline
   alias Egregoros.Workers.ResolveMiniAppCard
 
   @public "https://www.w3.org/ns/activitystreams#Public"
@@ -30,6 +31,7 @@ defmodule Egregoros.Workers.ResolveMiniAppCardTest do
   test "resolves and stores a card asynchronously" do
     object = note_fixture(~s(<a href="https://app.example/read">reader</a>))
     enable_mini_apps()
+    Timeline.subscribe_public()
 
     manifest =
       Jason.encode!(%{
@@ -56,6 +58,8 @@ defmodule Egregoros.Workers.ResolveMiniAppCardTest do
     assert stored = Cards.get_active(object)
     assert stored.title == "Reader"
     assert stored.launch_url == "https://app.example/read"
+    assert_receive {:mini_app_card_updated, %{id: object_id}}
+    assert object_id == object.id
   end
 
   test "clears a stale card when a note is no longer eligible" do
@@ -63,12 +67,16 @@ defmodule Egregoros.Workers.ResolveMiniAppCardTest do
     enable_mini_apps()
     stored_card_fixture(object)
     assert Cards.get_active(object)
+    Timeline.subscribe_public()
 
-    {:ok, object} = Objects.update_object(object, %{data: Map.put(object.data, "to", [])})
+    {:ok, object} =
+      Objects.update_object(object, %{data: Map.put(object.data, "content", "no app link")})
 
     assert :ok = ResolveMiniAppCard.maybe_enqueue(object)
     assert Cards.get_active(object) == nil
     refute_enqueued(worker: ResolveMiniAppCard, args: %{"object_id" => object.id})
+    assert_receive {:mini_app_card_updated, %{id: object_id}}
+    assert object_id == object.id
   end
 
   test "invalidates an old card before attempting a changed candidate" do
@@ -100,7 +108,7 @@ defmodule Egregoros.Workers.ResolveMiniAppCardTest do
     end)
 
     Egregoros.Config.with_impl(Egregoros.Config.Mock, fn ->
-      assert :ok =
+      assert {:error, :transient_mini_app_resolution} =
                ResolveMiniAppCard.perform(%Oban.Job{args: %{"object_id" => object.id}})
     end)
 
@@ -114,7 +122,7 @@ defmodule Egregoros.Workers.ResolveMiniAppCardTest do
              ResolveMiniAppCard.perform(%Oban.Job{args: %{"object_id" => Ecto.UUID.generate()}})
   end
 
-  test "does not amplify ordinary discovery failures with Oban retries" do
+  test "returns transient discovery failures so Oban retries them" do
     object = note_fixture(~s(<a href="https://app.example/read">reader</a>))
     enable_mini_apps()
 
@@ -124,9 +132,57 @@ defmodule Egregoros.Workers.ResolveMiniAppCardTest do
     end)
 
     Egregoros.Config.with_impl(Egregoros.Config.Mock, fn ->
-      assert :ok =
+      assert {:error, :transient_mini_app_resolution} =
                ResolveMiniAppCard.perform(%Oban.Job{args: %{"object_id" => object.id}})
     end)
+  end
+
+  test "keeps a cached card while a transient refresh failure is retried" do
+    object = note_fixture(~s(<a href="https://app.example/read">reader</a>))
+    enable_mini_apps()
+    {:ok, stored} = stored_card_fixture(object)
+
+    expect(Egregoros.MiniApps.Fetcher.Mock, :get, fn
+      "https://app.example/.well-known/fediverse-miniapp.json", :manifest ->
+        {:error, :timeout}
+    end)
+
+    Egregoros.Config.with_impl(Egregoros.Config.Mock, fn ->
+      assert {:error, :transient_mini_app_resolution} =
+               ResolveMiniAppCard.perform(%Oban.Job{
+                 args: %{
+                   "object_id" => object.id,
+                   "resolution_token" => stored.resolution_token
+                 }
+               })
+    end)
+
+    assert Cards.get_cached(object) == stored
+    assert Cards.get_active(object) == stored
+  end
+
+  test "keeps a cached card after a non-retryable remote revalidation failure" do
+    object = note_fixture(~s(<a href="https://app.example/read">reader</a>))
+    enable_mini_apps()
+    {:ok, stored} = stored_card_fixture(object)
+
+    expect(Egregoros.MiniApps.Fetcher.Mock, :get, fn
+      "https://app.example/.well-known/fediverse-miniapp.json", :manifest ->
+        {:error, {:unexpected_status, 404}}
+    end)
+
+    Egregoros.Config.with_impl(Egregoros.Config.Mock, fn ->
+      assert :ok =
+               ResolveMiniAppCard.perform(%Oban.Job{
+                 args: %{
+                   "object_id" => object.id,
+                   "resolution_token" => stored.resolution_token
+                 }
+               })
+    end)
+
+    assert Cards.get_cached(object) == stored
+    assert Cards.get_active(object) == stored
   end
 
   test "never stores a resolution for an object revision changed during network fetches" do

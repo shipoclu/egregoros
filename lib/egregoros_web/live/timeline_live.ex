@@ -873,6 +873,23 @@ defmodule EgregorosWeb.TimelineLive do
   end
 
   @impl true
+  def handle_info({:mini_app_card_updated, post}, socket) do
+    if include_post?(
+         post,
+         socket.assigns.timeline,
+         socket.assigns.current_user,
+         socket.assigns.home_actor_ids
+       ) do
+      {:noreply,
+       insert_post(socket, StatusVM.decorate(post, socket.assigns.current_user),
+         update_only: true
+       )}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl true
   def handle_info({:post_deleted, %{id: id}}, socket) when is_binary(id) do
     pending_posts =
       socket.assigns.pending_posts

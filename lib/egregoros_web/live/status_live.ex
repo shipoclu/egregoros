@@ -241,6 +241,18 @@ defmodule EgregorosWeb.StatusLive do
     {:noreply, socket}
   end
 
+  @impl true
+  def handle_info({:mini_app_card_updated, %Egregoros.Object{} = object}, socket) do
+    socket =
+      if thread_relevant?(socket, object) do
+        refresh_thread(socket)
+      else
+        socket
+      end
+
+    {:noreply, socket}
+  end
+
   def handle_info({:thread_retry_available, :context}, socket) do
     socket =
       if socket.assigns.thread_missing_context? do
