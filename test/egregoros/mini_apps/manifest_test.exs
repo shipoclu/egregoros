@@ -26,17 +26,18 @@ defmodule Egregoros.MiniApps.ManifestTest do
     assert manifest.cache_ttl_seconds == 600
   end
 
-  test "allows a public app without oauth" do
+  test "allows a compose-capable app without oauth" do
     json =
       Jason.encode!(%{
         "version" => "1",
         "name" => "Reader",
         "homeUrl" => "https://app.example/reader",
-        "capabilities" => []
+        "capabilities" => ["compose_note"]
       })
 
     assert {:ok, manifest} = Manifest.decode(json, @manifest_url)
     assert manifest.oauth == nil
+    assert manifest.capabilities == ["compose_note"]
   end
 
   test "the deployable reference app ships a valid optional-wallet manifest" do
@@ -147,6 +148,18 @@ defmodule Egregoros.MiniApps.ManifestTest do
     activity_pub = get_in(schema, ["$defs", "activityPub"])
     assert activity_pub["additionalProperties"] == false
     assert activity_pub["required"] == ["actorUrl", "publicNotes", "transactionalMentions"]
+
+    assert [transactional_mentions_rule] = schema["allOf"]
+    assert get_in(transactional_mentions_rule, ["then", "required"]) == ["oauth"]
+
+    assert get_in(transactional_mentions_rule, [
+             "if",
+             "properties",
+             "activityPub",
+             "properties",
+             "transactionalMentions",
+             "const"
+           ]) == true
   end
 
   test "rejects duplicate json keys at every depth" do

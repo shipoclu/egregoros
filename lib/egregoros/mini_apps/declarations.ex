@@ -30,6 +30,19 @@ defmodule Egregoros.MiniApps.Declarations do
 
   def get_by_origin(_origin), do: nil
 
+  def capability_allowed?(origin, capability)
+      when is_binary(origin) and is_binary(capability) do
+    case get_by_origin(origin) do
+      %Declaration{capabilities: capabilities} ->
+        capability in capabilities and origin_allowed?(origin)
+
+      _ ->
+        false
+    end
+  end
+
+  def capability_allowed?(_origin, _capability), do: false
+
   def wallet_enabled?(origin) when is_binary(origin) do
     case get_by_origin(origin) do
       %Declaration{wallet_evm_enabled: true} -> origin_allowed?(origin)

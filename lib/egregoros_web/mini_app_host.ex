@@ -954,11 +954,10 @@ defmodule EgregorosWeb.MiniAppHost do
       not compose_request_base_allowed?(state, launch_id, call_id) ->
         {:halt, socket}
 
-      not current_compose_grant?(socket, state) ->
-        socket = assign_oauth_authenticated(socket, false)
-        {:halt, push_compose_response(socket, call_id, "auth_required")}
+      not is_binary(socket.assigns.mini_app_user_id) ->
+        {:halt, push_compose_response(socket, call_id, "unavailable")}
 
-      not OAuthRegistrations.capability_allowed?(state.card.app_origin, "compose_note") ->
+      not Declarations.capability_allowed?(state.card.app_origin, "compose_note") ->
         {:halt, push_compose_response(socket, call_id, "unavailable")}
 
       true ->
@@ -2194,23 +2193,16 @@ defmodule EgregorosWeb.MiniAppHost do
         scope: scope
       })
     else
-      {:error, :oauth_grant} ->
-        socket
-        |> assign_oauth_authenticated(false)
-        |> put_compose_error("Authorization expired. Authenticate again before posting.")
-
-      _ ->
-        put_compose_error(socket, "Could not post. Review the draft and try again.")
+      _ -> put_compose_error(socket, "Could not post. Review the draft and try again.")
     end
   end
 
-  defp publish_compose(socket, state, request, params, user_id) do
+  defp publish_compose(_socket, state, request, params, user_id) do
     Repo.transaction(fn ->
       GrantLock.acquire(user_id, state.card.app_origin)
 
-      with {:oauth_grant, true} <- {:oauth_grant, current_compose_grant?(socket, state)},
-           true <- active_card?(state.card),
-           true <- OAuthRegistrations.capability_allowed?(state.card.app_origin, "compose_note"),
+      with true <- active_card?(state.card),
+           true <- Declarations.capability_allowed?(state.card.app_origin, "compose_note"),
            %User{} = user <- Users.get(user_id),
            :ok <- reply_target_still_allowed(state.card, request.in_reply_to),
            {:ok, publish} <- ComposeDraft.validate_form(params),
@@ -2224,7 +2216,6 @@ defmodule EgregorosWeb.MiniAppHost do
            id when is_binary(id) <- create.object do
         {:ok, id, publish.scope}
       else
-        {:oauth_grant, false} -> {:error, :oauth_grant}
         _error -> {:error, :publish_failed}
       end
     end)
@@ -2232,22 +2223,6 @@ defmodule EgregorosWeb.MiniAppHost do
       {:ok, result} -> result
       {:error, _reason} -> {:error, :publish_failed}
     end
-  end
-
-  defp current_compose_grant?(socket, state) do
-    OAuthRegistrations.active_user_grant?(
-      state.card.app_origin,
-      socket.assigns.mini_app_user_id
-    )
-  end
-
-  defp assign_oauth_authenticated(socket, authenticated?) when is_boolean(authenticated?) do
-    state = socket.assigns.mini_app_host
-
-    Phoenix.Component.assign(socket, :mini_app_host, %{
-      state
-      | oauth_authenticated?: authenticated?
-    })
   end
 
   defp reply_target_still_allowed(_card, nil), do: :ok

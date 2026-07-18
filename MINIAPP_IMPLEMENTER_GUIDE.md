@@ -370,7 +370,7 @@ card resolution token when `imageUrl` changes, coalesce repeated requests for
 the same resolution, and never cache unsanitized source bytes or failed image
 processing results.
 
-## Optional: add OAuth and authenticated actions
+## Optional: add OAuth for identity or API access
 
 Add OAuth only after the static milestone works. Choose one completion profile:
 
@@ -384,14 +384,15 @@ the normal SPA risk that an XSS vulnerability can read its tokens; a backend
 profile provides stronger token isolation.
 
 Because the declaration is immutable after first observation, develop this on
-a disposable origin or publish the final OAuth declaration before testing the
-production origin. Adding `oauth` or `compose_note` to an already observed
-manifest requires a new app identity/origin.
+a disposable origin or publish the final OAuth and capability declarations
+before testing the production origin. Adding `oauth` or `compose_note` to an
+already observed manifest requires a new app identity/origin.
 
 ### Step 1: declare the smallest authority
 
-For account linking, add only `identify`. The host-owned composer also needs
-the `compose_note` capability, but it does not need the broad `write` API scope:
+For account linking, add only `identify`. Independently, the host-owned composer
+needs the `compose_note` capability, but it does not require OAuth or the broad
+`write` API scope. This combined example declares both features:
 
 ```json
 {
@@ -594,8 +595,8 @@ state, PKCE, and handoff values.
 
 ### Use the host-owned composer
 
-Once the OAuth grant includes the required authority and the manifest declares
-`compose_note`, the iframe can call:
+Once the manifest declares `compose_note`, the iframe can call this before or
+without any OAuth flow:
 
 ```js
 const result = await sdk.composeNote({
@@ -606,7 +607,8 @@ const result = await sdk.composeNote({
 
 This opens and pre-fills Egregoros's normal composer. It does not publish a
 note. The user can edit the draft and must explicitly submit it. This feature
-does not require the miniapp to implement any ActivityPub endpoint.
+uses the signed-in host session rather than an app-held token and does not
+require the miniapp to implement OAuth or any ActivityPub endpoint.
 
 ## Other optional SDK features
 

@@ -438,7 +438,7 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
     })
   end
 
-  test "compose requires completed OAuth and publishes only from the host form", %{
+  test "compose needs no OAuth and publishes only from the host form", %{
     conn: conn,
     user: user
   } do
@@ -448,12 +448,8 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
         local: true
       )
 
-    resolved = resolved_card(oauth?: true)
-    assert {:ok, _registration} = OAuthRegistrations.register(resolved.manifest)
+    resolved = resolved_card(compose?: true)
     assert {:ok, _card} = Cards.put(note, resolved)
-
-    application =
-      Egregoros.OAuth.get_application_by_client_id(client_id_for("https://app.example"))
 
     conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
     {:ok, view, _html} = live(conn, "/?timeline=public")
@@ -476,40 +472,6 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
         "links" => ["https://app.example/results/1"]
       }
     }
-
-    render_hook(view, "mini_app_compose_request", compose_params)
-    refute has_element?(view, "#mini-app-compose-sheet")
-
-    assert_push_event(view, "mini_app_compose_response", %{
-      launch_id: ^launch_id,
-      call_id: "compose-call-1",
-      status: "auth_required"
-    })
-
-    auth = auth_params(launch_id, application.client_id)
-    render_hook(view, "mini_app_auth_request", auth)
-
-    render_hook(view, "mini_app_auth_complete", %{
-      "launch_id" => launch_id,
-      "request_id" => "auth-1",
-      "status" => "success"
-    })
-
-    refute :sys.get_state(view.pid).socket.assigns.mini_app_host.oauth_authenticated?
-
-    render_hook(
-      view,
-      "mini_app_auth_request",
-      auth_params(launch_id, application.client_id, "auth-2")
-    )
-
-    complete_oauth_grant(application, user)
-
-    render_hook(view, "mini_app_auth_complete", %{
-      "launch_id" => launch_id,
-      "request_id" => "auth-2",
-      "status" => "success"
-    })
 
     render_hook(view, "mini_app_compose_request", compose_params)
     assert has_element?(view, "#mini-app-compose-sheet")
@@ -548,7 +510,37 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
              Objects.get_by_ap_id(published_id)
   end
 
-  test "compose accepts an active grant created before the current mini app launch", %{
+  test "compose still requires a signed-in host session", %{conn: conn, user: user} do
+    {:ok, note} =
+      Pipeline.ingest(
+        Note.build(user, ~s(<a href="https://app.example/shared/anonymous">writer</a>)),
+        local: true
+      )
+
+    assert {:ok, _card} = Cards.put(note, resolved_card(compose?: true))
+
+    {:ok, view, _html} = live(conn, "/?timeline=public")
+    view |> element("[data-role='open-mini-app']") |> render_click()
+
+    launch_id = :sys.get_state(view.pid).socket.assigns.mini_app_host.launch_id
+    render_hook(view, "mini_app_ready", %{"launch_id" => launch_id})
+
+    render_hook(view, "mini_app_compose_request", %{
+      "launch_id" => launch_id,
+      "call_id" => "compose-anonymous",
+      "draft" => %{"text" => "Cannot submit without a host user"}
+    })
+
+    refute has_element?(view, "#mini-app-compose-sheet")
+
+    assert_push_event(view, "mini_app_compose_response", %{
+      launch_id: ^launch_id,
+      call_id: "compose-anonymous",
+      status: "unavailable"
+    })
+  end
+
+  test "compose remains available when the app also has an active OAuth grant", %{
     conn: conn,
     user: user
   } do
@@ -663,7 +655,7 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
     assert :sys.get_state(view.pid).socket.assigns.mini_app_host.oauth_authenticated?
   end
 
-  test "compose revalidates the live OAuth grant at request and submit boundaries", %{
+  test "compose remains available after an unrelated OAuth grant is revoked", %{
     conn: conn,
     user: user
   } do
@@ -699,51 +691,30 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
     revoke_token_directly!(first_token)
 
     draft = %{
-      "text" => "Must not escape a revoked grant",
+      "text" => "Compose is authorized by the host confirmation",
       "visibility" => "public",
       "links" => []
     }
 
     render_hook(view, "mini_app_compose_request", %{
       "launch_id" => launch_id,
-      "call_id" => "compose-stale-request",
-      "draft" => draft
-    })
-
-    assert_push_event(view, "mini_app_compose_response", %{
-      launch_id: ^launch_id,
-      call_id: "compose-stale-request",
-      status: "auth_required"
-    })
-
-    render_hook(
-      view,
-      "mini_app_auth_request",
-      auth_params(launch_id, application.client_id, "auth-2")
-    )
-
-    second_token = complete_oauth_grant(application, user)
-
-    render_hook(view, "mini_app_auth_complete", %{
-      "launch_id" => launch_id,
-      "request_id" => "auth-2",
-      "status" => "success"
-    })
-
-    render_hook(view, "mini_app_compose_request", %{
-      "launch_id" => launch_id,
-      "call_id" => "compose-stale-submit",
+      "call_id" => "compose-with-revoked-oauth",
       "draft" => draft
     })
 
     assert has_element?(view, "#mini-app-compose-sheet")
-    object_count = Egregoros.Repo.aggregate(Egregoros.Object, :count)
-    revoke_token_directly!(second_token)
+
+    assert_push_event(view, "mini_app_compose_response", %{
+      launch_id: ^launch_id,
+      call_id: "compose-with-revoked-oauth",
+      request_id: request_id,
+      status: "accepted"
+    })
 
     view
     |> form("#mini-app-compose-form", %{
       "mini_app_post" => %{
-        "content" => "This must not be published",
+        "content" => "Published through explicit host confirmation",
         "spoiler_text" => "",
         "language" => "en",
         "visibility" => "public"
@@ -751,12 +722,20 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
     })
     |> render_submit()
 
-    assert has_element?(view, "#mini-app-compose-error")
-    refute_push_event(view, "mini_app_compose_published", %{launch_id: ^launch_id})
-    assert Egregoros.Repo.aggregate(Egregoros.Object, :count) == object_count
+    refute has_element?(view, "#mini-app-compose-error")
+
+    assert_push_event(view, "mini_app_compose_published", %{
+      launch_id: ^launch_id,
+      request_id: ^request_id,
+      id: published_id,
+      scope: "public"
+    })
+
+    assert %{data: %{"source" => %{"content" => "Published through explicit host confirmation"}}} =
+             Objects.get_by_ap_id(published_id)
   end
 
-  test "compose rechecks policy after waiting on the OAuth revocation boundary", %{
+  test "compose rechecks policy after waiting on the serialization boundary", %{
     conn: conn,
     user: user
   } do
@@ -1427,6 +1406,7 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
 
   defp resolved_card(options \\ []) do
     oauth? = Keyword.get(options, :oauth?, false)
+    compose? = Keyword.get(options, :compose?, oauth?)
     notifications? = Keyword.get(options, :notifications?, false)
     wallet? = Keyword.get(options, :wallet?, false)
     wallet_required? = Keyword.get(options, :wallet_required?, false)
@@ -1468,7 +1448,7 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
           },
           else: nil
         ),
-      capabilities: if(oauth?, do: ["compose_note"], else: []),
+      capabilities: if(compose?, do: ["compose_note"], else: []),
       cache_ttl_seconds: 600
     }
 

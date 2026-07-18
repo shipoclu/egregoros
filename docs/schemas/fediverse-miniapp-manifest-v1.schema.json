@@ -55,21 +55,6 @@
     {
       "if": {
         "properties": {
-          "capabilities": {
-            "contains": {
-              "const": "compose_note"
-            }
-          }
-        },
-        "required": ["capabilities"]
-      },
-      "then": {
-        "required": ["oauth"]
-      }
-    },
-    {
-      "if": {
-        "properties": {
           "activityPub": {
             "properties": {
               "transactionalMentions": {

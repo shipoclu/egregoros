@@ -88,7 +88,8 @@ defmodule EgregorosWeb.Layouts do
                   <span
                     data-role="mini-app-library-count"
                     class="absolute right-0.5 top-0.5 hidden size-2 border-2 border-[color:var(--bg-base)] bg-[color:var(--accent)]"
-                  ></span>
+                  >
+                  </span>
                 </:trigger>
 
                 <div class="max-h-[min(32rem,calc(100vh-7rem))] overflow-y-auto">
@@ -96,12 +97,18 @@ defmodule EgregorosWeb.Layouts do
                     <strong class="text-sm font-bold uppercase tracking-wide text-[color:var(--text-primary)]">
                       Mini apps
                     </strong>
-                    <span data-role="mini-app-library-total" class="font-mono text-xs text-[color:var(--text-muted)]">
+                    <span
+                      data-role="mini-app-library-total"
+                      class="font-mono text-xs text-[color:var(--text-muted)]"
+                    >
                       0
                     </span>
                   </header>
 
-                  <div data-role="mini-app-library-empty" class="px-4 py-5 text-sm text-[color:var(--text-muted)]">
+                  <div
+                    data-role="mini-app-library-empty"
+                    class="px-4 py-5 text-sm text-[color:var(--text-muted)]"
+                  >
                     Recently opened mini apps will appear here.
                   </div>
 

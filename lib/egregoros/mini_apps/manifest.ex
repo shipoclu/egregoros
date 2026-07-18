@@ -58,7 +58,6 @@ defmodule Egregoros.MiniApps.Manifest do
          {:ok, wallet} <- wallet(attrs["wallet"]),
          {:ok, activity_pub} <- activity_pub(attrs["activityPub"], origin, oauth),
          {:ok, capabilities} <- capabilities(attrs["capabilities"]),
-         :ok <- validate_capability_prerequisites(capabilities, oauth),
          {:ok, cache_ttl_seconds} <- cache_ttl(attrs) do
       {:ok,
        %__MODULE__{
@@ -230,14 +229,6 @@ defmodule Egregoros.MiniApps.Manifest do
       {:ok, capabilities}
     end
   end
-
-  defp validate_capability_prerequisites(capabilities, nil) do
-    if "compose_note" in capabilities,
-      do: {:error, :oauth_required_for_capability},
-      else: :ok
-  end
-
-  defp validate_capability_prerequisites(_capabilities, _oauth), do: :ok
 
   defp cache_ttl(attrs) do
     case Map.get(attrs, "cacheTtlSeconds", @default_cache_ttl_seconds) do

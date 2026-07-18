@@ -63,6 +63,19 @@ defmodule Egregoros.MiniApps.DeclarationsTest do
     assert Declarations.get_by_origin("https://wallet.example") == nil
   end
 
+  test "allows a declared compose capability without OAuth" do
+    manifest =
+      decode_manifest(%{
+        "version" => "1",
+        "name" => "Public Composer",
+        "homeUrl" => "https://wallet.example/",
+        "capabilities" => ["compose_note"]
+      })
+
+    assert {:ok, _declaration, :created} = Declarations.ensure(manifest)
+    assert Declarations.capability_allowed?("https://wallet.example", "compose_note")
+  end
+
   defp refute_manifest_change(wallet_overrides) do
     wallet =
       %{

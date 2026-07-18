@@ -136,7 +136,8 @@ defmodule Egregoros.MiniApps.TransactionalMessages do
 
     cond do
       match?(%User{}, inbox_user) and targets_local_user?(create, note) and
-          public?(create, note) and declaration.activity_pub_public_notes ->
+        public?(create, %{}) and public?(%{}, note) and
+          declaration.activity_pub_public_notes ->
         :allow
 
       match?(%User{}, inbox_user) and

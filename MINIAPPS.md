@@ -1,5 +1,11 @@
 # Fediverse Mini Apps — Normative V1 Host and App Protocol
 
+> **Mastodon API compatibility required.** This protocol relies on the
+> Mastodon-compatible API and OAuth surface throughout. It is for Egregoros and
+> servers that implement that surface; it is **not** a generic ActivityPub
+> feature. Servers such as Misskey that do not implement the Mastodon API are
+> unsupported and miniapps will not work on them.
+
 This document is the self-contained interoperability specification. It is
 intended to be sufficient input for a person or coding agent implementing a
 compatible host in different ActivityPub server software, or implementing a
@@ -338,10 +344,10 @@ Authentication is optional and app-initiated. A newly launched iframe may call
 user gesture, discover host capabilities, and use any separately authorized
 non-OAuth capability such as the EVM wallet. It can read the narrow public
 launch information and may request separately disclosed enriched public-note
-context before OAuth. It must request OAuth before
-`composeNote` or any future capability explicitly marked auth-gated. This lets
-read-only public mini apps work without a consent prompt, while ensuring that
-actions affecting the user's Egregoros account remain authenticated.
+context before OAuth. It may also call `composeNote` without OAuth: the current
+host session identifies the posting user, and the trusted host composer requires
+that user to review and explicitly submit the draft. Future capabilities marked
+auth-gated still require OAuth.
 
 The default backend authorization handoff is as follows:
 
@@ -907,7 +913,7 @@ pending calls.
 | OAuth initiation | `requestAuth` | Optional `oauth` manifest object and a public dynamic registration obtained by the backend or browser. |
 | Wallet | `wallet.evm.getProvider` and its allowlisted EIP-1193 calls | Immutable wallet declaration, host wallet availability, and per-app wallet connection/confirmation. No OAuth required. |
 | Transactional notifications | `notifications.getPermission`, `notifications.requestPermission` | Immutable ActivityPub declaration and OAuth; prompting additionally requires a user gesture and host confirmation. |
-| OAuth-gated | `composeNote` | Immutable `compose_note` declaration plus an unexpired OAuth grant containing `identify` (or legacy `read`). |
+| Host-confirmed compose | `composeNote` | Immutable `compose_note` declaration, active channel, signed-in host user, current domain allowance, and explicit submission in trusted host UI. No OAuth grant is required. |
 
 #### Compose a note
 
@@ -930,13 +936,12 @@ host API token is included in v1. These boundaries make the action useful for
 sharing a result, challenge, or invite without letting a remote app post on a
 user's behalf.
 
-`compose_note` is an explicit immutable manifest capability. When an app
-declares OAuth, its first approval screen shows every requested non-base host
-capability; Egregoros enables only declared capabilities. Lifecycle/
-authentication methods and `openExternal` are base SDK methods, not manifest
-capabilities. `compose_note` is auth-gated and therefore unavailable until a
-declared OAuth flow completes; wallet capabilities use their own per-app wallet
-approval and do not require OAuth.
+`compose_note` is an explicit immutable manifest capability. Egregoros enables
+only declared capabilities, but compose permission is not part of OAuth consent:
+each invocation opens trusted host UI and only the host user can submit it.
+Lifecycle/authentication methods and `openExternal` are base SDK methods, not
+manifest capabilities. Wallet capabilities use their own per-app wallet
+approval and likewise do not require OAuth.
 
 Each successful `composeNote` call is assigned a host-generated `requestId`.
 After—and only after—the user submits successfully, the SDK emits a
@@ -1251,13 +1256,14 @@ the user as such.
 
 ### Compose boundary
 
-`composeNote` requires a currently authenticated OAuth grant, declared
-`compose_note` capability, active exact-origin channel, current domain-policy
-allowance, and a fresh broker request. All draft fields are untrusted and pass
-through the same length, URL, visibility, reply-target, and content validation
-as user-entered composer data. The app can only open and prefill the host-owned
-composer; it cannot trigger its submit event, manufacture LiveView events,
-select a hidden visibility, attach files, or bypass normal posting validation.
+`composeNote` requires a declared `compose_note` capability, active exact-origin
+channel, signed-in host user, current domain-policy allowance, and a fresh
+broker request. It does not require an OAuth grant. All draft fields are
+untrusted and pass through the same length, URL, visibility, reply-target, and
+content validation as user-entered composer data. The app can only open and
+prefill the host-owned composer; it cannot trigger its submit event, manufacture
+LiveView events, select a hidden visibility, attach files, or bypass normal
+posting validation.
 
 The final submit is a direct user action on Egregoros UI. The publication
 receipt is generated only after the database transaction succeeds and contains
@@ -1545,7 +1551,7 @@ The enriched-context consent choices are:
 | Metadata refresh | One-hour default; shorter explicit TTL honored | User can manually refresh app details. |
 | Pre-auth SDK data | Bootstrap plus public `getLaunchInfo()` attribution | Enables dynamic registration and organic-share discovery without exposing viewer identity; enriched context remains permissioned. |
 | Authentication trigger | App calls `requestAuth` | No automatic prompt merely from card display or launch. |
-| Authentication requirement | On demand | OAuth is required for compose/auth-gated capabilities, not for public/read-only apps. |
+| Authentication requirement | On demand | OAuth is required only for OAuth-gated capabilities, not for public/read-only apps or host-confirmed compose. |
 | OAuth callback completion | Opener-free popup redirects to a host-owned fragment relay and launch-secret `BroadcastChannel` | Backend mode relays a verifier-bound app handoff; browser mode relays only the exact PKCE-bound authorization code. Bearer tokens never traverse the relay. |
 | Repeat consent | Reuse valid immutable grant | Authorization UI still provides account identity, switch, and cancel. |
 | Token renewal | Short-lived access + rotating refresh token | Backend or browser refreshes without extending the absolute grant deadline. |
@@ -1610,7 +1616,7 @@ The enriched-context consent choices are:
    changes, and checks that derived state never enters ActivityPub objects.
 
 The feature is ready for release only when tests demonstrate that an
-untrusted app cannot obtain user identity or auth-gated actions without OAuth,
+untrusted app cannot obtain user identity or OAuth-gated actions without OAuth,
 cannot obtain note context before the separate context disclosure, cannot
 increase scopes or capabilities, redeem a host-visible handoff code without the
 iframe verifier, navigate Egregoros, escape exact-origin restrictions, bypass
@@ -1862,9 +1868,10 @@ satisfies the narrow identity check; `write` does not. A host MAY continue to
 register a legacy manifest whose scope list contains `read` but not `identify`,
 but every conforming new app declares and normally requests `identify`
 explicitly.
-`compose_note` requires `oauth` and a declared `identify` scope. The broad OAuth
-scope `write` is not required for `compose_note`: compose opens host UI and the
-user submits; it is not delegated API publishing.
+`compose_note` does not require an `oauth` object or any OAuth scope. Compose
+opens host UI and the signed-in host user submits; it is not delegated API
+publishing. An app declares OAuth only when it separately needs identity,
+transactional mentions, or Mastodon-compatible API access.
 
 `wallet` contains exactly required member `evm`. `evm` contains required
 boolean `enabled`, optional boolean `required` (default `false`), and optional
@@ -2244,10 +2251,10 @@ DTO. Context denial never changes the prompt-free launch object.
 
 ### 7. Compose draft and receipt
 
-`composeNote` requires current OAuth authorization satisfying `identify`
-(including the explicitly documented legacy `read` expansion), the
-immutable `compose_note` capability, a public-note launch, current domain
-allowance, and the active channel. The draft is a closed object with optional:
+`composeNote` requires the immutable `compose_note` capability, a public-note
+launch, a signed-in host user, current domain allowance, and the active channel.
+It does not require OAuth authorization. The draft is a closed object with
+optional:
 
 | Member | Rule and default |
 | --- | --- |
@@ -2264,8 +2271,8 @@ Acceptance opens a host-owned, editable composer; it never publishes. The user
 may edit every normal field and must submit using trusted host UI. The app
 receives no edit stream.
 
-The initial result status is one of `accepted`, `auth_required`, `unavailable`,
-or `invalid_draft`. Only `accepted` also contains a fresh `requestId`. After a
+The initial result status is one of `accepted`, `unavailable`, or
+`invalid_draft`. Only `accepted` also contains a fresh `requestId`. After a
 successful database commit, the host emits a receipt for that request with
 only the canonical ActivityPub Note `id`/URL and final `scope` (`public`,
 `unlisted`, `followers`, or `direct`). It emits no receipt on cancel or failed
@@ -2562,7 +2569,7 @@ sixth `requestId` matching the ID grammar:
 }
 ```
 
-Statuses are `accepted`, `auth_required`, `unavailable`, or `invalid_draft`.
+Statuses are `accepted`, `unavailable`, or `invalid_draft`.
 The later event is closed and independent of the original `callId`:
 
 ```json
@@ -2980,8 +2987,9 @@ production IDs are random.
 | MAN-01 | Minimal `{"version":"1","name":"A","homeUrl":"https://app.example/","capabilities":[]}` | Accept as unauthenticated core app. |
 | MAN-02 | The same JSON with a second `name` key or unknown top-level key | Reject manifest. |
 | MAN-03 | OAuth scopes `["identify"]`, exact redirect, empty capabilities | Accept; registration is public and identity-only. |
-| MAN-04 | `compose_note` without OAuth/identify, cross-origin icon/redirect, or mutable scope maximum after registration | Reject/fail closed. |
-| MAN-05 | Optional wallet enabled false with required true or a required chain `eip155:0` | Reject manifest. |
+| MAN-04 | `compose_note` without OAuth/identify | Accept; compose authorization comes from the declaration, active host session, and explicit host UI submission. |
+| MAN-05 | Cross-origin icon/redirect or mutable OAuth scope maximum after registration | Reject/fail closed. |
+| MAN-06 | Optional wallet enabled false with required true or a required chain `eip155:0` | Reject manifest. |
 | CARD-01 | No mini-app meta on valid linked page | Generic card; launch exact linked URL, not home URL. |
 | CARD-02 | Two matching meta tags, duplicate JSON key, cross-origin launch/image, or overlong title | Treat metadata as absent; never apply its authority. |
 | DISC-01 | Public Note has mention anchor first and ordinary app anchor second | Skip mention link; test the ordinary link. |
