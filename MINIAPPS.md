@@ -107,7 +107,7 @@ An implementer MUST preserve these externally observable rules:
 | Authorization metadata | Serve RFC 8414 metadata at `https://<issuer>/.well-known/oauth-authorization-server`, including `fediverse_miniapp_profile: "1"`, S256 PKCE support, and the advertised registration, authorization, token, and revocation endpoints. The current SDK validates this exact metadata location. |
 | Authorization relay | Provide the host-owned, fragment-only relay at `https://<issuer>/mini-apps/oauth/relay`. The current v1 SDK/bootstrap binds this exact URL. It accepts no token, does not use `window.opener`, broadcasts only the correlated result, and uses `no-store`, no-referrer, and `frame-ancestors 'none'`. |
 | Browser OAuth | Support public clients with `token_endpoint_auth_method: "none"`, authorization-code + required S256 PKCE, exact redirect-URI matching, single-use short-lived codes, and no implicit, password, or client-credentials grant. |
-| Dynamic registration | Deduplicate public registrations by `(issuer, canonical manifest URL)` and return the same public `client_id` for an equivalent registration. No client secret may be issued or required. |
+| Dynamic registration | Advertise the registration endpoint through RFC 8414, implement the RFC 7591-based public-client profile, deduplicate registrations by `(issuer, canonical manifest URL)`, and return the same public `client_id` for an equivalent registration. No client secret may be issued or required. |
 | Narrow identity | Expose `GET /api/v1/mini-apps/identity` for an `identify` bearer grant, returning only the documented narrow identity representation and `Cache-Control: no-store`. This is a current v1 profile endpoint; a future version can advertise an alternative explicitly. |
 
 The metadata-advertised registration, authorization, token, and revocation URLs
@@ -715,6 +715,15 @@ Registration (RFC 7591) advertised from the instance's OAuth Authorization
 Server Metadata (RFC 8414), with a mini-app profile that makes the following
 normative:
 
+The RFC 8414 discovery step is required. An app MUST fetch the issuer's exact
+authorization-server metadata document and use its advertised
+`registration_endpoint`; it MUST NOT hard-code Egregoros's current endpoint
+path. A host MUST advertise an absolute HTTPS registration endpoint on the
+exact issuer origin. Missing, malformed, cross-origin, or policy-denied metadata
+makes OAuth registration unavailable and MUST NOT trigger fallback to an
+unadvertised native endpoint. This discovery requirement is independent of the
+optional FAP application-kind extension described below.
+
 1. Registration may occur from the mini-app backend or, for a static browser
    app, directly from the iframe through non-credentialed CORS. The response is
    a public OAuth client: it returns a stable `client_id`, declares
@@ -750,6 +759,16 @@ registration. Mini-app public clients MUST omit `client_secret` during code
 exchange, refresh, and revocation. The instance requires S256 PKCE for every
 authorization code and explicitly rejects `client_credentials` for these
 clients.
+
+The optional FAP extension may add server-derived `fap:kind: "miniapp"` to a
+successful response. It is not accepted from the caller at this
+manifest-driven endpoint. A supporting host derives the value only after
+securely fetching and validating the canonical manifest and persists it with
+the OAuth application. The kind is an immutable application/provenance
+classification, not an OAuth scope, capability, grant, or registration success
+signal. Clients MUST tolerate its absence and MUST NOT require it to complete
+the RFC 8414/RFC 7591 flow. An unknown kind must never be stored as a fallback
+string.
 
 This prevents an ordinary app launch from producing a client per user. It does
 not make an anonymous registration endpoint cost-free: instances still need
@@ -1526,7 +1545,7 @@ The enriched-context consent choices are:
 | Publishing | Anybody may publish a manifest-bearing HTTPS mini app | No directory/admin approval is required to publish. |
 | Platforms | Desktop and mobile/PWA | Desktop floating panel; mobile full-screen sheet. |
 | App installation | Not in v1 | No saved/pinned-app launcher; optional ActivityPub transactional mentions do not install an app. |
-| Registration | Anonymous dynamic registration | One public registration per mini-app manifest and calling issuer, cached by the app backend or browser. |
+| Registration | RFC 8414-discovered anonymous dynamic registration | One public registration per mini-app manifest and calling issuer, cached by the app backend or browser; optional FAP metadata may classify it as a miniapp. |
 | Public launch information | `getLaunchInfo()` after explicit card open, without a second prompt | Exact launch URL, linked URL, and original public Note ID only; no viewer identity or Announce attribution. |
 | Enriched context | `getContext()` after once-per-app disclosure | Untrusted public-note text, author, and mentions are shared with the app domain. |
 | Context source visibility | Fully public notes only | Non-public notes retain ordinary links in v1. |
@@ -2078,6 +2097,19 @@ No response contains `client_secret`. Closed error bodies have
 `invalid_manifest`; 409 `manifest_changed`; 403 `disabled` or
 `domain_denied`; and 429 for a registration-rate limit. An implementation may
 vary descriptions but not codes or their meaning.
+
+An implementation of the optional FAP application-provenance extension may add
+`"fap:kind":"miniapp"` to this response. The manifest-driven request body
+remains closed to the single `manifest_url` member; a caller-supplied
+`fap:kind` is an unknown field and is rejected. A supporting server derives and
+persists `miniapp` together with the canonical manifest website. For
+Mastodon-compatible native application registration, `POST /api/v1/apps` may
+also accept the exact optional field `fap:kind=miniapp`, require a non-empty
+`website` when it is present, and echo the same field in the successful
+application response. It rejects every other non-empty kind. Ordinary OAuth
+applications omit the field in both directions. This optional input selects
+only the closed classification; it grants no mini-app capability and does not
+replace canonical manifest validation for the mini-app profile endpoint.
 
 Authorization uses code + mandatory S256 PKCE, exact redirect matching,
 single-use short-lived codes, and public-client token exchange. Do not support
@@ -3003,6 +3035,8 @@ production IDs are random.
 | OAUTH-01 | New app requests only `identify` on Egregoros, Mastodon-adapter, Pleroma-adapter, or Misskey-adapter host | Same profile flow and same five-field identity DTO; native mapping is not visible. |
 | OAUTH-02 | App asks for undeclared/unsupported scope, wrong redirect, wrong state/PKCE/mode, expired code, or second code use | Reject without token or grant mutation. |
 | OAUTH-03 | Repeat registration for same issuer + canonical manifest | Same client ID; no new row per user. |
+| OAUTH-04 | RFC 8414 metadata omits `registration_endpoint`, advertises it off-origin, or the app substitutes a hard-coded endpoint | Fail closed; do not register or fall back to a native app-registration path. |
+| FAP-01 | A host implements optional registration `fap:kind`; manifest-driven request supplies it, native `/api/v1/apps` supplies an unsupported kind, or `miniapp` lacks the required website | Reject without creating an OAuth application. |
 | RELAY-01 | Exact one-time browser-code fragment for active request | Relay only authorization code to matching port; iframe must still present verifier at token endpoint. |
 | RELAY-02 | Duplicate/extra fragment key, wrong state/launch/mode, both code fields, or fragment over 1,024 chars | Ignore/close; no app response containing a code. |
 | COMP-01 | Valid compose after identify, then user edits and submits | `accepted` first; receipt only after commit with final ID/scope. |
@@ -3087,7 +3121,8 @@ item below is true:
       submit a post, expose an account, sign data, send a transaction, or grant
       transactional mentions.
 - [ ] Anonymous registration is idempotent per issuer+manifest, never returns a
-      secret, and cannot create one client per user.
+      secret, is reached through the RFC 8414-advertised endpoint, and cannot
+      create one client per user. Clients do not require optional `fap:kind`.
 - [ ] `identify` works identically over the host's native auth model without
       granting native read/write access; additional scopes are advertised and
       consented according to actual local semantics.
