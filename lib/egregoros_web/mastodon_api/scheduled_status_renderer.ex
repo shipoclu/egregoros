@@ -44,6 +44,7 @@ defmodule EgregorosWeb.MastodonAPI.ScheduledStatusRenderer do
       |> Enum.reject(&(&1 == ""))
 
     params
+    |> Map.delete("_fap_generator")
     |> Map.put("media_ids", media_ids)
     |> Map.update("sensitive", false, &truthy?/1)
   end

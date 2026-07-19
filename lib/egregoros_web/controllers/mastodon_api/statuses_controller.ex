@@ -6,10 +6,14 @@ defmodule EgregorosWeb.MastodonAPI.StatusesController do
   alias Egregoros.Activities.Like
   alias Egregoros.Activities.Update
   alias Egregoros.Activities.Undo
+  alias Egregoros.ApplicationProvenance
+  alias Egregoros.Auth.BearerToken
   alias Egregoros.HTML
   alias Egregoros.Mentions
   alias Egregoros.Media
   alias Egregoros.Objects
+  alias Egregoros.OAuth
+  alias Egregoros.OAuth.Token
   alias Egregoros.Pipeline
   alias Egregoros.Publish
   alias Egregoros.ScheduledStatuses
@@ -33,10 +37,15 @@ defmodule EgregorosWeb.MastodonAPI.StatusesController do
     language = Map.get(params, "language")
 
     user = conn.assigns.current_user
+    generator = application_generator(conn, user)
+    promotional = promotional?(params)
 
     scheduled? = is_binary(scheduled_at) and String.trim(scheduled_at) != ""
 
     cond do
+      invalid_promotional?(params) ->
+        send_resp(conn, 422, "Unprocessable Entity")
+
       scheduled? ->
         schedule_params = %{
           "text" => status,
@@ -47,6 +56,11 @@ defmodule EgregorosWeb.MastodonAPI.StatusesController do
           "sensitive" => sensitive,
           "language" => language
         }
+
+        schedule_params =
+          schedule_params
+          |> maybe_put("fap:promotional", promotional, promotional)
+          |> maybe_put("_fap_generator", generator, is_map(generator))
 
         schedule_params =
           if is_map(poll) do
@@ -76,7 +90,9 @@ defmodule EgregorosWeb.MastodonAPI.StatusesController do
                     visibility: visibility,
                     spoiler_text: spoiler_text,
                     sensitive: sensitive,
-                    language: language
+                    language: language,
+                    generator: generator,
+                    promotional: promotional
                   )
                 else
                   Publish.post_note(user, status,
@@ -85,7 +101,9 @@ defmodule EgregorosWeb.MastodonAPI.StatusesController do
                     visibility: visibility,
                     spoiler_text: spoiler_text,
                     sensitive: sensitive,
-                    language: language
+                    language: language,
+                    generator: generator,
+                    promotional: promotional
                   )
                 end),
              %{} = object <- Objects.get_by_ap_id(create_object.object) do
@@ -99,6 +117,25 @@ defmodule EgregorosWeb.MastodonAPI.StatusesController do
   def create(conn, _params) do
     send_resp(conn, 422, "Unprocessable Entity")
   end
+
+  defp application_generator(conn, user) do
+    case conn |> BearerToken.access_token() |> OAuth.get_token() do
+      %Token{user_id: user_id, application: application} when user_id == user.id ->
+        ApplicationProvenance.generator(application)
+
+      _ ->
+        nil
+    end
+  end
+
+  defp promotional?(%{"fap:promotional" => value}), do: value in [true, "true"]
+  defp promotional?(_params), do: false
+
+  defp invalid_promotional?(%{"fap:promotional" => value}), do: value not in [true, "true"]
+  defp invalid_promotional?(_params), do: false
+
+  defp maybe_put(map, key, value, true), do: Map.put(map, key, value)
+  defp maybe_put(map, _key, _value, false), do: map
 
   def update(conn, %{"id" => id} = params) do
     status = params |> Map.get("status", "") |> to_string() |> String.trim()

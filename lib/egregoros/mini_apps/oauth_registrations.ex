@@ -297,7 +297,8 @@ defmodule Egregoros.MiniApps.OAuthRegistrations do
       "client_name" => manifest.name,
       "website" => manifest.home_url,
       "redirect_uris" => oauth.redirect_uris,
-      "scopes" => Enum.join(oauth.scopes, " ")
+      "scopes" => Enum.join(oauth.scopes, " "),
+      "fap:kind" => "miniapp"
     }
 
     case OAuth.create_application(application_attrs, client_type: :public_mini_app) do

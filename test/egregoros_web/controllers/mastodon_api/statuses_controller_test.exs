@@ -3,6 +3,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusesControllerTest do
 
   alias Egregoros.Object
   alias Egregoros.Objects
+  alias Egregoros.OAuth
   alias Egregoros.Pipeline
   alias Egregoros.Publish
   alias Egregoros.Repo
@@ -27,6 +28,78 @@ defmodule EgregorosWeb.MastodonAPI.StatusesControllerTest do
 
     [object] = Objects.list_notes()
     assert object.data["content"] == "<p>Hello API</p>"
+  end
+
+  test "POST /api/v1/statuses emits application provenance and promotional metadata", %{
+    conn: conn
+  } do
+    {:ok, user} = Users.create_local_user("miniapp_publisher")
+
+    {:ok, app} =
+      OAuth.create_application(%{
+        "client_name" => "Open Farm Game",
+        "redirect_uris" => "urn:ietf:wg:oauth:2.0:oob",
+        "scopes" => "write",
+        "website" => "https://openfarm.example/",
+        "fap:kind" => "miniapp"
+      })
+
+    {:ok, auth_code} =
+      OAuth.create_authorization_code(app, user, "urn:ietf:wg:oauth:2.0:oob", "write")
+
+    {:ok, token} =
+      OAuth.exchange_code_for_token(%{
+        "grant_type" => "authorization_code",
+        "code" => auth_code.code,
+        "client_id" => app.client_id,
+        "client_secret" => app.client_secret,
+        "redirect_uri" => "urn:ietf:wg:oauth:2.0:oob"
+      })
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, user} end)
+
+    conn =
+      conn
+      |> put_req_header("authorization", "Bearer " <> token.token)
+      |> post("/api/v1/statuses", %{
+        "status" => "Plant spring crops this weekend.",
+        "fap:promotional" => true
+      })
+
+    response = json_response(conn, 200)
+    assert response["fap:promotional"] == true
+
+    assert response["application"] == %{
+             "name" => "Open Farm Game",
+             "website" => "https://openfarm.example/",
+             "kind" => "miniapp"
+           }
+
+    note = Objects.get(response["id"])
+    assert note.data["fap:promotional"] == true
+    assert note.data["generator"]["fap:kind"] == "miniapp"
+
+    [create] = Objects.list_creates_by_actor(user.ap_id)
+    assert create.data["fap:promotional"] == true
+    assert create.data["generator"] == note.data["generator"]
+    assert create.data["@context"] == note.data["@context"]
+  end
+
+  test "POST /api/v1/statuses rejects non-affirmative promotional values", %{conn: conn} do
+    {:ok, user} = Users.create_local_user("invalid_promotion")
+
+    Egregoros.Auth.Mock
+    |> expect(:current_user, fn _conn -> {:ok, user} end)
+
+    conn =
+      post(conn, "/api/v1/statuses", %{
+        "status" => "This must not publish",
+        "fap:promotional" => false
+      })
+
+    assert response(conn, 422) == "Unprocessable Entity"
+    assert Objects.list_notes() == []
   end
 
   test "POST /api/v1/statuses creates a poll when poll params are provided", %{conn: conn} do

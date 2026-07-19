@@ -34,6 +34,7 @@ defmodule EgregorosWeb.MiniAppRegistrationControllerTest do
     assert response["grant_types"] == ["authorization_code", "refresh_token"]
     assert response["response_types"] == ["code"]
     assert response["token_endpoint_auth_method"] == "none"
+    assert response["fap:kind"] == "miniapp"
     assert get_resp_header(conn, "cache-control") == ["no-store"]
     assert get_resp_header(conn, "referrer-policy") == ["no-referrer"]
 

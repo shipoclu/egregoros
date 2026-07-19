@@ -9,7 +9,8 @@ defmodule EgregorosWeb.MastodonAPI.AppsControllerTest do
         "client_name" => "Husky",
         "redirect_uris" => "urn:ietf:wg:oauth:2.0:oob",
         "scopes" => "read write follow",
-        "website" => "https://example.com"
+        "website" => "https://example.com",
+        "fap:kind" => "miniapp"
       })
 
     response = json_response(conn, 200)
@@ -18,7 +19,19 @@ defmodule EgregorosWeb.MastodonAPI.AppsControllerTest do
     assert response["redirect_uri"] == "urn:ietf:wg:oauth:2.0:oob"
     assert is_binary(response["client_id"])
     assert is_binary(response["client_secret"])
+    assert response["fap:kind"] == "miniapp"
 
-    assert %{} = OAuth.get_application_by_client_id(response["client_id"])
+    assert %{kind: "miniapp"} = OAuth.get_application_by_client_id(response["client_id"])
+  end
+
+  test "POST /api/v1/apps rejects unsupported application kinds", %{conn: conn} do
+    conn =
+      post(conn, "/api/v1/apps", %{
+        "client_name" => "Unknown client",
+        "redirect_uris" => "urn:ietf:wg:oauth:2.0:oob",
+        "fap:kind" => "game"
+      })
+
+    assert json_response(conn, 422)["error"] == "Could not create application"
   end
 end

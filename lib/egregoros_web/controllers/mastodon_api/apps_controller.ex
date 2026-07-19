@@ -12,15 +12,19 @@ defmodule EgregorosWeb.MastodonAPI.AppsController do
   def create(conn, params) do
     case OAuth.create_application(params) do
       {:ok, app} ->
-        json(conn, %{
-          "id" => app.id,
-          "name" => app.name,
-          "website" => app.website,
-          "redirect_uri" => List.first(app.redirect_uris) || "",
-          "client_id" => app.client_id,
-          "client_secret" => app.client_secret,
-          "vapid_key" => ""
-        })
+        response =
+          %{
+            "id" => app.id,
+            "name" => app.name,
+            "website" => app.website,
+            "redirect_uri" => List.first(app.redirect_uris) || "",
+            "client_id" => app.client_id,
+            "client_secret" => app.client_secret,
+            "vapid_key" => ""
+          }
+          |> maybe_put_kind(app.kind)
+
+        json(conn, response)
 
       {:error, _changeset} ->
         conn
@@ -28,4 +32,7 @@ defmodule EgregorosWeb.MastodonAPI.AppsController do
         |> json(%{"error" => "Could not create application"})
     end
   end
+
+  defp maybe_put_kind(response, "miniapp"), do: Map.put(response, "fap:kind", "miniapp")
+  defp maybe_put_kind(response, _kind), do: response
 end

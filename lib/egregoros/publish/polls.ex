@@ -8,6 +8,7 @@ defmodule Egregoros.Publish.Polls do
   alias Egregoros.Activities.Answer
   alias Egregoros.Activities.Create
   alias Egregoros.Activities.Question
+  alias Egregoros.ApplicationProvenance
   alias Egregoros.HTML
   alias Egregoros.Object
   alias Egregoros.Objects
@@ -107,6 +108,8 @@ defmodule Egregoros.Publish.Polls do
     spoiler_text = Keyword.get(opts, :spoiler_text)
     sensitive = Keyword.get(opts, :sensitive)
     language = Keyword.get(opts, :language)
+    generator = Keyword.get(opts, :generator)
+    promotional = Keyword.get(opts, :promotional, false)
 
     cond do
       content == "" and attachments == [] ->
@@ -144,6 +147,10 @@ defmodule Egregoros.Publish.Polls do
             |> PostBuilder.put_summary(spoiler_text)
             |> PostBuilder.put_sensitive(sensitive)
             |> PostBuilder.put_language(language)
+            |> ApplicationProvenance.put_metadata(
+              generator: generator,
+              promotional: promotional
+            )
 
           create = Create.build(user, question)
 

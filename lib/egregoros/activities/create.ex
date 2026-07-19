@@ -4,6 +4,7 @@ defmodule Egregoros.Activities.Create do
   import Ecto.Changeset
 
   alias Egregoros.Activities.Helpers
+  alias Egregoros.ApplicationProvenance
   alias Egregoros.ActivityPub.ObjectValidators.Types.ObjectID
   alias Egregoros.ActivityPub.ObjectValidators.Types.Recipients
   alias Egregoros.ActivityPub.ObjectValidators.Types.DateTime, as: APDateTime
@@ -49,6 +50,7 @@ defmodule Egregoros.Activities.Create do
       "object" => object,
       "published" => object["published"] || DateTime.utc_now() |> DateTime.to_iso8601()
     }
+    |> ApplicationProvenance.copy_to_activity(object)
   end
 
   def cast_and_validate(activity) when is_map(activity) do

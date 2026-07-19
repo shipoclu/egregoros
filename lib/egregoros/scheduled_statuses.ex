@@ -148,6 +148,8 @@ defmodule Egregoros.ScheduledStatuses do
       media_ids = Map.get(params, "media_ids", [])
       in_reply_to_id = Map.get(params, "in_reply_to_id")
       poll = Map.get(params, "poll")
+      generator = Map.get(params, "_fap_generator")
+      promotional = Map.get(params, "fap:promotional") == true
 
       with {:ok, attachments} <- Media.attachments_from_ids(user, media_ids),
            {:ok, in_reply_to} <- resolve_in_reply_to(in_reply_to_id, user),
@@ -159,7 +161,9 @@ defmodule Egregoros.ScheduledStatuses do
                   visibility: visibility,
                   spoiler_text: spoiler_text,
                   sensitive: sensitive,
-                  language: language
+                  language: language,
+                  generator: generator,
+                  promotional: promotional
                 )
               else
                 Publish.post_note(user, text,
@@ -168,7 +172,9 @@ defmodule Egregoros.ScheduledStatuses do
                   visibility: visibility,
                   spoiler_text: spoiler_text,
                   sensitive: sensitive,
-                  language: language
+                  language: language,
+                  generator: generator,
+                  promotional: promotional
                 )
               end) do
         Repo.update(Ecto.Changeset.change(scheduled_status, published_at: DateTime.utc_now()))

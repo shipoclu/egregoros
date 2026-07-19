@@ -31,6 +31,42 @@ defmodule EgregorosWeb.MastodonAPI.StatusRendererTest do
     refute rendered["content"] =~ "<script"
   end
 
+  test "projects remote FAP provenance and promotional metadata", do: assert_fap_projection()
+
+  defp assert_fap_projection do
+    {:ok, object} =
+      Objects.create_object(%{
+        ap_id: "https://remote.example/objects/fap",
+        type: "Note",
+        actor: "https://remote.example/users/alice",
+        local: false,
+        data: %{
+          "id" => "https://remote.example/objects/fap",
+          "type" => "Note",
+          "actor" => "https://remote.example/users/alice",
+          "content" => "<p>Try this game.</p>",
+          "generator" => %{
+            "id" => "https://game.example/",
+            "type" => "Application",
+            "name" => "Example Game",
+            "url" => "https://game.example/",
+            "fap:kind" => "miniapp"
+          },
+          "fap:promotional" => true
+        }
+      })
+
+    rendered = StatusRenderer.render_status(object)
+
+    assert rendered["application"] == %{
+             "name" => "Example Game",
+             "website" => "https://game.example/",
+             "kind" => "miniapp"
+           }
+
+    assert rendered["fap:promotional"] == true
+  end
+
   test "escapes local user input while still producing HTML content" do
     {:ok, user} = Users.create_local_user("alice")
 

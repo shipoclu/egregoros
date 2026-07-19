@@ -1,5 +1,6 @@
 defmodule EgregorosWeb.MastodonAPI.StatusRenderer do
   alias Egregoros.Domain
+  alias Egregoros.ApplicationProvenance
   alias Egregoros.EmojiReactions
   alias Egregoros.HTML
   alias Egregoros.Object
@@ -185,7 +186,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusRenderer do
       "poll" => PollRenderer.render(object, ctx.current_user),
       "card" => nil,
       "quote_approval" => nil,
-      "application" => nil,
+      "application" => ApplicationProvenance.render_application(object.data),
       "filtered" => [],
       "language" => language(object),
       "pleroma" => %{
@@ -194,6 +195,7 @@ defmodule EgregorosWeb.MastodonAPI.StatusRenderer do
         "emoji_reactions" => emoji_reactions(object, ctx)
       }
     }
+    |> maybe_put_promotional(object.data)
   end
 
   defp render_reblog(%Object{} = announce, ctx) do
@@ -259,6 +261,14 @@ defmodule EgregorosWeb.MastodonAPI.StatusRenderer do
         "emoji_reactions" => []
       }
     }
+  end
+
+  defp maybe_put_promotional(status, data) do
+    if ApplicationProvenance.promotional?(data) do
+      Map.put(status, "fap:promotional", true)
+    else
+      status
+    end
   end
 
   defp conversation_id_for_reblog(%{} = reblog, _announce, _ctx) do

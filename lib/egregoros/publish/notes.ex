@@ -8,6 +8,7 @@ defmodule Egregoros.Publish.Notes do
   alias Egregoros.Activities.Create
   alias Egregoros.Activities.EncryptedMessage
   alias Egregoros.Activities.Note
+  alias Egregoros.ApplicationProvenance
   alias Egregoros.HTML
   alias Egregoros.Pipeline
   alias Egregoros.Publish.PostBuilder
@@ -62,6 +63,8 @@ defmodule Egregoros.Publish.Notes do
     sensitive = Keyword.get(opts, :sensitive)
     language = Keyword.get(opts, :language)
     e2ee_dm = Keyword.get(opts, :e2ee_dm)
+    generator = Keyword.get(opts, :generator)
+    promotional = Keyword.get(opts, :promotional, false)
 
     cond do
       content == "" and attachments == [] ->
@@ -98,6 +101,10 @@ defmodule Egregoros.Publish.Notes do
           |> PostBuilder.put_sensitive(sensitive)
           |> PostBuilder.put_language(language)
           |> maybe_put_e2ee_dm(e2ee_dm)
+          |> ApplicationProvenance.put_metadata(
+            generator: generator,
+            promotional: promotional
+          )
 
         create = Create.build(user, note)
 

@@ -7,7 +7,7 @@ defmodule Egregoros.OAuth.Application do
   @foreign_key_type FlakeId.Ecto.Type
 
   @required_fields ~w(name redirect_uris client_id client_secret)a
-  @optional_fields ~w(website scopes)a
+  @optional_fields ~w(website scopes kind)a
 
   schema "oauth_applications" do
     field :name, :string
@@ -16,6 +16,7 @@ defmodule Egregoros.OAuth.Application do
     field :scopes, :string, default: ""
     field :client_id, :string
     field :client_secret, :string
+    field :kind, :string
 
     field :client_type, Ecto.Enum,
       values: [:confidential, :public_mini_app],
@@ -31,8 +32,25 @@ defmodule Egregoros.OAuth.Application do
     |> validate_length(:name, max: 200)
     |> validate_length(:client_id, min: 10, max: 200)
     |> validate_length(:client_secret, min: 10, max: 200)
+    |> validate_inclusion(:kind, ["miniapp"])
+    |> validate_kind_website()
     |> validate_redirect_uris()
     |> unique_constraint(:client_id)
+  end
+
+  defp validate_kind_website(changeset) do
+    case {get_field(changeset, :kind), get_field(changeset, :website)} do
+      {"miniapp", website} when not is_binary(website) ->
+        add_error(changeset, :website, "is required for a miniapp")
+
+      {"miniapp", website} ->
+        if String.trim(website) == "",
+          do: add_error(changeset, :website, "is required for a miniapp"),
+          else: changeset
+
+      _ ->
+        changeset
+    end
   end
 
   defp validate_redirect_uris(changeset) do

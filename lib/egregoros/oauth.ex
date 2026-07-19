@@ -27,6 +27,7 @@ defmodule Egregoros.OAuth do
         redirect_uris:
           parse_redirect_uris(Map.get(attrs, "redirect_uris") || Map.get(attrs, :redirect_uris)),
         scopes: Map.get(attrs, "scopes") || Map.get(attrs, :scopes) || "",
+        kind: Map.get(attrs, "fap:kind") || Map.get(attrs, :kind),
         client_id: generate_token(32),
         client_secret: generate_token(48),
         inserted_at: now,

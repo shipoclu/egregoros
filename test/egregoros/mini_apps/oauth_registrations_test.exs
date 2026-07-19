@@ -59,6 +59,7 @@ defmodule Egregoros.MiniApps.OAuthRegistrationsTest do
     assert application.redirect_uris == ["https://app.example/oauth/callback"]
     assert application.scopes == "identify write"
     assert application.client_type == :public_mini_app
+    assert Map.get(application, :kind) == "miniapp"
   end
 
   test "rejects immutable OAuth or capability changes without creating another client" do

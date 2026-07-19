@@ -33,7 +33,8 @@ defmodule EgregorosWeb.MiniAppRegistrationController do
         "scope_authorization_max_age_seconds" => registration.scope_authorization_max_age_seconds,
         "grant_types" => ["authorization_code", "refresh_token"],
         "response_types" => ["code"],
-        "token_endpoint_auth_method" => "none"
+        "token_endpoint_auth_method" => "none",
+        "fap:kind" => application.kind
       })
     else
       {:error, :invalid_manifest_url} ->
