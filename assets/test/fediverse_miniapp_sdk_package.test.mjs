@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import {readFile} from "node:fs/promises"
 import test from "node:test"
 
-const sdkRevision = "2574607f1d176ea4bac1786abb30eac7d9205518"
+const sdkRevision = "856f88e8a1de1495a765d4a5aae83a070289cd42"
 const sdkDependency = `github:shipoclu/fediverse-miniapp-sdk#${sdkRevision}`
 const sdkResolved =
   `git+ssh://git@github.com/shipoclu/fediverse-miniapp-sdk.git#${sdkRevision}`
