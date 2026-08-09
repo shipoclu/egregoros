@@ -152,6 +152,18 @@ const MiniAppHost = {
         status: payload.status,
       })
     })
+    this.handleEvent("mini_app_session_restore_response", payload => {
+      if (payload?.launch_id !== this.el.dataset.launchId) return
+
+      this.broker?.send({
+        type: "sessionRestoreResult",
+        version: "1",
+        launchId: payload.launch_id,
+        requestId: payload.request_id,
+        status: payload.status,
+        ...(payload.status === "success" ? {restoreCode: payload.restore_code} : {}),
+      })
+    })
     this.handleEvent("mini_app_compose_response", payload => {
       if (payload?.launch_id !== this.el.dataset.launchId) return
 
@@ -446,6 +458,13 @@ const MiniAppHost = {
             handoff_challenge: request.handoffChallenge,
             completion_mode: request.completionMode,
             authorization_lifetime_seconds: request.authorizationLifetimeSeconds,
+          }),
+        onSessionRestoreRequest: request =>
+          this.pushEvent("mini_app_session_restore_request", {
+            launch_id: launchId,
+            request_id: request.requestId,
+            client_id: request.clientId,
+            restore_challenge: request.restoreChallenge,
           }),
         onComposeRequest: request =>
           this.pushEvent("mini_app_compose_request", {

@@ -466,6 +466,63 @@ defmodule EgregorosWeb.MiniAppHostLiveTest do
     })
   end
 
+  test "restores an existing exact-origin OAuth grant without prompting", %{
+    conn: conn,
+    user: user
+  } do
+    {:ok, note} =
+      Pipeline.ingest(
+        Note.build(user, ~s(<a href="https://app.example/shared/write">writer</a>)),
+        local: true
+      )
+
+    resolved = resolved_card(oauth?: true)
+    assert {:ok, registration} = OAuthRegistrations.register(resolved.manifest)
+    assert {:ok, _card} = Cards.put(note, resolved)
+
+    application =
+      Egregoros.Repo.get!(Egregoros.OAuth.Application, registration.oauth_application_id)
+
+    insert_active_oauth_grant!(application, user)
+
+    conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+    {:ok, view, _html} = live(conn, "/?timeline=public")
+    view |> element("[data-role='open-mini-app']") |> render_click()
+
+    launch_id = :sys.get_state(view.pid).socket.assigns.mini_app_host.launch_id
+    render_hook(view, "mini_app_ready", %{"launch_id" => launch_id})
+
+    render_hook(view, "mini_app_session_restore_request", %{
+      "launch_id" => launch_id,
+      "request_id" => "restore-1",
+      "client_id" => application.client_id,
+      "restore_challenge" => String.duplicate("c", 43)
+    })
+
+    assert_push_event(view, "mini_app_session_restore_response", %{
+      launch_id: ^launch_id,
+      request_id: "restore-1",
+      status: "success",
+      restore_code: restore_code
+    })
+
+    assert is_binary(restore_code)
+    refute has_element?(view, "#mini-app-auth-consent")
+
+    render_hook(view, "mini_app_session_restore_request", %{
+      "launch_id" => launch_id,
+      "request_id" => "restore-missing",
+      "client_id" => String.duplicate("x", 32),
+      "restore_challenge" => String.duplicate("c", 43)
+    })
+
+    assert_push_event(view, "mini_app_session_restore_response", %{
+      launch_id: ^launch_id,
+      request_id: "restore-missing",
+      status: "interaction_required"
+    })
+  end
+
   test "compose needs no OAuth and publishes only from the host form", %{
     conn: conn,
     user: user

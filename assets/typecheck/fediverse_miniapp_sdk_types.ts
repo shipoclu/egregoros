@@ -45,6 +45,14 @@ const browserAuthorization = await sdk.requestAuth({
   codeChallenge: "ccccccccccccccccccccccccccccccccccccccccccc",
 })
 const authorizationCode: string = browserAuthorization.authorizationCode
+const restored = await sdk.restoreSession({
+  clientId: "miniapp-client",
+  restoreChallenge: "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr",
+})
+if (restored.status === "success") {
+  const restoreCode: string = restored.restoreCode
+  void restoreCode
+}
 
 sdk.on("composeNotePublished", (receipt: MiniAppComposePublishedReceipt) => {
   const publishedId: string = receipt.id

@@ -534,6 +534,59 @@ test("auth requests require the active launch and a strict PKCE handoff schema",
   broker.destroy()
 })
 
+test("session restoration is strict, correlated, and releases its outstanding slot", async () => {
+  const fixture = iframeFixture()
+  const requests = []
+  const responses = []
+  const broker = createMiniAppBroker({
+    iframe: fixture.iframe,
+    appOrigin: "https://app.example",
+    launchId: "launch-restore",
+    onSessionRestoreRequest: request => requests.push(request),
+  })
+
+  fixture.load()
+  const appPort = fixture.posts[0].transfer[0]
+  appPort.onmessage = event => responses.push(event.data)
+  appPort.start?.()
+  await markReady(appPort, "launch-restore")
+
+  const request = {
+    type: "restoreSession",
+    version: "1",
+    launchId: "launch-restore",
+    requestId: "restore-1",
+    clientId: "client_1234567890",
+    restoreChallenge: "c".repeat(43),
+  }
+
+  appPort.postMessage({...request, restoreVerifier: "must-not-enter-the-host"})
+  appPort.postMessage({...request, restoreChallenge: "short"})
+  await tick()
+  assert.deepEqual(requests, [])
+
+  appPort.postMessage(request)
+  await tick()
+  assert.deepEqual(requests, [{
+    requestId: "restore-1",
+    clientId: "client_1234567890",
+    restoreChallenge: "c".repeat(43),
+  }])
+
+  assert.equal(broker.send({
+    type: "sessionRestoreResult",
+    version: "1",
+    launchId: "launch-restore",
+    requestId: "restore-1",
+    status: "success",
+    restoreCode: "r".repeat(43),
+  }), true)
+  await tick()
+  assert.equal(responses[0].restoreCode, "r".repeat(43))
+
+  broker.destroy()
+})
+
 test("rejects enumerable-property smuggling on schema arrays", async () => {
   const fixture = iframeFixture()
   const requests = []

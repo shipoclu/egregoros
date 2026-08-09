@@ -4,6 +4,6 @@
     "test": "node --test"
   },
   "dependencies": {
-    "@fediverse-miniapps/sdk": "github:shipoclu/fediverse-miniapp-sdk#7323d6f08d021e08b23c73ed39e8426f9a0a4615"
+    "@fediverse-miniapps/sdk": "github:shipoclu/fediverse-miniapp-sdk#2574607f1d176ea4bac1786abb30eac7d9205518"
   }
 }

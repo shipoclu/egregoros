@@ -17,7 +17,9 @@ defmodule EgregorosWeb.OAuthServerMetadataController do
       "code_challenge_methods_supported" => ["S256"],
       "token_endpoint_auth_methods_supported" => ["client_secret_post", "none"],
       "scopes_supported" => ["identify", "profile", "read", "write", "follow", "push"],
-      "fediverse_miniapp_profile" => "1"
+      "fediverse_miniapp_profile" => "1",
+      "fediverse_miniapp_session_restore_endpoint" =>
+        issuer <> "/api/v1/mini-apps/session-restores/consume"
     })
   end
 end

@@ -260,6 +260,22 @@ const validAuthRequest = (message, launchId) => {
   return false
 }
 
+const validSessionRestoreRequest = (message, launchId) =>
+  !!message &&
+  typeof message === "object" &&
+  !Array.isArray(message) &&
+  Object.keys(message).length === 6 &&
+  Object.keys(message).every(key =>
+    ["type", "version", "launchId", "requestId", "clientId", "restoreChallenge"].includes(key)
+  ) &&
+  message.type === "restoreSession" &&
+  message.version === protocolVersion &&
+  message.launchId === launchId &&
+  validRequestId(message.requestId) &&
+  typeof message.clientId === "string" &&
+  /^[A-Za-z0-9_-]{10,200}$/.test(message.clientId) &&
+  base64UrlSha256(message.restoreChallenge)
+
 const composeDraftFields = new Set([
   "text",
   "spoilerText",
@@ -379,6 +395,7 @@ export const createMiniAppBroker = ({
   onContextRequest,
   onNotificationPermissionRequest,
   onAuthRequest,
+  onSessionRestoreRequest,
   onComposeRequest,
   onCloseRequest,
   onExternalRequest,
@@ -471,6 +488,7 @@ export const createMiniAppBroker = ({
     if (message.type === "contextResult") return `context:${message.requestId}`
     if (message.type === "notificationPermissionResult") return `notification:${message.requestId}`
     if (message.type === "authResult") return `auth:${message.requestId}`
+    if (message.type === "sessionRestoreResult") return `restore:${message.requestId}`
     if (message.type === "composeNoteResult") return `compose:${message.callId}`
     if (message.type === "openExternalResult") return `external:${message.requestId}`
     if (message.type === "walletResult") return `wallet:${message.requestId}`
@@ -565,6 +583,18 @@ export const createMiniAppBroker = ({
           ...(message.authorizationLifetimeSeconds === undefined
             ? {}
             : {authorizationLifetimeSeconds: message.authorizationLifetimeSeconds}),
+        })
+        return
+      }
+
+      if (
+        validSessionRestoreRequest(message, launchId) &&
+        acceptOnce(`restore:${message.requestId}`)
+      ) {
+        onSessionRestoreRequest?.({
+          requestId: message.requestId,
+          clientId: message.clientId,
+          restoreChallenge: message.restoreChallenge,
         })
         return
       }

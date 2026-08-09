@@ -163,6 +163,10 @@ defmodule EgregorosWeb.Router do
     post "/oauth/token", OAuthController, :token
     post "/oauth/revoke", OAuthController, :revoke
 
+    post "/api/v1/mini-apps/session-restores/consume",
+         MiniAppSessionRestoreController,
+         :consume
+
     get "/api/v1/mini-apps/notification-permission",
         MiniAppNotificationPermissionController,
         :show

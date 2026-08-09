@@ -34,6 +34,10 @@ defmodule EgregorosWeb.OAuthServerMetadataControllerTest do
            ]
 
     assert metadata["fediverse_miniapp_profile"] == "1"
+
+    assert metadata["fediverse_miniapp_session_restore_endpoint"] ==
+             issuer <> "/api/v1/mini-apps/session-restores/consume"
+
     assert get_resp_header(conn, "access-control-allow-origin") == ["*"]
   end
 end

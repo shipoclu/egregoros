@@ -17,6 +17,7 @@ defmodule EgregorosWeb.Plugs.CORS do
   @default_expose_headers ["link"]
   @default_allow_headers "authorization,content-type,accept"
   @default_max_age 86_400
+  @cors_forbidden_paths ["/api/v1/mini-apps/session-restores/consume"]
 
   def init(opts) do
     config = Egregoros.Config.get(__MODULE__, [])
@@ -53,10 +54,13 @@ defmodule EgregorosWeb.Plugs.CORS do
   end
 
   defp cors_path?(request_path, paths) when is_binary(request_path) and is_list(paths) do
-    Enum.any?(paths, &String.starts_with?(request_path, &1))
+    not Enum.any?(@cors_forbidden_paths, &exact_path?(request_path, &1)) and
+      Enum.any?(paths, &String.starts_with?(request_path, &1))
   end
 
   defp cors_path?(_request_path, _paths), do: false
+
+  defp exact_path?(request_path, path), do: request_path == path or request_path == path <> "/"
 
   defp maybe_put_origin(conn, origin, opts) do
     case allowed_origin(

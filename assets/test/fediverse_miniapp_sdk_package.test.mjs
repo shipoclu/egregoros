@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import {readFile} from "node:fs/promises"
 import test from "node:test"
 
-const sdkRevision = "7323d6f08d021e08b23c73ed39e8426f9a0a4615"
+const sdkRevision = "2574607f1d176ea4bac1786abb30eac7d9205518"
 const sdkDependency = `github:shipoclu/fediverse-miniapp-sdk#${sdkRevision}`
 const sdkResolved =
   `git+ssh://git@github.com/shipoclu/fediverse-miniapp-sdk.git#${sdkRevision}`
@@ -33,4 +33,5 @@ test("builds the public SDK from the pinned standalone package", async () => {
     'export {createFediverseMiniAppSDK, miniAppError} from "@fediverse-miniapps/sdk"'
   )
   assert.match(sdkSource, /\["unavailable", "invalid_draft"\]/)
+  assert.match(sdkSource, /restoreSession/)
 })

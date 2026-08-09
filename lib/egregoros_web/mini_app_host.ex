@@ -16,10 +16,12 @@ defmodule EgregorosWeb.MiniAppHost do
   alias Egregoros.MiniApps.OAuthRegistrations
   alias Egregoros.MiniApps.NotificationConsents
   alias Egregoros.MiniApps.Permissions
+  alias Egregoros.MiniApps.SessionRestores
   alias Egregoros.MiniApps.WalletConnections
   alias Egregoros.MiniApps.WalletRequest
   alias Egregoros.OAuth
   alias Egregoros.Publish
+  alias Egregoros.RateLimiter
   alias Egregoros.Repo
   alias Egregoros.User
   alias Egregoros.Users
@@ -29,6 +31,7 @@ defmodule EgregorosWeb.MiniAppHost do
     "mini_app_context_request",
     "mini_app_notification_permission_request",
     "mini_app_auth_request",
+    "mini_app_session_restore_request",
     "mini_app_compose_request",
     "mini_app_close_request",
     "mini_app_external_request",
@@ -920,6 +923,42 @@ defmodule EgregorosWeb.MiniAppHost do
   end
 
   defp handle_host_event(
+         "mini_app_session_restore_request",
+         %{
+           "launch_id" => launch_id,
+           "request_id" => request_id,
+           "client_id" => client_id,
+           "restore_challenge" => restore_challenge
+         },
+         socket
+       ) do
+    state = socket.assigns.mini_app_host
+    user = Users.get(socket.assigns.mini_app_user_id)
+
+    result =
+      with true <- state.launch_id == launch_id,
+           true <- valid_request_id?(request_id),
+           %User{} = user <- user,
+           %Card{} <- state.card,
+           true <- active_card?(state.card),
+           :ok <-
+             RateLimiter.allow?(
+               :mini_app_session_restore_issues,
+               "#{user.id}|#{state.card.app_origin}",
+               10,
+               60_000
+             ),
+           {:ok, restore_code} <-
+             SessionRestores.issue(user, state.card.app_origin, client_id, restore_challenge) do
+        {:ok, restore_code}
+      else
+        _other -> {:error, :interaction_required}
+      end
+
+    {:halt, push_session_restore_response(socket, request_id, result)}
+  end
+
+  defp handle_host_event(
          "mini_app_auth_complete",
          %{"launch_id" => launch_id, "request_id" => request_id, "status" => status} = params,
          socket
@@ -1729,6 +1768,16 @@ defmodule EgregorosWeb.MiniAppHost do
     end
   end
 
+  defp reject_concurrent_request(socket, "mini_app_session_restore_request", %{
+         "request_id" => request_id
+       }) do
+    if valid_request_id?(request_id) do
+      push_session_restore_response(socket, request_id, {:error, :interaction_required})
+    else
+      socket
+    end
+  end
+
   defp reject_concurrent_request(socket, "mini_app_compose_request", %{"call_id" => call_id}) do
     if valid_request_id?(call_id) do
       state = socket.assigns.mini_app_host
@@ -1957,6 +2006,27 @@ defmodule EgregorosWeb.MiniAppHost do
       launch_id: state.launch_id,
       request_id: request_id,
       status: status
+    })
+  end
+
+  defp push_session_restore_response(socket, request_id, {:ok, restore_code}) do
+    state = socket.assigns.mini_app_host
+
+    Phoenix.LiveView.push_event(socket, "mini_app_session_restore_response", %{
+      launch_id: state.launch_id,
+      request_id: request_id,
+      status: "success",
+      restore_code: restore_code
+    })
+  end
+
+  defp push_session_restore_response(socket, request_id, {:error, :interaction_required}) do
+    state = socket.assigns.mini_app_host
+
+    Phoenix.LiveView.push_event(socket, "mini_app_session_restore_response", %{
+      launch_id: state.launch_id,
+      request_id: request_id,
+      status: "interaction_required"
     })
   end
 

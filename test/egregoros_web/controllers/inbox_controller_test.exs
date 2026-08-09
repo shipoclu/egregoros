@@ -194,7 +194,7 @@ defmodule EgregorosWeb.InboxControllerTest do
                  "homeUrl" => origin <> "/",
                  "oauth" => %{
                    "redirectUris" => [origin <> "/oauth/callback"],
-                   "scopes" => ["read"]
+                   "scopes" => ["identify"]
                  },
                  "activityPub" => %{
                    "actorUrl" => actor,
@@ -1569,7 +1569,7 @@ defmodule EgregorosWeb.InboxControllerTest do
                application,
                user,
                origin <> "/oauth/callback",
-               "read",
+               "identify",
                code_challenge: challenge,
                code_challenge_method: "S256"
              )
