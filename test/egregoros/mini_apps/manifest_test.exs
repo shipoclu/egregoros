@@ -207,15 +207,36 @@ defmodule Egregoros.MiniApps.ManifestTest do
     assert {:error, :identify_scope_required} = Manifest.decode(json, @manifest_url)
   end
 
-  test "accepts a legacy broad read grant as satisfying identity compatibility" do
+  test "rejects broad read as a substitute for identify" do
     json =
       valid_manifest()
       |> put_in(["oauth", "scopes"], ["read"])
       |> put_in(["oauth", "scopeAuthorizationMaxAgeSeconds"], %{"read" => 86_400})
       |> Jason.encode!()
 
-    assert {:ok, manifest} = Manifest.decode(json, @manifest_url)
-    assert manifest.oauth.scopes == ["read"]
+    assert {:error, :identify_scope_required} = Manifest.decode(json, @manifest_url)
+  end
+
+  test "accepts profile only when the required identify baseline is present" do
+    with_profile =
+      valid_manifest()
+      |> put_in(["oauth", "scopes"], ["identify", "profile"])
+      |> put_in(["oauth", "scopeAuthorizationMaxAgeSeconds"], %{
+        "identify" => 31_536_000,
+        "profile" => 31_536_000
+      })
+      |> Jason.encode!()
+
+    assert {:ok, manifest} = Manifest.decode(with_profile, @manifest_url)
+    assert manifest.oauth.scopes == ["identify", "profile"]
+
+    profile_only =
+      valid_manifest()
+      |> put_in(["oauth", "scopes"], ["profile"])
+      |> put_in(["oauth", "scopeAuthorizationMaxAgeSeconds"], %{"profile" => 86_400})
+      |> Jason.encode!()
+
+    assert {:error, :identify_scope_required} = Manifest.decode(profile_only, @manifest_url)
   end
 
   test "rejects duplicate scopes, capabilities, redirects, and chains" do

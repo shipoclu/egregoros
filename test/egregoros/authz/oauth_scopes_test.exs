@@ -40,7 +40,7 @@ defmodule Egregoros.AuthZ.OAuthScopesTest do
       |> put_req_header("authorization", "Bearer " <> token.token)
 
     assert :ok == OAuthScopes.authorize(conn, ["read"])
-    assert :ok == OAuthScopes.authorize(conn, ["identify"])
+    assert {:error, :insufficient_scope} == OAuthScopes.authorize(conn, ["identify"])
     assert :ok == OAuthScopes.authorize(conn, ["follow"])
     assert {:error, :insufficient_scope} = OAuthScopes.authorize(conn, ["write", "admin"])
   end

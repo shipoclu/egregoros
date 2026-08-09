@@ -123,7 +123,7 @@ defmodule Egregoros.MiniApps.Manifest do
          {:ok, scopes} <- string_list(attrs["scopes"], 1, 32),
          :ok <- unique(scopes),
          true <- Enum.all?(scopes, &valid_scope?/1) or {:error, :invalid_scope},
-         true <- "identify" in scopes or "read" in scopes or {:error, :identify_scope_required},
+         true <- "identify" in scopes or {:error, :identify_scope_required},
          {:ok, scope_max_ages} <-
            scope_authorization_max_ages(attrs["scopeAuthorizationMaxAgeSeconds"], scopes) do
       {:ok,

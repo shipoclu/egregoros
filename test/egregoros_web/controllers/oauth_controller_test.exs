@@ -304,7 +304,7 @@ defmodule EgregorosWeb.OAuthControllerTest do
              "Link your Fediverse identity"
 
     assert document |> LazyHTML.query("#oauth-permission-identify") |> LazyHTML.text() =~
-             "does not permit reading timelines or posts"
+             "does not permit reading timelines, posts, profile presentation, email, or settings"
 
     assert document |> LazyHTML.query("#oauth-permission-read") |> LazyHTML.text() =~
              "Read authenticated account data"

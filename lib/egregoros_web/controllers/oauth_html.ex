@@ -7,7 +7,16 @@ defmodule EgregorosWeb.OAuthHTML do
     %{
       title: "Link your Fediverse identity",
       description:
-        "Share your account ID, handle, display name, and profile URL. This does not permit reading timelines or posts.",
+        "Share only your stable account ID and fully qualified handle. This does not permit reading timelines, posts, profile presentation, email, or settings.",
+      risk: :base
+    }
+  end
+
+  def oauth_permission("profile") do
+    %{
+      title: "Share public profile presentation",
+      description:
+        "Share your public username, display name, profile URL, and avatar together with your Fediverse identity.",
       risk: :base
     }
   end

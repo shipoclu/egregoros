@@ -3,12 +3,16 @@ defmodule EgregorosWeb.MastodonAPI.AccountsController do
 
   alias Egregoros.Activities.Follow
   alias Egregoros.Activities.Undo
+  alias Egregoros.Auth.BearerToken
   alias Egregoros.AvatarStorage
   alias Egregoros.Domain
   alias Egregoros.Federation.Actor
   alias Egregoros.Federation.WebFinger
   alias Egregoros.Handles
   alias Egregoros.Objects
+  alias Egregoros.OAuth
+  alias Egregoros.OAuth.Scopes
+  alias Egregoros.OAuth.Token
   alias Egregoros.Pipeline
   alias Egregoros.Relationships
   alias Egregoros.User
@@ -18,10 +22,68 @@ defmodule EgregorosWeb.MastodonAPI.AccountsController do
   alias EgregorosWeb.MastodonAPI.Pagination
   alias EgregorosWeb.MastodonAPI.RelationshipRenderer
   alias EgregorosWeb.MastodonAPI.StatusRenderer
+  alias EgregorosWeb.ProfilePaths
+  alias EgregorosWeb.URL
 
   def verify_credentials(conn, _params) do
-    json(conn, AccountRenderer.render_account(conn.assigns.current_user))
+    user = conn.assigns.current_user
+
+    case bearer_token(conn) do
+      %Token{scopes: scopes} ->
+        if narrow_identity?(scopes) do
+          conn
+          |> put_resp_header("cache-control", "no-store")
+          |> put_resp_header("pragma", "no-cache")
+          |> json(identity_response(user, scopes))
+        else
+          json(conn, AccountRenderer.render_account(user))
+        end
+
+      nil ->
+        json(conn, AccountRenderer.render_account(user))
+    end
   end
+
+  defp bearer_token(conn) do
+    with token when is_binary(token) <- BearerToken.access_token(conn),
+         %Token{} = token <- OAuth.get_token(token) do
+      token
+    else
+      _other -> nil
+    end
+  end
+
+  defp narrow_identity?(scopes) do
+    Scopes.contains_all?(scopes, ["identify"]) and
+      not Scopes.contains_all?(scopes, ["read"])
+  end
+
+  defp identity_response(user, scopes) do
+    host = URI.parse(Endpoint.url()).host
+
+    %{
+      "sub" => user.ap_id,
+      "acct" => "#{user.nickname}@#{host}"
+    }
+    |> maybe_add_profile(user, Scopes.contains_all?(scopes, ["profile"]))
+  end
+
+  defp maybe_add_profile(identity, user, true) do
+    identity
+    |> Map.merge(%{
+      "preferred_username" => user.nickname,
+      "name" => user.name || user.nickname,
+      "profile" => URL.absolute(ProfilePaths.profile_path(user))
+    })
+    |> maybe_put_picture(URL.absolute(user.avatar_url, user.ap_id))
+  end
+
+  defp maybe_add_profile(identity, _user, false), do: identity
+
+  defp maybe_put_picture(identity, picture) when is_binary(picture) and picture != "",
+    do: Map.put(identity, "picture", picture)
+
+  defp maybe_put_picture(identity, _picture), do: identity
 
   def search(conn, params) do
     q = params |> Map.get("q", "") |> to_string() |> String.trim()

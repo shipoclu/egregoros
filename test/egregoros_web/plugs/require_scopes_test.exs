@@ -38,4 +38,29 @@ defmodule EgregorosWeb.Plugs.RequireScopesTest do
     refute conn.halted
     assert is_nil(conn.status)
   end
+
+  test "passes when any one of several alternative scopes is allowed" do
+    Egregoros.AuthZ.Mock
+    |> expect(:authorize, fn _conn, ["identify"] -> {:error, :insufficient_scope} end)
+    |> expect(:authorize, fn _conn, ["read"] -> :ok end)
+
+    conn =
+      conn(:get, "/api/v1/accounts/verify_credentials")
+      |> RequireScopes.call({:any, ["identify", "read"]})
+
+    refute conn.halted
+    assert is_nil(conn.status)
+  end
+
+  test "rejects alternative scopes when none is allowed" do
+    Egregoros.AuthZ.Mock
+    |> expect(:authorize, 2, fn _conn, [_scope] -> {:error, :insufficient_scope} end)
+
+    conn =
+      conn(:get, "/api/v1/accounts/verify_credentials")
+      |> RequireScopes.call({:any, ["identify", "read"]})
+
+    assert conn.halted
+    assert conn.status == 403
+  end
 end

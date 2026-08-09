@@ -385,13 +385,13 @@ defmodule Egregoros.MiniApps.OAuthRegistrations do
     parsed = Scopes.parse(scopes)
 
     raw == parsed and length(parsed) in 1..32 and
-      ("identify" in parsed or "read" in parsed) and
+      "identify" in parsed and
       MapSet.subset?(MapSet.new(parsed), MapSet.new(registered))
   end
 
   defp identity_scope?(scopes) when is_binary(scopes) do
     parsed = Scopes.parse(scopes)
-    "identify" in parsed or "read" in parsed
+    "identify" in parsed
   end
 
   defp aggregate_user_grant([first | _] = rows) do

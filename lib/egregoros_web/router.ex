@@ -59,6 +59,10 @@ defmodule EgregorosWeb.Router do
     plug EgregorosWeb.Plugs.RequireScopes, ["read"]
   end
 
+  pipeline :oauth_identity do
+    plug EgregorosWeb.Plugs.RequireScopes, {:any, ["identify", "read"]}
+  end
+
   pipeline :oauth_write do
     plug EgregorosWeb.Plugs.RequireScopes, ["write"]
   end
@@ -237,9 +241,13 @@ defmodule EgregorosWeb.Router do
   end
 
   scope "/api/v1", EgregorosWeb.MastodonAPI do
+    pipe_through [:api, :api_auth, :oauth_identity]
+    get "/accounts/verify_credentials", AccountsController, :verify_credentials
+  end
+
+  scope "/api/v1", EgregorosWeb.MastodonAPI do
     pipe_through [:api, :api_auth, :oauth_read]
 
-    get "/accounts/verify_credentials", AccountsController, :verify_credentials
     get "/accounts/search", AccountsController, :search
     get "/accounts/relationships", AccountsController, :relationships
     get "/timelines/home", TimelinesController, :home

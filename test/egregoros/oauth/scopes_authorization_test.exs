@@ -31,4 +31,26 @@ defmodule Egregoros.OAuth.ScopesAuthorizationTest do
     assert {:ok, _auth_code} =
              OAuth.create_authorization_code(app, user, "urn:ietf:wg:oauth:2.0:oob", "read write")
   end
+
+  test "create_authorization_code rejects profile without identify" do
+    {:ok, user} = Users.create_local_user("alice")
+
+    {:ok, app} =
+      OAuth.create_application(%{
+        "client_name" => "Profile client",
+        "redirect_uris" => "urn:ietf:wg:oauth:2.0:oob",
+        "scopes" => "identify profile"
+      })
+
+    assert {:error, :invalid_scope} =
+             OAuth.create_authorization_code(app, user, "urn:ietf:wg:oauth:2.0:oob", "profile")
+
+    assert {:ok, _auth_code} =
+             OAuth.create_authorization_code(
+               app,
+               user,
+               "urn:ietf:wg:oauth:2.0:oob",
+               "identify profile"
+             )
+  end
 end
